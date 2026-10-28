@@ -69,6 +69,10 @@ def list_files_command(directory: str, name: Optional[str] = None, maxdepth: Opt
     cmd = ["find", directory]
     if maxdepth is not None:
         cmd += ["-maxdepth", str(int(maxdepth))]
+    # ext4 workspace volumes contain a root-only recovery directory. Descending
+    # into it makes find exit nonzero, discarding even readable configs/results.
+    # Prune it rather than weakening its permissions or ignoring scan failures.
+    cmd += ["-path", directory.rstrip("/") + "/lost+found", "-prune", "-o"]
     if name:
         cmd += ["-name", name, "-not", "-path", "*/.fdp/*"]
     return cmd + ["-type", "f", "-printf", "%P\\t%s\\n"]
