@@ -39,10 +39,11 @@ unavailable history independently, and opens the native Airflow DAG grid with a 
 authorized gateway ticket. Deployment runtime status is separate from DAG-run status.
 
 `GET /v1/workloads/{id}/orchestrator-runs?dag_id=&limit=5` checks workload visibility
-and execute permission before opening metadata. Limits are 1–25. Standalone history uses
-the workload's own `airflow/{id}/airflow.db` with SQLite `mode=ro`. Distributed history
-uses its existing deployment database/login from OpenBao, with read-only transactions,
-a connection timeout and statement timeout. The endpoint never provisions a database,
+and execute permission before opening metadata. Limits are 1–25. Shared PostgreSQL
+metadata is queried with the deployment's restricted database identity when that
+backend is configured; retained local SQLite and dedicated deployment databases
+have their own compatibility paths. Reads use bounded queries and read-only
+transactions where supported. The endpoint never provisions a database,
 runs a DAG, executes user code, or queries data products. It returns only DAG/run IDs,
 state and timestamps; run configuration, task arguments, credentials and driver errors
 are excluded. Missing metadata yields a generic 503 rather than a misleading empty list.

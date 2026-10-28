@@ -12,7 +12,8 @@ metadataDatabase:
     enabled: true
 ```
 
-Include these settings in your private installation values.
+The Floren installation includes these settings in
+`deploy/environments/floren/system-data.yaml`; `install.sh` includes that overlay.
 An empty namespace keeps the old release-local placement for compatibility.
 
 ## Database and credential boundaries
@@ -79,12 +80,16 @@ against an existing database until its state has been migrated and verified.
    databases into the new server; do not copy or recreate application passwords.
 5. Compare every application's table row counts and content hashes. Run the shared
    provisioner bootstrap only after restoring the original roles/databases.
-   Record the comparison and require operator verification before switching endpoints.
+   For the Floren installer, record verification with `kubectl -n fdp-system-data create
+   configmap fdp-migration-verified --from-literal=status=verified` only after this comparison.
+   The installer refuses an ordinary namespace-changing upgrade while the old server exists
+   without this verification marker.
 6. Upgrade Helm using the new namespace and tested control-plane image while preserving
    pinned runtime images and all other installation values. Restore intended replica
    counts and verify FDP readiness, Keycloak login and layer reconciliation.
 7. Redeploy each Airflow publication through FDP. Existing nonempty orchestration history
-   blocks automatic backend switching; explicitly migrate it first. Empty deployments can initialize PostgreSQL directly.
+   blocks automatic backend switching; explicitly migrate it first. Empty deployments,
+   including the freshly reset Pokémon deployments, can initialize PostgreSQL directly.
    Verify paused DAG state, history, private database credentials and cross-database denial.
    For a matching Airflow runtime, `deploy/airflow/migrate_metadata.py` copies an offline
    SQLite snapshot into an initialized empty PostgreSQL database. It verifies schema
@@ -95,7 +100,7 @@ against an existing database until its state has been migrated and verified.
    writes, rollback requires synchronizing those writes; reverting Helm alone is unsafe.
    Remove an unused old database server, but do not automatically delete rollback storage.
 
-Keep deployment progress and verification evidence in private operator records.
-No OpenTofu business-object changes are required:
+Current deployment progress and verification evidence are recorded in
+`docs/shared-system-data-progress.md`. No OpenTofu business-object changes are required:
 Helm configures shared infrastructure and FDP automatically provisions each publication's
 operational database. Existing layer/workload OpenTofu definitions remain authoritative.

@@ -2,12 +2,25 @@
 
 A desktop hub for analysts. Code, data and compute stay on the server: small editor workspaces
 (VS Code or RStudio) for writing code, sized compute pools that start on demand for heavy runs,
-and governed data access with secrets kept in OpenBao.
+and governed data access with secrets in Kubernetes Secrets or OpenBao.
 
 Supports Python, Jupyter notebooks, Streamlit, R, Shiny, dbt and Airflow, in versions admins choose.
 100% free/open source.
 Workspaces are private; code is shared through git, and programs and apps are **deployed from
 git** and kept in sync with their branch (GitOps).
+
+## Documentation
+
+Read the **[searchable documentation site](https://floren-app.github.io/floren-data-platform-public/)**
+or start with the [Markdown overview](docs/index.md). Installation, concepts,
+workspaces, IAM, SDKs, Terraform, catalog, certificates and the Pokemon walkthrough
+live in this repository. API, JSON and provider references are generated from code.
+
+```sh
+make docs-install
+make docs-serve     # local preview
+make docs-build     # strict links, search and publication checks
+```
 
 - [docs/query-execution.md](docs/query-execution.md): shared Trino SQL, PostgreSQL/Iceberg catalogs, execution identities and deployment
 - [docs/rbac.md](docs/rbac.md): RBAC, SCIM provisioning, schema enforcement, nested folders, and service identities
@@ -84,18 +97,13 @@ make test-ui     # desktop browser regression tests
 
 ## Deploy to Kubernetes
 
-```sh
-helm dependency build deploy/helm/fdp
-kubectl create secret generic fdp-control-plane -n fdp \
-  --from-literal=FDP_DATABASE_URL=postgresql+psycopg://... \
-  --from-literal=FDP_SESSION_SIGNING_KEY=$(openssl rand -hex 32) \
-  --from-literal=FDP_GATEWAY_CONFIG_TOKEN=$(openssl rand -hex 32) \
-  --from-literal=FDP_OPENBAO_TOKEN=...
-helm install fdp deploy/helm/fdp -n fdp -f my-values.yaml
-```
+Follow the [Kubernetes installation guide](docs/kubernetes-install.md) for the
+bundled/external service profiles, image pins, TLS and first sign-in. Keep the Helm
+release in your cluster's ArgoCD configuration, and application/workload resources
+in separate OpenTofu roots. See [GitOps](docs/gitops.md) and [Terraform](docs/terraform.md).
 
-Requires a ReadWriteMany storage class, a CNI that enforces NetworkPolicy (Calico, Cilium) and the
-cluster autoscaler for elastic pools.
+Requires a CNI that enforces NetworkPolicy and storage classes supporting the
+selected volume access modes. Elastic node capacity depends on your cluster setup.
 
 Incoming program APIs use a separate TLS gateway entry point. Configure its public
 address and certificates as described in [API management](docs/api-management.md#gateway-deployment).

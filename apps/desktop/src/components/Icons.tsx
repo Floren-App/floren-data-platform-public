@@ -22,6 +22,8 @@ export const IconAccount = ({ size = 24 }: P) =>
   svg(size, <><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>);
 export const IconHome = ({ size = 24 }: P) =>
   svg(size, <><path d="M3 11l9-8 9 8M5 10v11h14V10M9 21v-8h6v8" /></>);
+export const IconBook = ({ size = 24 }: P) =>
+  svg(size, <><path d="M12 6C9 4 5 4 3 5v15c2-1 6-1 9 1 3-2 7-2 9-1V5c-2-1-6-1-9 1zM12 6v15" /></>);
 export const IconDeployed = ({ size = 24 }: P) =>
   svg(size, <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h7v7h-7zM16 16l3 1.5-3 1.5z" /></>);
 export const IconBranch = ({ size = 16 }: P) =>

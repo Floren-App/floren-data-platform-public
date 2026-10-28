@@ -1,0 +1,58 @@
+name: documentation
+
+on:
+  pull_request:
+    paths: ['docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'scripts/*docs*', 'scripts/docs_reference.py', 'services/control-plane/**', 'sdk/**', 'terraform/provider-fdp/**', '.github/workflows/docs.yml']
+  push:
+    branches: [main]
+    paths: ['docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'scripts/*docs*', 'scripts/docs_reference.py', 'services/control-plane/**', 'sdk/**', 'terraform/provider-fdp/**', '.github/workflows/docs.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: terraform/provider-fdp/go.mod
+          cache-dependency-path: terraform/provider-fdp/go.sum
+      - name: Install documentation and schema dependencies
+        run: python -m pip install -r requirements-docs.txt -e services/control-plane
+      - name: Generate references without runtime connections
+        run: make docs-reference CP_PYTHON=python
+      - name: Build and verify
+        run: |
+          python -m mkdocs build --strict
+          python scripts/check_docs.py site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    if: github.repository == 'Floren-App/floren-data-platform-public' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v4

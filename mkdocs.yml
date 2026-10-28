@@ -1,0 +1,104 @@
+site_name: Floren Data Platform
+site_description: Install, operate and develop governed data products with FDP.
+site_url: https://floren-app.github.io/floren-data-platform-public/
+repo_url: https://github.com/Floren-App/floren-data-platform-public
+repo_name: Floren-App/floren-data-platform-public
+edit_uri: edit/main/docs/
+strict: true
+theme:
+  name: material
+  custom_dir: docs/overrides
+  language: en
+  font: false
+  palette:
+    - scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+plugins:
+  - search
+hooks:
+  - scripts/docs_hooks.py
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+validation:
+  nav:
+    omitted_files: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn
+nav:
+  - Start here:
+      - Overview: index.md
+      - Quickstart: getting-started.md
+      - Core concepts: concepts.md
+      - Navigation: home-and-navigation.md
+      - Feature boundaries: feature-status.md
+  - Install and operate:
+      - Kubernetes installation: kubernetes-install.md
+      - Configuration ownership: configuration.md
+      - Compute pools: compute.md
+      - GitOps and ArgoCD: gitops.md
+      - Layers and isolation: layers.md
+      - Secrets and certificates: secrets-and-certificates.md
+      - Operations and recovery: kubernetes-operations.md
+      - Platform storage: platform-storage.md
+      - Shared system databases: shared-system-data.md
+      - Infrastructure contract: kubernetes-configuration-contracts.md
+      - Troubleshooting: troubleshooting.md
+  - Develop:
+      - Workspaces: workspaces.md
+      - Program configuration: fdp-json.md
+      - Publishing and promotion: deploying.md
+      - Python SDK: python-sdk.md
+      - R SDK: r-sdk.md
+      - dbt and Airflow: dbt-and-airflow.md
+      - SQL execution: query-execution.md
+      - Iceberg and files: data-lake.md
+      - API management: api-management.md
+      - Packages: packages.md
+      - Pokemon walkthrough: pokemon.md
+  - Govern:
+      - Security and roles: rbac.md
+      - Active groups and ownership: active-groups.md
+      - Storage integrations: storage-integrations.md
+      - Catalog and lineage: catalog.md
+      - KPIs, quality and SLAs: metrics-and-slas.md
+      - Metadata SQL: metadata-sql.md
+      - SQL workspace: sql-workspace.md
+  - Reference:
+      - Terraform guide: terraform.md
+      - Terraform schema: reference/terraform/index.md
+      - HTTP API: reference/api.md
+      - JSON configuration schema: reference/json-schema.md
+      - Python functions: reference/python.md
+      - Architecture: architecture.md
+  - Contribute:
+      - Maintaining the docs: contributing-docs.md

@@ -1,0 +1,647 @@
+{
+  "$defs": {
+    "AirflowSettings": {
+      "additionalProperties": false,
+      "description": "How an Airflow deployment runs.",
+      "properties": {
+        "local_parallelism": {
+          "default": 2,
+          "description": "Concurrent orchestration tasks in a single-container PostgreSQL deployment.",
+          "maximum": 32,
+          "minimum": 1,
+          "title": "Local Parallelism",
+          "type": "integer"
+        },
+        "mode": {
+          "default": "standalone",
+          "description": "standalone: one container, LocalExecutor with PostgreSQL; SQLite/SequentialExecutor only for local development. distributed: separate webserver, scheduler and Celery workers.",
+          "enum": [
+            "standalone",
+            "distributed"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "parallelism": {
+          "default": 32,
+          "description": "Max running tasks across the deployment.",
+          "maximum": 512,
+          "minimum": 1,
+          "title": "Parallelism",
+          "type": "integer"
+        },
+        "worker_concurrency": {
+          "default": 8,
+          "description": "Tasks per worker at a time (distributed).",
+          "maximum": 64,
+          "minimum": 1,
+          "title": "Worker Concurrency",
+          "type": "integer"
+        },
+        "worker_warehouse": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Warehouse for workers (default: the program's).",
+          "title": "Worker Warehouse"
+        },
+        "workers": {
+          "default": 2,
+          "description": "Celery workers (distributed).",
+          "maximum": 32,
+          "minimum": 1,
+          "title": "Workers",
+          "type": "integer"
+        }
+      },
+      "title": "AirflowSettings",
+      "type": "object"
+    },
+    "Arg": {
+      "additionalProperties": false,
+      "description": "One input of a program. The UI renders a matching form field.",
+      "properties": {
+        "choices": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Options for type=choice.",
+          "title": "Choices"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "flag": {
+          "anyOf": [
+            {
+              "pattern": "^--?[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Command-line flag, default --<name> with _ replaced by -. Booleans are passed as a bare flag when true.",
+          "title": "Flag"
+        },
+        "help": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hint shown under the field.",
+          "title": "Help"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Label shown in the form (defaults to the name).",
+          "title": "Label"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum for integer/number.",
+          "title": "Max"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum for integer/number.",
+          "title": "Min"
+        },
+        "name": {
+          "description": "Identifier; also the key in fdp.args().",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Regular expression a string must match.",
+          "title": "Pattern"
+        },
+        "positional": {
+          "default": false,
+          "description": "Pass the value as a positional argument instead of a flag.",
+          "title": "Positional",
+          "type": "boolean"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "default": "string",
+          "description": "Form field type. data_source = pick one of your granted sources.",
+          "enum": [
+            "string",
+            "text",
+            "integer",
+            "number",
+            "boolean",
+            "choice",
+            "date",
+            "data_source"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Arg",
+      "type": "object"
+    },
+    "DbtSettings": {
+      "additionalProperties": false,
+      "description": "Where a dbt project reads and writes. Credentials come from the data source (OpenBao).",
+      "properties": {
+        "data_source": {
+          "description": "Data source to build in (needs write access, e.g. finance-dw-transform).",
+          "title": "Data Source",
+          "type": "string"
+        },
+        "dev_schema": {
+          "default": "dbt_{user}",
+          "description": "Schema for workspace runs; {user} is your user name.",
+          "title": "Dev Schema",
+          "type": "string"
+        },
+        "schema": {
+          "default": "analytics",
+          "description": "Production schema (deployed runs).",
+          "title": "Schema",
+          "type": "string"
+        },
+        "threads": {
+          "default": 4,
+          "maximum": 64,
+          "minimum": 1,
+          "title": "Threads",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "data_source"
+      ],
+      "title": "DbtSettings",
+      "type": "object"
+    },
+    "LineageReference": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "schema": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Schema",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "schema",
+        "name"
+      ],
+      "title": "LineageReference",
+      "type": "object"
+    },
+    "Program": {
+      "additionalProperties": false,
+      "properties": {
+        "airflow": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9][0-9A-Za-z.\\-]{0,15}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Airflow version from the runtime catalog, e.g. 2.10.",
+          "title": "Airflow"
+        },
+        "airflow_settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AirflowSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For kind airflow."
+        },
+        "args": {
+          "items": {
+            "$ref": "#/$defs/Arg"
+          },
+          "title": "Args",
+          "type": "array"
+        },
+        "data_sources": {
+          "description": "Data sources the program needs; checked before it starts.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Data Sources",
+          "type": "array"
+        },
+        "dbt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DbtSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required for kind dbt."
+        },
+        "dbt_version": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9][0-9A-Za-z.\\-]{0,15}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "dbt version from the runtime catalog, e.g. 1.8.",
+          "title": "Dbt Version"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "entrypoint": {
+          "description": "File or folder, relative to the fdp.json folder.",
+          "title": "Entrypoint",
+          "type": "string"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra environment variables (no secret values here).",
+          "title": "Env",
+          "type": "object"
+        },
+        "kind": {
+          "default": "script",
+          "description": "script = run to completion; notebook = execute with papermill; app = Streamlit/Shiny server; dbt = a dbt project (entrypoint = folder with dbt_project.yml); airflow = an Airflow deployment (entrypoint = folder with dags/).",
+          "enum": [
+            "script",
+            "notebook",
+            "app",
+            "dbt",
+            "airflow"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Layer name or stable ID. Only available in a matching workspace/workload layer; never grants access. Inherits the file's layer when omitted.",
+          "title": "Layer"
+        },
+        "lineage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProgramLineage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional manual dependencies for access outside Floren Data Platform. SQL, managed API calls, SDK files, dbt and Airflow capture lineage automatically. Does not grant data access."
+        },
+        "python": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9][0-9A-Za-z.\\-]{0,15}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Python version from the runtime catalog, e.g. 3.12.",
+          "title": "Python"
+        },
+        "r": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9][0-9A-Za-z.\\-]{0,15}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "R version from the runtime catalog, e.g. 4.4.",
+          "title": "R"
+        },
+        "requirements": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Python: a requirements.txt. R: a text file with one package per line, or an renv.lock. Installed once into a cached environment and reused until the file changes.",
+          "title": "Requirements"
+        },
+        "runtime": {
+          "anyOf": [
+            {
+              "enum": [
+                "python",
+                "r"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Inferred from the entrypoint when omitted.",
+          "title": "Runtime"
+        },
+        "secrets": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Environment variables filled from Floren Data Platform secrets: {\"API_KEY\": \"<ref>\"}, where <ref> is me/<name> (yours or the service account running it), group:<group>/<name> or sa:<account>/<name>.",
+          "title": "Secrets",
+          "type": "object"
+        },
+        "warehouse": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default warehouse (compute pool) for this program.",
+          "title": "Warehouse"
+        }
+      },
+      "required": [
+        "entrypoint"
+      ],
+      "title": "Program",
+      "type": "object"
+    },
+    "ProgramLineage": {
+      "additionalProperties": false,
+      "properties": {
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/LineageReference"
+          },
+          "maxItems": 500,
+          "title": "Inputs",
+          "type": "array"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/LineageReference"
+          },
+          "maxItems": 500,
+          "title": "Outputs",
+          "type": "array"
+        }
+      },
+      "title": "ProgramLineage",
+      "type": "object"
+    }
+  },
+  "$id": "fdp.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "fdp.json \u2014 programs this workspace can run on a warehouse.",
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "airflow": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9][0-9A-Za-z.\\-]{0,15}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default Airflow version.",
+      "title": "Airflow"
+    },
+    "dbt_version": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9][0-9A-Za-z.\\-]{0,15}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default dbt version.",
+      "title": "Dbt Version"
+    },
+    "layer": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default layer name or stable ID for programs in this file. Programs can override it. Omitted means use the workspace/workload layer.",
+      "title": "Layer"
+    },
+    "programs": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Program"
+      },
+      "description": "Keyed by program name (lowercase, dashes).",
+      "title": "Programs",
+      "type": "object"
+    },
+    "python": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9][0-9A-Za-z.\\-]{0,15}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default Python version.",
+      "title": "Python"
+    },
+    "r": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9][0-9A-Za-z.\\-]{0,15}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default R version.",
+      "title": "R"
+    },
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "warehouse": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default warehouse for programs that don't set one.",
+      "title": "Warehouse"
+    }
+  },
+  "title": "Floren Data Platform workspace config",
+  "type": "object"
+}

@@ -228,14 +228,16 @@ library containing the SDK dependencies. Set `FDP_TEST_SQL_BENCHMARK` to an
 output path to include measurements. Docker Desktop supplies the callback hostname;
 Linux needs `host.docker.internal` routed to the host running the tests.
 
-Benchmark the shared query path on your own infrastructure. Trino preserves database
-execution advantages but adds request, planning and policy overhead for small calls;
-local development measurements should not be treated as a production SLA.
+Benchmark the installed path with representative data, request sizes and concurrency.
+For tiny indexed lookups, Trino still adds request, planning and authorization overhead
+compared with a direct database connection. Predicate pushdown can preserve database
+execution efficiency without removing that overhead. Do not treat local development
+measurements as a production latency SLA.
 
-Custom roles, object-level grants, extra SQL connectors, a native low-latency bypass,
-multi-node query pools and automatic catalog-secret reconciliation remain outside
-this first single-engine release. The SQL access rules do not govern infrastructure
-administrators acting directly on database/catalog/storage servers.
+Custom roles, individual object grants and a native low-latency bypass are not the
+initial supported IAM model. Managed layer Trino configuration is described by the
+[infrastructure contract](kubernetes-configuration-contracts.md). Infrastructure
+administrators acting directly on databases/storage remain outside application IAM.
 
 ## References
 

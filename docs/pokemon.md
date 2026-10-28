@@ -1,0 +1,97 @@
+# Pokemon: a complete data product
+
+This walkthrough describes the reusable example in
+[examples/pokemon](../examples/pokemon) and
+[terraform/modules/pokemon](../terraform/modules/pokemon). It uses a few English
+TCGDex sets, immutable batch files, raw records, dbt history/products, Airflow and
+two Streamlit dashboards. Your installation and workload Git repository remain
+separate from the public platform source.
+
+## Data flow
+
+```text
+TCGDex managed API
+       │ extract Python job
+       ▼
+RustFS landing: immutable JSON batches + manifests/checksums
+       │ load Python job; one row per list record
+       ▼
+Raw PostgreSQL: append-only payloads + provenance / load commits
+       │ dbt engineering models and tests
+       ▼
+SCD2 history + process-history evidence
+       │ dbt product models and tests
+       ├──> Reporting tables ──> Analyst explorer dashboard
+       └──────────────────────> Engineering monitoring dashboard
+
+Airflow orchestrates the jobs and supplies task/run relationships.
+```
+
+S3 batches hold lists, not one file per card. Raw loading preserves payloads as
+faithfully as possible and adds record IDs, file/object identifiers, checksums,
+batch/load IDs and timestamps. Transformations preserve the provenance needed to
+trace a product row back through history/raw observations to the source file.
+
+## Prepare infrastructure and source
+
+1. Install FDP and configure the [provider mirror](terraform.md).
+2. Declare isolated Prod and Non-Prod layers, PostgreSQL, RustFS and compute pools.
+3. Configure distinct landing buckets/prefixes per layer, separate from Iceberg storage.
+4. Create engineers and analysts app groups and their directory bindings.
+5. Copy `examples/pokemon/` to the root of your own Git repository so `fdp.json`
+   is at its root. Create `test` and `main` branches; configure promotion protection.
+6. In an independent workload Terraform root, use the Pokemon module once per
+   environment. See its [input variables](../terraform/modules/pokemon/variables.tf).
+
+Each module receives the layer ID, source integration name, product schema ID,
+engineer/analyst group IDs, private repository URL and existing compute pool names.
+Supply repository credentials ephemerally when registering private Git access;
+do not commit them. Pin remote module source to a reviewed platform commit.
+
+## Identity and access
+
+| Actor | Intended access |
+|---|---|
+| Extract identity | Registered TCGDex API and its own landing storage |
+| Load identity | Landing reads and append-only raw writes |
+| dbt identity | Raw reads and required history/product DDL/DML |
+| Orchestrator identity | Execute only its own environment's pipeline steps |
+| Analyst dashboard identity | Read reporting output only |
+| Engineering dashboard identity | Read raw/history/process evidence |
+| Analysts | Published explorer and reporting data; no raw/history access |
+| Engineers | Development and monitoring permissions as explicitly assigned |
+
+Use each workload's built-in identity and `managed_identity_grants`. Test/Prod
+must have independent workloads and grants, even if they share the source repo.
+An analyst may view a Prod dashboard without receiving permission to modify Prod
+or use a Prod execution identity from a Test workspace.
+
+## Apply and run
+
+Apply platform configuration first, then the independent Pokemon root. Inspect
+each plan and check a second plan is clean. The module declares registration,
+permissions, governance and workloads; it is not a guarantee that a scheduled
+ingestion has already populated the tables.
+
+Inspect the published bootstrap and pipeline definitions before running them.
+Bootstrap creates the required schemas/tables; run the Test Airflow DAG, inspect
+each ingestion/dbt task and verify both Test dashboards. Keep Prod scheduling
+paused until the deployment and access checks are complete. Promote through Git,
+then initialize/run Prod deliberately with its own identities.
+
+## Acceptance checks
+
+- Re-running a committed load does not duplicate the same file's records.
+- SCD2 has at most one current version per business key; changes preserve history.
+- Current products retain record/file traceability and have passing dbt tests.
+- Engineers can trace failures through process history and orchestrator runs.
+- Analysts can read the explorer/output, and are denied raw/history access.
+- Test identities cannot read, write or execute Prod resources, and vice versa.
+- Catalog objects have the Pokemon tag, accountable ownership, visible layer and
+  appropriate freshness/run SLAs. Uncertified status remains visible.
+- App upstream lineage shows API → extract → landing/raw → dbt → product → app.
+  The orchestration toggle adds Airflow relationships without treating every task
+  trigger as a data transformation.
+
+These are repeatable acceptance criteria. Do not infer success merely from green
+publication status; check actual runs, data and denied-access cases.

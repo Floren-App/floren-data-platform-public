@@ -8,6 +8,25 @@ $(error Choose EXAMPLE_STORAGE=1 POKEMON_STORAGE=0 or the Pokemon overlay)
 endif
 COMPOSE := docker compose $(if $(filter 1,$(POKEMON_STORAGE)),--env-file deploy/pokemon/.env) -f deploy/compose/docker-compose.yml $(if $(filter 1,$(EXAMPLE_STORAGE)),-f deploy/compose/example-storage/docker-compose.yml) $(if $(filter 1,$(POKEMON_STORAGE)),-f deploy/pokemon/docker-compose.yml)
 CP := services/control-plane
+DOCS_VENV ?= .venv-docs
+DOCS_PYTHON ?= $(DOCS_VENV)/bin/python
+CP_PYTHON ?= $(CP)/.venv/bin/python
+
+.PHONY: docs-install docs-serve docs-build docs-reference
+docs-install:
+	python3 -m venv $(DOCS_VENV)
+	$(DOCS_PYTHON) -m pip install -r requirements-docs.txt
+
+docs-serve:
+	$(DOCS_PYTHON) -m mkdocs serve
+
+docs-build:
+	$(DOCS_PYTHON) -m mkdocs build --strict
+	$(DOCS_PYTHON) scripts/check_docs.py site
+
+docs-reference:
+	$(CP_PYTHON) scripts/docs_reference.py
+	cd terraform/provider-fdp && go run ./cmd/docs ../../docs/reference/terraform
 
 .PHONY: certs images runtime dev down seed storage-example desktop desktop-web test test-postgres test-sql test-ui test-helm test-helm-bootstrap test-layer-egress test-layer-tls test-certificate-renewal schema pokemon pokemon-verify
 

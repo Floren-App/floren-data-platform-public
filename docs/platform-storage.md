@@ -18,7 +18,7 @@ The current local Compose deployment stores its data in these Docker volumes:
 | `fdp-data` | Control plane `/fdp-data` | Deployed run consoles/outputs, workload files/docs, environment caches and runtime state |
 | `fdp_gitea-data` | Gitea `/data` | Hosted Git repositories and Gitea's own SQLite database/configuration |
 | `fdp_git-cache` | Control plane `/var/lib/fdp/git` | Cached Git checkouts; the authoritative repository remains in Gitea/the connected Git provider |
-| `fdp-home-ws-<workspace-id>` | Editor and its compute runs `/workspace` | One workspace's private files, Git checkout/settings, SQL scripts and editor state |
+| `fdp-home-ws-<workspace-id>` | Editor and its compute runs `/workspace` | Only the volume's `workspace/` subdirectory: private files, Git checkout/settings, SQL scripts and editor state |
 
 CloudBeaver saves SQL scripts under `/workspace/sql` and its internal metadata under
 `/workspace/.fdp/cloudbeaver`. Stopping/restarting an editor keeps its volume. Deleting
@@ -55,8 +55,14 @@ proxy as uid 1000. Existing files are retained and their ownership is not recurs
 On Docker, each editor and the runs started from it use a private workspace network. Only
 the platform control plane, gateway and Git integration bridge that network. Other workspaces
 and workloads cannot call its editor directly and impersonate gateway-authenticated users.
-This does not implement the future full Kubernetes layer/network separation.
+Managed Kubernetes layers use their own namespaces and enforced network policies; Docker workspace networks are not equivalent to a Kubernetes layer isolation test.
 
 CloudBeaver's URI prefix uses its documented
 [`CLOUDBEAVER_ROOT_URI`](https://dbeaver.com/docs/cloudbeaver/Server-configuration/) setting;
 SQL query access continues through Floren Data Platform's governed gateway and its workspace identity.
+
+## Project subdirectory
+
+New private volumes expose only their `workspace/` subdirectory at `/workspace`.
+The root recovery folder is outside the editor/job mount. Existing nonempty
+root-layout volumes require an explicit migration or reset; see [workspaces](workspaces.md).

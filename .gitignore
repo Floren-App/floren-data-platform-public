@@ -33,3 +33,7 @@ terraform.tfvars.json
 
 # Installation-specific configuration belongs in a private repository.
 deploy/environments/
+/site/
+/docs/.cache/
+/.venv-docs/
+/.providers/

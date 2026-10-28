@@ -1,7 +1,7 @@
 # Kubernetes configuration contracts (version 1)
 
 This document defines the first implementation boundary for the
-[architecture](architecture.md). Contracts and API admission
+[configuration guide](configuration.md). Contracts and API admission
 and core layer reconciliation are implemented. The complete deployment remains
 in progress; an accepted infrastructure operation does not mean a usable layer
 exists until its readiness checks pass.

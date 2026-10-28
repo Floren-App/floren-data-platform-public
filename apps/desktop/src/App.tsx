@@ -4,13 +4,15 @@ import { currentUser, getServer, onSessionExpired, resetManager, setServer, sign
 import { useHub } from "./hub";
 import { ObjectCacheProvider } from "./cache";
 import {
-  IconPin, IconHome, IconAccount, IconAdmin, IconCatalog, IconClose, IconCompute, IconApi, IconPackage, IconData, IconDeployed, IconSettings, IconWorkspaces,
+  IconPin, IconHome, IconBook, IconAccount, IconAdmin, IconCatalog, IconClose, IconCompute, IconApi, IconPackage, IconData, IconDeployed, IconSettings, IconWorkspaces,
 } from "./components/Icons";
 import { MenuButton } from "./components/Menu";
 import { ProductIcon } from "./components/ProductIcon";
 import { Sidebar, View } from "./views/Sidebar";
 import { TabContent, TabRef } from "./views/Tabs";
 import { GitChoiceHost } from "./views/GitCredentials";
+import { openInWindow } from "./api";
+import { documentationUrl } from "./documentation";
 
 const HOME: TabRef = { kind: "home", title: "Home" };
 type EditorTab = TabRef & { pinned: boolean };
@@ -172,6 +174,9 @@ function Shell({ user }: { user: User }) {
       <nav className="activity" aria-label="Views">
         {activities.map(activityButton)}
         <div className="spacer" />
+        <button title="Documentation for this section" aria-label="Documentation" onClick={() => {
+          void hub.act(() => openInWindow(documentationUrl(view), "FDP documentation", `fdp-help-${view}`));
+        }}><IconBook /></button>
         {hub.me?.is_admin && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}
         <MenuButton id="account-menu" label="Account" menuLabel="Account" className="" icon={<IconAccount />}>
           {(close) => <>

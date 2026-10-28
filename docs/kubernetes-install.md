@@ -27,14 +27,23 @@ a deny NetworkPolicy really blocks traffic. Any `FAIL` must be fixed first.
 
 ## 2. Install
 
+Copy `deploy/helm/fdp/examples/minimal.yaml` to your private installation values.
+It is a template: replace hostnames, network CIDRs and **all platform/runtime image
+repositories/tags** with images available to your cluster. The example's
+`fdp/control-plane:0.1.0` is not an assumed public registry release. Configure
+`web.enabled` and the web image for browser access, or use the desktop client.
+Pin reviewed image commits/digests; do not paste another installation's values.
+
 ```sh
+cp deploy/helm/fdp/examples/minimal.yaml installation-values.yaml
+# Edit installation-values.yaml as described above before installing.
 kubectl create namespace fdp
 kubectl -n fdp create secret tls fdp-public-tls --cert=tls.crt --key=tls.key
 # Optional private CA bundle (public certificates only, including the public roots you need):
 kubectl -n fdp create secret generic platform-ca --from-file=ca-bundle.pem
 
 helm install fdp deploy/helm/fdp -n fdp \
-  -f deploy/helm/fdp/examples/minimal.yaml --wait --timeout 10m
+  -f installation-values.yaml --wait --timeout 10m
 ```
 
 [`examples/minimal.yaml`](../deploy/helm/fdp/examples/minimal.yaml) bundles the metadata
@@ -74,6 +83,11 @@ Sign in at `https://fdp.example.com`, set a new password, and add people through
 identity provider; the directory sync provisions them within a minute.
 
 ## 4. Configure with OpenTofu
+
+First follow [provider installation from source](terraform.md#install-the-provider-from-source).
+The provider address alone does not imply a published registry binary. Adapt the
+getting-started example's version, addresses, storage and directory group lookups
+to your installation before applying it.
 
 ```sh
 export FDP_CLIENT_SECRET=$(kubectl -n fdp get secret fdp-keycloak \
