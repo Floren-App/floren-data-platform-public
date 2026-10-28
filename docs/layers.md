@@ -67,7 +67,8 @@ A **managed layer** has infrastructure configured (`fdp_layer` with `infrastruct
 - optionally its own PostgreSQL and RustFS, with Iceberg on that storage.
 
 Workspaces, jobs, apps and Airflow components of that layer run only in its namespace.
-See the [layer infrastructure reference](layer-infrastructure.md) for every setting.
+See the [layer infrastructure reference](layer-infrastructure.md) for every setting, and
+[layer isolation](architecture/layer-isolation.md) for what each boundary enforces and a worked example.
 
 An **unmanaged layer** is an authorization boundary only. Its workloads run in the shared
 runtime namespace, so there is no network separation between unmanaged layers. Use

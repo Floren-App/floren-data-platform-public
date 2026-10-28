@@ -82,6 +82,11 @@ OpenAPI/WSDL definition. Request bodies are limited to 10 MB; SOAP parsing to 1 
 
 ## External: programs call registered REST/SOAP backends
 
+Jobs and apps have no direct internet access, and the workspace allowlist applies only to editors. An
+external API is how a program reaches an outside service: the control plane makes the call, so the
+backend needs no allowlist entry or layer egress. See
+[outbound paths](architecture/layer-isolation.md#outbound-paths-data-the-workspace-allowlist-and-apis).
+
 Create an External API with the backend's base URL, then declare its operations.
 Grant the calling program/service identity Consumer on the API, group or operation.
 Undeclared paths and methods are refused. Calls are authorized as the program's

@@ -70,6 +70,7 @@ nav:
       - Bring your own infrastructure: architecture/bring-your-own.md
       - Security by design: architecture/security.md
       - Control plane and layers: architecture/control-plane-and-layers.md
+      - Layer isolation: architecture/layer-isolation.md
       - System components: architecture/components.md
   - Install and operate:
       - Kubernetes installation: kubernetes-install.md

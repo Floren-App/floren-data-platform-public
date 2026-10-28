@@ -129,7 +129,7 @@ refuses a cluster without NetworkPolicy enforcement.
 
 ## What is not supported yet
 
-- CNIs other than k3s's kube-router (Cilium is the intended reference but untested) and IPv6.
+- Automated tests for CNIs other than k3s's kube-router (Cilium is verified manually), and IPv6.
 - Iceberg on a layer's own PostgreSQL with data on external S3 (use the layer RustFS, or register an external
   Iceberg REST catalog as a storage integration).
 - Highly available bundled databases or RustFS, and multi-cluster layers.

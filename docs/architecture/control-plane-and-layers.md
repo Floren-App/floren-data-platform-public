@@ -105,4 +105,5 @@ database or another layer directly.
 Everything above describes **managed** layers. An unmanaged layer, without infrastructure, uses the same
 control plane and authorization, but its pods run in the shared runtime namespace. It is an
 authorization boundary only, without network isolation. Use managed layers wherever layers must be
-separated, as with production and non-production.
+separated, as with production and non-production. [Layer isolation](layer-isolation.md) details every
+boundary, the CNI requirement and a worked example with three layers.
