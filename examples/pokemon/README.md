@@ -4,9 +4,18 @@ Two English sets (`base1`, `base2`), separate **Test / Non-Prod** and **Prod / P
 `test` is the development branch; protected `main` is the production promotion branch.
 The source API is [TCGdex](https://tcgdex.dev/rest/set).
 
-This directory is a reusable example, not an installation record. Supply your own
-repository, layers, storage and compute sizing through `terraform/modules/pokemon`.
-Keep installation values and credentials in a separate private configuration repository.
+Deployment status: source is published privately at
+`https://github.com/Floren-App/pokemon-data-product`. The current GitHub plan refused private
+branch protection (HTTP 403); `main` protection is therefore still pending. Keep promotion
+through a reviewed pull request. Floren enforces the production folder's `main` branch binding
+and separate layer identities, regardless of GitHub plan. The required platform upgrade was
+approved and deployed; both native pipelines and all four dashboards passed live verification. See
+`docs/pokemon-pipeline-progress.md` in the platform repository for the current checklist.
+
+The Floren installation overrides the module's `warehouses` input with dedicated, modest
+sizes for this initial allowlist: dashboards 0.125 CPU/0.75 GiB, batch/dbt jobs 0.25 CPU/1 GiB,
+and Airflow 0.25 CPU/1.5 GiB. Increase these for larger ingestions or dashboard concurrency;
+the module defaults continue to use the installation's `xsmall`/`small` warehouses.
 
 ```mermaid
 flowchart LR
@@ -115,7 +124,9 @@ workload folders. The platform's Global Admin recovery access remains in effect.
 | Process-event identity | Contributor on raw only |
 | Bootstrap identity | Admin on raw/history/reporting for initial schema/table creation |
 
-Every stage has a separate **layer-bound service account**, fixed on its workload. RustFS root
+Every stage uses its own **built-in workload managed identity**, fixed to its layer.
+No separate service accounts are needed. Direct permissions are declared through
+`managed_identity_grants` on each Terraform workload (FDP provider 0.2.0 or later). RustFS root
 credentials stay inside the platform; service identities receive short-lived **STS sessions**
 scoped to their granted prefixes. Terraform does not need S3 keys. Source-specific network rules
 allow those executions to reach only their own layer's RustFS. Test identities cannot use Prod
@@ -129,20 +140,25 @@ within its engineer-only access boundary. It displays limited rows; engineers ca
 
 ## Deploy with laptop OpenTofu
 
-Use `terraform/modules/pokemon` from your own private OpenTofu configuration. Declare
-a separate `pokemon-landing` storage connection in each layer using its existing RustFS.
-No additional storage service is required.
+The reusable module is `terraform/modules/pokemon` (also mirrored in this repository's
+`terraform/` directory). It requires FDP provider 0.2.0 or later. Keep the shared FDP
+configuration and this application's configuration in separate Terraform roots and states.
+The installation-local setup uses `data-platform/terraform` and
+`data-platform/pokemon/terraform`; those files are deliberately outside the public source.
 
 1. Deploy the platform version that supports managed RustFS files and append-only schemas.
-2. Push **the contents of this directory** as a dedicated Git repository (`fdp.json` at root),
-   with `test` and protected `main` branches. For ongoing promotion, merge a reviewed exact Test
-   commit into `main`; never copy Test data, identities or credentials into Prod.
-3. Configure the module with your repository URL and layer-specific storage and identities.
-   For a private repository, supply its read credential through the ephemeral
-   `TF_VAR_pokemon_repository_credentials` map (`username`, `token`); it is stored server-side,
-   never in Terraform state or workspaces. Use a technical read credential for normal operation.
-4. Run `tofu plan -out=pokemon.tfplan` in your private configuration, review the plan,
-   then apply that exact plan. Keep plan and state files outside public source control.
+2. Publish this code to a dedicated Git repository (`fdp.json` at root), with `test` and
+   protected `main` branches. Promote through a reviewed merge; never copy Test data,
+   identities or credentials into Prod.
+3. Apply the shared platform root, then the Pokemon root. Allocate a `pokemon-landing`
+   bucket in each layer's existing RustFS; no additional storage service is required.
+   First-time private repository registration uses the ephemeral
+   `TF_VAR_repository_credentials` map (`username`, `token`). It is stored server-side,
+   never in Terraform state or workspaces.
+4. Use ordinary `tofu init`, `tofu plan -out=pokemon.tfplan`, `tofu show pokemon.tfplan`
+   and `tofu apply pokemon.tfplan` in the Pokemon root. Use its pinned provider/module
+   versions and configure `TF_CLI_CONFIG_FILE` if using a local provider mirror.
+
 5. Run `pokemon-bootstrap-test` once, then trigger `pokemon_test_daily` in the Test Airflow UI.
    Verify history, file traces, products and access before running `pokemon-bootstrap-prod` and
    `pokemon_prod_daily`. The bootstrap job is separate from the recurring DAG.
@@ -166,5 +182,5 @@ python3 deploy/pokemon/validate.py  # copied files, temporary provider, backend 
 ```
 
 The tests execute the SCD2 window SQL against an isolated SQLite fixture and parse every model/test
-as Trino SQL; they do not substitute for a real Trino/dbt deployment run. Keep deployment evidence
-in your private operator records.
+as Trino SQL; they do not substitute for a real Trino/dbt deployment run. Deployment progress and
+actual evidence are tracked in `docs/pokemon-pipeline-progress.md` in the platform repository.
