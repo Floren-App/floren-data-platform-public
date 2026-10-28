@@ -17,7 +17,7 @@ software, and they are optional.
 | Shiny, RPostgres | GPL-3.0 | `workspace-rstudio`, `compute-r` | Unmodified R packages from CRAN. |
 | DBI | LGPL-2.1 or later | `workspace-rstudio`, `compute-r` | Unmodified R package from CRAN. |
 | data.table | MPL-2.0 | `compute-r` | Weak (file-level) copyleft; unmodified. |
-| OpenBao (when used as the secret store) | MPL-2.0 | not built here; your own deployment | Weak (file-level) copyleft. |
+| OpenBao (when used as the secret store) | MPL-2.0 | not built here; the official `ghcr.io/openbao/openbao` image, run unmodified by the chart when `openbao.enabled` or deployed by you | Weak (file-level) copyleft. |
 
 **R is an optional part of an installation.** Without it (`r.enabled: false` in the Helm values), the
 `workspace-rstudio` and `compute-r` images are not used or pulled, and no GPL or AGPL software runs. Python, SQL,
@@ -30,7 +30,7 @@ separate programs, and nothing links them into Floren Data Platform's code.
 
 | Image | Main components (license) |
 |---|---|
-| `control-plane` (also the egress proxy and layer controller) | Python (PSF), FastAPI, Starlette, Pydantic (MIT), SQLAlchemy (MIT), uvicorn (BSD-3), httpx (BSD-3), PyJWT (MIT), cryptography (Apache-2.0/BSD), psycopg (LGPL-3.0, unmodified, dynamically used), kubernetes client (Apache-2.0), hvac (Apache-2.0), boto3 (Apache-2.0), sqlglot (MIT), packaging (Apache-2.0/BSD), python-multipart (Apache-2.0), Git (GPL-2.0, used as a separate program), Debian (various free licenses) |
+| `control-plane` (also the egress proxy and layer controller) | Python (PSF), FastAPI, Starlette, Pydantic (MIT), SQLAlchemy (MIT), uvicorn (BSD-3), httpx (BSD-3), PyJWT (MIT), cryptography (Apache-2.0/BSD), psycopg (LGPL-3.0, unmodified, dynamically used), kubernetes client (Apache-2.0), hvac (Apache-2.0), boto3 (Apache-2.0), Azure Identity and Key Vault Secrets client libraries (MIT), Google Cloud Secret Manager client and gRPC (Apache-2.0), sqlglot (MIT), packaging (Apache-2.0/BSD), python-multipart (Apache-2.0), Git (GPL-2.0, used as a separate program), Debian (various free licenses) |
 | `workspace-vscode` | code-server and VS Code OSS (MIT); from Open VSX: Python and Jupyter extensions (MIT), Ruff (MIT), basedpyright (MIT); Python (PSF), Jupyter, ipykernel, pandas (BSD-3), Streamlit (Apache-2.0), Ruff (MIT); Floren Data Platform extension and SDK (Apache-2.0) |
 | `workspace-sql` | CloudBeaver Community (Apache-2.0); Python (PSF) |
 | `web` (the app in the browser) | nginx (BSD-2-Clause); the app's own code (Apache-2.0) with React, React DOM (MIT), oidc-client-ts (Apache-2.0), and their dependencies (MIT, ISC, BSD) |

@@ -1,5 +1,3 @@
-> Governed SQL now uses dbt-trino for both PostgreSQL and Iceberg. Profiles authenticate to the shared gateway and contain no native database/storage credentials. See [shared SQL](query-execution.md); older adapter/materialization instructions below describe legacy mode.
-
 # dbt and Airflow
 
 Both are program kinds in `fdp.json` ([reference](fdp-json.md)). They get everything
@@ -32,14 +30,9 @@ Floren Data Platform generates `profiles.yml` at run time from the connection me
 execution token. Native database and storage credentials remain in the infrastructure.
 The project's `profile:` name is used automatically.
 
-Older demo projects used a separate `finance-dw-transform` integration and dbt-postgres 1.8.
-Update those projects to `finance-dw`, use the Trino runtime, and grant the execution
-identity Reader on `public` and Admin on `analytics`. Use portable `cast(...)` expressions
-and table materializations. Existing native PostgreSQL staging views are blocked on the
-governed path; migrate those generated views to tables before rebuilding, preserving their
-definitions, rows, ownership and grants. Updating files in `examples/workspace` alone does
-not update an existing Gitea repository: commit the changes to the workload's branch
-and sync the workload before rerunning it.
+Use portable `cast(...)` expressions and table materializations. Native PostgreSQL views
+are blocked on the governed path (see [SQL execution](query-execution.md)), so materialize
+staging models as tables, or as `SECURITY INVOKER` views in Iceberg.
 
 **The run form is built in:** command (`build`, `run`, `test`, `seed`, `snapshot`, `docs`), select,
 exclude, full refresh and vars.
@@ -94,7 +87,7 @@ starts on a warehouse with the DAGs straight from your workspace, and **Open Air
 suspends like an app.
 
 **Deployed:** the UI is at `https://<fdp host>/p/<name>/` for everyone allowed (the gateway
-handles sign-in; Airflow has no login of its own). Run history lives on the data volume and
+handles sign-in; Airflow has no login of its own). Run history lives in its metadata database and
 survives redeploys. A new commit **recreates** the deployment (the old scheduler stops before the
 new one starts), so DAGs never run twice.
 
@@ -108,7 +101,7 @@ new one starts), so DAGs never run twice.
 | | `standalone` (default) | `distributed` |
 |---|---|---|
 | Containers | one | webserver, scheduler (+ triggerer), N Celery workers, a Valkey broker |
-| Metadata | SQLite on the data volume (the layer's volume in a managed layer) | its **own database**: in a managed layer, a PostgreSQL pod of the deployment inside that layer; otherwise created automatically on the server admins configure (`FDP_AIRFLOW_METADATA_URL`) |
+| Metadata | SQLite on the data volume, or its own database on the shared server when one is configured | its **own database**: on the shared server when one is configured, otherwise a PostgreSQL pod of the deployment inside its managed layer |
 | Tasks at a time | 1 | `workers × worker_concurrency`, capped by `parallelism` |
 | Used for | small pipelines, workspace test deployments | production pipelines with parallel tasks |
 

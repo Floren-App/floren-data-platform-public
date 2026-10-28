@@ -59,8 +59,13 @@ nav:
       - Overview: index.md
       - Quickstart: getting-started.md
       - Core concepts: concepts.md
-      - Navigation: home-and-navigation.md
+      - Using the app: home-and-navigation.md
       - Feature boundaries: feature-status.md
+  - Architecture:
+      - Design principles: architecture/index.md
+      - Bring your own infrastructure: architecture/bring-your-own.md
+      - Security by design: architecture/security.md
+      - System components: architecture/components.md
   - Install and operate:
       - Kubernetes installation: kubernetes-install.md
       - Configuration ownership: configuration.md
@@ -69,9 +74,8 @@ nav:
       - Layers and isolation: layers.md
       - Secrets and certificates: secrets-and-certificates.md
       - Operations and recovery: kubernetes-operations.md
-      - Platform storage: platform-storage.md
-      - Shared system databases: shared-system-data.md
-      - Infrastructure contract: kubernetes-configuration-contracts.md
+      - Shared system database: shared-system-data.md
+      - Layer infrastructure reference: layer-infrastructure.md
       - Troubleshooting: troubleshooting.md
   - Develop:
       - Workspaces: workspaces.md
@@ -84,7 +88,7 @@ nav:
       - Iceberg and files: data-lake.md
       - API management: api-management.md
       - Packages: packages.md
-      - Pokemon walkthrough: pokemon.md
+      - "Example: end-to-end data product": pokemon.md
   - Govern:
       - Security and roles: rbac.md
       - Active groups and ownership: active-groups.md
@@ -99,6 +103,6 @@ nav:
       - HTTP API: reference/api.md
       - JSON configuration schema: reference/json-schema.md
       - Python functions: reference/python.md
-      - Architecture: architecture.md
   - Contribute:
+      - Local development environment: local-development.md
       - Maintaining the docs: contributing-docs.md

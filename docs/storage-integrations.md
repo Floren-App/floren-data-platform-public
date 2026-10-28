@@ -9,15 +9,15 @@ type, then describe the location. The form asks for exactly what that type needs
 control plane validates the same rules (`GET /v1/admin/storage-types` serves them; see
 `services/control-plane/app/storage_types.py`).
 
-| Type | Location you configure | Credentials Floren Data Platform keeps (OpenBao, write-only) | Must exist outside Floren Data Platform |
+| Type | Location you configure | Credentials Floren Data Platform keeps (secret store, write-only) | Must exist outside Floren Data Platform |
 |---|---|---|---|
-| **PostgreSQL** | host, port, database, Trino catalog name; optional SSL mode | access-setup login (creates roles, grants schema privileges); optional native-executor login | a Trino catalog (`connector.name=postgresql`) for the same database, with the engine's own login |
-| **Iceberg tables on S3** | Trino catalog name, warehouse (`s3://bucket/path`), REST catalog URL; optional S3 endpoint, region | none | an Iceberg REST catalog, the bucket, and a Trino catalog (`connector.name=iceberg`, REST type) with its own S3 keys |
+| **PostgreSQL** | host, port, database, Trino catalog name; optional SSL mode | access-setup login (creates roles, grants schema privileges); the engine login | the database. In an unmanaged layer, also a Trino catalog (`connector.name=postgresql`) for it |
+| **Iceberg tables on S3** | Trino catalog name, warehouse (`s3://bucket/path`), REST catalog URL; optional S3 endpoint, region | the engine's S3 keys | an Iceberg REST catalog and the bucket. In an unmanaged layer, also a Trino catalog (`connector.name=iceberg`, REST type) |
 | **S3 files** | bucket, region, role to assume; optional base prefix, S3 and STS endpoints | STS provisioning access key | the bucket and a role that the provisioning key may assume |
 
 What happens after an integration is added:
 
-- Owners register schemas or namespaces on it and assign roles under **Data**.
+- Owners register schemas or namespaces on it and assign roles under **Storage**.
 - SQL types run every query through the shared Trino engine, so table credentials stay
   in the engine.
 - S3 files issue short-lived credentials scoped to the granted prefixes.
@@ -30,18 +30,20 @@ credentials; the storage itself is not touched.
 
 ## Engine catalogs
 
-The SQL types are queried through catalogs that you configure in the shared Trino engine, not
-in Floren Data Platform:
+The SQL types are queried through Trino catalogs:
 
-- **Compose:** one `<catalog>.properties` file per integration in
+- **Managed layers:** the platform writes the catalog into the layer's Trino from the
+  integration's engine login.
+- **Helm, without managed layers:** entries in the `trino.catalogSecret` secret.
+- **Local development:** one `<catalog>.properties` file per integration in
   `deploy/compose/trino/catalog/`.
-- **Helm:** entries in the `trino.catalogSecret` secret.
 
-The catalog name is what you enter as **Trino catalog**. Restart Trino after adding a catalog.
+The catalog name is what you enter as **Trino catalog**. Restart Trino after adding a
+catalog you configured yourself.
 
 ## Local example storage
 
-To have something to test with, the repository includes example external storage. It stands
+For [local development](local-development.md), the repository includes example external storage. It stands
 in for what an organisation already runs, and lives in `deploy/compose/example-storage/`, apart
 from the platform's `docker-compose.yml`:
 
@@ -52,9 +54,8 @@ from the platform's `docker-compose.yml`:
   the two SQL integrations. While the example storage is enabled, this directory replaces
   `deploy/compose/trino/catalog/`.
 
-Example storage is opt-in. Start it with `EXAMPLE_STORAGE=1 POKEMON_STORAGE=0 make dev`.
-The default `make dev` runs without this example storage (and preserves the Pokémon overlay
-if that project has been installed).
+Example storage is opt-in. Start it with `EXAMPLE_STORAGE=1 make dev`. The default
+`make dev` runs without it.
 
 It is connected through a setup action that takes the same two steps you would take for your
 own storage:
@@ -63,8 +64,8 @@ own storage:
 make storage-example   # deploy/compose/example-storage/setup.sh
 ```
 
-1. **Outside Floren Data Platform:** prepare the storage (here, it creates the warehouse schemas
-   `analytics` and `dbt_ana`; the Compose services and catalog files already exist).
+1. **Outside Floren Data Platform:** prepare the storage (here, it creates example warehouse
+   schemas; the Compose services and catalog files already exist).
 2. **In Floren Data Platform:** register three integrations through the admin API
    (`example-storage/register.py`):
 
@@ -78,15 +79,15 @@ make storage-example   # deploy/compose/example-storage/setup.sh
 admin/admin account is provisioned. It does not require these integrations or add demo
 users, repositories, namespaces or grants. Existing objects and permissions are preserved.
 
-To install the finance demo deliberately, start the example stack above, then run
-`EXAMPLE_STORAGE=1 POKEMON_STORAGE=0 make seed`. This runs `storage-example` first and adds
-example identities, namespaces and roles on top (`seed_rbac.py`). This demo seed is separate
-from the Pokémon installation and should be used only for the disposable example stack.
+To add the example data deliberately, start the example stack above, then run
+`EXAMPLE_STORAGE=1 make seed`. This runs `storage-example` first and adds example
+identities, namespaces and roles on top (`seed_rbac.py`). Use it only for a disposable
+local stack.
 
 ## Bringing your own storage
 
-1. Make the location reachable from the `data` network (or your cluster), and create its
-   engine catalog for PostgreSQL or Iceberg.
+1. Make the location reachable from the layer's Trino (allow its egress in a managed layer),
+   and, in an unmanaged layer, create its engine catalog for PostgreSQL or Iceberg.
 2. Add the integration in the desktop app, or script it like `register.py` does:
 
    ```sh
@@ -98,9 +99,6 @@ from the Pokémon installation and should be used only for the disposable exampl
    ```
 
    An incomplete request is refused with per-field errors.
-3. Under **Data**, register its schemas, set up access, and assign roles.
+3. Under **Storage**, register its schemas, set up access, and assign roles.
 
-Integrations registered before types were enforced keep working. They are validated the next
-time they are saved. Re-save an Iceberg integration with its warehouse location, so that its
-bucket is reserved for tables.
 `FDP_SQL_LAKE_BUCKETS` can reserve additional table buckets.

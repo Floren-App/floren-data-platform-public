@@ -48,3 +48,23 @@ imagePullSecrets:
 {{- else -}}{{- printf "fdp-metadata-db.%s.svc" (include "fdp.databaseNamespace" .) -}}
 {{- end -}}
 {{- end -}}
+{{- define "fdp.openbaoNamespace" -}}
+{{- $namespace := default (printf "%s-openbao" .Release.Namespace) .Values.openbao.namespace -}}
+{{- if or (gt (len $namespace) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $namespace)) -}}
+{{- fail "openbao.namespace must be a valid Kubernetes namespace (at most 63 characters)" -}}
+{{- end -}}
+{{- if has $namespace (list .Release.Namespace .Values.runtime.namespace (include "fdp.secretNamespace" .)) -}}
+{{- fail "openbao.namespace must be dedicated to OpenBao, separate from platform, runtime and secret namespaces" -}}
+{{- end -}}
+{{- $namespace -}}
+{{- end -}}
+{{- define "fdp.openbaoScheme" -}}
+{{- if eq .Values.openbao.tls.mode "disabled" }}http{{ else }}https{{ end -}}
+{{- end -}}
+{{- define "fdp.openbaoAddr" -}}
+{{- if .Values.openbao.enabled -}}
+{{- printf "%s://fdp-openbao.%s.svc:8200" (include "fdp.openbaoScheme" .) (include "fdp.openbaoNamespace" .) -}}
+{{- else -}}
+{{- .Values.openbao.addr -}}
+{{- end -}}
+{{- end -}}

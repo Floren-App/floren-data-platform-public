@@ -17,7 +17,10 @@ dependencies = [
     "docker>=7.1",
     "kubernetes>=30.1",
     "psycopg[binary]>=3.2",
-    "boto3>=1.35",
+    "boto3>=1.35",        # S3 storage and the AWS Secrets Manager secret store
+    "azure-identity>=1.19",          # Azure Key Vault secret store: workload identity (MIT)
+    "azure-keyvault-secrets>=4.9",   # (MIT)
+    "google-cloud-secret-manager>=2.21",   # Google Secret Manager secret store (Apache-2.0)
     "sqlglot>=28,<29",   # validate invoker views, including prepared/EXECUTE IMMEDIATE wrappers
     "tzdata>=2024.1",     # IANA zones for scheduled SLAs, including slim runtime images
     "packaging>=24",      # package repository: names, versions, wheel/sdist filenames (Apache-2.0/BSD)
@@ -25,7 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "moto[secretsmanager]>=5.0"]   # moto: in-process AWS API (Apache-2.0)
 
 [build-system]
 requires = ["setuptools>=69"]

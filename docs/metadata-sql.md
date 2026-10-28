@@ -1,9 +1,8 @@
 # Platform metadata database and SQL
 
-Floren Data Platform's operational database is configured with `FDP_DATABASE_URL`. Compose
-defaults to database `fdp` on its bundled PostgreSQL, using the existing persistent
-`fdp_pgdata` volume. No additional setup or seed command is required. This remains
-separate from Test/Prod warehouse data and OpenBao's secret values.
+Floren Data Platform's operational database is configured with `FDP_DATABASE_URL`: your
+own PostgreSQL, or the optional bundled one. It is separate from your business data and
+from the secret store's values.
 
 Select **Global Admin** and open **Storage → fdp-metadata → public → SQL**.
 Application tables are also indexed in Catalog: identities, groups, bindings, permissions,
@@ -88,7 +87,7 @@ To relocate metadata, provision PostgreSQL, migrate the existing database, chang
 `FDP_DATABASE_URL`, and restart Floren Data Platform. Update the metadata JDBC URL to the same
 database and ensure Trino can reach it. Changing a URL does not migrate existing data.
 
-Compose environment overrides:
+Local development (Compose) defaults:
 
 | Setting | Default |
 | --- | --- |
@@ -101,8 +100,8 @@ Compose environment overrides:
 
 Startup provisions a dedicated reader with schema USAGE and table SELECT. Database owner
 credentials never reach Trino. Set bootstrap false to provision this reader yourself;
-refresh its SELECT grants after migrations. Metadata tables currently use public.
-SQLite remains available for API tests/development; this SQL catalog requires PostgreSQL.
+refresh its SELECT grants after migrations. Metadata tables use the `public` schema.
+SQLite is available for API tests and development only; this SQL catalog requires PostgreSQL.
 
 Helm exposes `metadataSql.enabled`, `.catalog`, `.readerUser`, `.bootstrapReader` and
 `.existingSecret`. The secret has keys `metadata-jdbc-url` and `metadata-reader-password`;

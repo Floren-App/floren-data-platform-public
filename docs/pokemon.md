@@ -1,6 +1,7 @@
-# Pokemon: a complete data product
+# Example: an end-to-end data product
 
-This walkthrough describes the reusable example in
+This walkthrough builds a complete data product from public Pokémon trading-card data,
+from an external API to analyst dashboards. It describes the reusable example in
 [examples/pokemon](../examples/pokemon) and
 [terraform/modules/pokemon](../terraform/modules/pokemon). It uses a few English
 TCGDex sets, immutable batch files, raw records, dbt history/products, Airflow and

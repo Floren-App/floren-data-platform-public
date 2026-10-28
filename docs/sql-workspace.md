@@ -49,7 +49,7 @@ Creating the container reports **starting** until CloudBeaver's health endpoint 
 it is ready. The workspace page updates automatically and enables **Open editor** when
 startup completes. Existing editor links show an authenticated loading page while waiting.
 If startup fails or times out, the workspace displays a failure message and **Retry start**.
-Files remain on the volume across retries. See [platform storage](platform-storage.md).
+Files remain on the volume across retries. See [local development](local-development.md) for the Compose volumes.
 
 ## Keeping data on the server
 

@@ -1,19 +1,31 @@
 # Floren Data Platform
 
-A desktop hub for analysts. Code, data and compute stay on the server: small editor workspaces
-(VS Code or RStudio) for writing code, sized compute pools that start on demand for heavy runs,
-and governed data access with secrets in Kubernetes Secrets or OpenBao.
+An open-source, governed compute layer for data teams. Private editor workspaces (VS Code,
+RStudio or SQL), compute pools that start on demand, governed SQL over your own databases
+and buckets, and programs, dashboards, dbt projects and Airflow pipelines deployed from Git
+(GitOps), with a catalog, lineage, quality checks and SLAs.
 
 Supports Python, Jupyter notebooks, Streamlit, R, Shiny, dbt and Airflow, in versions admins choose.
-100% free/open source.
-Workspaces are private; code is shared through git, and programs and apps are **deployed from
-git** and kept in sync with their branch (GitOps).
+
+**Design principles**
+
+- **Security by design:** every person and workload has an identity, permissions are explicit
+  and additive, and database or storage credentials never reach user code.
+- **Bring your own infrastructure:** any OIDC + SCIM identity provider; OpenBao, HashiCorp Vault,
+  Kubernetes Secrets, AWS Secrets Manager, Azure Key Vault or Google Secret Manager; your own
+  PostgreSQL and S3-compatible storage. Keycloak, PostgreSQL, RustFS and OpenBao can be switched on
+  in the Helm chart for an all-in-one installation.
+- **No vendor lock-in:** 100% free, OSI-licensed open source, open data formats (PostgreSQL,
+  Iceberg, plain files) and any Kubernetes, in any cloud or on-premises.
+
+See [design principles](docs/architecture/index.md) and
+[bring your own infrastructure](docs/architecture/bring-your-own.md).
 
 ## Documentation
 
 Read the **[searchable documentation site](https://floren-app.github.io/floren-data-platform-public/)**
 or start with the [Markdown overview](docs/index.md). Installation, concepts,
-workspaces, IAM, SDKs, Terraform, catalog, certificates and the Pokemon walkthrough
+workspaces, IAM, SDKs, Terraform, catalog, certificates and an end-to-end example
 live in this repository. API, JSON and provider references are generated from code.
 
 ```sh
@@ -26,8 +38,8 @@ make docs-build     # strict links, search and publication checks
 - [docs/rbac.md](docs/rbac.md): RBAC, SCIM provisioning, schema enforcement, nested folders, and service identities
 - [docs/catalog.md](docs/catalog.md): catalog search, governance, freshness/run SLAs, IAM, and native dbt/Airflow/program lineage
 - [docs/api-management.md](docs/api-management.md): internal program APIs, outbound REST/SOAP, managed identities, JWT/mTLS and gateway deployment
-- [docs/architecture.md](docs/architecture.md): the design
-- [docs/platform-storage.md](docs/platform-storage.md): where application metadata, secrets, workspace files and runtime data are stored; workspace startup
+- [docs/architecture/](docs/architecture/index.md): design principles, bring your own infrastructure, security by design
+- [docs/local-development.md](docs/local-development.md): the local Compose stack, its data volumes and workspace startup
 - [docs/metadata-sql.md](docs/metadata-sql.md): configurable metadata database, Global Admin SQL catalog, and validated RBAC changes
 - [docs/metrics-and-slas.md](docs/metrics-and-slas.md): KPI definitions, dbt quality measurements, scheduled SLAs, history and input gates
 - [docs/fdp-json.md](docs/fdp-json.md): defining runnable programs

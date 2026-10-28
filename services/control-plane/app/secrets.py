@@ -1,6 +1,7 @@
 """Secret storage: data source, Git, program, and certificate credentials.
 
-Backends: external OpenBao (MPL-2.0), namespace-scoped Kubernetes, or test memory.
+Backends: OpenBao (MPL-2.0) or HashiCorp Vault through the same API, namespace-scoped Kubernetes,
+AWS Secrets Manager, Azure Key Vault, Google Secret Manager, or test memory.
 
 Paths: datasources/<name> for data sources, repos/<name> for git repositories.
 """
@@ -51,25 +52,76 @@ class MemorySecretStore:
 
 
 class OpenBaoSecretStore:
-    """Static credentials in KV v2; short-lived ones from the database secrets engine.
+    """OpenBao or HashiCorp Vault (same API): static credentials in KV v2, short-lived ones from the
+    database secrets engine.
 
-    If a data source config sets ``dynamic_role``, every connect() gets a fresh
-    username/password with a lease, so nothing long-lived ever reaches an execution.
+    The platform authenticates with a token, its Kubernetes service account, or an AppRole. Login tokens
+    are renewed by logging in again shortly before they expire, or after the server refuses one.
+    If a data source config sets ``dynamic_role``, every connect() gets a fresh username/password with a lease.
     """
 
+    label = 'OpenBao'
+    auth = 'token'
+    _expires = None
+    _lock = None
+
     def __init__(self, settings: Settings):
+        import threading
+
         import hvac
 
+        self.label = 'Vault' if settings.secrets_backend == 'vault' else 'OpenBao'
         self.mount = settings.openbao_kv_mount
-        token = settings.openbao_token
-        if not token and settings.openbao_token_file:
-            with open(settings.openbao_token_file, encoding="utf-8") as f:
-                token = f.read().strip()
-        self.client = hvac.Client(url=settings.openbao_addr, token=token)
+        self.auth = settings.openbao_auth
+        self.role = settings.openbao_auth_role
+        self.auth_mount = settings.openbao_auth_mount or settings.openbao_auth
+        self.jwt_file = settings.kubernetes_token_file
+        self.role_id, self.secret_id = settings.openbao_approle_role_id, settings.openbao_approle_secret_id
+        self._lock = threading.Lock()
+        token = None
+        if self.auth == 'token':
+            token = settings.openbao_token
+            if not token and settings.openbao_token_file:
+                with open(settings.openbao_token_file, encoding="utf-8") as f:
+                    token = f.read().strip()
+        self.client = hvac.Client(url=settings.openbao_addr, token=token,
+                                  namespace=settings.openbao_namespace or None, timeout=15)
+        # hvac falls back to VAULT_TOKEN or ~/.vault-token: use only the configured identity.
+        self.client.token = token
 
-    @staticmethod
-    def _call(operation):
-        """Run one OpenBao request; failures become sanitized 503s (never provider responses)."""
+    def _login(self) -> None:
+        """Exchange the platform identity for a token. Called under the lock."""
+        import time
+
+        # The server refuses every request that carries an invalid token, logins included.
+        self.client.token = None
+
+        if self.auth == 'kubernetes':
+            try:
+                with open(self.jwt_file, encoding='utf-8') as f:
+                    jwt = f.read().strip()
+            except OSError:
+                raise SecretBackendError('The platform service account token is unavailable for '
+                                         f'{self.label} login; check automountServiceAccountToken') from None
+            response = self.client.auth.kubernetes.login(role=self.role, jwt=jwt, mount_point=self.auth_mount)
+        else:
+            response = self.client.auth.approle.login(role_id=self.role_id, secret_id=self.secret_id,
+                                                      mount_point=self.auth_mount)
+        lease = int(response['auth'].get('lease_duration') or 0)
+        # Log in again at 80% of the lease (renewable tokens may still end at their maximum TTL).
+        self._expires = time.monotonic() + lease * 0.8 if lease else None
+
+    def _ensure_login(self, force: bool = False) -> None:
+        import time
+
+        if self.auth == 'token':
+            return
+        with self._lock:
+            if force or not self.client.token or (self._expires is not None and time.monotonic() >= self._expires):
+                self._call_once(self._login)
+
+    def _call_once(self, operation):
+        """Run one request; failures become sanitized 503s (never provider responses)."""
         import hvac
         import requests
 
@@ -78,13 +130,29 @@ class OpenBaoSecretStore:
         except hvac.exceptions.InvalidPath:
             raise
         except hvac.exceptions.VaultDown:
-            raise SecretBackendError('OpenBao is sealed or starting; unseal it, then retry') from None
+            raise SecretBackendError(f'{self.label} is sealed or starting; unseal it, then retry') from None
         except hvac.exceptions.Forbidden:
-            raise SecretBackendError('OpenBao refused the platform token; check its policy and that it has not expired') from None
-        except requests.exceptions.RequestException:
-            raise SecretBackendError('Cannot reach OpenBao; check its address and network access') from None
+            raise SecretBackendError(f'{self.label} refused the platform token; check its policy and that it has not expired') from None
+        except (requests.exceptions.RequestException, OSError):
+            raise SecretBackendError(f'Cannot reach {self.label}; check its address and network access') from None
         except hvac.exceptions.VaultError:
-            raise SecretBackendError('OpenBao rejected the request; check its logs') from None
+            raise SecretBackendError(f'{self.label} rejected the request; check its logs') from None
+
+    def _call(self, operation):
+        import hvac
+
+        self._ensure_login()
+        if self.auth == 'token':
+            return self._call_once(operation)
+        try:
+            return operation()
+        except hvac.exceptions.Forbidden:
+            self._ensure_login(force=True)   # the login token expired or was revoked: log in once more
+        except hvac.exceptions.InvalidPath:
+            raise
+        except Exception:
+            pass   # sanitized below by the retry
+        return self._call_once(operation)
 
     def put(self, path: str, secret: Dict[str, str]) -> None:
         self._call(lambda: self.client.secrets.kv.v2.create_or_update_secret(
@@ -124,4 +192,7 @@ def make_secret_store(settings: Settings) -> SecretStore:
     if settings.secrets_backend == 'kubernetes':
         from .kubernetes_secrets import KubernetesSecretStore
         return KubernetesSecretStore(settings)
+    if settings.secrets_backend in ('aws', 'azure', 'gcp'):
+        from . import cloud_secrets
+        return cloud_secrets.make(settings)
     return OpenBaoSecretStore(settings)

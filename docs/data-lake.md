@@ -80,17 +80,16 @@ Use `viewer_token=viewer` for delegated plain-file requests in shared caller app
 Delegated file reads/writes are limited to 5 MB and listings to 1,000 entries.
 Recreate direct STS clients after credential expiry.
 
-## Local deployment
+## Local example
 
-Compose's example external storage (`deploy/compose/example-storage`) includes RustFS
+In [local development](local-development.md), the example external storage (`deploy/compose/example-storage`) includes RustFS
 and a private Iceberg REST reference catalog in front of Trino 484. `make storage-example`
 registers it as the `lake` and `lake-files` storage integrations (see
-[storage integrations](storage-integrations.md)); `EXAMPLE_STORAGE=1 POKEMON_STORAGE=0 make seed` then registers namespaces, creates them through governed SQL and assigns
+[storage integrations](storage-integrations.md)); `EXAMPLE_STORAGE=1 make seed` then registers namespaces, creates them through governed SQL and assigns
 example roles. `load-lake` copies warehouse sales into Iceberg with a cross-catalog
 SQL operation; `lake-models` builds dbt tables through the same engine. Table data
 stays in the lake bucket and plain-file summaries in the files bucket.
 
 Direct PyIceberg catalogs and root storage keys are not issued for governed tables.
 SQL and dbt models use Trino; file helpers continue to support scoped plain-file access.
-Production may replace the development REST fixture with a durable compatible
-catalog. See [shared SQL deployment](query-execution.md) and [RBAC](rbac.md).
+In production, use a durable Iceberg REST catalog of your choice. See [SQL execution](query-execution.md) and [RBAC](rbac.md).

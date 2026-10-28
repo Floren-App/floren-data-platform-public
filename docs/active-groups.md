@@ -52,11 +52,11 @@ The shared SQL gateway uses combined permissions for reads, writes and alteratio
 requires primary-group DDL authority at the destination for CREATE operations. A secondary
 Admin grant cannot supply that authority. Job admission snapshots both ordinary data
 access and primary CREATE authority, so already running jobs finish under their admitted
-permissions after switches or revocation. Older admitted jobs retain their existing snapshot.
+permissions after switches or revocation.
 
 Data remains governed at schema level: current and future tables inherit the schema's IAM.
-This change does not introduce individual table grants or transfer schema ownership when
-someone creates a table. Catalog governance defaults to the registered resource's owner group.
+There are no individual table grants, and creating a table does not transfer schema
+ownership. Catalog governance defaults to the registered resource's owner group.
 Personal credential scope remains separate from shared object ownership.
 
 ## Global Admin
@@ -75,21 +75,3 @@ Global administration remains secondary when another primary group is selected: 
 not supply that group's missing CREATE privileges. Interactive administration can span
 layers, but execution contexts never gain an unrestricted administrator bypass. Existing
 workspace/workload layer checks still reject cross-layer execution and data access.
-
-## Migration
-
-The migration retires generated `Personal owners <id>` groups. Administrator-owned grants
-move to Global Admin; other personal grants become equivalent direct grants without sharing
-them with all members of an arbitrary team. Catalog references are updated. Manually extended
-groups with ongoing IdP bindings are preserved as ordinary legacy ownership groups instead
-of flattening their dynamic membership into user snapshots. Existing non-personal group
-grants, workspace files, workload identities and layer assignments are preserved.
-
-New resource records store a canonical owner group alongside their normal additive role
-assignments. Existing resources use an already authorized owner group where one exists;
-legacy direct-user ownership remains valid without manufacturing a replacement personal group.
-
-Existing direct-user schema grants retain access to existing data, but cannot authorize new
-SQL objects. For example, a personal development schema with a direct user Admin grant also
-needs an Admin/Owner grant to the chosen primary group before that user can create models
-there. The migration does not automatically share a private schema with an entire team.

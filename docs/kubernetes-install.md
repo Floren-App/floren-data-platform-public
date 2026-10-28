@@ -47,10 +47,11 @@ helm install fdp deploy/helm/fdp -n fdp \
 ```
 
 [`examples/minimal.yaml`](../deploy/helm/fdp/examples/minimal.yaml) bundles the metadata
-database and Keycloak, enables isolated layers, needs no shared NFS volume, and creates the
+database, Keycloak and OpenBao (auto-unsealed by a key in a Kubernetes Secret), enables isolated layers, needs no shared NFS volume, and creates the
 automation identity for OpenTofu. Replace its hostnames and `layerController.network` CIDRs.
-For your own PostgreSQL, identity provider or OpenBao, start from
-`examples/external-services.yaml`.
+For your own PostgreSQL, identity provider or secret store, start from
+`examples/external-services.yaml`. To unseal the bundled OpenBao through your KMS instead, set
+`openbao.seal.mode: kms`; see the [chart README](../deploy/helm/fdp/README.md#bundled-openbao).
 
 ### Using your own PostgreSQL, identity provider and OpenBao
 
@@ -65,6 +66,12 @@ generated for you, so provide:
 | Identity provider | An API audience (`oidc.audience`, default `fdp-api`) in access tokens; a public desktop client (`oidc.clientId`) with PKCE; a confidential client with a service account for OpenTofu; an admin role (`oidc.adminRole`) |
 | Directory | SCIM provisioning from your IdP to `https://<host>/api/scim/v2` with `FDP_SCIM_TOKEN`. Provision people **and** the automation service account (its token's username), giving administrators the admin role |
 | Platform Secret (`existingSecret`) | `FDP_DATABASE_URL` (`postgresql+psycopg://user:password@host:5432/db`), `FDP_SESSION_SIGNING_KEY`, `FDP_GATEWAY_CONFIG_TOKEN`, `FDP_TRINO_SIGNING_KEY` (random strings), `FDP_TRINO_JWT_PRIVATE_KEY` (an EC P-256 private key, PEM), `FDP_SCIM_TOKEN`, `FDP_OPENBAO_TOKEN` |
+
+Instead of OpenBao, `secretManagement.backend` can be `vault` (same settings, under `openbao`), `kubernetes`,
+`aws`, `azure` or `gcp`. With OpenBao or Vault, `openbao.auth.method: kubernetes` or `approle` avoids a
+long-lived token. Cloud secret managers use the control plane's workload identity: set
+`serviceAccount.annotations` (and `podLabels` for Azure). See
+[bring your own infrastructure](architecture/bring-your-own.md#secret-store).
 
 Set `oidc.issuer` to the issuer in your tokens. If the cluster reaches the IdP by another address,
 also set `oidc.jwksUrl`; HTTPS is verified against `trust.caBundleSecret`. Point the OpenTofu
@@ -111,7 +118,7 @@ tested with OpenTofu. See [the provider README](../terraform/provider-fdp/README
 |---|---|
 | Platform | `kubectl -n fdp get pods`: every pod Running |
 | Layers | `GET /api/v1/admin/layers/<id>/infrastructure`: phase `Ready` |
-| Isolation | Pods in `dc-<installation>-layer-<id>` namespaces; a workload cannot reach another layer |
+| Isolation | Pods in `fdp-<installation>-layer-<id>` namespaces; a workload cannot reach another layer |
 | Configuration | `tofu plan` shows no changes |
 
 `make test-e2e-install` runs this whole path on a disposable k3s cluster (about 25 minutes,
@@ -143,7 +150,9 @@ registryCredentials:
   existingSecret: ghcr-pull
 ```
 
-The control plane, directory sync and layer controller pull with it. The control plane keeps a copy under
+The control plane, directory sync and layer controller pull with it. With the bundled OpenBao, also create
+the Secret in its namespace (default `fdp-openbao`), where the seal-key init container uses the
+control-plane image. The control plane keeps a copy under
 the same name in the runtime namespace and every managed layer namespace (and replaces those copies when
 the Secret changes), and every workspace, job, app and layer helper pod references it. A Secret with that
 name the platform did not write is never overwritten.

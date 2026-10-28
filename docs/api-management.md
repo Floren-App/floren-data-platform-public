@@ -29,7 +29,7 @@ JWT configuration includes issuer, audience, JWKS URL, asymmetric algorithms and
 optional required claims (such as a scope). Tokens need expiry, issuer, audience and
 a nonempty subject. JWKS URLs must be reachable by the control plane. mTLS references
 a shared certificate secret containing trusted issuers, with optional subject and
-SHA-256 fingerprint restrictions. This release verifies the leaf directly against an
+SHA-256 fingerprint restrictions. FDP verifies the leaf directly against an
 issuer in the configured certificate/CA bundle; include the issuing intermediate in
 that bundle when needed. It does not provide certificate revocation-list checking.
 
@@ -40,15 +40,14 @@ JSON body. Explicit mappings support `path.region`, `query.region`, `body.filter
 passed on, and the normal argument validation still applies.
 
 ```sh
-curl -X POST https://localhost:8091/gw/finance-reports/reports/North \
+curl -X POST https://api.fdp.example.com:9443/gw/finance-reports/reports/North \
   -H "Authorization: Bearer $CALLER_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"start_date":"2026-01-01","end_date":"2026-01-31"}'
 ```
 
 For mTLS, add `--cert client.pem --key client.key`. The API's actual address is shown
-in Floren Data Platform; port 8091 is the local Compose default, configurable with
-`API_GATEWAY_PORT`.
+in the app (`apiGateway.publicUrl` in Helm; port 8091 in local development).
 
 Async operations return HTTP 202 with `run_id`, `status` and `status_url`, also in the
 Location header. Poll that URL with the same JWT subject and/or client certificate.
@@ -78,7 +77,7 @@ does not automatically return arbitrary run files, logs or source code.
 
 SOAP selects the operation using SOAPAction (1.1), the content-type action parameter
 (1.2), or the operation element name. Child elements supply arguments. Responses
-use SOAP envelopes and faults. This release does not generate WSDL or import an
+use SOAP envelopes and faults. FDP does not generate WSDL or import an
 OpenAPI/WSDL definition. Request bodies are limited to 10 MB; SOAP parsing to 1 MB.
 
 ## External: programs call registered REST/SOAP backends
@@ -134,7 +133,7 @@ at a child add access; they do not block inherited permissions.
 | Admin | Contributor plus create/delete |
 | Owner | Admin plus permission assignment and identity management |
 
-Platform admins can initially create APIs. Owners assign roles directly to service identities or through app groups,
+Platform admins create APIs. Owners assign roles directly to service identities or through app groups,
 which bind IdP users/groups or app-managed identities. A grant only on one operation
 shows its API and containing group for navigation, without exposing sibling operations
 or their call records. External Consumer checks apply to Floren Data Platform identities; outside
@@ -197,18 +196,3 @@ If `existingSecret` is renamed, also update the gateway token's Secret reference
 options, entry points and routing there. The backend references `api-gateway@file`.
 See the upstream [HTTP provider](https://doc.traefik.io/traefik/v3.1/providers/http/) and
 [TLS options](https://doc.traefik.io/traefik/v3.3/https/tls/) configuration references.
-
-## Verification
-
-`make test-postgres` runs the backend suite against a disposable PostgreSQL container,
-removing it afterward. It never points at the application database. SQLite tests remain
-the default. `make test-ui` covers API settings, operations, permissions navigation and
-the test console. Live verification must use the actual TLS gateway to test certificate
-forwarding; directly injecting certificate headers into unit tests cannot prove that
-the TLS listener requests certificates correctly.
-
-Existing workloads remain tied to their Git revisions. When upgrading examples from
-native PostgreSQL to the shared Trino executor, use SQLAlchemy `text()` for queries with
-named parameter dictionaries, as in `examples/workspace/analysis/sales_report.py`, and
-deploy that revision. Updating local example files does not overwrite a repository or
-an already-deployed commit.

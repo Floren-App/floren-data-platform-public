@@ -1,4 +1,4 @@
-# Smallest production-shaped install: bundled metadata PostgreSQL and Keycloak, isolated layers,
+# Smallest production-shaped install: bundled metadata PostgreSQL, Keycloak and OpenBao, isolated layers,
 # no shared NFS volume (jobs and apps run only in managed layers), and the automation identity
 # for OpenTofu. Replace the hostnames; create the TLS Secret first (see docs/kubernetes-install.md).
 image:
@@ -14,7 +14,10 @@ metadataDatabase:
 bootstrap:
   enabled: true               # generates and retains platform keys
 secretManagement:
-  backend: kubernetes
+  backend: openbao
+openbao:
+  enabled: true               # bundled OpenBao; auto-unseals with a key kept in a Kubernetes Secret
+                              # (seal.mode: kms to unseal through your KMS instead)
 keycloak:
   enabled: true
   publicUrl: https://idp.fdp.example.com

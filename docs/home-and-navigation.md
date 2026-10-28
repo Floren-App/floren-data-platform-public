@@ -1,49 +1,42 @@
-# Home and navigation
+# Using the app
 
-The activity bar is ordered **Home → Workspaces → Workloads → Storage → APIs →
-Catalog → Security → Compute pools**. Administration and Account remain in the
-separate bottom section. Workloads has an application-grid icon; APIs keep the globe.
-Opening an object or switching editor tabs selects the matching activity section.
-New pages replace the single unpinned preview tab. Use the pin icon in a tab to keep
-it open. Unpinning makes that page replaceable again; pinned pages can still be closed.
-The bottom of every sidebar contains the persistent **Active group** selector. It controls
-creation authority and the owning group of new objects; secondary memberships continue
-authorizing existing-object access. See [active groups](active-groups.md).
+FDP runs in the browser or as a desktop app. Both use the same API and the same sign-in.
 
-Home is the opening editor. It shows four workspaces, four recent runs, four recently
-updated runs, and four recently deployed workloads. Updated runs sort by completion
-time, falling back to creation time; this represents recorded starts and completions.
-This panel asks for its own four rows with `GET /v1/runs?limit=4&sort=updated`, so jobs
-started long ago that finish now still appear. Other run cards and counts use the currently
-loaded, authorized run history, initially twenty rows. They do not imply a platform-wide job inventory. Workspaces retain their existing
-private identity and layer scope. Home search reuses the catalog's authorized
-suggestions and passes the query to the full catalog on Enter or Search. Ctrl/Cmd+K
-still opens catalog search directly.
+## Activity bar
 
-The Workloads sidebar contains the folder/workload hierarchy followed by recent
-runs. Its **Recent runs** link and the root's **Recent runs** tab open the same history
-page, with search, status filters and pagination. Workspace/pool/object consoles and
-rerun controls stay on their existing pages. There is no separate Runs activity.
+| Section | What it is for |
+|---|---|
+| **Home** | Your workspaces, recent runs, recent deployments and followed Airflow pipelines |
+| **Workspaces** | Your private VS Code, RStudio and SQL editors ([workspaces](workspaces.md)) |
+| **Workloads** | Folders of published programs, apps, dbt projects and Airflow deployments, plus run history ([publishing](deploying.md)) |
+| **Storage** | Registered databases, buckets and their schemas, with metadata and data previews ([storage integrations](storage-integrations.md)) |
+| **APIs** | Internal and external REST/SOAP APIs ([API management](api-management.md)) |
+| **Packages** | The platform's Python and R package repository ([packages](packages.md)) |
+| **Catalog** | Search, governance, lineage, quality and SLAs ([catalog](catalog.md)) |
+| **Security** | App groups, users, service identities and secrets ([RBAC](rbac.md)) |
+| **Compute pools** | Execution sizes, their limits and current activity ([compute pools](compute.md)) |
+| **Administration** | Platform settings, layers, runtimes, repositories and integrations (administrators only) |
 
-## Orchestrator watch list
+The **Documentation** button in the activity bar opens the guide for the current section.
 
-Home follows up to six Airflow deployments. It initially selects the first three
-deployments the user can execute. **Choose orchestrators** saves an explicit selection;
-each deployment also has an optional DAG filter. Preferences live in local storage,
-scoped by server and username. Every render filters saved IDs against current workload
-permissions. Clearing all selections is preserved. This preference never grants access.
+Opening an object opens it in a tab. New pages replace the single unpinned preview tab;
+pin a tab to keep it open. **Ctrl/Cmd+K** opens catalog search from anywhere.
 
-Only while Home is mounted, selected deployments poll their three most recently updated
-DAG runs every thirty seconds. Each card reports its last successful refresh, handles
-unavailable history independently, and opens the native Airflow DAG grid with a newly
-authorized gateway ticket. Deployment runtime status is separate from DAG-run status.
+## Active group
 
-`GET /v1/workloads/{id}/orchestrator-runs?dag_id=&limit=5` checks workload visibility
-and execute permission before opening metadata. Limits are 1–25. Shared PostgreSQL
-metadata is queried with the deployment's restricted database identity when that
-backend is configured; retained local SQLite and dedicated deployment databases
-have their own compatibility paths. Reads use bounded queries and read-only
-transactions where supported. The endpoint never provisions a database,
-runs a DAG, executes user code, or queries data products. It returns only DAG/run IDs,
-state and timestamps; run configuration, task arguments, credentials and driver errors
-are excluded. Missing metadata yields a generic 503 rather than a misleading empty list.
+The **Active group** selector at the bottom of every sidebar decides which app group
+creates and owns new objects, and which objects the Workloads, Storage and Catalog lists
+show. Your other memberships still authorize actions on existing objects. See
+[active groups](active-groups.md).
+
+## Home
+
+Home shows your latest workspaces, recently started and recently finished runs, and
+recently deployed workloads. Its search box uses the same authorized suggestions as the
+catalog. Press Enter to open the full catalog search.
+
+You can follow up to six Airflow deployments that you may execute. Each card shows the
+latest DAG runs and refreshes every thirty seconds while Home is open, and opens the
+native Airflow grid. **Choose orchestrators** saves your selection, with an optional DAG
+filter per deployment, in your browser. A saved selection never grants access: it is
+filtered against your current permissions each time.

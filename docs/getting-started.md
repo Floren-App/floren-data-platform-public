@@ -1,7 +1,8 @@
 # Quickstart
 
-Choose local Compose for development, or the [Kubernetes installation](kubernetes-install.md)
-for an installation with managed layer infrastructure. Both run the same control-plane API.
+Choose local Compose to try FDP or develop it, or the [Kubernetes installation](kubernetes-install.md)
+for a real installation with managed layers. Both run the same control-plane API. The local
+stack bundles every supporting service; see [local development](local-development.md).
 
 ## Local development
 
@@ -75,5 +76,5 @@ the run console. Saving code in a workspace does not publish it to other users.
 
 Commit a project to Git, [register its repository and publish it](deploying.md),
 then assign its managed identity the specific data/API permissions it needs.
-Follow the [Pokemon walkthrough](pokemon.md) for Test/Prod, ingestion, dbt,
+Follow the [end-to-end example](pokemon.md) for Test/Prod, ingestion, dbt,
 Airflow, dashboards and engineering observability.

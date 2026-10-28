@@ -1,7 +1,7 @@
 # RBAC
 
 See [active groups and ownership](active-groups.md) for primary-group creation,
-secondary-group access, protected Global Admin, and migration of personal ownership groups.
+secondary-group access and the protected Global Admin group.
 
 Floren Data Platform has one policy layer for schema access, nested workload folders, deployed
 services, and service accounts:
@@ -28,15 +28,15 @@ bindings, and provides a searchable service directory.
 The **Security** area has four pages: **App groups**, **Users**, **Services**, and **Secrets**. Its sidebar only switches between them; each page carries its own list and detail. App groups
 are app-managed security groups. They bind users, IdP groups/roles, or service principals
 to fixed resource roles. They are separate from the nested workload folders under
-Deployed. Group details show their roles on visible objects and link to those objects'
+Workloads. Group details show their roles on visible objects and link to those objects'
 permissions. Changing bindings and changing resource assignments remain separate powers.
 IdP identities and memberships carry **IdP · SCIM/OIDC** labels and are read-only here;
 application groups and managed service identities carry **App-managed** labels.
 
-The Data sidebar and pages list only sources and schemas you hold a data role on, directly or through the parent source; a source appears when you can use it or at least one of its schemas. Global Admin has protected Owner access across resources; ordinary users still need explicit data grants. Admins manage every connection under **Administration → Storage integrations** (see [storage integrations](storage-integrations.md)). Deployed folders expose **Contents**,
+The Storage sidebar and pages list only sources and schemas you hold a data role on, directly or through the parent source; a source appears when you can use it or at least one of its schemas. Global Admin has protected Owner access across resources; ordinary users still need explicit data grants. Admins manage every connection under **Administration → Storage integrations** (see [storage integrations](storage-integrations.md)). Workload folders expose **Contents**,
 **Permissions**, and **Settings**; **New folder** and **Deploy here** preserve the current
 location. Workload settings separate execution identity changes from normal use.
-The Deployed sidebar's **+** menu offers **Folder** and **Deploy**, plus subfolder creation
+The Workloads sidebar's **+** menu offers **Folder** and **Deploy**, plus subfolder creation
 and permissions shortcuts on each folder. Creating a folder as an Owner opens its
 Permissions tab so app groups can be assigned immediately.
 
@@ -53,7 +53,7 @@ Service accounts expose their own permissions and Owner-only tokens. Group membe
 and binding management stay with the app group, rather than with resource grants.
 
 Activity icons open the corresponding collection immediately. Their sidebars list actual
-groups, services, secrets, and compute pools. The Data tree expands from a source to its
+groups, services, secrets, and compute pools. The Storage tree expands from a source to its
 registered schemas, tables/views, and columns; S3 namespaces expand into folders and files.
 Opening a schema or table requests only that object's immediate metadata children. SQL
 metadata goes through governed Trino admission and S3 listing uses read-only STS credentials
@@ -79,16 +79,6 @@ they reserve no persistent process and remain callable through the run API and
 `FDPRunOperator(workload="slug", args={...})` from Airflow. Executor permission on
 the workload/folder and the configured execution identity's data grants still apply.
 
-The Compose demo provisions `ana/ana` as a Floren Data Platform platform administrator in Keycloak
-and the SCIM directory. It is not an IdP administrator account.
-
-Product, group, user, managed-identity, and folder icons are original local SVG artwork
-in `apps/desktop/src/components/ProductIcon.tsx`, with no external image requests.
-
-Run `make test-ui` for browser coverage of these workflows, including duplicate schema
-names across catalogs, inherited access, and limited-access users. Install the browser
-once with `cd apps/desktop && npx playwright install chromium`. Tests use isolated API
-fixtures and do not modify a running platform.
 
 ## Roles and inheritance
 
@@ -99,11 +89,7 @@ fixtures and do not modify a running platform.
 | Admin | Read/write and native DDL |
 | Owner | Admin plus Floren Data Platform role assignment |
 
-In legacy native mode, PostgreSQL DDL uses object-owner authority; Admin may therefore issue native grants.
-This accepted exception never grants permission to Floren Data Platform's role-assignment APIs.
-Native privilege drift that exposes extra rights to a new Reader/Contributor connection is
-rejected during issuance; native changes can affect already-issued database sessions.
-Custom stored-function execution is not granted to Reader/Contributor in this release.
+Custom stored-function execution is not granted to Reader or Contributor.
 
 | Workload/folder role | Permissions |
 |---|---|
@@ -113,30 +99,26 @@ Custom stored-function execution is not granted to Reader/Contributor in this re
 | Owner | Admin plus role assignment and protected identity configuration |
 
 Parent grants always apply. Children can add permissions, never block them. There are no
-custom permission bundles, deny rules, inheritance breaks, or individual-table grants in
-this release. Schema grants include existing/future tables under managed creation paths.
+custom permission bundles, deny rules, inheritance breaks, or individual-table grants. Schema grants include existing/future tables under managed creation paths.
 Folder moves require source removal and destination creation rights; moves that change
 inherited assignments also require Owner authority on the moved resource.
 
 Global Admin has protected Owner access to every resource, including data. New registered
 objects receive a direct Owner assignment for the active primary group, in addition to
 inherited access. Only that primary group's privileges authorize creation; other groups remain
-active for existing-object access. Generated personal ownership groups are retired without
-broadening ordinary users' grants. See [active groups](active-groups.md).
+active for existing-object access. See [active groups](active-groups.md).
 
 ## Shared SQL and storage support
 
-PostgreSQL and Iceberg use one authenticated Trino 484 execution path by default.
+PostgreSQL and Iceberg use one authenticated Trino execution path.
 Python/R, dbt and viewer-bound apps use the same engine and schema policy. The engine
 holds backend credentials; clients receive only gateway metadata and their own API
 identity. Catalog mappings must be unique and schemas must be provisioned before SQL
 admission. See [Shared SQL execution](query-execution.md) for deployment and limitations.
 
 S3 plain files retain scoped STS prefix policies, tested against RustFS 1.0.2. Reserved
-Iceberg buckets cannot be accessed through file helpers. Other SQL connectors
-remain unavailable; no native shared-secret fallback is issued.
-Legacy PostgreSQL native leases are available with `FDP_QUERY_EXECUTOR=native`
-only for migration/older deployments.
+Iceberg buckets cannot be accessed through file helpers. Other SQL connectors are not
+available, and no native shared-secret fallback is issued.
 
 ## Set up schema access
 
@@ -144,7 +126,7 @@ only for migration/older deployments.
    Floren Data Platform source with its matching `catalog`. For PostgreSQL also set host/port/
    database and an engine-only connection secret matching the catalog, plus a separate
    write-only **Native provisioning credential** at `datasources/<source>/provisioner`.
-2. Open **Data**, open the source, and register a schema from **Schemas & usage**. Open
+2. Open **Storage**, open the source, and register a schema from **Schemas & usage**. Open
    the schema and choose **Set up access**. PostgreSQL
    provisioning transfers managed ownership, reconciles PUBLIC privileges and gives
    the engine login authority over that schema. Iceberg reserves the namespace in
@@ -211,8 +193,8 @@ application code from intentionally displaying previously read data to another v
 Set a strong separate `FDP_SCIM_TOKEN` to enable `/api/scim/v2` through the gateway
 (`/scim/v2` directly on the control plane). Empty disables provisioning. Discovery, Users,
 Groups, nested membership, equality filters, pagination, PUT, PATCH and soft deletion are
-supported. Use bearer authentication with the provisioning token. The production provider
-is intentionally unspecified; provider-specific interoperability must be tested before use.
+supported. Use bearer authentication with the provisioning token. Any SCIM 2.0 client can
+provision the directory. Test your provider's behavior before production use.
 
 Set `FDP_DIRECTORY_MODE=scim` for a provisioned directory (the Compose and Helm
 examples use this). Unknown/unprovisioned human identities cannot sign in in this mode.
@@ -235,43 +217,7 @@ expired execution tokens; stopped runs cannot revive their context. Python/R SDK
 tokens near expiry. Private editor sessions and shared-app viewers do not grandfather future
 requests as jobs.
 
-In legacy native mode, PostgreSQL credentials default to 15-minute leases. The reaper extends active-job leases
-without increasing scope, and retires finished/expired leases, terminating their database
-sessions. Objects a native Admin creates are retained under the stable schema owner at
-credential cleanup. Existing interactive native sessions may persist until lease expiry plus
-the reaper interval. STS credentials expire at the storage service (minimum 15 minutes for
-AWS-style STS); current app requests are blocked immediately after policy changes are
-processed, but previously issued native credentials remain valid for their lease window.
-SCIM delivery latency precedes all of these timings.
-
-## Migration and local examples
-
-Startup records revision `001_rbac` after the additive schema upgrade. It registers legacy
-workloads/services and makes deployer management explicit. It never infers data levels
-from legacy `DataGrant` rows or copies deployer data grants into service principals. Legacy
-whole-source grant endpoints return 410; legacy grants remain visible for inventory. Review
-and map them into explicit app-group/schema assignments. Broad old credentials must be
-retired separately at their source; disabling issuance cannot recall copies of old passwords.
-
-Existing workloads no longer get implicit everyone visibility. Assign explicit folder or
-service Executor roles for their intended audiences. Review fixed identity configuration for
-legacy apps before redeploying. Runtime/client images need rebuilding to include SDK changes.
-
-For the Compose example, `EXAMPLE_STORAGE=1 POKEMON_STORAGE=0 make seed` provisions the test directory through SCIM,
-registers `finance-dw` schemas `public`, `analytics`, and `dbt_ana`, assigns development and
-production roles separately, registers `finance-etl`, and seeds scoped `lake-files` access.
-The seed also registers the `lake` Trino catalog and creates its finance, analytics and
-dbt_ana Iceberg namespaces through governed SQL. The local-only SCIM token can be
-overridden through `FDP_SCIM_TOKEN`.
-
-## Validation
-
-`make test` runs backend tests, the desktop build, and extension compilation. Shared SQL tests are documented in [query-execution.md](query-execution.md). Native tests
-are opt-in and must use disposable isolated services:
-
-- `FDP_TEST_PG_URL=postgresql://... pytest tests/test_native_rbac.py`
-- `FDP_TEST_S3_URL=http://... pytest tests/test_storage_rbac.py`
-
-The native PostgreSQL test creates/drops its own schema and runtime roles and verifies
-Reader/Contributor/DDL rights, future-object access, viewer delegation, and retained running-job
-access after revocation. The RustFS test checks STS policy enforcement against actual storage.
+STS credentials expire at the storage service (minimum 15 minutes for AWS-style STS).
+Delegated app requests are blocked as soon as policy changes are processed, but
+previously issued STS credentials remain valid until they expire. SCIM delivery latency
+precedes all of these timings.

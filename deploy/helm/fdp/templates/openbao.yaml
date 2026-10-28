@@ -1,0 +1,449 @@
+{{- /* Bundled OpenBao: Raft storage, auto-unseal (a key in a Kubernetes Secret, or your KMS), self-initialized
+       on pod 0's first start. Self-initialization uses a root token that OpenBao revokes immediately; the chart
+       never stores a root token or unseal key. Only the control plane may call it. */}}
+{{- define "fdp.openbaoServer" -}}
+ui = false
+disable_mlock = true   # recommended with Raft; the container drops all capabilities
+cluster_name = "fdp"
+listener "tcp" {
+  address         = "0.0.0.0:8200"
+  cluster_address = "0.0.0.0:8201"
+  {{- if .tls }}
+  tls_cert_file   = "/openbao/tls/tls.crt"
+  tls_key_file    = "/openbao/tls/tls.key"
+  tls_min_version = "tls12"
+  {{- else }}
+  tls_disable     = true
+  {{- end }}
+}
+storage "raft" {
+  path = "/openbao/data"
+  {{- range $i := until .replicas }}
+  retry_join {
+    leader_api_addr = "{{ $.scheme }}://fdp-openbao-{{ $i }}.fdp-openbao-internal.{{ $.ns }}.svc:8200"
+    {{- if $.tls }}
+    leader_ca_cert_file = "/openbao/tls/ca.crt"
+    {{- end }}
+  }
+  {{- end }}
+}
+audit "file" "stdout" {
+  description = "Every request and response, with secrets HMAC-hashed, on the pod log"
+  options {
+    file_path = "stdout"
+  }
+}
+{{- if eq .seal.mode "kubernetes" }}
+seal "static" {
+  current_key_id = {{ .seal.keyId | quote }}
+  current_key    = "file:///openbao/seal/key"
+}
+{{- else }}
+seal {{ .seal.kms.type | quote }} {
+  {{- range $key, $value := .seal.kms.config }}
+  {{ $key }} = {{ $value | toString | quote }}
+  {{- end }}
+}
+{{- end }}
+{{- if .init }}
+initialize "platform" {
+  request "kv" {
+    operation = "update"
+    path      = "sys/mounts/{{ .kvMount }}"
+    data = {
+      type    = "kv"
+      options = { version = "2" }
+    }
+  }
+  request "policy" {
+    operation = "update"
+    path      = "sys/policies/acl/fdp-platform"
+    data = { policy = {{ .policy | toJson }} }
+  }
+  request "kubernetes-auth" {
+    operation = "update"
+    path      = "sys/auth/kubernetes"
+    data = { type = "kubernetes" }
+  }
+  request "kubernetes-config" {
+    operation = "update"
+    path      = "auth/kubernetes/config"
+    data = { kubernetes_host = "https://kubernetes.default.svc" }
+  }
+  request "break-glass-policy" {
+    operation = "update"
+    path      = "sys/policies/acl/fdp-break-glass"
+    data = { policy = "path \"*\" { capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\", \"sudo\"] }\n" }
+  }
+  request "break-glass-role" {
+    operation = "update"
+    path      = "auth/kubernetes/role/admin"
+    data = {
+      bound_service_account_names      = ["fdp-openbao-admin"]
+      bound_service_account_namespaces = [{{ .ns | quote }}]
+      token_policies                   = ["fdp-break-glass"]
+      token_ttl                        = "15m"
+      token_max_ttl                    = "1h"
+    }
+  }
+  request "control-plane-role" {
+    operation = "update"
+    path      = "auth/kubernetes/role/{{ .role }}"
+    data = {
+      bound_service_account_names      = ["fdp-control-plane"]
+      bound_service_account_namespaces = [{{ .platformNamespace | quote }}]
+      token_policies                   = ["fdp-platform"]
+      token_ttl                        = "1h"
+      token_max_ttl                    = "4h"
+    }
+  }
+}
+{{- end }}
+{{- end }}
+{{- if .Values.openbao.enabled }}
+{{- $ns := include "fdp.openbaoNamespace" . }}
+{{- $scheme := include "fdp.openbaoScheme" . }}
+{{- $tls := ne .Values.openbao.tls.mode "disabled" }}
+{{- $replicas := int .Values.openbao.replicas }}
+{{- $seal := .Values.openbao.seal }}
+{{- $generateKey := and (eq $seal.mode "kubernetes") (not $seal.existingSecret) }}
+{{- $keySecret := default "fdp-openbao-seal" $seal.existingSecret }}
+{{- $policy := printf "path \"%s/data/*\" { capabilities = [\"create\", \"read\", \"update\", \"delete\"] }\npath \"%s/metadata/*\" { capabilities = [\"read\", \"list\", \"delete\"] }\n" .Values.openbao.kvMount .Values.openbao.kvMount }}
+{{- $server := dict "tls" $tls "scheme" $scheme "ns" $ns "replicas" $replicas "seal" $seal "kvMount" .Values.openbao.kvMount "policy" $policy "role" .Values.openbao.auth.role "platformNamespace" .Release.Namespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  annotations: { helm.sh/resource-policy: keep }
+  labels:
+    fdp.floren.app/installation: {{ include "fdp.installation" . }}
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fdp-openbao
+  namespace: {{ $ns }}
+  {{- with .Values.openbao.serviceAccount.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+# Break-glass administration (snapshots, policy changes, key rotation): no pod runs as this account. Whoever
+# may create its tokens (`kubectl create token`) can log in to OpenBao as an audited, short-lived admin.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fdp-openbao-admin
+  namespace: {{ $ns }}
+automountServiceAccountToken: false
+---
+# Kubernetes auth: OpenBao reviews the control plane's service account tokens with its own identity.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $ns }}-fdp-openbao-token-review
+subjects:
+  - kind: ServiceAccount
+    name: fdp-openbao
+    namespace: {{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+{{- if $generateKey }}
+---
+# The seal key is created once by pod 0's init container and never rewritten, so GitOps tools that render
+# without cluster lookups cannot replace it. It stays when the chart is uninstalled.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: fdp-openbao-seal-key
+  namespace: {{ $ns }}
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [{{ $keySecret }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: fdp-openbao-seal-key
+  namespace: {{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: fdp-openbao
+    namespace: {{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: fdp-openbao-seal-key
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fdp-openbao-config
+  namespace: {{ $ns }}
+data:
+  server.hcl: |
+    {{- include "fdp.openbaoServer" (merge (dict "init" false) $server) | nindent 4 }}
+  initialize.hcl: |
+    {{- include "fdp.openbaoServer" (merge (dict "init" .Values.openbao.selfInitialize) $server) | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-openbao-internal
+  namespace: {{ $ns }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true   # Raft members find each other before they are ready
+  selector: { app.kubernetes.io/name: fdp-openbao }
+  ports:
+    - { name: api, port: 8200 }
+    - { name: cluster, port: 8201 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-openbao
+  namespace: {{ $ns }}
+spec:
+  selector: { app.kubernetes.io/name: fdp-openbao }
+  ports:
+    - { name: api, port: 8200 }
+{{- if eq .Values.openbao.tls.mode "certManager" }}
+{{- $issuer := .Values.openbao.tls.issuerRef | default .Values.tls.issuerRef }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: fdp-openbao
+  namespace: {{ $ns }}
+spec:
+  secretName: {{ .Values.openbao.tls.secretName }}
+  duration: {{ .Values.tls.duration | quote }}
+  renewBefore: {{ .Values.tls.renewBefore | quote }}
+  privateKey: { rotationPolicy: Always }
+  issuerRef:
+    name: {{ required "openbao.tls.mode=certManager requires openbao.tls.issuerRef.name or tls.issuerRef.name" $issuer.name | quote }}
+    kind: {{ $issuer.kind | default "Issuer" }}
+    group: cert-manager.io
+  dnsNames:
+    - fdp-openbao.{{ $ns }}.svc
+    - fdp-openbao.{{ $ns }}.svc.cluster.local
+    {{- range $i := until $replicas }}
+    - fdp-openbao-{{ $i }}.fdp-openbao-internal.{{ $ns }}.svc
+    {{- end }}
+  ipAddresses: [127.0.0.1]
+{{- end }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: fdp-openbao
+  namespace: {{ $ns }}
+spec:
+  serviceName: fdp-openbao-internal
+  replicas: {{ $replicas }}
+  podManagementPolicy: OrderedReady   # pod 0 initializes alone; the others join it
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-openbao }
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fdp-openbao
+        {{- with .Values.openbao.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
+      annotations:
+        checksum/config: {{ include "fdp.openbaoServer" (merge (dict "init" .Values.openbao.selfInitialize) $server) | sha256sum }}
+    spec:
+      serviceAccountName: fdp-openbao
+      {{- include "fdp.imagePullSecrets" . | nindent 6 }}
+      {{- if $tls }}
+      shareProcessNamespace: true   # the reloader signals OpenBao when its certificate is renewed
+      {{- end }}
+      securityContext: { runAsNonRoot: true, runAsUser: 100, runAsGroup: 1000, fsGroup: 1000, seccompProfile: { type: RuntimeDefault } }
+      {{- if $generateKey }}
+      initContainers:
+        - name: seal-key
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [python, -m, app.openbao_seal_key]
+          env:
+            - { name: FDP_OPENBAO_SEAL_NAMESPACE, value: {{ $ns | quote }} }
+            - { name: FDP_OPENBAO_SEAL_SECRET, value: {{ $keySecret | quote }} }
+            - { name: FDP_OPENBAO_SEAL_KEY_FILE, value: /openbao/seal/key }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts:
+            - { name: seal, mountPath: /openbao/seal }
+          resources:
+            requests: { cpu: 10m, memory: 64Mi }
+            limits: { memory: 256Mi }
+      {{- end }}
+      containers:
+        - name: openbao
+          image: {{ .Values.openbao.image | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              config=/openbao/config/server.hcl
+              case "$POD_NAME" in *-0) config=/openbao/config/initialize.hcl ;; esac
+              exec bao server -config="$config"
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - { name: BAO_API_ADDR, value: "{{ $scheme }}://$(POD_NAME).fdp-openbao-internal.{{ $ns }}.svc:8200" }
+            - { name: BAO_CLUSTER_ADDR, value: "https://$(POD_NAME).fdp-openbao-internal.{{ $ns }}.svc:8201" }
+            - { name: BAO_ADDR, value: "{{ $scheme }}://127.0.0.1:8200" }
+            {{- if $tls }}
+            - { name: BAO_CACERT, value: /openbao/tls/ca.crt }
+            {{- end }}
+            {{- with .Values.openbao.extraEnv }}{{ toYaml . | nindent 12 }}{{ end }}
+          ports:
+            - { name: api, containerPort: 8200 }
+            - { name: cluster, containerPort: 8201 }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          startupProbe:
+            httpGet: { path: "/v1/sys/health?standbyok=true", port: api, scheme: {{ upper $scheme }} }
+            periodSeconds: 5
+            failureThreshold: 120
+          readinessProbe:   # active or unsealed standby
+            httpGet: { path: "/v1/sys/health?standbyok=true", port: api, scheme: {{ upper $scheme }} }
+            periodSeconds: 5
+          livenessProbe:    # sealed or uninitialized is not a reason to restart
+            httpGet: { path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204", port: api, scheme: {{ upper $scheme }} }
+            periodSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - { name: data, mountPath: /openbao/data }
+            - { name: config, mountPath: /openbao/config, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+            {{- if eq $seal.mode "kubernetes" }}
+            - { name: seal, mountPath: /openbao/seal, readOnly: true }
+            {{- end }}
+            {{- if $tls }}
+            - { name: tls, mountPath: /openbao/tls, readOnly: true }
+            {{- end }}
+          resources: {{- toYaml .Values.openbao.resources | nindent 12 }}
+        {{- if $tls }}
+        - name: tls-reloader
+          image: {{ .Values.openbao.image | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              last=$(md5sum /openbao/tls/tls.crt)
+              while sleep 30; do
+                now=$(md5sum /openbao/tls/tls.crt)
+                [ "$now" = "$last" ] || { pkill -HUP -x bao && echo "certificate reloaded"; last=$now; }
+              done
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts:
+            - { name: tls, mountPath: /openbao/tls, readOnly: true }
+          resources:
+            requests: { cpu: 5m, memory: 16Mi }
+            limits: { memory: 32Mi }
+        {{- end }}
+      volumes:
+        - name: config
+          configMap: { name: fdp-openbao-config }
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
+        {{- if $generateKey }}
+        - name: seal
+          emptyDir: { medium: Memory, sizeLimit: 1Mi }
+        {{- else if eq $seal.mode "kubernetes" }}
+        - name: seal
+          secret: { secretName: {{ $keySecret }}, defaultMode: 0440 }   # group-readable through fsGroup
+        {{- end }}
+        {{- if $tls }}
+        - name: tls
+          secret: { secretName: {{ .Values.openbao.tls.secretName }} }
+        {{- end }}
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.openbao.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests: { storage: {{ .Values.openbao.size | quote }} }
+{{- if gt $replicas 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: fdp-openbao
+  namespace: {{ $ns }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-openbao }
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ $ns }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fdp-openbao
+  namespace: {{ $ns }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: fdp-openbao }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:   # only the control plane calls OpenBao
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Release.Namespace }} } }
+          podSelector: { matchLabels: { app.kubernetes.io/name: fdp-control-plane } }
+      ports: [{ port: 8200, protocol: TCP }]
+    - from:   # Raft members
+        - podSelector: { matchLabels: { app.kubernetes.io/name: fdp-openbao } }
+      ports: [{ port: 8200, protocol: TCP }, { port: 8201, protocol: TCP }]
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: fdp-openbao } }
+      ports: [{ port: 8200, protocol: TCP }, { port: 8201, protocol: TCP }]
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.layerController.dnsNamespace }} } }
+          podSelector: { matchLabels: { k8s-app: kube-dns } }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    - to:   # Kubernetes API (token reviews, seal key) and KMS endpoints
+        {{- range .Values.openbao.networkPolicy.apiServerCidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports: [{ port: 443, protocol: TCP }, { port: 6443, protocol: TCP }]
+{{- $cilium := toString .Values.openbao.networkPolicy.cilium }}
+{{- if or (eq $cilium "true") (and (eq $cilium "auto") (.Capabilities.APIVersions.Has "cilium.io/v2/CiliumNetworkPolicy")) }}
+---
+# Cilium does not match the API server with ipBlock rules (unless policy-cidr-match-mode includes nodes):
+# allow exactly the kube-apiserver entity for token reviews and the one-time seal key.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: fdp-openbao-kube-apiserver
+  namespace: {{ $ns }}
+spec:
+  endpointSelector:
+    matchLabels: { app.kubernetes.io/name: fdp-openbao }
+  egress:
+    - toEntities: [kube-apiserver]
+      toPorts:
+        - ports: [{ port: "443", protocol: TCP }, { port: "6443", protocol: TCP }]
+{{- end }}
+{{- end }}

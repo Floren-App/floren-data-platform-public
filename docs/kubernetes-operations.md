@@ -35,9 +35,11 @@ rollback.
 |---|---|---|
 | Platform metadata (configuration, permissions, run history, catalog) | Bundled: `fdp-metadata-db` StatefulSet; external: your PostgreSQL | `pg_dump` (below) |
 | Platform keys and passwords | Secrets `fdp-control-plane`, `fdp-keycloak`, `fdp-metadata-db` | Back up with your cluster backup tool (encrypted) |
+| Application secrets (bundled OpenBao) | Raft data in namespace `<release>-openbao` | `bao operator raft snapshot save`, plus the `fdp-openbao-seal` Secret (Kubernetes model) |
 | Application secrets (Kubernetes backend) | Namespace `<release>-secrets` | Same as above |
+| Application secrets (your OpenBao, Vault or cloud secret manager) | Your secret store | Its own backup tooling |
 | Identity provider | Bundled Keycloak database in the metadata server | Included in a full `pg_dumpall` |
-| Layer artifacts and workspace volumes | PVCs in each `dc-<installation>-layer-<id>` namespace | Volume snapshots |
+| Layer artifacts and workspace volumes | PVCs in each `fdp-<installation>-layer-<id>` namespace | Volume snapshots |
 
 Metadata backup and a restore check:
 
@@ -140,7 +142,28 @@ admin API and the metrics endpoint.
 
 ## Secret backend recovery (OpenBao)
 
-With `secretManagement.backend: openbao`, secret values live only in OpenBao. When it is
+**Bundled OpenBao.** Pods unseal themselves; a pod that stays sealed or not ready usually lacks its key:
+in the Kubernetes model, check that the `fdp-openbao-seal` Secret exists and that the seal-key init
+container succeeded; in the KMS model, check the pods' KMS identity and network access. Never delete or
+replace the seal Secret: without the original key the data cannot be decrypted. Restore a lost key from
+its backup.
+
+The chart keeps no OpenBao root token. For administration (snapshots, policy changes, seal key rotation),
+log in through the break-glass service account `fdp-openbao-admin`. No pod runs as it; Kubernetes RBAC
+decides who may create its tokens. The OpenBao token is valid for at most an hour and every request is
+audited. For example, to take a Raft snapshot:
+
+```sh
+JWT=$(kubectl -n fdp-openbao create token fdp-openbao-admin --duration=10m)
+kubectl -n fdp-openbao exec -i fdp-openbao-0 -c openbao -- sh -c '
+  export BAO_TOKEN=$(bao write -field=token auth/kubernetes/login role=admin jwt="$(cat)")
+  bao operator raft snapshot save /tmp/openbao.snap >/dev/null && cat /tmp/openbao.snap && rm /tmp/openbao.snap
+' <<< "$JWT" > openbao.snap
+```
+
+Store snapshots encrypted, together with a copy of the seal key in the Kubernetes model.
+
+With `secretManagement.backend: openbao` or `vault`, secret values live only in that server. When it is
 unavailable the platform stays up; anything that reads or writes a secret answers **503** with
 the cause, never OpenBao's own response:
 
@@ -170,7 +193,7 @@ policies stay. Reactivate it by applying the infrastructure again with `retired:
 Deleting the retained data is a deliberate operator step, never done by the platform:
 
 ```sh
-kubectl delete namespace dc-<installation>-layer-<id>
+kubectl delete namespace fdp-<installation>-layer-<id>
 ```
 
 The controller notices within about a minute and reports `StorageDeleted`, and never

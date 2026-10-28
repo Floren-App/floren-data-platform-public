@@ -1,19 +1,16 @@
 # Floren Data Platform Helm chart
 
-The chart currently provides the existing shared-namespace deployment plus opt-in
-public certificates, private-CA trust, optional PostgreSQL/Keycloak, SCIM provisioning,
-and a Kubernetes-backed secret store. The opt-in layer controller now provisions
-layer Trino, workspace volumes and artifact storage; runtime integration and
-operational validation remain in progress. Do not treat
-this chart as the completed deployment described in the
-[operations guide](../../../docs/kubernetes-operations.md).
+Installs the Floren Data Platform control plane, gateway and optional components. Every supporting
+service can be bundled or brought from outside: Keycloak or any OIDC/SCIM identity provider, PostgreSQL
+for platform metadata, OpenBao or another secret store, and per-layer PostgreSQL and RustFS. The optional
+layer controller provisions isolated layers with their own Trino, workspace volumes and artifact storage.
+Start with the [Kubernetes installation guide](../../../docs/kubernetes-install.md).
 
 The shared platform/legacy data path currently needs an existing NFS export through
 `dataVolume.nfs.server` and `dataVolume.nfs.path`. Both namespace-local claims bind
 to that export. The PVs and PVCs carry Helm `keep` annotations, and PV reclaim policy
 is `Retain`; uninstall therefore leaves storage for explicit operator recovery or
 cleanup. This is separate from private workspace PVCs and managed layer artifacts.
-Fresh install/upgrade and storage recovery verification remain open checklist items.
 
 ## Layer data-source networking
 
@@ -422,7 +419,7 @@ Set `metadataDatabase.enabled: true` or use `examples/bundled-metadata.yaml`.
 The chart creates a persistent PostgreSQL server, a distinct `fdp` database
 and non-superuser application role, and connects the control plane automatically.
 Supply platform credentials through `existingSecret`, or enable automatic
-generation with `bootstrap.enabled` and the Kubernetes secret backend.
+generation with `bootstrap.enabled`.
 
 Database passwords are generated on initial installation and reused through Helm
 lookup on upgrades. The Secret and PVC have Retain behavior. A missing key in an
@@ -462,7 +459,7 @@ metadata reader with an explicit CONNECT grant as well as SELECT privileges.
 ## Bundled and external profiles
 
 `examples/bundled.yaml` enables metadata PostgreSQL, generated platform keys,
-Keycloak, SCIM synchronization, and the Kubernetes application-secret backend.
+Keycloak, SCIM synchronization, and the bundled OpenBao secret store.
 `examples/external-services.yaml` keeps external PostgreSQL, OIDC/SCIM, and OpenBao.
 Keycloak can also use its own external database independently of metadata PostgreSQL:
 set `keycloak.database.existingSecret` with `jdbc-url`, `username`, and `password`.
@@ -526,21 +523,74 @@ existing realm. Changing imported clients, passwords, realm name, or issuer afte
 installation requires an explicit IdP update/migration. Helm rollback alone cannot
 roll back IdP state or database writes.
 
-## Kubernetes application-secret backend
+## Secret stores
+
+`secretManagement.backend` selects where application secrets (data-source, Git and API credentials,
+certificates, per-deployment Airflow keys) are stored. Values are write-only through the API and never
+enter metadata tables. Changing backends requires a coordinated secret migration.
+
+| Backend | Configure | Platform identity |
+|---|---|---|
+| `openbao` bundled | `openbao.enabled: true` | Kubernetes auth, configured automatically |
+| `openbao` / `vault` external | `openbao.addr`, `openbao.kvMount`, `openbao.auth.*` | Token, Kubernetes auth or AppRole |
+| `kubernetes` | `secretManagement.namespace` | The control plane's service account |
+| `aws` | `secretManagement.aws.*` | IRSA or EKS Pod Identity (`serviceAccount.annotations`) |
+| `azure` | `secretManagement.azure.vaultUrl` | Azure Workload Identity (`serviceAccount.annotations`, `podLabels`) |
+| `gcp` | `secretManagement.gcp.project` | GKE Workload Identity (`serviceAccount.annotations`) |
+
+Dynamic database credentials (`dynamic_role`) need the OpenBao or Vault backend.
+
+### Bundled OpenBao
+
+`openbao.enabled: true` runs OpenBao (MPL-2.0) as a StatefulSet with Raft storage in its own namespace
+(`<release-namespace>-openbao`, Pod Security `restricted`, default-deny network policies; only the
+control plane may connect). On its first start, pod 0 initializes itself declaratively: a KV v2 mount,
+Kubernetes auth with a role bound to the `fdp-control-plane` service account, and a policy limited to
+that mount. OpenBao revokes the root token used for this immediately; the chart never stores a root
+token or unseal key. Every request is audited, with secrets HMAC-hashed, on the pod log.
+
+Two unseal models, both automatic:
+
+- `openbao.seal.mode: kubernetes` (default): a static 32-byte seal key in the Secret `fdp-openbao-seal`.
+  An init container creates it once as an immutable Secret and never rewrites it, so GitOps renders
+  without cluster lookups cannot replace it. Anyone who can read that Secret and the OpenBao volume
+  can read the stored secrets: enable etcd encryption at rest and keep a protected copy of the key.
+  To bring your own key, set `openbao.seal.existingSecret` (key `key`, exactly 32 bytes).
+- `openbao.seal.mode: kms`: auto-unseal through your KMS (`awskms`, `azurekeyvault`, `gcpckms`,
+  `transit`, ...). `openbao.seal.kms.config` is passed to the OpenBao seal stanza; give the OpenBao pods
+  access with `openbao.serviceAccount.annotations`, `openbao.podLabels` or `openbao.extraEnv`.
+  No key is stored in the cluster.
+
+`openbao.replicas: 3` (or 5) runs a Raft cluster. Pods start in order: pod 0 initializes and the others
+join it. After installation you may set `openbao.selfInitialize: false`; with it enabled, never delete
+pod 0's volume while other members still run. `openbao.tls.mode` (`existing` or `certManager` with a
+private-CA issuer) encrypts client traffic; renewed certificates are reloaded without a restart. Add
+the CA to `trust.caBundleSecret` so the control plane verifies it. With a private registry, create the
+pull Secret in the OpenBao namespace too (the seal-key init container uses the control-plane image).
+
+Administration uses a break-glass role: whoever may create tokens for the `fdp-openbao-admin` service
+account (`kubectl create token`) can log in with Kubernetes auth (`role=admin`) for at most an hour. No pod
+runs as that account. Back up the Raft data with `bao operator raft snapshot save` and, in `kubernetes`
+mode, the seal key Secret: without the key, the data cannot be decrypted. See
+[operations](../../../docs/kubernetes-operations.md#secret-backend-recovery-openbao).
+
+### Kubernetes Secrets
 
 `secretManagement.backend: kubernetes` stores application secrets and certificate
 bundles in a dedicated namespace, defaulting to `<release-namespace>-secrets`.
 Only the control-plane service account gets Secret get/create/update/delete there;
 workloads and the directory adapter receive no such permissions. App IAM still
-authorizes each access. Secret names are hashes of internal paths and values never
-enter metadata tables. The namespace is retained to preserve stored secrets.
+authorizes each access. Secret names are hashes of internal paths. The namespace
+is retained to preserve stored secrets. Kubernetes base64 encoding is not
+encryption: configure cluster encryption at rest and encrypted backups.
 
-Kubernetes base64 encoding is not encryption: configure cluster encryption at rest
-and encrypted backups. This is an installation prerequisite, not something the
-application can infer from ordinary Secret API access. External OpenBao remains
-supported for installations needing its independent secret-management facilities
-and dynamic database credentials; dynamic roles fail explicitly with the Kubernetes
-backend. Changing backends requires a coordinated secret migration.
+### Cloud secret managers
+
+Each platform secret becomes one provider secret holding a JSON map, named with the configured prefix
+plus a readable form of its path and a hash. The control plane needs permission to create, read, update
+and delete secrets with that prefix (AWS also `RestoreSecret`; Azure `recover`; Google
+`secretmanager.secrets.*` and `versions.*`). AWS keeps deleted secrets for
+`secretManagement.aws.recoveryWindowDays`; Azure soft-deletes; Google keeps only the latest version.
 
 References: [Kubernetes Secret guidance](https://kubernetes.io/docs/concepts/security/secrets-good-practices/),
 [Keycloak realm import](https://www.keycloak.org/server/importExport),

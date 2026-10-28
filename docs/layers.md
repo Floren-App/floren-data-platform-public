@@ -14,10 +14,6 @@ example Dev, Test and Prod), and nothing runs until one exists.
   restricted to that layer's objects and the user's RBAC grants; it does not grant production data
   access or bypass promotion and branch restrictions.
 
-Installations that had the built-in **Prod** and **Non-Prod** keep them as ordinary layers with the same
-IDs: Prod is marked production and Non-Prod is the default, as they behaved before. Import them once
-to manage them with OpenTofu.
-
 A person can create a private workspace in any layer that allows workspaces. Creation
 does not create a security group or give access to an object. Each request requires:
 
@@ -35,19 +31,19 @@ to its layer. Platform-admin status is stripped from execution contexts.
   catalog metadata inherit that layer. An existing integration cannot change layers.
 - Workload folders can select a layer or remain organization folders spanning multiple
   layers. Child workloads must match a bound parent's layer. Workloads in an unbound
-  folder explicitly select a layer. Unspecified legacy creations default to Non-Prod.
+  folder explicitly select a layer. Otherwise the default layer applies.
 - Deployed programs/apps and their registered identities keep that layer. Workspace
   programs and runs inherit the workspace's layer. Neither program configuration nor a
   client-supplied claim can override the server-derived execution boundary.
 - `fdp.json` supports `layer` on each program and as a file-level default, by name
   or stable layer ID. Workspace discovery includes only matching programs. Direct runs,
   Airflow task admission, workload and GitOps validate the declaration too. It never
-  changes the workspace/workload layer or grants access. Legacy undeclared programs
-  continue using the workspace/workload layer.
+  changes the workspace/workload layer or grants access. Programs without a declaration
+  use the workspace/workload layer.
 - APIs and service accounts select a layer too. Direct service grants across layers are
   rejected. Users and app groups may have permissions in several layers; each execution
   still narrows those permissions to its own layer.
-- Personal/shared development secrets belong to Non-Prod. Other layers use their own
+- Personal and group secrets are refused in production layers, which use their own
   service-account secrets. Workload contexts cannot borrow credentials from another layer.
 - Catalog results and detail pages show Layer, with a Layer filter and `layer:"Non-Prod"`
   search syntax. Filters and facets are computed only from authorized metadata.
@@ -59,41 +55,26 @@ layer of an existing workload. In-use layers, the default layer and layers that 
 retained storage cannot be deleted. With OpenTofu, destroying a layer with infrastructure retires it
 and keeps it with its storage.
 
-## Compatibility and migration
+## Managed and unmanaged layers
 
-Layer IDs use the existing resource identity format. The database/runtime field
-`environment_id` remains an internal compatibility field containing the canonical layer ID;
-new clients use `layer_id`. Legacy environment-folder IDs resolve to their global layer.
-No data files or workspace volumes are moved. Existing running jobs keep their access
-snapshots. New resource admission and all subsequent workspace requests use layer checks.
+A **managed layer** has infrastructure configured (`fdp_layer` with `infrastructure`, or
+**Administration → Layers**). The layer controller then gives it:
 
-The initial migration maps legacy production folders to Prod and development folders to
-Non-Prod, binds existing storage/APIs/services/workspaces, and records an audit event.
-The Pokémon fixture's `Pokemon Test Workspace Ana` group is converted into equivalent
-direct user grants and removed. Ana's private dbt schema is not granted to all developers.
-New workspace setup creates no group. Other existing security groups retain their roles.
+- its own namespace, `fdp-<installation>-layer-<id>`, derived from the stable layer ID;
+- default-deny ingress and egress network policies, opened only for documented platform
+  paths and the data-source egress you admit;
+- its own Trino coordinator and workers, artifact volume and resource quota;
+- optionally its own PostgreSQL and RustFS, with Iceberg on that storage.
 
-Runtime pods/containers carry a stable `fdp.floren.app/layer` label, alongside the legacy
-environment label. Docker continues using isolated execution networks. Existing running
-containers may retain their narrower, old folder network until restarted; authorization
-immediately resolves their context to the canonical layer.
+Workspaces, jobs, apps and Airflow components of that layer run only in its namespace.
+See the [layer infrastructure reference](layer-infrastructure.md) for every setting.
 
-## Future: full Kubernetes network separation
+An **unmanaged layer** is an authorization boundary only. Its workloads run in the shared
+runtime namespace, so there is no network separation between unmanaged layers. Use
+managed layers wherever layers must be isolated at the network level, as with production
+and non-production. Authorization and network isolation are separate controls, and both
+apply to managed layers.
 
-Tracked follow-up; full separation is **not implemented by this change**:
-
-1. Use a namespace/security boundary per layer, with layer-scoped service accounts,
-   secrets, storage claims and admission controls that prevent label/namespace spoofing.
-2. Deny cross-layer pod/service traffic by default in both directions. Apply a default-deny
-   ingress/egress policy to every workload, including Airflow workers, brokers and jobs.
-3. Allow only documented platform paths: authenticated control-plane/data/API gateways,
-   DNS, approved Git/package mirrors, and explicitly approved external destinations.
-   Gateway access must not become a route to a different layer's backend or credentials.
-4. Layer-scope direct file-storage egress and separate the SQL/catalog/credential path
-   where needed. Shared gateways must preserve the server-derived layer on every request.
-5. Verify DNS, direct IP, service discovery, IPv4/IPv6, shared storage and service-account
-   credentials cannot cross the boundary, including nested Airflow-launched workloads.
-
-The current shared Kubernetes namespace and existing network policies do not yet provide
-this full guarantee. RBAC/layer authorization and future network enforcement are separate
-controls and both must pass before claiming complete network separation.
+Runtime pods carry a stable `fdp.floren.app/layer` label. Admission and authorization never
+rely on that label: the server derives every execution's layer from its own records.
+In local Docker development, each workspace and its runs use a private network instead.

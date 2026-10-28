@@ -1,8 +1,21 @@
 # Floren Data Platform
 
-FDP brings workspaces, compute, governed storage, published workloads and a catalog
-into one platform. Develop in a private workspace, share code through Git, and
-publish repeatable jobs or dashboards with their own managed identities.
+FDP is an open-source, governed compute layer for data teams. It brings workspaces,
+compute, governed SQL, published workloads and a catalog together on Kubernetes.
+Develop in a private workspace, share code through Git, and publish repeatable jobs or
+dashboards with their own managed identities.
+
+It is built on three principles:
+
+- **Security by design.** Every actor has an identity, permissions are explicit, and
+  credentials never reach user code.
+- **Bring your own infrastructure.** Use your own identity provider, secret store
+  (OpenBao, Vault, Kubernetes, AWS, Azure or Google), PostgreSQL and object storage, or switch
+  on the optional bundled Keycloak, PostgreSQL, RustFS and OpenBao.
+- **No vendor lock-in.** Only open-source components, open data formats and standard
+  interfaces, on any Kubernetes in any cloud or on-premises.
+
+Read the [design principles](architecture/index.md) to see how these shape the platform.
 
 ## Choose a starting point
 
@@ -10,10 +23,12 @@ publish repeatable jobs or dashboards with their own managed identities.
 |---|---|
 | Try the application locally | [Quickstart](getting-started.md) |
 | Install it on Kubernetes | [Installation](kubernetes-install.md) |
+| Understand the design and its security model | [Architecture](architecture/index.md) |
+| See what you can bring and what is bundled | [Bring your own infrastructure](architecture/bring-your-own.md) |
 | Understand the object and identity model | [Core concepts](concepts.md) |
 | Configure everything as code | [Terraform/OpenTofu](terraform.md) |
 | Write a program or dashboard | [Workspaces](workspaces.md), then [fdp.json](fdp-json.md) |
-| Build a complete data product | [Pokemon walkthrough](pokemon.md) |
+| Build a complete data product | [End-to-end example](pokemon.md) |
 | Find data and its upstream dependencies | [Catalog and lineage](catalog.md) |
 | Diagnose a problem | [Troubleshooting](troubleshooting.md) |
 
@@ -30,8 +45,8 @@ Git ──> Workspaces ──> Publish ──> Workloads ──> Data products
 ```
 
 The control plane owns metadata, policy and orchestration. Managed layers own
-their workload compute and data-access infrastructure. Prod and Non-Prod are
-initial examples of layers, not hard-coded environment names.
+their workload compute and data-access infrastructure. Layers are defined by you, for
+example Dev, Test and Prod.
 
 ## Documentation and versions
 

@@ -192,13 +192,34 @@ class Settings(BaseSettings):
     data_dir: str = "/fdp-data"        # where the control plane itself mounts that volume
     app_start_timeout_seconds: int = 600     # a new app version must answer within this to go live
 
-    # --- Secrets (OpenBao, Vault-API compatible) ---
-    secrets_backend: Literal["openbao", "kubernetes", "memory"] = "openbao"
+    # --- Secrets: where secret values live ---
+    secrets_backend: Literal["openbao", "vault", "kubernetes", "aws", "azure", "gcp", "memory"] = "openbao"
     k8s_secret_namespace: str = 'fdp-secrets'
+    # OpenBao or HashiCorp Vault (same API)
     openbao_addr: str = "http://localhost:8200"
+    openbao_kv_mount: str = "fdp"
+    openbao_namespace: Optional[str] = None    # OpenBao/Vault Enterprise namespace
+    openbao_auth: Literal["token", "kubernetes", "approle"] = "token"
     openbao_token: Optional[str] = None
     openbao_token_file: Optional[str] = None   # read the token from a file (mounted secret)
-    openbao_kv_mount: str = "fdp"
+    openbao_auth_role: str = "fdp-control-plane"   # kubernetes auth role
+    openbao_auth_mount: str = ""               # auth mount path; empty: the method name
+    openbao_approle_role_id: Optional[str] = None
+    openbao_approle_secret_id: Optional[str] = None
+    kubernetes_token_file: str = '/var/run/secrets/kubernetes.io/serviceaccount/token'
+    # AWS Secrets Manager (credentials from the default chain: IRSA, EKS Pod Identity, environment)
+    aws_secrets_region: Optional[str] = None
+    aws_secrets_endpoint_url: Optional[str] = None
+    aws_secrets_prefix: str = "fdp/"
+    aws_secrets_kms_key_id: Optional[str] = None
+    aws_secrets_recovery_window_days: int = 7   # 0 deletes immediately; otherwise 7-30
+    # Azure Key Vault (credentials from DefaultAzureCredential: workload identity, managed identity)
+    azure_key_vault_url: Optional[str] = None
+    azure_secrets_prefix: str = "fdp-"
+    # Google Secret Manager (credentials from Application Default Credentials: GKE workload identity)
+    gcp_secrets_project: Optional[str] = None
+    gcp_secrets_prefix: str = "fdp-"
+    gcp_secrets_locations: str = ""            # comma-separated replica locations; empty: automatic
 
 
 @lru_cache

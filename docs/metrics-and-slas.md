@@ -21,10 +21,10 @@ queries, observations and input gates stay in their respective layers.
 - Disable a definition to retain its history while excluding it from quality evaluation.
 - KPIs and quality checks appear in catalog search and lineage with `measures` edges.
 
-Example card-count calculation on a Test data product:
+Example row-count calculation on a data product:
 
 ```sql
-SELECT count(*) AS value FROM pokemon_test.analytics.cards_current
+SELECT count(*) AS value FROM warehouse.reporting.revenue
 ```
 
 For completeness, calculate a percentage in a dbt model or SQL definition and test the
@@ -44,9 +44,9 @@ that authority still show the project's tests, but cannot repair another dataset
 Read-only testing can instead use an Owner-defined SQL quality metric with governed
 measurement, or retain the results on the producing dbt project.
 
-The independent evaluator backfills completed dbt artifacts already captured by Dev
-Center. It never reruns dbt. New SDK images preserve counts and invocation metadata;
-older incomplete SDK uploads defer to captured raw artifacts for failing-row values.
+The independent evaluator backfills completed dbt artifacts already captured by FDP.
+It never reruns dbt. Where an upload is incomplete, failing-row values come from the
+captured raw artifacts.
 
 The dbt program's command picker includes **freshness**, which runs `dbt source freshness`
 and imports `sources.json`. This is a source check, not a data materialization.
@@ -94,7 +94,7 @@ execution identity's access, at new-run admission, including Airflow-triggered j
 
 The error links to the affected catalog SLA pages. Producers can still repair their data;
 the consumer gate does not stop running jobs, revoke access, or shut down apps.
-Deployment/promotion gates and availability/request blocking are separate future features.
+Deployment/promotion gates and request blocking are not part of this mechanism.
 
 ## Python SDK and HTTP API
 
@@ -118,8 +118,7 @@ fdp.report_metric(
 
 Caller-mode apps must pass `viewer_token=` when measuring SQL on behalf of a viewer.
 The helper uses the existing execution token/renewal; there are no embedded storage
-credentials. Rebuild runtime SDK images before using new helper methods; existing clients
-can use the same authenticated HTTP endpoints.
+credentials. Other clients can use the same authenticated HTTP endpoints.
 
 Routes under `/v1/catalog`:
 
@@ -132,7 +131,7 @@ Routes under `/v1/catalog`:
 - `PUT /assets/{id}/sla`, `POST /assets/{id}/evaluate-sla`, `GET /assets/{id}/sla-history`.
 - `GET /alerts`, `POST /alerts/{id}/acknowledge` — authorized in-app incidents.
 
-Global Admin can query the six new metadata tables through `fdp_metadata.public`:
+Global Admin can query these metadata tables through `fdp_metadata.public`:
 `metric_definitions`, `metric_definition_revisions`, `metric_observations`,
 `dataset_observations`, `sla_evaluations`, and `sla_incidents`. Operational history stays
 read-only through the metadata SQL catalog; definitions/policies use validated APIs.

@@ -132,9 +132,53 @@ dataVolume:
 # GitOps: how often deployed branches are checked for new commits.
 gitopsIntervalSeconds: 60
 
+# OpenBao or HashiCorp Vault (same API) for secretManagement.backend openbao or vault: an external server,
+# or the bundled OpenBao (enabled: true). See docs/architecture/bring-your-own.md.
 openbao:
-  addr: http://openbao.openbao.svc:8200
+  addr: http://openbao.openbao.svc:8200   # external server; ignored when the bundled OpenBao is enabled
   kvMount: fdp
+  enterpriseNamespace: ""        # OpenBao/Vault Enterprise namespace, if used
+  auth:
+    method: token                # token: FDP_OPENBAO_TOKEN in existingSecret | kubernetes | approle:
+                                 # FDP_OPENBAO_APPROLE_ROLE_ID and FDP_OPENBAO_APPROLE_SECRET_ID in existingSecret
+    role: fdp-control-plane      # kubernetes auth role bound to the fdp-control-plane service account
+    mount: ""                    # auth mount path; empty: the method name
+
+  # Bundled OpenBao (MPL-2.0): Raft storage in its own namespace, self-initialized on first start with the
+  # KV mount, an audit log on stdout and Kubernetes auth for the control plane. The root token used for that
+  # is revoked immediately; no root token or unseal key is ever stored by the chart.
+  enabled: false
+  image: ghcr.io/openbao/openbao:2.7.2
+  namespace: ""                  # default: <release namespace>-openbao
+  replicas: 1                    # 1, or 3/5 for Raft high availability
+  storageClass: ""
+  size: 10Gi
+  seal:
+    # kubernetes: auto-unseal with a 32-byte key kept in a Kubernetes Secret (created once in the cluster,
+    #   never rewritten; or bring your own with existingSecret, key "key"). Protect it like etcd itself.
+    # kms: auto-unseal through your KMS; no key is stored in the cluster.
+    mode: kubernetes
+    existingSecret: ""           # kubernetes mode: Secret in the OpenBao namespace with a 32-byte key under "key"
+    keyId: "fdp-1"               # changes only when the key changes
+    kms: {}
+    # kms example (any OpenBao seal type: awskms, azurekeyvault, gcpckms, transit, ocikms):
+    #   type: awskms
+    #   config: { region: eu-west-1, kms_key_id: alias/fdp-openbao }
+  serviceAccount:
+    annotations: {}              # e.g. eks.amazonaws.com/role-arn or iam.gke.io/gcp-service-account for KMS access
+  podLabels: {}                  # e.g. azure.workload.identity/use: "true"
+  extraEnv: []                   # e.g. a transit seal token: - {name: BAO_SEAL_TOKEN, valueFrom: {secretKeyRef: ...}}
+  selfInitialize: true           # first start of pod 0 only; may be set false after installation
+  tls:
+    mode: disabled               # disabled | existing | certManager (covers the Service, pod names and 127.0.0.1)
+    secretName: fdp-openbao-tls  # tls.crt, tls.key and ca.crt; add the CA to trust.caBundleSecret
+    issuerRef: {}                # certManager: a private-CA Issuer/ClusterIssuer; empty uses tls.issuerRef
+  networkPolicy:
+    apiServerCidrs: ["0.0.0.0/0"]   # Kubernetes API (token reviews) and KMS endpoints on TCP 443/6443
+    cilium: auto                 # auto: also allow the kube-apiserver entity when Cilium's CRDs exist | true | false
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }
 
 # Optional SCIM provisioning: add FDP_SCIM_TOKEN to the existing Secret.
 # Existing Secret: FDP_DATABASE_URL, FDP_SESSION_SIGNING_KEY,
@@ -144,8 +188,30 @@ existingSecret: fdp-control-plane
 bootstrap:
   enabled: false                 # Generate and retain platform/Trino keys. Never rotates existing keys.
 secretManagement:
-  backend: openbao                # openbao (external) | kubernetes (bundled namespace)
+  # openbao (bundled with openbao.enabled, or external) | vault (HashiCorp Vault, external) |
+  # kubernetes (a dedicated namespace) | aws (Secrets Manager) | azure (Key Vault) | gcp (Secret Manager)
+  backend: openbao
   namespace: ""                  # kubernetes: defaults to <release-namespace>-secrets
+  # Cloud secret managers use the control plane's workload identity (serviceAccount.annotations, podLabels).
+  aws:
+    region: ""                   # empty: the AWS_REGION of the workload identity
+    prefix: fdp/
+    kmsKeyId: ""                 # empty: the account's default key
+    recoveryWindowDays: 7        # 0 deletes immediately; otherwise 7-30
+  azure:
+    vaultUrl: ""                 # https://<name>.vault.azure.net/
+    prefix: fdp-
+  gcp:
+    project: ""
+    prefix: fdp-
+    locations: []                # replica locations; empty: automatic replication
+
+# Control plane identity, e.g. for cloud secret managers or KMS:
+#   AWS IRSA: eks.amazonaws.com/role-arn · GKE: iam.gke.io/gcp-service-account ·
+#   Azure: azure.workload.identity/client-id (and podLabels azure.workload.identity/use: "true")
+serviceAccount:
+  annotations: {}
+podLabels: {}
 
 keycloak:
   enabled: false

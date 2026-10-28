@@ -200,7 +200,7 @@ def bundled(*args):
 
 
 def test_bundled_platform_keys_match_trino_and_secret_store_has_separate_namespace():
-    docs=bundled()
+    docs=bundled('--set','openbao.enabled=false','--set','secretManagement.backend=kubernetes')
     cp=resource(docs,'Secret','fdp-control-plane')
     trino=resource(docs,'Secret','fdp-trino')
     assert base64.b64decode(cp['data']['FDP_TRINO_SIGNING_KEY'])==base64.b64decode(base64.b64decode(trino['data']['gateway.hmac']))
@@ -213,6 +213,8 @@ def test_bundled_platform_keys_match_trino_and_secret_store_has_separate_namespa
     assert role['rules']==[{'apiGroups':[''],'resources':['secrets'],'verbs':['get','create','update','delete']}]
     assert resource(docs,'Namespace','fdp-secrets')['metadata']['annotations']['helm.sh/resource-policy']=='keep'
     assert not any(d['kind'] in ('ClusterRole','ClusterRoleBinding') for d in docs)
+    bundled_openbao=[d for d in bundled() if d['kind'] in ('ClusterRole','ClusterRoleBinding')]
+    assert [(d['kind'],d['roleRef']['name']) for d in bundled_openbao]==[('ClusterRoleBinding','system:auth-delegator')]
 
 
 def test_bundled_keycloak_scim_and_database_credentials_are_scoped_and_have_no_inline_values():
@@ -228,7 +230,7 @@ def test_bundled_keycloak_scim_and_database_credentials_are_scoped_and_have_no_i
     env={v['name']:v.get('value') for v in cp['env']}
     assert env['FDP_DIRECTORY_MODE']=='scim'
     assert env['FDP_OIDC_ISSUER']=='https://idp.example.com/realms/fdp'
-    assert env['FDP_SECRETS_BACKEND']=='kubernetes'
+    assert env['FDP_SECRETS_BACKEND']=='openbao' and env['FDP_OPENBAO_AUTH']=='kubernetes'
     pod=resource(docs,'Deployment','fdp-directory-sync')['spec']['template']['spec']
     assert pod['automountServiceAccountToken'] is False
     refs={v['valueFrom']['secretKeyRef']['key'] for v in pod['containers'][0]['env'] if 'valueFrom' in v}

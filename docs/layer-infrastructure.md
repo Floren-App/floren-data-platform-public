@@ -1,19 +1,19 @@
-# Kubernetes configuration contracts (version 1)
+# Layer infrastructure reference
 
-This document defines the first implementation boundary for the
-[configuration guide](configuration.md). Contracts and API admission
-and core layer reconciliation are implemented. The complete deployment remains
-in progress; an accepted infrastructure operation does not mean a usable layer
-exists until its readiness checks pass.
+A managed [layer](layers.md) is described by a desired-state specification that the layer
+controller reconciles into Kubernetes resources. This page describes that specification,
+its API and the ownership boundaries between the components involved. An accepted
+infrastructure operation does not mean the layer is usable: it is usable once its
+readiness checks pass.
 
 ## Desired state and provisioning operations
 
-Layers retain their existing stable 12-character IDs. Their display names are
-editable; namespaces are derived from IDs (`fdp-layer-<id>`), never names or
-client-provided namespace values. Namespace selection is not an authorization input.
+Layers have stable 12-character IDs. Their display names are editable. Namespaces are
+derived from IDs (`fdp-<installation>-layer-<id>`), never from names or client-provided
+values. Namespace selection is not an authorization input.
 
-Existing layers are unmanaged by default. No namespace, data, permission, or running
-workload migration occurs just because the server is upgraded.
+A layer without infrastructure is unmanaged. Enabling infrastructure is an explicit
+operation. Upgrading the platform never converts a layer.
 
 Administrator APIs:
 
@@ -26,9 +26,10 @@ Administrator APIs:
   generation of the same desired state after correcting an external prerequisite.
   Supply `expected_generation`; an unfinished operation still blocks a retry.
 
-The desired-state schema is defined by `InfrastructureSpec` in
-`services/control-plane/app/layer_infrastructure.py` and deployed in
-`schemas/layer-infrastructure.schema.json`. Unknown properties are rejected.
+The desired-state schema is published as
+[`schemas/layer-infrastructure.schema.json`](../schemas/layer-infrastructure.schema.json).
+Unknown properties are rejected. With OpenTofu, use the `infrastructure` block of
+[`fdp_layer`](reference/terraform/fdp_layer.md).
 
 An update locks the layer row and compares its generation. Stale updates return
 409, preventing two automation clients from silently overwriting each other.
@@ -56,8 +57,7 @@ phase, namespace, readiness, or runtime credentials through the desired-state AP
 Controller errors must be sanitized; Kubernetes responses or secret values must
 not be copied into operation messages.
 
-The ordinary layer edit API preserves infrastructure settings. Existing JSON
-configuration clients continue to work. The new contract is opt-in.
+The ordinary layer edit API preserves infrastructure settings.
 
 ## Infrastructure settings
 
@@ -81,28 +81,24 @@ configuration clients continue to work. The new contract is opt-in.
   their next update. JWT configuration uses
   public JWKS; the private signing key stays in the platform. Existing/cert-manager
   TLS policies configure layer HTTPS; the controller waits for verified platform
-  trust before reporting Ready. Plain HTTP remains a legacy option using a
-  layer-bound policy context and restricted coordinator ingress.
+  trust before reporting Ready. Plain HTTP is also possible, using a layer-bound
+  policy context and restricted coordinator ingress.
   The controller generates the layer-local node secret unless overridden.
 - Storage: separate workspace and artifact volume class, size and access mode,
-  and Retain policy. Cross-namespace PVC references are not accepted. The reserved
-  object-storage artifact-secret setting is not implemented yet.
+  and Retain policy. Cross-namespace PVC references are not accepted.
 - Optional PostgreSQL: explicit image, CPU/memory, credential Secret, storage
   class/size and TLS. Provisioned as a single-instance layer data database with a
-  retained PVC and a separate non-superuser engine login. Existing TLS, live native
-  reload, database retention and network isolation are verified on Kubernetes;
-  cert-manager Certificate/readiness logic has unit coverage. The controller checks
+  retained PVC and a separate non-superuser engine login. The controller checks
   native TLS with platform CA trust. Database image, credential reference and volume
-  changes require an explicit migration; disabling storage or downgrading TLS is
-  refused. Automatic catalog/credential wiring, native password rotation and HA are
-  not implemented. See the chart's layer PostgreSQL instructions.
-- Optional RustFS: explicit image supplied by the administrator, credential Secret,
-  storage class/size, TLS. Its tested deployment profile is still to be implemented.
+  changes require an explicit migration. Disabling storage or downgrading TLS is
+  refused. Native password rotation and high availability are not provided. See the
+  chart's layer PostgreSQL instructions.
+- Optional RustFS: explicit image, credential Secret, storage class/size, buckets and TLS.
+  Iceberg on layer storage requires both the layer PostgreSQL and RustFS.
 
 Managed layers require signing and internal-secret references. Infrastructure
-images cannot use `latest` or an unversioned image name. These checks establish a
-configuration contract; resource readiness and connector compatibility still need
-controller-side validation against Kubernetes and the actual services.
+images cannot use `latest` or an unversioned image name. Readiness is verified by the
+controller against the running services, not inferred from the specification.
 
 ## Ownership boundaries
 
@@ -114,8 +110,8 @@ controller-side validation against Kubernetes and the actual services.
 | Terraform | Declared application configuration through the validated API | Generated Kubernetes resources or runtime history |
 | Issuer/certificate controller | Certificate issuance, private keys, renewal | Application grants or cross-layer secret access |
 
-The controller will run separately from the control-plane deployment. Its
-namespace-provisioning permissions must not be inherited by execution identities.
+The controller runs separately from the control-plane deployment. Its
+namespace-provisioning permissions are never inherited by execution identities.
 Runtime access is granted through scoped namespace Roles. Protected labels,
 service-account selection, namespaces, and credentials are server-derived.
 
@@ -135,11 +131,10 @@ Certificate policy modes:
 Issuance duration and renewal lead time are explicit and validated. Layer Trino
 uses a derived namespace-qualified service SAN and local init/sidecar validation
 before installing a certificate/key pair. Platform CA trust verifies HTTPS before
-the controller reports Ready. A disposable Kubernetes integration verifies actual
-cert-manager issuance, requested renewal, key rotation, kubelet projection and
-Trino 484 reload without restarts. It also verifies CA replacement with overlapping
-platform trust and rejection of the old root. Automatic renewal scheduling and
-expiry/failure alerts remain unverified. The layer-local trust-bundle Secret key
+the controller reports Ready. Renewed certificates are reloaded by Trino without a
+restart. Certificate state is monitored as described in
+[operations](kubernetes-operations.md#certificate-monitoring-and-issuer-recovery).
+The layer-local trust-bundle Secret key
 is validated by a tokenless init container and converted to a public-CA-only Java
 PKCS12 truststore used by each Trino JVM. It replaces default Java roots; include
 all required roots and enable each connector's TLS/hostname checks explicitly.
@@ -149,10 +144,8 @@ wrong-host/untrusted-CA rejection are integration-tested. TLS-enabled managed
 layers also enable native Trino discovery/exchange TLS, bound to the layer's node
 secret and environment, and disable their plaintext listener. Workers resolve a
 headless coordinator Service to its pod IP before startup and restart when that
-endpoint changes. DNS lookups are bounded; outages do not intentionally restart
-healthy workers. Kubernetes integration verifies encrypted worker queries through
-renewal and recovery after coordinator replacement. Legacy `disabled` TLS retains
-authenticated HTTP. Full runtime trust delivery remains open.
+endpoint changes. DNS lookups are bounded, so a DNS outage does not restart healthy
+workers. With TLS `disabled`, layers use authenticated HTTP.
 
 The Helm chart implements public certificate references/issuance and platform PEM
 trust mounts. See [certificate configuration](../deploy/helm/fdp/README.md).
@@ -171,9 +164,8 @@ selection. Existing creation authorization then checks the requested group's gra
 and records it as the owner. Secondary grants do not authorize creation.
 
 Workload and service-account execution credentials cannot override their primary
-group using this header. The first Terraform provider will use the dedicated OIDC
-automation identity; richer scoped platform automation credentials can be added
-without weakening workload identity boundaries.
+group using this header. The OpenTofu provider uses the dedicated OIDC automation
+identity.
 
 Each resource's layer is supplied through its typed configuration API and remains
 subject to existing layer and promotion validation. Never infer it from the active
@@ -182,34 +174,25 @@ UI page or silently use the human operator's latest selection.
 ## Admission and deletion
 
 Starting a new workspace or job in a managed layer requires a Ready operation for
-its current generation. Existing unmanaged layers keep their current behavior.
-Already running jobs retain their existing admission snapshots.
+its current generation. Already running jobs retain their admission snapshots.
 
 Configuring infrastructure does not migrate running workloads. Managed
-infrastructure cannot be disabled through an ordinary PUT. Layers with
-infrastructure history cannot be deleted through the legacy layer-delete endpoint.
-This deliberately fails closed until explicit retirement is implemented. No PVC,
-bucket, database, or historical operation is removed implicitly.
+infrastructure cannot be disabled through an ordinary PUT. A layer with infrastructure
+is removed through explicit [retirement](kubernetes-operations.md#retiring-and-deleting-a-layer).
+No PVC, bucket, database or historical operation is removed implicitly.
 
-## Migration and rollback sequence
+## Converting an unmanaged layer
 
-1. Install API/schema additions with managed infrastructure disabled. Existing
-   namespaces, volumes, URLs, grants, and execution remain unchanged.
-2. Inventory source connections, running jobs, workspace volumes, artifact paths,
-   credentials, and current layer mappings. Back up metadata and persistent data.
-3. Rehearse new isolated layers on a disposable Kubernetes cluster. Require policy,
-   identity, service, certificate, and storage readiness before admitting workloads.
-4. Once reconciliation and execution integration are verified, stop new admissions
-   to each migrating layer, allow admitted jobs to finish, and stop its workspaces.
-5. Copy files/artifacts into private, layer-local storage; verify contents and
-   access controls. Preserve originals as rollback data. Do not remount a shared
-   cross-layer NFS export into the new namespaces.
-6. Configure only that layer's connectors and credentials, then switch its runtime
-   bindings after positive and negative access tests. Use a later explicit migration
-   operation to record activation; do not edit database status fields by hand.
-7. Retire the legacy path only after all layers and administration paths pass.
+Enabling infrastructure on a layer that already holds work does not move files,
+artifacts or credentials. Before converting one:
 
-Before activation, rollback leaves the old runtime authoritative. After new data
-writes begin, rollback requires a coordinated restore/reconciliation decision;
-reverting a Helm release alone cannot undo database migrations or data changes.
-Keep platform metadata queries on their protected administrative path throughout.
+1. Back up platform metadata and persistent data, and inventory the layer's
+   connections, workspaces, artifacts and running jobs.
+2. Stop new admissions to the layer, let admitted jobs finish and stop its workspaces.
+3. Apply the infrastructure and wait for Ready. Copy files and artifacts into the
+   layer-local storage, and verify contents and access controls. Keep the originals.
+4. Configure the layer's connectors and credentials, then test positive and negative
+   access before reopening the layer.
+
+After new data writes begin, rolling back requires a coordinated restore. Reverting a
+Helm release alone cannot undo database migrations or data changes.

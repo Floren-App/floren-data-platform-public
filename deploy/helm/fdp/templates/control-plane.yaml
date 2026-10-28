@@ -3,6 +3,9 @@ kind: ServiceAccount
 metadata:
   name: fdp-control-plane
   namespace: {{ .Release.Namespace }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -19,7 +22,9 @@ spec:
     matchLabels: { app.kubernetes.io/name: fdp-control-plane }
   template:
     metadata:
-      labels: { app.kubernetes.io/name: fdp-control-plane }
+      labels:
+        app.kubernetes.io/name: fdp-control-plane
+        {{- with .Values.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
     spec:
       serviceAccountName: fdp-control-plane
       {{- if gt (int .Values.replicas) 1 }}
@@ -179,8 +184,42 @@ spec:
             {{- if eq .Values.secretManagement.backend "kubernetes" }}
             - { name: FDP_K8S_SECRET_NAMESPACE, value: {{ include "fdp.secretNamespace" . | quote }} }
             {{- end }}
-            - { name: FDP_OPENBAO_ADDR, value: {{ .Values.openbao.addr | quote }} }
+            {{- $secrets := .Values.secretManagement }}
+            {{- if has $secrets.backend (list "openbao" "vault") }}
+            - { name: FDP_OPENBAO_ADDR, value: {{ include "fdp.openbaoAddr" . | quote }} }
             - { name: FDP_OPENBAO_KV_MOUNT, value: {{ .Values.openbao.kvMount | quote }} }
+            {{- if .Values.openbao.enabled }}
+            - { name: FDP_OPENBAO_AUTH, value: kubernetes }
+            - { name: FDP_OPENBAO_AUTH_ROLE, value: {{ .Values.openbao.auth.role | quote }} }
+            {{- else }}
+            - { name: FDP_OPENBAO_AUTH, value: {{ .Values.openbao.auth.method | quote }} }
+            - { name: FDP_OPENBAO_AUTH_ROLE, value: {{ .Values.openbao.auth.role | quote }} }
+            {{- with .Values.openbao.auth.mount }}
+            - { name: FDP_OPENBAO_AUTH_MOUNT, value: {{ . | quote }} }
+            {{- end }}
+            {{- with .Values.openbao.enterpriseNamespace }}
+            - { name: FDP_OPENBAO_NAMESPACE, value: {{ . | quote }} }
+            {{- end }}
+            {{- end }}
+            {{- else if eq $secrets.backend "aws" }}
+            {{- with $secrets.aws.region }}
+            - { name: FDP_AWS_SECRETS_REGION, value: {{ . | quote }} }
+            {{- end }}
+            - { name: FDP_AWS_SECRETS_PREFIX, value: {{ $secrets.aws.prefix | quote }} }
+            {{- with $secrets.aws.kmsKeyId }}
+            - { name: FDP_AWS_SECRETS_KMS_KEY_ID, value: {{ . | quote }} }
+            {{- end }}
+            - { name: FDP_AWS_SECRETS_RECOVERY_WINDOW_DAYS, value: {{ $secrets.aws.recoveryWindowDays | quote }} }
+            {{- else if eq $secrets.backend "azure" }}
+            - { name: FDP_AZURE_KEY_VAULT_URL, value: {{ $secrets.azure.vaultUrl | quote }} }
+            - { name: FDP_AZURE_SECRETS_PREFIX, value: {{ $secrets.azure.prefix | quote }} }
+            {{- else if eq $secrets.backend "gcp" }}
+            - { name: FDP_GCP_SECRETS_PROJECT, value: {{ $secrets.gcp.project | quote }} }
+            - { name: FDP_GCP_SECRETS_PREFIX, value: {{ $secrets.gcp.prefix | quote }} }
+            {{- with $secrets.gcp.locations }}
+            - { name: FDP_GCP_SECRETS_LOCATIONS, value: {{ join "," . | quote }} }
+            {{- end }}
+            {{- end }}
             - { name: FDP_DATA_VOLUME, value: fdp-data }
             {{- if not .Values.dataVolume.enabled }}
             - { name: FDP_SHARED_DATA_VOLUME, value: "false" }

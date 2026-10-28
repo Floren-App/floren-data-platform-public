@@ -37,7 +37,7 @@ Pagination, totals, and facets include only objects the current identity can rea
 Each result has Overview, Lineage, Governance, SLA, and Access pages. **Open object**
 returns to the original program/app/data page. **Access** edits the existing app-group
 role assignments, using the original RBAC boundary. Tables/files use their schema's
-IAM; this release does not introduce individual-object grants. Catalog metadata ownership
+IAM; there are no individual-object grants. Catalog metadata ownership
 and certification never grant resource or data access.
 
 Search queries the control-plane metadata index, not live data sources. Data objects are
@@ -144,7 +144,7 @@ Deployed dbt runs upload `manifest.json`, `catalog.json`, `run_results.json` and
 `sources.json` when available, including dbt programs invoked from a deployed Airflow
 deployment at its pinned commit. Run results are preserved before docs generation.
 The control plane also imports available completed dbt artifacts from its shared run
-volume, so existing runs/older runtime SDKs can populate the catalog. Each search checks
+volume, so runs that could not upload their artifacts still populate the catalog. Each search checks
 up to the latest 100 completed deployed dbt runs for unprocessed artifacts.
 
 Artifacts follow dbt's [manifest](https://docs.getdbt.com/reference/artifacts/manifest-json),
@@ -154,10 +154,7 @@ Artifacts follow dbt's [manifest](https://docs.getdbt.com/reference/artifacts/ma
 
 ### Airflow
 
-Rebuild the Airflow runtime with the current SDK and redeploy existing Airflow workloads
-to enable `fdp.airflow_lineage.FDPLineageBackend`. The runner configures the
-native backend automatically when present; older SDKs continue running with a clear log
-message. FDPRunOperator also reports its DAG before submitting a task. The backend
+The Airflow runtime configures `fdp.airflow_lineage.FDPLineageBackend` automatically. FDPRunOperator also reports its DAG before submitting a task. The backend
 collects rendered native inlets/outlets after operator execution. The scheduler also
 syncs changed serialized DAG metadata every 30 seconds, so dependencies appear before
 a DAG is executed, without parsing DAG code in the control plane. It follows Airflow's
@@ -167,14 +164,14 @@ Dataset/Asset identifiers such as `Dataset("fdp://lake/finance/sales")` resolve 
 the registered source `lake`, schema `finance`, object `sales`. Native Table entities can
 also identify source/schema/name through cluster/database/name. External URLs are never
 fetched, and URIs with credentials/query tokens are excluded. Other URI schemes are
-currently unresolved. Native metadata appears as DAGs are parsed by Airflow or executed/reported; this
-release does not poll external Airflow servers or execute DAG code in the control plane.
+unresolved. Native metadata appears as DAGs are parsed by Airflow or executed/reported. FDP
+does not poll external Airflow servers or execute DAG code in the control plane.
 
 ### Python/R programs
 
 Ordinary Python/R programs need no lineage configuration. For example, using
-`fdp.query("pokemon-test", "SELECT * FROM analytics.cards_current")` in a deployed
-app automatically adds `cards_current → app` after the query completes. The same applies
+`fdp.query("warehouse", "SELECT * FROM reporting.revenue")` in a deployed
+app automatically adds `revenue → app` after the query completes. The same applies
 to SQL issued through `fdp.connect` or the R SDK's managed connection.
 
 Files work the same way. In a deployed job, reads and writes through `fdp.files()`

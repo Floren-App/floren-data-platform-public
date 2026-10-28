@@ -58,7 +58,7 @@ Airflow serves an orchestrator. Inspect run outcomes separately from publication
 
 Use `test` and `main` branches with distinct layer-bound Test/Prod publications.
 Promotion is a reviewed Git change; configure branch protection at the Git provider.
-See [GitOps](gitops.md) and the [Pokemon walkthrough](pokemon.md).
+See [GitOps](gitops.md) and the [end-to-end example](pokemon.md).
 
 ## Catalog, lineage and health
 

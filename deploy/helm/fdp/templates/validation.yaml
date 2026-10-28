@@ -23,8 +23,30 @@
 {{- if and .Values.bootstrap.enabled (not .Values.metadataDatabase.enabled) (not .Values.metadataDatabase.connectionSecret) }}
 {{- fail "automatic platform bootstrap requires metadataDatabase.enabled or metadataDatabase.connectionSecret" }}
 {{- end }}
-{{- if and .Values.bootstrap.enabled (eq .Values.secretManagement.backend "openbao") }}
-{{- fail "automatic platform bootstrap uses secretManagement.backend=kubernetes; external OpenBao uses a managed platform existingSecret with its token" }}
+{{- $backend := .Values.secretManagement.backend }}
+{{- $vaultApi := has $backend (list "openbao" "vault") }}
+{{- if and .Values.bootstrap.enabled $vaultApi (not .Values.openbao.enabled) (ne .Values.openbao.auth.method "kubernetes") }}
+{{- fail "automatic platform bootstrap cannot hold an OpenBao/Vault token or AppRole; use the bundled OpenBao (openbao.enabled), openbao.auth.method=kubernetes, or a managed existingSecret" }}
+{{- end }}
+{{- if and .Values.openbao.enabled (ne $backend "openbao") }}
+{{- fail "openbao.enabled bundles OpenBao as the secret store; it requires secretManagement.backend=openbao" }}
+{{- end }}
+{{- if .Values.openbao.enabled }}
+{{- if and (eq .Values.openbao.seal.mode "kms") (not .Values.openbao.seal.kms.type) }}
+{{- fail "openbao.seal.mode=kms requires openbao.seal.kms.type and its config" }}
+{{- end }}
+{{- if and (eq .Values.openbao.seal.mode "kubernetes") .Values.openbao.seal.kms.type }}
+{{- fail "openbao.seal.kms is only used with openbao.seal.mode=kms" }}
+{{- end }}
+{{- if and (ne .Values.openbao.auth.method "kubernetes") (ne .Values.openbao.auth.method "token") }}
+{{- fail "the bundled OpenBao authenticates the control plane with Kubernetes auth; leave openbao.auth.method unset" }}
+{{- end }}
+{{- end }}
+{{- if and (eq $backend "azure") (not .Values.secretManagement.azure.vaultUrl) }}
+{{- fail "secretManagement.backend=azure requires secretManagement.azure.vaultUrl" }}
+{{- end }}
+{{- if and (eq $backend "gcp") (not .Values.secretManagement.gcp.project) }}
+{{- fail "secretManagement.backend=gcp requires secretManagement.gcp.project" }}
 {{- end }}
 {{- if and .Values.metadataDatabase.enabled .Values.metadataSql.bootstrapReader }}
 {{- fail "bundled metadata uses a non-superuser app role; set metadataSql.bootstrapReader=false and provision its SELECT-only reader separately" }}
@@ -41,7 +63,7 @@
 {{- end }}
 {{- end }}
 {{- /* Every image must name an explicit version: "latest" or no tag makes upgrades unpredictable. */}}
-{{- $images := dict "image.tag" (printf "%s:%s" .Values.image.repository (toString .Values.image.tag)) "keycloak.image" .Values.keycloak.image "metadataDatabase.image" .Values.metadataDatabase.image "trino.image" .Values.trino.image }}
+{{- $images := dict "image.tag" (printf "%s:%s" .Values.image.repository (toString .Values.image.tag)) "keycloak.image" .Values.keycloak.image "metadataDatabase.image" .Values.metadataDatabase.image "trino.image" .Values.trino.image "openbao.image" .Values.openbao.image }}
 {{- range $key, $ref := .Values.runtime.images }}{{- $_ := set $images (printf "runtime.images.%s" $key) $ref }}{{- end }}
 {{- range $name, $ref := $images }}
 {{- $tag := regexReplaceAll "^.*?(:([^:/@]+))?(@sha256:[a-f0-9]+)?$" (toString $ref) "${2}" }}

@@ -46,8 +46,7 @@ terraform {
 ```
 
 Commit each root's dependency lock file. Do not commit the mirror binary, state,
-saved plan or credentials. A module that uses `managed_identity_grants` needs the
-provider implementation containing that feature, not an older 0.1.0 binary.
+saved plan or credentials.
 
 ## Authenticate
 
@@ -73,17 +72,15 @@ The directory must recognize the automation identity. Select the owner group wit
 
 ```text
 cluster/                     ArgoCD / Helm installation configuration
-data-platform/
-├── terraform/               layers, groups, pools, storage, templates
-└── pokemon/
-    ├── terraform/           Pokemon publications, grants, governance
-    └── repos/               workload source checkouts
+platform/                    layers, groups, pools, storage, templates
+workloads/
+└── sales-reporting/         one root per product: publications, grants, governance
 ```
 
 Use separate backend state keys for platform and workload roots. Export generic
-IDs/names from the platform root. Workload configuration consumes those outputs
-and owns its own registrations, identities' grants and publications. Do not put
-Pokemon-specific resources in the shared platform root.
+IDs and names from the platform root. Each workload root consumes those outputs and
+owns its own registrations, identities' grants and publications. Keep product-specific
+resources out of the shared platform root.
 
 ## Review and apply
 

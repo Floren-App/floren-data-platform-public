@@ -6,7 +6,10 @@ metadataDatabase:
 bootstrap:
   enabled: true
 secretManagement:
-  backend: kubernetes
+  backend: openbao
+openbao:
+  enabled: true               # bundled OpenBao; auto-unseals with a key kept in a Kubernetes Secret
+                              # (seal.mode: kms to unseal through your KMS instead)
 keycloak:
   enabled: true
   publicUrl: https://idp.example.com

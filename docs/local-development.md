@@ -1,14 +1,21 @@
-# Floren Data Platform's own data
+# Local development environment
+
+`make dev` runs the whole platform with Docker Compose for development: PostgreSQL,
+Keycloak, OpenBao, Gitea, Traefik, Trino and the control plane. It is a development
+environment, not an installation profile. Use the [Kubernetes installation](kubernetes-install.md)
+for anything shared with other people.
+
+## Where local data lives
 
 The database connection is configurable through `FDP_DATABASE_URL`. Compose uses
-the bundled PostgreSQL by default. Select Global Admin to browse **Storage →
+its bundled PostgreSQL by default. Select Global Admin to browse **Storage →
 fdp-metadata → public**, query live metadata, and make validated SQL changes in
 its SQL tab. See [Metadata SQL](metadata-sql.md) for configuration and supported commands.
 
 Floren Data Platform's application metadata is separate from the storage integrations registered in
 Storage. A program's Postgres/Iceberg tables do not contain Floren Data Platform's IAM or configuration.
 
-The current local Compose deployment stores its data in these Docker volumes:
+Compose stores its data in these Docker volumes:
 
 | Volume | Container location | Contents |
 | --- | --- | --- |
@@ -27,17 +34,17 @@ Different workspaces have separate volumes even if they have the same name or cr
 
 On Docker Desktop for macOS these named volumes live inside Docker's Linux VM/disk image,
 not directly in the project checkout. `docker volume inspect fdp_pgdata` reports its
-Linux mount path. Host configuration (Compose files, TLS certificates and local Pokemon
-configuration) remains under `deploy/` in this checkout.
+Linux mount path. Host configuration (Compose files and local TLS certificates) remains
+under `deploy/` in this checkout.
 
 ## Identity-provider persistence
 
-The local Keycloak service currently has no persistent data volume/database configured.
+The local Keycloak service has no persistent data volume or database.
 Its mutable identity data lives in the container's writable storage: an ordinary restart
 keeps it, but recreating/removing that container does not. The mounted realm JSON is a
 bootstrap import, not a backup of account changes. Floren Data Platform's SCIM directory remains in
-its own Postgres database. Persistent IdP storage needs a separate migration that preserves
-the existing realm/accounts; mounting an empty directory would not preserve them.
+its own PostgreSQL database. The Kubernetes chart's bundled Keycloak stores its data in
+PostgreSQL.
 
 ## Workspace startup
 

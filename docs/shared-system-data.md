@@ -12,9 +12,8 @@ metadataDatabase:
     enabled: true
 ```
 
-The Floren installation includes these settings in
-`deploy/environments/floren/system-data.yaml`; `install.sh` includes that overlay.
-An empty namespace keeps the old release-local placement for compatibility.
+An empty `namespace` places the database in the release namespace. You can use your own
+PostgreSQL instead: see [external PostgreSQL](#external-postgresql).
 
 ## Database and credential boundaries
 
@@ -57,6 +56,8 @@ both the control-plane and database namespaces when those differ. Never put pass
 in Helm values or OpenTofu state. Provisioner password changes require coordinated role
 and Secret updates; bootstrap never silently changes existing credentials.
 
+## External PostgreSQL
+
 For external PostgreSQL, configure `FDP_AIRFLOW_METADATA_URL` (trusted provisioner URL)
 in the platform Secret. Existing TLS URL parameters are preserved in the per-publication
 connection. Certificate private keys stay in Secrets, and CA trust/certificate files
@@ -64,43 +65,28 @@ must be mounted for the clients that reference them. The bundled server currentl
 internal TCP with CNI policy isolation; server TLS and automated backup/HA are separate
 configuration work and must not be assumed from the namespace change.
 
-## Existing-installation migration
+## Moving an existing database
 
-Changing a namespace does not move a PVC. Do not perform an ordinary Helm upgrade
-against an existing database until its state has been migrated and verified.
+Changing `metadataDatabase.namespace` does not move a PersistentVolumeClaim. To move an
+existing bundled database, or to switch to your own PostgreSQL:
 
-1. Save the current Helm values and release revision in protected operator storage.
-2. Render with server-side lookups so retained credentials are reused. Prepare the new
-   namespace, database Secret, PVC, Service, network policies and PostgreSQL StatefulSet.
-   Keep the old database running. Do not expose a new, empty database to FDP.
-3. Stop metadata writers: FDP control-plane replicas, layer controller, directory sync
-   and Keycloak. Confirm no active pipeline jobs. Keep Airflow DAGs paused.
-4. Dump PostgreSQL roles and each operational database using PostgreSQL tools matching
-   the server version. Store backups with mode 0600 outside Git. Restore roles and
-   databases into the new server; do not copy or recreate application passwords.
-5. Compare every application's table row counts and content hashes. Run the shared
-   provisioner bootstrap only after restoring the original roles/databases.
-   For the Floren installer, record verification with `kubectl -n fdp-system-data create
-   configmap fdp-migration-verified --from-literal=status=verified` only after this comparison.
-   The installer refuses an ordinary namespace-changing upgrade while the old server exists
-   without this verification marker.
-6. Upgrade Helm using the new namespace and tested control-plane image while preserving
-   pinned runtime images and all other installation values. Restore intended replica
-   counts and verify FDP readiness, Keycloak login and layer reconciliation.
-7. Redeploy each Airflow publication through FDP. Existing nonempty orchestration history
-   blocks automatic backend switching; explicitly migrate it first. Empty deployments,
-   including the freshly reset Pokémon deployments, can initialize PostgreSQL directly.
-   Verify paused DAG state, history, private database credentials and cross-database denial.
-   For a matching Airflow runtime, `deploy/airflow/migrate_metadata.py` copies an offline
-   SQLite snapshot into an initialized empty PostgreSQL database. It verifies schema
-   revisions and every copied row, repairs sequences, and refuses nonempty targets.
-   Run it only with old writers stopped, preserve the old Fernet key, and keep its
-   PostgreSQL connection in `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN` rather than argv.
-8. Keep the old PVC and protected backups for rollback. Once the new server accepts
-   writes, rollback requires synchronizing those writes; reverting Helm alone is unsafe.
-   Remove an unused old database server, but do not automatically delete rollback storage.
+1. Stop metadata writers: the control plane, layer controller, directory sync and
+   Keycloak, if bundled. Pause Airflow DAGs and let active jobs finish.
+2. Dump the roles and every operational database with PostgreSQL tools matching the
+   server version. Keep the backups outside Git, readable only by operators.
+3. Restore roles and databases into the new server without recreating passwords, and
+   compare row counts and content of every database.
+4. Point the installation at the new server, upgrade, and verify readiness, sign-in,
+   layer reconciliation and Airflow history.
+5. Keep the old volume and backups until the new server has run successfully. Once it
+   accepts writes, rolling back requires synchronizing those writes. Reverting Helm alone
+   is not enough.
 
-Current deployment progress and verification evidence are recorded in
-`docs/shared-system-data-progress.md`. No OpenTofu business-object changes are required:
-Helm configures shared infrastructure and FDP automatically provisions each publication's
-operational database. Existing layer/workload OpenTofu definitions remain authoritative.
+For a matching Airflow runtime, `deploy/airflow/migrate_metadata.py` copies an offline
+SQLite Airflow database into an initialized, empty PostgreSQL database. It verifies schema
+revisions and every copied row, repairs sequences and refuses nonempty targets. Run it with
+the old writers stopped, keep the original Fernet key, and pass the PostgreSQL connection
+through `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN` rather than the command line.
+
+Helm configures the shared database service. FDP provisions each Airflow publication's
+database automatically, so no OpenTofu changes are needed.
