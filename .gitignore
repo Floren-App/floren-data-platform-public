@@ -1,0 +1,35 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.egg-info/
+sdk/python/build/
+*.db
+.env
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+.DS_Store
+deploy/compose/certs/
+deploy/helm/fdp/charts/
+apps/desktop/test-results/
+apps/desktop/playwright-report/
+.lab/
+# dbt run output
+examples/**/logs/
+examples/**/target/
+
+# Keep private installation inputs and generated runtime state outside source control.
+.local/
+.env.*
+!.env.example
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+terraform.tfvars
+terraform.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Installation-specific configuration belongs in a private repository.
+deploy/environments/

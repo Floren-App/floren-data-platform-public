@@ -1,0 +1,56 @@
+{
+  "realm": {{ .Values.keycloak.realm | toJson }},
+  "enabled": true,
+  "displayName": "Floren Data Platform",
+  "accessTokenLifespan": 900,
+  "roles": {"realm": [{"name": {{ .Values.oidc.adminRole | toJson }}}]},
+  "groups": [{"name": "platform-admins", "realmRoles": [{{ .Values.oidc.adminRole | toJson }}]}],
+  "clients": [
+    {"clientId": {{ .Values.oidc.audience | toJson }}, "enabled": true, "bearerOnly": true},
+    {
+      "clientId": {{ .Values.oidc.clientId | toJson }},
+      "enabled": true, "publicClient": true, "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": {{ .Values.keycloak.passwordGrantEnabled | toJson }},
+      "redirectUris": {{ include "fdp.appRedirectUris" . }},
+      "webOrigins": ["+"],
+      "attributes": {"pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "+"},
+      "protocolMappers": [
+        {"name":"api-audience", "protocol":"openid-connect", "protocolMapper":"oidc-audience-mapper",
+         "config":{"included.client.audience":{{ .Values.oidc.audience | toJson }},"access.token.claim":"true","id.token.claim":"false"}},
+        {"name":"groups", "protocol":"openid-connect", "protocolMapper":"oidc-group-membership-mapper",
+         "config":{"claim.name":"groups","full.path":"true","access.token.claim":"true","id.token.claim":"true"}}
+      ]
+    },
+    {
+      "clientId":"fdp-provisioner", "enabled":true, "publicClient":false,
+      "standardFlowEnabled":false, "directAccessGrantsEnabled":false, "serviceAccountsEnabled":true,
+      "secret":"${FDP_PROVISIONER_SECRET}"
+    }{{ if .Values.keycloak.automationClient.enabled }},
+    {
+      "clientId":"fdp-automation", "enabled":true, "publicClient":false,
+      "standardFlowEnabled":false, "directAccessGrantsEnabled":false, "serviceAccountsEnabled":true,
+      "secret":"${FDP_AUTOMATION_SECRET}",
+      "protocolMappers": [
+        {"name":"api-audience", "protocol":"openid-connect", "protocolMapper":"oidc-audience-mapper",
+         "config":{"included.client.audience":{{ .Values.oidc.audience | toJson }},"access.token.claim":"true","id.token.claim":"false"}}
+      ]
+    }{{ end }}
+  ],
+  "users": [
+    {
+      "username": {{ .Values.keycloak.initialAdminUser | toJson }}, "enabled":true,
+      "credentials":[{"type":"password","value":"${FDP_INITIAL_USER_PASSWORD}","temporary":true}],
+      "groups":["/platform-admins"]
+    },
+    {
+      "username":"service-account-fdp-provisioner", "enabled":true,
+      "serviceAccountClientId":"fdp-provisioner",
+      "clientRoles":{"realm-management":["view-users","query-users","query-groups","view-realm"]}
+    }{{ if .Values.keycloak.automationClient.enabled }},
+    {
+      "username":"service-account-fdp-automation", "enabled":true,
+      "serviceAccountClientId":"fdp-automation",
+      "realmRoles":[{{ .Values.oidc.adminRole | toJson }}]
+    }{{ end }}
+  ]
+}

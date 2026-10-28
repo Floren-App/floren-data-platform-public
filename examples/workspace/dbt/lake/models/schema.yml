@@ -1,0 +1,12 @@
+version: 2
+models:
+  - name: stg_lake_sales
+    description: Sales from the lake, cleaned.
+    columns:
+      - name: sale_id
+        tests: [unique, not_null]
+  - name: lake_monthly_revenue
+    description: Monthly revenue per region (Iceberg).
+    columns:
+      - name: month
+        tests: [not_null]

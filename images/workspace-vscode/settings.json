@@ -1,0 +1,18 @@
+{
+  "workbench.colorTheme": "Default Dark Modern",
+  "workbench.startupEditor": "none",
+  "telemetry.telemetryLevel": "off",
+  "python.defaultInterpreterPath": "/opt/venv/bin/python",
+  "python.languageServer": "None",
+  "basedpyright.analysis.typeCheckingMode": "standard",
+  "jupyter.askForKernelRestart": false,
+  "security.workspace.trust.enabled": false,
+  "extensions.autoUpdate": false,
+  "remote.otherPortsAttributes": { "onAutoForward": "silent" },
+  "remote.portsAttributes": {
+    "8501": { "label": "Streamlit", "onAutoForward": "silent" },
+    "3838": { "label": "Shiny", "onAutoForward": "silent" }
+  },
+  "git.autofetch": true,
+  "git.confirmSync": false
+}

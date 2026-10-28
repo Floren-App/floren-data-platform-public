@@ -1,0 +1,41 @@
+version: 2
+models:
+  - name: stg_records
+    description: Complete observations retaining original file, JSON pointer and load attempt.
+    columns:
+      - name: observation_id
+        tests: [unique, not_null]
+      - name: record_id
+        tests: [not_null]
+      - name: file_id
+        tests: [not_null]
+      - name: source_file_uri
+        tests: [not_null]
+  - name: record_history
+    description: Observed SCD2 for roots and nested records; half-open validity, no inferred deletion.
+    columns:
+      - name: record_version_id
+        tests: [unique, not_null]
+      - name: record_id
+        tests: [not_null]
+      - name: valid_from
+        tests: [not_null]
+  - name: dim_cards_history
+    columns:
+      - name: record_version_id
+        tests: [unique, not_null]
+  - name: dim_sets_history
+    columns:
+      - name: record_version_id
+        tests: [unique, not_null]
+  - name: cards_current
+    description: Analyst-facing card data product with stable cross-layer record IDs.
+    columns:
+      - name: record_id
+        tests: [unique, not_null]
+      - name: card_id
+        tests: [unique, not_null]
+  - name: set_summary
+    columns:
+      - name: set_id
+        tests: [unique, not_null]

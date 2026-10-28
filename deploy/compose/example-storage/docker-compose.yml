@@ -1,0 +1,83 @@
+# Example external storage for local testing. Not part of Floren Data Platform: it stands in for the
+# databases and buckets an organisation already runs. Used with the platform file:
+#   docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/example-storage/docker-compose.yml up -d
+# (the Makefile does this only with EXAMPLE_STORAGE=1 POKEMON_STORAGE=0). Then `make storage-example` registers it in
+# Floren Data Platform as three storage integrations. Paths are relative to deploy/compose (the project dir).
+
+volumes:
+  warehouse-data:
+  rustfs-data:
+  iceberg-catalog:
+
+services:
+  # PostgreSQL warehouse → "PostgreSQL" integration finance-dw (Trino catalog: finance).
+  warehouse:
+    image: postgres:16-alpine
+    networks: [data]
+    environment:
+      POSTGRES_USER: warehouse_admin
+      POSTGRES_PASSWORD: warehouse_admin
+      POSTGRES_DB: finance
+    volumes:
+      - warehouse-data:/var/lib/postgresql/data
+      - ./example-storage/warehouse-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  # S3-compatible object storage (Apache-2.0). API http://localhost:9000, console http://localhost:9001
+  #   bucket "files" → "S3 files" integration lake-files
+  #   bucket "lake"  → "Iceberg tables on S3" integration lake (Trino catalog: lake)
+  rustfs:
+    image: rustfs/rustfs:1.0.2
+    networks: [default, data]  # plain-file STS clients; lake keys remain infrastructure-only
+    environment:
+      RUSTFS_ACCESS_KEY: fdp
+      RUSTFS_SECRET_KEY: fdp-rustfs-secret
+      RUSTFS_VOLUMES: /data
+      RUSTFS_CONSOLE_ENABLE: "true"
+    volumes: [rustfs-data:/data]
+    ports: ["9000:9000", "9001:9001"]
+
+  rustfs-init:   # buckets: lake (Iceberg tables), files (plain files)
+    image: fdp/compute-python:dev
+    depends_on: [rustfs]
+    entrypoint: ["python", "-c"]
+    command:
+      - |
+        import time, boto3
+        s3 = boto3.client("s3", endpoint_url="http://rustfs:9000", aws_access_key_id="fdp",
+                          aws_secret_access_key="fdp-rustfs-secret", region_name="us-east-1")
+        for _ in range(60):
+            try:
+                existing = {b["Name"] for b in s3.list_buckets()["Buckets"]}; break
+            except Exception:
+                time.sleep(1)
+        for bucket in ("lake", "files"):
+            if bucket not in existing:
+                s3.create_bucket(Bucket=bucket)
+        print("rustfs buckets ready")
+    restart: "no"
+
+  # Iceberg REST catalog (Apache Iceberg's reference implementation; metadata in SQLite on a volume).
+  # Production: any Iceberg REST catalog (Lakekeeper, Apache Polaris, Nessie, …).
+  iceberg-rest:
+    image: apache/iceberg-rest-fixture:1.10.0
+    networks: [data]
+    user: "0"
+    depends_on: [rustfs]
+    environment:
+      CATALOG_URI: jdbc:sqlite:file:/catalog/iceberg.db
+      CATALOG_JDBC_USER: iceberg
+      CATALOG_JDBC_PASSWORD: iceberg
+      CATALOG_WAREHOUSE: s3://lake/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://rustfs:9000
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+      AWS_ACCESS_KEY_ID: fdp
+      AWS_SECRET_ACCESS_KEY: fdp-rustfs-secret
+      AWS_REGION: us-east-1
+    volumes: [iceberg-catalog:/catalog]
+
+  # The engine side of the two SQL integrations: catalogs "finance" and "lake".
+  trino:
+    depends_on: [warehouse, iceberg-rest, rustfs-init]
+    volumes:
+      - ./example-storage/trino-catalog:/etc/trino/catalog:ro

@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: warehouse
+    description: Raw finance data, loaded by the source systems.
+    schema: public
+    tables:
+      - name: sales
+        description: One row per sale.

@@ -1,0 +1,20 @@
+[project]
+name = "fdp"
+version = "0.1.0"
+description = "Floren Data Platform SDK: governed data connections and compute runs from inside a workspace"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+dependencies = ["httpx>=0.27"]
+
+[project.optional-dependencies]
+sql = ["sqlalchemy>=2.0", "trino[sqlalchemy]>=0.336"]
+s3 = ["boto3>=1.34"]
+lake = ["boto3>=1.34", "pyiceberg>=0.9"]
+all = ["fdp[sql,lake]"]
+
+[project.scripts]
+fdp = "fdp.cli:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"

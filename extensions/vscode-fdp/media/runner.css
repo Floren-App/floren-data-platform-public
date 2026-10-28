@@ -1,0 +1,39 @@
+/* Uses VS Code theme variables so the panel looks native in every theme. */
+body { padding: 0 12px 16px; color: var(--vscode-foreground); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
+h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 6px; color: var(--vscode-sideBarSectionHeader-foreground, var(--vscode-foreground)); display: flex; justify-content: space-between; align-items: center; }
+.muted { color: var(--vscode-descriptionForeground); }
+.error { color: var(--vscode-errorForeground); margin: 6px 0; white-space: pre-wrap; }
+label { display: block; margin: 8px 0 3px; }
+.help { font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 2px; }
+.field-error { font-size: 11px; color: var(--vscode-errorForeground); margin-top: 2px; }
+input, select { width: 100%; box-sizing: border-box; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, transparent); padding: 4px 6px; border-radius: 2px; font: inherit; }
+input:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+input[type=checkbox] { width: auto; margin-right: 6px; vertical-align: middle; }
+.check { display: flex; align-items: center; margin: 8px 0 3px; }
+button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 5px 10px; border-radius: 2px; cursor: pointer; font: inherit; }
+button:hover { background: var(--vscode-button-hoverBackground); }
+button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+button.secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
+button.link { background: none; color: var(--vscode-textLink-foreground); padding: 0 4px; }
+button.link:hover { text-decoration: underline; background: none; }
+button:disabled { opacity: .5; cursor: default; }
+.run-btn { width: 100%; margin-top: 12px; }
+.desc { margin: 4px 0 0; color: var(--vscode-descriptionForeground); }
+.meta { font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 4px; }
+.runs { list-style: none; margin: 0; padding: 0; }
+.runs li { padding: 6px 0; border-bottom: 1px solid var(--vscode-widget-border, rgba(128,128,128,.2)); }
+.runs .top { display: flex; align-items: center; gap: 6px; }
+.runs .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runs .actions { margin-top: 2px; }
+.sources { list-style: none; margin: 0; padding: 0; }
+.sources li { padding: 5px 0; border-bottom: 1px solid var(--vscode-widget-border, rgba(128,128,128,.2)); }
+.sources .top { display: flex; align-items: center; gap: 6px; }
+.sources .name { flex: 1; font-family: var(--vscode-editor-font-family); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+button.small { padding: 2px 8px; font-size: 11px; }
+.small-text { font-size: 11px; margin-top: 2px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-descriptionForeground); flex: none; }
+.dot.running, .dot.pending { background: var(--vscode-testing-iconQueued, #cca700); animation: pulse 1.2s infinite; }
+.dot.succeeded { background: var(--vscode-testing-iconPassed, #2ea043); }
+.dot.failed { background: var(--vscode-testing-iconFailed, #f85149); }
+@keyframes pulse { 50% { opacity: .35; } }

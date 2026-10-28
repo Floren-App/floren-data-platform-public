@@ -1,0 +1,8 @@
+version: 2
+sources:
+  - name: lake
+    description: Iceberg tables loaded by the load-lake program.
+    database: lake
+    schema: finance
+    tables:
+      - name: sales

@@ -1,0 +1,34 @@
+# Smallest production-shaped install: bundled metadata PostgreSQL and Keycloak, isolated layers,
+# no shared NFS volume (jobs and apps run only in managed layers), and the automation identity
+# for OpenTofu. Replace the hostnames; create the TLS Secret first (see docs/kubernetes-install.md).
+image:
+  repository: fdp/control-plane
+  tag: "0.1.0"
+publicUrl: https://fdp.example.com
+apiGateway:
+  publicUrl: https://api.fdp.example.com:9443
+tls:
+  mode: existing              # Secret fdp-public-tls (tls.crt/tls.key) covering all three hostnames
+metadataDatabase:
+  enabled: true
+bootstrap:
+  enabled: true               # generates and retains platform keys
+secretManagement:
+  backend: kubernetes
+keycloak:
+  enabled: true
+  publicUrl: https://idp.fdp.example.com
+  automationClient:
+    enabled: true             # client "fdp-automation" for OpenTofu
+oidc:
+  directoryMode: scim
+layerController:
+  enabled: true
+  network:                    # required before granting data-source egress; values for k3s shown
+    podCidrs: ["10.42.0.0/16"]
+    serviceCidrs: ["10.43.0.0/16"]
+    nodeCidrs: ["172.18.0.0/16"]
+dataVolume:
+  enabled: false
+trino:
+  enabled: false              # each managed layer runs its own Trino

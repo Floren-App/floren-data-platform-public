@@ -1,0 +1,166 @@
+{{- if .Values.layerController.enabled }}
+{{- $installation := include "fdp.installation" . }}
+{{- $prefix := include "fdp.layerNamespacePrefix" . }}
+{{- $controllerRole := printf "fdp-%s-layer-controller" $installation }}
+{{- $runtimeRole := printf "fdp-%s-layer-runtime" $installation }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fdp-layer-controller
+  namespace: {{ .Release.Namespace }}
+---
+# Trusted installation operator. Ordinary runtime orchestration does not receive
+# this binding. Secrets are create-only (each layer's generated Trino node secret);
+# no Secret reads, namespace/PVC deletion, or arbitrary RBAC bind.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $controllerRole }}
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, resourcequotas, limitranges, serviceaccounts, configmaps, services, persistentvolumeclaims]
+    verbs: [get, create, patch]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [create]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, create, patch]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [get, list, create, patch]
+  - apiGroups: [cert-manager.io]
+    resources: [certificates]
+    verbs: [get, create, patch]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [rolebindings]
+    verbs: [get, create, patch]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [clusterroles]
+    resourceNames: [{{ $runtimeRole }}]
+    verbs: [bind]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $controllerRole }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ $controllerRole }} }
+subjects:
+  - {kind: ServiceAccount, name: fdp-layer-controller, namespace: {{ .Release.Namespace }} }
+---
+# Reusable permission template; NO ClusterRoleBinding. Bound inside each layer.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $runtimeRole }}
+rules:
+  - apiGroups: [""]
+    resources: [pods, services, secrets]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    verbs: [get, list, watch, create]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [get, create]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdp-layer-controller
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: fdp-layer-controller}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: fdp-layer-controller}
+    spec:
+      serviceAccountName: fdp-layer-controller
+      {{- include "fdp.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: controller
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [python, -m, app.layer_controller]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          env:
+            {{- if .Values.metadataDatabase.enabled }}
+            - {name: FDP_DATABASE_HOST, value: {{ include "fdp.databaseHost" . | quote }}}
+            - {name: FDP_DATABASE_NAME, value: fdp}
+            - {name: FDP_DATABASE_USER, value: fdp}
+            - name: FDP_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "fdp-metadata-db" .Values.metadataDatabase.existingSecret }}
+                  key: fdp-password
+            {{- else }}
+            - name: FDP_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.metadataDatabase.connectionSecret }}
+                  name: {{ .Values.metadataDatabase.connectionSecret }}
+                  key: database-url
+                  {{- else }}
+                  name: {{ .Values.existingSecret }}
+                  key: FDP_DATABASE_URL
+                  {{- end }}
+            {{- end }}
+            {{- if and .Values.metadataDatabase.enabled .Values.metadataDatabase.airflow.enabled }}
+            - {name: FDP_LAYER_SHARED_DATABASE_NAMESPACE, value: {{ include "fdp.databaseNamespace" . | quote }} }
+            {{- end }}
+            - {name: FDP_LAYER_PLATFORM_NAMESPACE, value: {{ .Release.Namespace | quote }} }
+            - {name: FDP_LAYER_INSTALLATION, value: {{ $installation | quote }} }
+            - {name: FDP_LAYER_NAMESPACE_PREFIX, value: {{ $prefix | quote }} }
+            - {name: FDP_LAYER_RUNTIME_CLUSTER_ROLE, value: {{ $runtimeRole | quote }} }
+            {{- if .Values.registryCredentials.existingSecret }}
+            - {name: FDP_LAYER_IMAGE_PULL_SECRET, value: {{ .Values.registryCredentials.existingSecret | quote }} }
+            {{- end }}
+            {{- if .Values.egressProxy.enabled }}
+            - {name: FDP_LAYER_EGRESS_PROXY, value: "true"}
+            {{- end }}
+            - {name: FDP_LAYER_DNS_NAMESPACE, value: {{ .Values.layerController.dnsNamespace | quote }} }
+            - {name: FDP_LAYER_POD_CIDRS, value: {{ .Values.layerController.network.podCidrs | toJson | quote }} }
+            - {name: FDP_LAYER_SERVICE_CIDRS, value: {{ .Values.layerController.network.serviceCidrs | toJson | quote }} }
+            - {name: FDP_LAYER_NODE_CIDRS, value: {{ .Values.layerController.network.nodeCidrs | toJson | quote }} }
+            - {name: FDP_LAYER_PROTECTED_CIDRS, value: {{ .Values.layerController.network.protectedCidrs | toJson | quote }} }
+            # Artifact holder: the control-plane image already has sh/find/head/base64/stat.
+            - {name: FDP_LAYER_ARTIFACT_IMAGE, value: "{{ .Values.image.repository }}:{{ .Values.image.tag }}" }
+            {{- if .Values.trust.caBundleSecret }}
+            - {name: SSL_CERT_FILE, value: /etc/fdp/trust/ca-bundle.pem}
+            # Re-read each reconcile and deployed to every layer as public certificates only.
+            - {name: FDP_LAYER_TRUST_FILE, value: /etc/fdp/trust/ca-bundle.pem}
+            {{- end }}
+          readinessProbe:
+            exec:
+              command: [python, -c, "import os,time; assert time.time()-os.stat('/tmp/fdp-layer-controller-ready').st_mtime < 180"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: [python, -c, "import os,time; assert time.time()-os.stat('/tmp/fdp-layer-controller-ready').st_mtime < 300"]
+            periodSeconds: 30
+            initialDelaySeconds: 300
+          resources: {{- toYaml .Values.layerController.resources | nindent 12 }}
+          {{- if .Values.trust.caBundleSecret }}
+          volumeMounts:
+            - {name: trust, mountPath: /etc/fdp/trust, readOnly: true}
+          {{- end }}
+      {{- if .Values.trust.caBundleSecret }}
+      volumes:
+        - name: trust
+          secret:
+            secretName: {{ .Values.trust.caBundleSecret }}
+            items: [{key: ca-bundle.pem, path: ca-bundle.pem}]
+      {{- end }}
+{{- end }}

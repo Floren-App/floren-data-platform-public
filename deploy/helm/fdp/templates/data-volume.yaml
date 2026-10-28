@@ -1,0 +1,38 @@
+{{- /*
+Shared data volume for deployed runs (console/outputs) and environment caches.
+The control plane (release namespace) and workloads (runtime namespace) must see the SAME
+share, and PVCs are namespaced, so this binds two static PVs to one NFS export.
+Each workload only mounts its own sub-folder of it.
+*/ -}}
+{{- $d := .Values.dataVolume }}
+{{- if $d.enabled }}
+{{- range $i, $ns := list $.Release.Namespace $.Values.runtime.namespace }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: fdp-data-{{ $ns }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  capacity: { storage: {{ $d.size }} }
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef: { namespace: {{ $ns }}, name: fdp-data }
+  nfs: { server: {{ $d.nfs.server | quote }}, path: {{ $d.nfs.path | quote }} }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fdp-data
+  namespace: {{ $ns }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: ""
+  volumeName: fdp-data-{{ $ns }}
+  resources: { requests: { storage: {{ $d.size }} } }
+{{- end }}
+{{- end }}

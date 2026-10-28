@@ -1,0 +1,12 @@
+apiVersion: v2
+name: fdp
+description: Floren Data Platform control plane, gateway and runtime namespace
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  # MIT-licensed gateway; configured to read dynamic routes from the control plane.
+  - name: traefik
+    version: "32.1.1"
+    repository: https://traefik.github.io/charts
+    condition: traefik.enabled

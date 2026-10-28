@@ -1,0 +1,136 @@
+{{- if .Values.trino.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fdp-trino
+  namespace: {{ .Release.Namespace }}
+data:
+  {{- if .Values.metadataSql.enabled }}
+  metadata.properties: |
+    connector.name=postgresql
+    connection-url=${ENV:FDP_METADATA_JDBC_URL}
+    connection-user=${ENV:FDP_METADATA_READER_USER}
+    connection-password=${ENV:FDP_METADATA_READER_PASSWORD}
+    unsupported-type-handling=CONVERT_TO_VARCHAR
+    metadata.cache-ttl=0s
+  {{- end }}
+  config.properties: |
+    coordinator=true
+    node-scheduler.include-coordinator=true
+    http-server.http.port=8080
+    discovery.uri=http://fdp-trino:8080
+    http-server.authentication.type=JWT
+    http-server.authentication.allow-insecure-over-http=true
+    http-server.authentication.jwt.key-file=/etc/trino-secrets/gateway.hmac
+    http-server.authentication.jwt.required-issuer=fdp-sql
+    http-server.authentication.jwt.required-audience=trino
+    internal-communication.shared-secret=${ENV:TRINO_INTERNAL_SECRET}
+    query.max-run-time=1h
+    protocol.spooling.enabled=false
+  node.properties: |
+    node.environment=fdp
+    node.data-dir=/data/trino
+  jvm.config: |
+    -server
+    -Xmx{{ .Values.trino.heapSize }}
+    -XX:+UseG1GC
+    -XX:+ExitOnOutOfMemoryError
+    -Djdk.attach.allowAttachSelf=true
+  access-control.properties: |
+    access-control.name=opa
+    opa.policy.uri=http://fdp-control-plane:8000/internal/trino/allow
+    opa.policy.batched-uri=http://fdp-control-plane:8000/internal/trino/batch
+    opa.policy.row-filters-uri=http://fdp-control-plane:8000/internal/trino/row-filters
+    opa.identity.extra-credentials-keys=dc_context
+    opa.allow-permission-management-operations=false
+    opa.log-requests=false
+    opa.log-responses=false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdp-trino
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-trino }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: fdp-trino }
+    spec:
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000 }
+      containers:
+        - name: trino
+          image: {{ .Values.trino.image | quote }}
+          ports: [{ name: http, containerPort: 8080 }]
+          env:
+            {{- if .Values.metadataSql.enabled }}
+            - { name: FDP_METADATA_READER_USER, value: {{ .Values.metadataSql.readerUser | quote }} }
+            - name: FDP_METADATA_JDBC_URL
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.metadataSql.existingSecret }}, key: metadata-jdbc-url }
+            - name: FDP_METADATA_READER_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.metadataSql.existingSecret }}, key: metadata-reader-password }
+            {{- end }}
+            - name: TRINO_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.trino.existingSecret }}, key: internal-secret }
+          volumeMounts:
+            - { name: config, mountPath: /etc/trino, readOnly: true }
+            - { name: secrets, mountPath: /etc/trino-secrets, readOnly: true }
+            - { name: catalogs, mountPath: /etc/trino/catalog, readOnly: true }
+            - { name: data, mountPath: /data/trino }
+          startupProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: http }
+          resources: {{- toYaml .Values.trino.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap: { name: fdp-trino }
+        - name: secrets
+          secret: { secretName: {{ .Values.trino.existingSecret }} }
+        - name: catalogs
+          {{- if .Values.metadataSql.enabled }}
+          projected:
+            sources:
+              - secret: { name: {{ .Values.trino.catalogSecret }} }
+              - configMap:
+                  name: fdp-trino
+                  items: [{ key: metadata.properties, path: "{{ .Values.metadataSql.catalog }}.properties" }]
+          {{- else }}
+          secret: { secretName: {{ .Values.trino.catalogSecret }} }
+          {{- end }}
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-trino
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector: { app.kubernetes.io/name: fdp-trino }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+# The coordinator accepts requests only from the authenticated SQL gateway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trino-ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: fdp-trino }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: fdp-control-plane } }
+      ports: [{ port: 8080, protocol: TCP }]
+{{- end }}

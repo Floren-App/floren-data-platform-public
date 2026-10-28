@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "warehouse": "small",
+  "programs": {
+    "sales-report": {
+      "description": "Sales per region for a period, written to CSV and a chart",
+      "entrypoint": "analysis/sales_report.py",
+      "requirements": "requirements.txt",
+      "warehouse": "medium",
+      "data_sources": [
+        "finance-dw"
+      ],
+      "args": [
+        {
+          "name": "start_date",
+          "type": "date",
+          "label": "From",
+          "required": true,
+          "default": "2026-01-01"
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "label": "Until",
+          "required": true,
+          "default": "2026-06-30"
+        },
+        {
+          "name": "region",
+          "type": "choice",
+          "choices": [
+            "All",
+            "North",
+            "South",
+            "East",
+            "West"
+          ],
+          "default": "All"
+        },
+        {
+          "name": "top",
+          "type": "integer",
+          "label": "Top products",
+          "min": 1,
+          "max": 50,
+          "default": 5
+        },
+        {
+          "name": "chart",
+          "type": "boolean",
+          "label": "Draw a chart",
+          "default": true
+        }
+      ]
+    },
+    "region-summary": {
+      "description": "R: totals per region and product",
+      "entrypoint": "analysis/region_summary.R",
+      "requirements": "r-requirements.txt",
+      "data_sources": [
+        "finance-dw"
+      ],
+      "args": [
+        {
+          "name": "min_amount",
+          "type": "number",
+          "label": "Ignore sales below (EUR)",
+          "min": 0,
+          "default": 0
+        }
+      ]
+    },
+    "explore": {
+      "description": "Parameterised notebook; the executed copy lands in the run outputs",
+      "kind": "notebook",
+      "entrypoint": "notebooks/explore.ipynb",
+      "requirements": "requirements.txt",
+      "args": [
+        {
+          "name": "region",
+          "type": "choice",
+          "choices": [
+            "North",
+            "South",
+            "East",
+            "West"
+          ],
+          "default": "North"
+        }
+      ]
+    },
+    "sales-dashboard": {
+      "description": "Streamlit dashboard on the finance warehouse",
+      "kind": "app",
+      "entrypoint": "dashboards/sales.py",
+      "requirements": "requirements.txt",
+      "warehouse": "xsmall",
+      "data_sources": [
+        "finance-dw"
+      ]
+    },
+    "finance-models": {
+      "description": "dbt: staging and monthly marts on the finance warehouse",
+      "kind": "dbt",
+      "entrypoint": "dbt/finance",
+      "dbt": {
+        "data_source": "finance-dw",
+        "schema": "analytics"
+      },
+      "dbt_version": "1.9",
+      "warehouse": "small"
+    },
+    "finance-pipelines": {
+      "description": "Airflow (distributed): finance and lake pipelines",
+      "kind": "airflow",
+      "entrypoint": "airflow",
+      "airflow": "2.10",
+      "warehouse": "small",
+      "airflow_settings": {
+        "mode": "distributed",
+        "workers": 2,
+        "worker_concurrency": 4
+      }
+    },
+    "load-lake": {
+      "description": "Load warehouse sales into an Iceberg table on RustFS; write JSON/text files",
+      "entrypoint": "lake/load_lake.py",
+      "data_sources": [
+        "finance-dw",
+        "lake",
+        "lake-files"
+      ],
+      "warehouse": "small",
+      "args": [
+        {
+          "name": "namespace",
+          "type": "string",
+          "default": "finance",
+          "pattern": "[a-z_]+"
+        }
+      ]
+    },
+    "lake-models": {
+      "description": "dbt on Iceberg (Trino): models on the lake's sales",
+      "kind": "dbt",
+      "entrypoint": "dbt/lake",
+      "dbt": {
+        "data_source": "lake",
+        "schema": "analytics"
+      },
+      "dbt_version": "1.9",
+      "warehouse": "small"
+    },
+    "lake-report": {
+      "description": "R: reads the JSON summary from RustFS and writes a text report",
+      "entrypoint": "lake/lake_report.R",
+      "data_sources": [
+        "lake-files"
+      ]
+    }
+  },
+  "python": "3.12"
+}

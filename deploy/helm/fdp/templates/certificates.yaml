@@ -1,0 +1,43 @@
+{{- $mode := .Values.tls.mode }}
+{{- if not (has $mode (list "disabled" "existing" "certManager")) }}
+{{- fail "tls.mode must be disabled, existing, or certManager" }}
+{{- end }}
+{{- if and (ne $mode "disabled") (not .Values.traefik.enabled) }}
+{{- fail "chart-managed public TLS requires traefik.enabled; configure certificates on your external gateway instead" }}
+{{- end }}
+{{- if eq $mode "certManager" }}
+{{- if or (not (regexMatch "^[1-9][0-9]*h$" .Values.tls.duration)) (not (regexMatch "^[1-9][0-9]*h$" .Values.tls.renewBefore)) }}
+{{- fail "tls.duration and tls.renewBefore must be positive whole hours, for example 2160h and 360h" }}
+{{- end }}
+{{- if ge (int (trimSuffix "h" .Values.tls.renewBefore)) (int (trimSuffix "h" .Values.tls.duration)) }}
+{{- fail "tls.renewBefore must be shorter than tls.duration" }}
+{{- end }}
+{{- if not (has .Values.tls.issuerRef.kind (list "Issuer" "ClusterIssuer")) }}
+{{- fail "tls.issuerRef.kind must be Issuer or ClusterIssuer" }}
+{{- end }}
+{{- $public := regexReplaceAll ":[0-9]+$" (urlParse .Values.publicUrl).host "" }}
+{{- $api := regexReplaceAll ":[0-9]+$" (urlParse .Values.apiGateway.publicUrl).host "" }}
+{{- $names := concat (list $public $api) .Values.tls.additionalDnsNames }}
+{{- if .Values.keycloak.enabled }}
+{{- $names = append $names (regexReplaceAll ":[0-9]+$" (urlParse .Values.keycloak.publicUrl).host "") }}
+{{- end }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: fdp-public
+  namespace: {{ .Release.Namespace }}
+spec:
+  secretName: fdp-public-tls
+  duration: {{ .Values.tls.duration | quote }}
+  renewBefore: {{ .Values.tls.renewBefore | quote }}
+  privateKey:
+    rotationPolicy: Always
+  issuerRef:
+    name: {{ required "certManager TLS requires tls.issuerRef.name" .Values.tls.issuerRef.name | quote }}
+    kind: {{ .Values.tls.issuerRef.kind }}
+    group: cert-manager.io
+  dnsNames:
+    {{- range ($names | uniq) }}
+    - {{ required "public TLS requires hostnames in publicUrl and apiGateway.publicUrl" . | quote }}
+    {{- end }}
+{{- end }}

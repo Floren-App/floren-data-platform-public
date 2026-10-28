@@ -1,0 +1,36 @@
+# Disposable integration backends. Does not attach to or modify the development stack.
+services:
+  warehouse:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: warehouse_admin
+      POSTGRES_PASSWORD: warehouse_admin
+      POSTGRES_DB: finance
+    ports: ["127.0.0.1::5432"]
+    tmpfs: [/var/lib/postgresql/data]
+  rustfs:
+    image: rustfs/rustfs:1.0.2
+    user: "0"
+    environment:
+      RUSTFS_ACCESS_KEY: fdp
+      RUSTFS_SECRET_KEY: fdp-rustfs-secret
+      RUSTFS_VOLUMES: /data
+    ports: ["127.0.0.1::9000"]
+    tmpfs: [/data]
+  iceberg-rest:
+    image: apache/iceberg-rest-fixture:1.10.0
+    environment:
+      CATALOG_URI: jdbc:sqlite:file:/tmp/iceberg.db
+      CATALOG_WAREHOUSE: s3://lake/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://rustfs:9000
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+      AWS_ACCESS_KEY_ID: fdp
+      AWS_SECRET_ACCESS_KEY: fdp-rustfs-secret
+      AWS_REGION: us-east-1
+  trino:
+    image: trinodb/trino:484
+    depends_on: [warehouse, iceberg-rest, rustfs]
+    volumes: ["./trino:/etc/trino:ro"]
+    ports: ["127.0.0.1::8080"]
+    mem_limit: 3g

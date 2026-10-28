@@ -1,0 +1,50 @@
+Floren Data Platform platform resources have been submitted in {{ .Release.Namespace }}.
+
+Check deployment readiness:
+  kubectl -n {{ .Release.Namespace }} get deployments,pods,jobs,pvc
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/fdp-control-plane
+
+Control-plane startup/readiness verifies initialization and metadata reachability
+on /readyz. Liveness uses /healthz, so a metadata outage removes traffic without
+restarting otherwise healthy replicas. Failed layer prerequisites are recorded in
+their provisioning operation; platform readiness does not make every layer Ready.
+{{- if .Values.keycloak.enabled }}
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/fdp-keycloak
+{{- if .Values.keycloak.directorySync.enabled }}
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/fdp-directory-sync
+{{- end }}
+
+Initial application administrator: {{ .Values.keycloak.initialAdminUser }}
+Identity provider: {{ .Values.keycloak.publicUrl }}
+Retrieve its temporary password from the approved secret-management workflow, or:
+  kubectl -n {{ .Release.Namespace }} get secret {{ default "fdp-keycloak" .Values.keycloak.existingSecret }} -o jsonpath='{.data.initial-user-password}' | base64 --decode
+Change this password at first login. IdP bootstrap-admin credentials are separate.
+{{- end }}
+{{- if eq .Values.tls.mode "certManager" }}
+
+Check issuance/renewal before directing public traffic:
+  kubectl -n {{ .Release.Namespace }} describe certificate fdp-public
+{{- end }}
+
+{{- if .Values.layerController.enabled }}
+
+Before granting external data-source egress, configure layerController.network
+with complete Pod, Service and node CIDRs, plus external platform-only endpoints
+in protectedCidrs. Missing boundaries close data egress and fail provisioning;
+correct configuration and retry the layer operation. See the chart README.
+{{- end }}
+
+The chart requires configured DNS/TLS and deployed images.
+{{- if .Values.dataVolume.enabled }}
+The shared data volume uses the configured NFS export (dataVolume.nfs).
+{{- else }}
+No shared data volume: jobs and apps run only in controller-managed layers.
+{{- end }}
+{{- if .Values.layerController.enabled }}
+Layers become isolated once their infrastructure is enabled
+(PUT /v1/admin/layers/<id>/infrastructure); unmanaged layers keep the shared
+runtime namespace. Remaining limitations: docs/kubernetes-operations.md.
+{{- else }}
+The layer controller is disabled: all layers share one runtime namespace and
+one SQL engine. Enable layerController for per-layer isolation.
+{{- end }}

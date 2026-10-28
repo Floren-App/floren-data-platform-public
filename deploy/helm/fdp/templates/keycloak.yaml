@@ -1,0 +1,179 @@
+{{- if .Values.keycloak.enabled }}
+{{- $secret := default "fdp-keycloak" .Values.keycloak.existingSecret }}
+{{- if not .Values.keycloak.existingSecret }}
+{{- $old := lookup "v1" "Secret" .Release.Namespace $secret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secret }}
+  namespace: {{ .Release.Namespace }}
+  annotations: { helm.sh/resource-policy: keep }
+type: Opaque
+data:
+  {{- range $key := list "admin-password" "initial-user-password" "provisioner-client-secret" }}
+  {{- if and $old (not (hasKey $old.data $key)) }}
+  {{- fail (printf "retained Keycloak Secret is missing %s; restore its original value before upgrading" $key) }}
+  {{- end }}
+  {{ $key }}: {{ if $old }}{{ index $old.data $key | quote }}{{ else }}{{ randAlphaNum 48 | b64enc | quote }}{{ end }}
+  {{- end }}
+  {{- /* Added later and opt-in: generated on upgrade too, never rotated. */}}
+  automation-client-secret: {{ if and $old (hasKey $old.data "automation-client-secret") }}{{ index $old.data "automation-client-secret" | quote }}{{ else }}{{ randAlphaNum 48 | b64enc | quote }}{{ end }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fdp-keycloak-realm
+  namespace: {{ .Release.Namespace }}
+data:
+  fdp-realm.json: |
+    {{- tpl (.Files.Get "files/keycloak-realm.json") . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdp-keycloak
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-keycloak }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: fdp-keycloak }
+      annotations:
+        checksum/realm: {{ tpl (.Files.Get "files/keycloak-realm.json") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000 }
+      containers:
+        - name: keycloak
+          image: {{ .Values.keycloak.image | quote }}
+          args: [start, --import-realm]
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          ports: [{ name: http, containerPort: 8080 }, { name: management, containerPort: 9000 }]
+          env:
+            - { name: KC_HOSTNAME, value: {{ trimSuffix "/" .Values.keycloak.publicUrl | quote }} }
+            - { name: KC_HTTP_ENABLED, value: "true" }
+            - { name: KC_PROXY_HEADERS, value: xforwarded }
+            - { name: KC_HEALTH_ENABLED, value: "true" }
+            - { name: KC_DB, value: postgres }
+            {{- if .Values.keycloak.database.existingSecret }}
+            - name: KC_DB_URL
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.keycloak.database.existingSecret }}, key: jdbc-url }
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.keycloak.database.existingSecret }}, key: username }
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.keycloak.database.existingSecret }}, key: password }
+            {{- else }}
+            - { name: KC_DB_URL, value: "jdbc:postgresql://{{ include "fdp.databaseHost" . }}:5432/keycloak" }
+            - { name: KC_DB_USERNAME, value: keycloak }
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "fdp-metadata-db" .Values.metadataDatabase.existingSecret }}
+                  key: keycloak-password
+            {{- end }}
+            - { name: KC_BOOTSTRAP_ADMIN_USERNAME, value: bootstrap-admin }
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: admin-password }
+            - name: FDP_INITIAL_USER_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: initial-user-password }
+            - name: FDP_PROVISIONER_SECRET
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: provisioner-client-secret }
+            {{- if .Values.keycloak.automationClient.enabled }}
+            - name: FDP_AUTOMATION_SECRET
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: automation-client-secret }
+            {{- end }}
+          volumeMounts:
+            - { name: realm, mountPath: /opt/keycloak/data/import, readOnly: true }
+          startupProbe:
+            httpGet: { path: /health/ready, port: management }
+            periodSeconds: 5
+            failureThreshold: 120
+          readinessProbe:
+            httpGet: { path: /health/ready, port: management }
+          resources: {{- toYaml .Values.keycloak.resources | nindent 12 }}
+      volumes:
+        - name: realm
+          configMap: { name: fdp-keycloak-realm }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-keycloak
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector: { app.kubernetes.io/name: fdp-keycloak }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fdp-keycloak-ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: fdp-keycloak }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: fdp-control-plane } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: traefik } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: fdp-directory-sync } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: fdp-keycloak-clients } }
+      ports: [{ port: 8080, protocol: TCP }]
+{{- if .Values.keycloak.directorySync.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdp-directory-sync
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-directory-sync }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: fdp-directory-sync }
+    spec:
+      {{- include "fdp.imagePullSecrets" . | nindent 6 }}
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001 }
+      containers:
+        - name: directory-sync
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: [python, -m, app.directory_sync, --loop, --interval, {{ .Values.keycloak.directorySync.intervalSeconds | quote }}]
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          env:
+            - { name: KEYCLOAK_URL, value: "http://fdp-keycloak:8080" }
+            - { name: KEYCLOAK_REALM, value: {{ .Values.keycloak.realm | quote }} }
+            {{- if .Values.keycloak.automationClient.enabled }}
+            # Provision the automation identity (infrastructure-as-code) like a user.
+            - { name: KEYCLOAK_SERVICE_CLIENTS, value: fdp-automation }
+            {{- end }}
+            - { name: FDP_URL, value: "http://fdp-control-plane:8000" }
+            - name: KEYCLOAK_PROVISIONER_SECRET
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: provisioner-client-secret }
+            - name: FDP_SCIM_TOKEN
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.existingSecret }}, key: FDP_SCIM_TOKEN }
+          readinessProbe:
+            exec:
+              command: [python, -c, "from pathlib import Path; raise SystemExit(0 if Path('/tmp/fdp-directory-sync-ready').exists() else 1)"]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
+{{- end }}
+{{- end }}

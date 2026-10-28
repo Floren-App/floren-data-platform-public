@@ -1,0 +1,622 @@
+{
+  "$defs": {
+    "CertificatePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "default": "disabled",
+          "enum": [
+            "disabled",
+            "existing",
+            "cert_manager"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "secret_name": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secret Name"
+        },
+        "issuer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IssuerRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "trust_bundle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SecretKeyRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "duration_hours": {
+          "default": 2160,
+          "maximum": 8760,
+          "minimum": 24,
+          "title": "Duration Hours",
+          "type": "integer"
+        },
+        "renew_before_hours": {
+          "default": 360,
+          "maximum": 4380,
+          "minimum": 1,
+          "title": "Renew Before Hours",
+          "type": "integer"
+        }
+      },
+      "title": "CertificatePolicy",
+      "type": "object"
+    },
+    "IssuerRef": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "default": "Issuer",
+          "enum": [
+            "Issuer",
+            "ClusterIssuer"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "group": {
+          "const": "cert-manager.io",
+          "default": "cert-manager.io",
+          "title": "Group",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "IssuerRef",
+      "type": "object"
+    },
+    "LayerIceberg": {
+      "additionalProperties": false,
+      "description": "Iceberg tables in a layer: metadata in the layer PostgreSQL, data in a layer RustFS bucket.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "catalog": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Catalog"
+        },
+        "bucket": {
+          "default": "lake",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$",
+          "title": "Bucket",
+          "type": "string"
+        }
+      },
+      "title": "LayerIceberg",
+      "type": "object"
+    },
+    "LayerQuota": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "default": 32,
+          "exclusiveMinimum": 0,
+          "maximum": 10000,
+          "title": "Cpu",
+          "type": "number"
+        },
+        "memory": {
+          "default": "128Gi",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Memory",
+          "type": "string"
+        },
+        "pods": {
+          "default": 100,
+          "maximum": 100000,
+          "minimum": 4,
+          "title": "Pods",
+          "type": "integer"
+        },
+        "persistent_volume_claims": {
+          "default": 100,
+          "maximum": 100000,
+          "minimum": 1,
+          "title": "Persistent Volume Claims",
+          "type": "integer"
+        },
+        "storage": {
+          "default": "1Ti",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Storage",
+          "type": "string"
+        }
+      },
+      "title": "LayerQuota",
+      "type": "object"
+    },
+    "LayerStorage": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_storage_class": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspace Storage Class"
+        },
+        "workspace_size": {
+          "default": "20Gi",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Workspace Size",
+          "type": "string"
+        },
+        "workspace_access_mode": {
+          "default": "ReadWriteMany",
+          "enum": [
+            "ReadWriteOnce",
+            "ReadWriteMany"
+          ],
+          "title": "Workspace Access Mode",
+          "type": "string"
+        },
+        "artifact_storage_class": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Storage Class"
+        },
+        "artifact_size": {
+          "default": "50Gi",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Artifact Size",
+          "type": "string"
+        },
+        "artifact_access_mode": {
+          "default": "ReadWriteMany",
+          "enum": [
+            "ReadWriteOnce",
+            "ReadWriteMany"
+          ],
+          "title": "Artifact Access Mode",
+          "type": "string"
+        },
+        "artifact_secret": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SecretKeyRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "retention": {
+          "const": "Retain",
+          "default": "Retain",
+          "title": "Retention",
+          "type": "string"
+        }
+      },
+      "title": "LayerStorage",
+      "type": "object"
+    },
+    "OptionalDatabase": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "image": {
+          "default": "postgres:16.15-bookworm",
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Image",
+          "type": "string"
+        },
+        "cpu": {
+          "default": 0.5,
+          "exclusiveMinimum": 0,
+          "maximum": 256,
+          "title": "Cpu",
+          "type": "number"
+        },
+        "memory": {
+          "default": "1Gi",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Memory",
+          "type": "string"
+        },
+        "credentials_secret": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Credentials Secret"
+        },
+        "storage_class": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Storage Class"
+        },
+        "size": {
+          "default": "20Gi",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Size",
+          "type": "string"
+        },
+        "tls": {
+          "$ref": "#/$defs/CertificatePolicy"
+        },
+        "catalog": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Catalog"
+        }
+      },
+      "title": "OptionalDatabase",
+      "type": "object"
+    },
+    "OptionalObjectStore": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image"
+        },
+        "credentials_secret": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Credentials Secret"
+        },
+        "storage_class": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Storage Class"
+        },
+        "size": {
+          "default": "50Gi",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Size",
+          "type": "string"
+        },
+        "cpu": {
+          "default": 0.5,
+          "exclusiveMinimum": 0,
+          "maximum": 256,
+          "title": "Cpu",
+          "type": "number"
+        },
+        "memory": {
+          "default": "1Gi",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Memory",
+          "type": "string"
+        },
+        "buckets": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Buckets",
+          "type": "array"
+        },
+        "tls": {
+          "$ref": "#/$defs/CertificatePolicy"
+        }
+      },
+      "title": "OptionalObjectStore",
+      "type": "object"
+    },
+    "SecretKeyRef": {
+      "additionalProperties": false,
+      "description": "Always local to the object's namespace; values are never accepted here.",
+      "properties": {
+        "name": {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+          "title": "Name",
+          "type": "string"
+        },
+        "key": {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^[-._a-zA-Z0-9]+$",
+          "title": "Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "key"
+      ],
+      "title": "SecretKeyRef",
+      "type": "object"
+    },
+    "TrinoCoordinator": {
+      "additionalProperties": false,
+      "description": "Plans and coordinates queries; does no query work itself. Its JVM heap is 70% of memory.",
+      "properties": {
+        "cpu": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "maximum": 256,
+          "title": "Cpu",
+          "type": "number"
+        },
+        "memory": {
+          "default": "2Gi",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Memory",
+          "type": "string"
+        }
+      },
+      "title": "TrinoCoordinator",
+      "type": "object"
+    },
+    "TrinoInfrastructure": {
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "default": "trinodb/trino:484",
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Image",
+          "type": "string"
+        },
+        "coordinator": {
+          "$ref": "#/$defs/TrinoCoordinator"
+        },
+        "workers": {
+          "$ref": "#/$defs/TrinoWorkers"
+        },
+        "internal_secret": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SecretKeyRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "catalog_secret": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Catalog Secret"
+        },
+        "tls": {
+          "$ref": "#/$defs/CertificatePolicy"
+        }
+      },
+      "title": "TrinoInfrastructure",
+      "type": "object"
+    },
+    "TrinoWorkers": {
+      "additionalProperties": false,
+      "description": "Workers run the queries and are shared by everyone querying the layer. All have the size of one\nwarehouse, each takes one of its slots, and the layer scales between min (always running) and max.",
+      "properties": {
+        "warehouse": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Warehouse"
+        },
+        "min": {
+          "default": 1,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Min",
+          "type": "integer"
+        },
+        "max": {
+          "default": 1,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max",
+          "type": "integer"
+        },
+        "queries_per_worker": {
+          "default": 4,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Queries Per Worker",
+          "type": "integer"
+        },
+        "scale_down_after_seconds": {
+          "default": 300,
+          "maximum": 86400,
+          "minimum": 60,
+          "title": "Scale Down After Seconds",
+          "type": "integer"
+        },
+        "drain_seconds": {
+          "default": 600,
+          "maximum": 86400,
+          "minimum": 30,
+          "title": "Drain Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "TrinoWorkers",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "enabled": {
+      "default": false,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "retired": {
+      "default": false,
+      "title": "Retired",
+      "type": "boolean"
+    },
+    "trino": {
+      "$ref": "#/$defs/TrinoInfrastructure"
+    },
+    "storage": {
+      "$ref": "#/$defs/LayerStorage"
+    },
+    "quota": {
+      "$ref": "#/$defs/LayerQuota"
+    },
+    "postgres": {
+      "$ref": "#/$defs/OptionalDatabase"
+    },
+    "rustfs": {
+      "$ref": "#/$defs/OptionalObjectStore"
+    },
+    "iceberg": {
+      "$ref": "#/$defs/LayerIceberg"
+    }
+  },
+  "title": "InfrastructureSpec",
+  "type": "object"
+}

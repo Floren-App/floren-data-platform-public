@@ -1,0 +1,8 @@
+Floren Data Platform
+Copyright 2026 The Floren Data Platform authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The container images built from this repository also contain third-party software under its own licenses,
+including the optional R images (RStudio Server Open Source under AGPL-3.0; R and Shiny under the GPL).
+See THIRD_PARTY_LICENSES.md.

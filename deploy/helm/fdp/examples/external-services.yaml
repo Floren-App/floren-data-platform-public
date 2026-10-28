@@ -1,0 +1,20 @@
+# Platform Secret: database URL, signing/gateway/Trino keys, SCIM bearer and OpenBao token.
+existingSecret: fdp-control-plane
+metadataDatabase:
+  enabled: false
+bootstrap:
+  enabled: false
+keycloak:
+  enabled: false
+secretManagement:
+  backend: openbao
+oidc:
+  issuer: https://your-idp.example.com/realms/fdp
+  audience: fdp-api
+  directoryMode: scim
+openbao:
+  addr: https://your-openbao.example.com:8200
+  kvMount: fdp
+
+# Provision the existing Secrets, trusted roots, IdP clients and SCIM connection.
+# Supply actual DNS/TLS and NFS/storage values, plus existing Trino/catalog Secrets.

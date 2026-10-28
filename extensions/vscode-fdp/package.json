@@ -1,0 +1,42 @@
+{
+  "name": "fdp",
+  "displayName": "Floren Data Platform",
+  "description": "Run fdp.json programs on Floren Data Platform warehouses and follow their console.",
+  "version": "0.1.0",
+  "deployer": "fdp",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://example.invalid/fdp" },
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [{ "id": "fdp", "title": "Floren Data Platform", "icon": "media/icon.svg" }]
+    },
+    "views": {
+      "fdp": [{ "type": "webview", "id": "fdp.runner", "name": "Runner" }]
+    },
+    "commands": [
+      { "command": "fdp.refresh", "title": "Floren Data Platform: Refresh programs" },
+      { "command": "fdp.openConfig", "title": "Floren Data Platform: Open fdp.json" },
+      { "command": "fdp.createConfig", "title": "Floren Data Platform: Create fdp.json" },
+      { "command": "fdp.showRunner", "title": "Floren Data Platform: Show runner" },
+      { "command": "fdp.previewPort", "title": "Floren Data Platform: Preview app on port…" }
+    ],
+    "jsonValidation": [
+      { "fileMatch": "fdp.json", "url": "./schemas/fdp.schema.json" }
+    ]
+  },
+  "scripts": {
+    "copy-schema": "node -e \"require('fs').copyFileSync('../../schemas/fdp.schema.json','schemas/fdp.schema.json')\"",
+    "compile": "tsc -p .",
+    "package": "npm run copy-schema && npm run compile && vsce package --skip-license -o fdp.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.11",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "3.1.1",
+    "typescript": "5.6.2"
+  }
+}

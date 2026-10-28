@@ -1,0 +1,18 @@
+# Bundled platform dependencies. The shared platform/legacy data path still needs
+# an existing NFS export. Managed layers have separate workspace/artifact volumes.
+# Public DNS/TLS and appropriate storage classes remain installation prerequisites.
+metadataDatabase:
+  enabled: true
+bootstrap:
+  enabled: true
+secretManagement:
+  backend: kubernetes
+keycloak:
+  enabled: true
+  publicUrl: https://idp.example.com
+oidc:
+  directoryMode: scim
+
+# Supply publicUrl, apiGateway.publicUrl, keycloak.publicUrl, dataVolume.nfs,
+# runtime.storageClass, and either TLS existing certificate or issuer values.
+# Combine with examples/tls-existing.yaml or examples/tls-cert-manager.yaml.

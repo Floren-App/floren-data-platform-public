@@ -1,0 +1,14 @@
+# Existing cert-manager installation and issuer required. No cluster-wide CRDs are installed.
+publicUrl: https://fdp.example.com
+apiGateway:
+  publicUrl: https://api.fdp.example.com:9443
+tls:
+  mode: certManager
+  issuerRef:
+    name: production-acme
+    kind: ClusterIssuer
+
+# Optional: an existing Secret containing a PEM ca-bundle.pem with public roots
+# plus your private CA certificates. Do not include private keys.
+# trust:
+#   caBundleSecret: fdp-ca-bundle

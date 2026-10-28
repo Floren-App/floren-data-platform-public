@@ -1,0 +1,6 @@
+# Open the Floren Data Platform runner in the Viewer pane whenever an RStudio session starts.
+setHook("rstudio.sessionInit", function(newSession) {
+  if (newSession && nzchar(Sys.getenv("FDP_API"))) {
+    try(fdp::runner(), silent = TRUE)
+  }
+}, action = "append")

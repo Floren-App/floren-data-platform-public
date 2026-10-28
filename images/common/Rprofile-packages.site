@@ -1,0 +1,7 @@
+
+# Floren Data Platform: R packages install from the platform's package repository only (Packages in the app).
+# Specific versions: renv::install("pkg@1.2.3") (the repository keeps every version under src/contrib/Archive).
+local({
+  repo <- Sys.getenv("FDP_CRAN")
+  if (nzchar(repo)) options(repos = c(FDP = repo))
+})

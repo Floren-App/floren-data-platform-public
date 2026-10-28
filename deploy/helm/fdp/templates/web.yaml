@@ -1,0 +1,65 @@
+{{- if .Values.web.enabled }}
+{{- /* The app in the browser: static files only (no secrets, no data); the gateway routes publicUrl here. */}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdp-web
+  namespace: {{ .Release.Namespace }}
+  labels: { app.kubernetes.io/name: fdp-web }
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-web }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: fdp-web }
+    spec:
+      automountServiceAccountToken: false
+      {{- include "fdp.imagePullSecrets" . | nindent 6 }}
+      securityContext: { runAsNonRoot: true, runAsUser: 101, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: web
+          image: {{ .Values.web.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{ containerPort: 8080, name: http }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 20
+          resources: {{- toYaml .Values.web.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-web
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector: { app.kubernetes.io/name: fdp-web }
+  ports: [{ port: 8080, targetPort: http, name: http }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fdp-web
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: fdp-web }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: traefik } }
+      ports: [{ port: 8080, protocol: TCP }]
+  egress: []
+{{- end }}

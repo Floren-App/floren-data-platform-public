@@ -1,0 +1,200 @@
+# Local development stack. Everything here is free/open source.
+#   make dev     (from the repo root)  → gateway on https://localhost:8090, Keycloak on https://localhost:8443
+# HTTPS uses a mkcert certificate (make certs). Keycloak's login cookies are Secure, which
+# Safari and the Tauri app (WebKit) only accept over HTTPS, even on localhost.
+# Gateway host port is overridable: GATEWAY_PORT=9090 make dev
+# NOT for production: dev-mode OpenBao, Docker socket mounted into the control plane.
+# Storage is not part of this file: Floren Data Platform governs databases and buckets that are operated
+# elsewhere. example-storage/docker-compose.yml adds a local PostgreSQL warehouse and RustFS for
+# testing (opt in with EXAMPLE_STORAGE=1).
+
+name: fdp
+
+networks:
+  default:
+    name: fdp   # workspace/compute containers started by the control plane join this network
+  data:
+    internal: true    # SQL backends/catalog/engine are not on the runtime network
+  metadata:
+    internal: true    # Only Trino and platform PostgreSQL; separate from warehouse backends.
+
+volumes:
+  pgdata:
+  gitea-data:
+  git-cache:
+  openbao-data:
+  openbao-keys:
+  # Deployed runs' consoles/outputs and environment caches. Fixed name: the control plane
+  # mounts sub-folders of it into the containers it starts.
+  fdp-data:
+    name: fdp-data
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    networks: [default, metadata]
+    environment:
+      POSTGRES_USER: fdp
+      POSTGRES_PASSWORD: fdp
+      POSTGRES_DB: fdp
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "fdp"]
+      interval: 5s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command:
+      - start-dev
+      - --import-realm
+      - --http-port=8080          # internal only: the control plane fetches signing keys here
+      - --https-port=8443
+      - --https-certificate-file=/certs/localhost.pem
+      - --https-certificate-key-file=/certs/localhost-key.pem
+      - --hostname=https://localhost:8443
+      - --hostname-backchannel-dynamic=true
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - ./keycloak/fdp-realm.json:/opt/keycloak/data/import/fdp-realm.json:ro
+      - ./certs:/certs:ro
+    ports: ["8443:8443"]
+
+  # Real storage (survives restarts); openbao-init unseals it on every start. UI: http://localhost:8200
+  openbao:
+    image: openbao/openbao:2.1.0
+    command: ["server"]   # the entrypoint adds -config=/openbao/config (our config.hcl)
+    cap_add: [IPC_LOCK]
+    volumes:
+      - ./openbao/config.hcl:/openbao/config/config.hcl:ro
+      - openbao-data:/openbao/file
+    ports: ["8200:8200"]
+
+  openbao-init:
+    image: openbao/openbao:2.1.0
+    depends_on: [openbao]
+    entrypoint: ["/bin/sh", "/init.sh"]
+    volumes:
+      - ./openbao/init.sh:/init.sh:ro
+      - openbao-keys:/openbao/keys
+    restart: "no"
+
+  # Self-hosted git for local development (MIT). In production, point Floren Data Platform at your own git.
+  #   http://localhost:3000 · integration service account fdp/fdp123
+  gitea:
+    image: gitea/gitea:1.22.3
+    environment:
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__server__ROOT_URL: http://gitea:3000/
+      GITEA__server__HTTP_PORT: "3000"
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      GITEA__repository__DEFAULT_BRANCH: main
+    volumes: [gitea-data:/data]
+    ports: ["3000:3000"]
+
+  gitea-init:
+    image: gitea/gitea:1.22.3
+    depends_on: [gitea]
+    volumes:
+      - gitea-data:/data
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        until wget -qO- http://gitea:3000/api/healthz >/dev/null 2>&1; do sleep 1; done
+        user() { su git -c "gitea --config /data/gitea/conf/app.ini admin user create --username $$1 --password $$2 --email $$1@fdp.test --must-change-password=false $$3" 2>/dev/null || true; }
+        user fdp fdp123 --admin
+        echo "gitea ready: http://localhost:3000 (no repositories are seeded)"
+    restart: "no"
+
+  # Shared SQL engine. It holds one catalog per SQL storage integration (trino/catalog/*.properties);
+  # the storage itself is external to Floren Data Platform. example-storage/ swaps in its own catalogs.
+  trino:
+    image: trinodb/trino:484
+    networks: [data, metadata]
+    environment:
+      FDP_METADATA_JDBC_URL: ${FDP_METADATA_JDBC_URL:-jdbc:postgresql://postgres:5432/fdp}
+      FDP_METADATA_READER_USER: ${FDP_METADATA_READER_USER:-fdp_metadata_reader}
+      FDP_METADATA_READER_PASSWORD: ${FDP_METADATA_READER_PASSWORD:-dev-only-metadata-reader}
+    volumes:
+      - ./trino:/etc/trino:ro
+      - ./trino/catalog:/etc/trino/catalog:ro
+    # No host port and no connection to the runtime network.
+    mem_limit: 3g
+
+  control-plane:
+    build: ../../services/control-plane
+    user: "0"   # dev only: needs the Docker socket
+    networks: [default, data]
+    depends_on:
+      postgres: { condition: service_healthy }
+      openbao-init: { condition: service_completed_successfully }
+    environment:
+      FDP_DATABASE_URL: ${FDP_DATABASE_URL:-postgresql+psycopg://fdp:fdp@postgres:5432/fdp}
+      FDP_METADATA_SQL_ENABLED: ${FDP_METADATA_SQL_ENABLED:-true}
+      FDP_METADATA_READER_USER: ${FDP_METADATA_READER_USER:-fdp_metadata_reader}
+      FDP_METADATA_READER_PASSWORD: ${FDP_METADATA_READER_PASSWORD:-dev-only-metadata-reader}
+      FDP_METADATA_BOOTSTRAP_READER: ${FDP_METADATA_BOOTSTRAP_READER:-true}
+      FDP_PUBLIC_URL: https://localhost:${GATEWAY_PORT:-8090}
+      FDP_API_GATEWAY_URL: https://localhost:${API_GATEWAY_PORT:-8091}
+      FDP_GATEWAY_CONFIG_TOKEN: ${FDP_GATEWAY_CONFIG_TOKEN:-dev-only-gateway-config-token}
+      FDP_INTERNAL_URL: http://control-plane:8000
+      FDP_OIDC_ISSUER: https://localhost:8443/realms/fdp
+      FDP_OIDC_JWKS_URL: http://keycloak:8080/realms/fdp/protocol/openid-connect/certs
+      FDP_OIDC_AUDIENCE: fdp-api
+      FDP_SESSION_SIGNING_KEY: dev-only-signing-key-change-me-0123456789
+      FDP_DIRECTORY_MODE: scim
+      FDP_SCIM_TOKEN: ${FDP_SCIM_TOKEN:-dev-only-scim-provisioning-token}
+      FDP_QUERY_EXECUTOR: trino
+      FDP_TRINO_URL: http://trino:8080
+      FDP_TRINO_SIGNING_KEY: dev-only-trino-key-change-me-01234567890123456789
+      FDP_ORCHESTRATOR: docker
+      FDP_DOCKER_NETWORK: fdp
+      FDP_SECRETS_BACKEND: openbao
+      FDP_OPENBAO_ADDR: http://openbao:8200
+      FDP_OPENBAO_TOKEN_FILE: /openbao/keys/token
+      FDP_DATA_VOLUME: fdp-data
+      FDP_GITOPS_INTERVAL_SECONDS: "30"
+      # Distributed Airflow deployments get their own database on the platform Postgres (dev only).
+      FDP_AIRFLOW_METADATA_URL: postgresql://fdp:fdp@postgres:5432/postgres
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - fdp-data:/fdp-data
+      - git-cache:/var/lib/fdp/git
+      - openbao-keys:/openbao/keys:ro
+
+  admin-init:
+    image: fdp/compute-python:dev
+    depends_on: [control-plane]
+    entrypoint: ["python", "/bootstrap_admin.py"]
+    environment:
+      FDP_BOOTSTRAP_API: http://control-plane:8000
+      FDP_SCIM_TOKEN: ${FDP_SCIM_TOKEN:-dev-only-scim-provisioning-token}
+    volumes:
+      - ./bootstrap_admin.py:/bootstrap_admin.py:ro
+    restart: "no"
+
+  gateway:
+    image: traefik:v3.1.6
+    depends_on: [control-plane]
+    command:
+      - --entrypoints.websecure.address=:8443
+      - --entrypoints.websecure.http.tls=true
+      - --entrypoints.websecure.asDefault=true   # routers without explicit entry points stay off the API gateway
+      # Internal APIs (/gw/...) get their own address: TLS asks callers for a client certificate there
+      # (a TLS handshake happens before the path is known, so this cannot share the app/editor address).
+      - --entrypoints.apigateway.address=:9443
+      - --entrypoints.apigateway.http.tls=true
+      - --entrypoints.apigateway.http.tls.options=api-gateway@file
+      - --providers.http.endpoint=http://control-plane:8000/internal/traefik/config
+      - --providers.http.headers.X-FDP-Gateway-Config=${FDP_GATEWAY_CONFIG_TOKEN:-dev-only-gateway-config-token}
+      - --providers.http.pollInterval=2s
+      # TLS certificates can only come from the file provider.
+      - --providers.file.filename=/etc/traefik/tls.yml
+      - --log.level=INFO
+    volumes:
+      - ./traefik-tls.yml:/etc/traefik/tls.yml:ro
+      - ./certs:/certs:ro
+    ports: ["${GATEWAY_PORT:-8090}:8443", "${API_GATEWAY_PORT:-8091}:9443"]

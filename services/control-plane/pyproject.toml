@@ -1,0 +1,38 @@
+[project]
+name = "fdp-control-plane"
+version = "0.1.0"
+description = "Floren Data Platform control plane: workspaces, compute pools, data catalog and secrets broker"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "pyjwt[crypto]>=2.9",
+    "cryptography>=45",   # public-CA Java PKCS12 truststores, certificate validation (Apache-2.0/BSD)
+    "httpx>=0.27",
+    "hvac>=2.3",          # client for OpenBao (Vault-API compatible)
+    "docker>=7.1",
+    "kubernetes>=30.1",
+    "psycopg[binary]>=3.2",
+    "boto3>=1.35",
+    "sqlglot>=28,<29",   # validate invoker views, including prepared/EXECUTE IMMEDIATE wrappers
+    "tzdata>=2024.1",     # IANA zones for scheduled SLAs, including slim runtime images
+    "packaging>=24",      # package repository: names, versions, wheel/sdist filenames (Apache-2.0/BSD)
+    "python-multipart>=0.0.18",  # package uploads from the app and twine (Apache-2.0)
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

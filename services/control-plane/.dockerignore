@@ -1,0 +1,10 @@
+# This service is also built with its own directory as the Docker context.
+# Send only the sources required by its Dockerfile, not local environments/data.
+**
+!Dockerfile
+!pyproject.toml
+!app/
+!app/**
+**/__pycache__
+**/*.pyc
+**/*.pyo

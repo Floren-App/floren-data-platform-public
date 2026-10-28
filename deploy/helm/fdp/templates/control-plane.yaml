@@ -1,0 +1,285 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fdp-control-plane
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdp-control-plane
+  namespace: {{ .Release.Namespace }}
+  labels: { app.kubernetes.io/name: fdp-control-plane }
+spec:
+  replicas: {{ .Values.replicas }}
+  {{- if eq .Values.packages.persistence.accessMode "ReadWriteOnce" }}
+  strategy: { type: Recreate }   # the package volume attaches to one node at a time
+  {{- end }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-control-plane }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: fdp-control-plane }
+    spec:
+      serviceAccountName: fdp-control-plane
+      {{- if gt (int .Values.replicas) 1 }}
+      # Replicas on different nodes where possible, so one node failing leaves the platform up.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: fdp-control-plane } }
+      {{- end }}
+      terminationGracePeriodSeconds: 30
+      {{- include "fdp.imagePullSecrets" . | nindent 6 }}
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001 }   # fsGroup: the package volume
+      initContainers:
+        # fsGroup does not reach every volume (e.g. Longhorn ReadWriteMany): hand the package folder to the
+        # control plane's user. Only CHOWN, nothing else.
+        - name: package-volume
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [sh, -c, "chown 10001:10001 /var/lib/fdp/packages"]
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL], add: [CHOWN] }
+          volumeMounts:
+            - { name: packages, mountPath: /var/lib/fdp/packages }
+          resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { cpu: 100m, memory: 64Mi } }
+      containers:
+        - name: control-plane
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{ containerPort: 8000, name: http }]
+          envFrom:
+            - secretRef: { name: {{ .Values.existingSecret }} }
+          env:
+            {{- if .Values.metadataDatabase.enabled }}
+            - { name: FDP_DATABASE_HOST, value: {{ include "fdp.databaseHost" . | quote }} }
+            - { name: FDP_DATABASE_NAME, value: fdp }
+            - { name: FDP_DATABASE_USER, value: fdp }
+            - name: FDP_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "fdp-metadata-db" .Values.metadataDatabase.existingSecret }}
+                  key: fdp-password
+            {{- else if .Values.metadataDatabase.connectionSecret }}
+            - name: FDP_DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.metadataDatabase.connectionSecret }}, key: database-url }
+            {{- end }}
+            {{- if and .Values.metadataDatabase.enabled .Values.metadataDatabase.airflow.enabled }}
+            - { name: FDP_AIRFLOW_METADATA_HOST, value: {{ include "fdp.databaseHost" . | quote }} }
+            - { name: FDP_AIRFLOW_METADATA_USER, value: airflow_provisioner }
+            - name: FDP_AIRFLOW_METADATA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "fdp-metadata-db" .Values.metadataDatabase.existingSecret }}
+                  key: airflow-provisioner-password
+            {{- end }}
+            {{- if .Values.trust.caBundleSecret }}
+            - { name: SSL_CERT_FILE, value: /etc/fdp/trust/ca-bundle.pem }
+            - { name: REQUESTS_CA_BUNDLE, value: /etc/fdp/trust/ca-bundle.pem }
+            {{- end }}
+            - { name: FDP_PUBLIC_URL, value: {{ .Values.publicUrl | quote }} }
+            - { name: FDP_API_GATEWAY_URL, value: {{ .Values.apiGateway.publicUrl | quote }} }
+            - { name: FDP_API_GATEWAY_ENTRYPOINT, value: apigateway }
+            - { name: FDP_INTERNAL_URL, value: "http://fdp-control-plane.{{ .Release.Namespace }}.svc:8000" }
+            - { name: FDP_ORCHESTRATOR, value: kubernetes }
+            - { name: FDP_QUERY_EXECUTOR, value: trino }
+            - { name: FDP_METADATA_SQL_ENABLED, value: {{ .Values.metadataSql.enabled | quote }} }
+            - { name: FDP_METADATA_CATALOG, value: {{ .Values.metadataSql.catalog | quote }} }
+            - { name: FDP_METADATA_BOOTSTRAP_READER, value: {{ .Values.metadataSql.bootstrapReader | quote }} }
+            - { name: FDP_METADATA_READER_USER, value: {{ .Values.metadataSql.readerUser | quote }} }
+            {{- if and .Values.metadataSql.enabled .Values.metadataSql.bootstrapReader }}
+            - name: FDP_METADATA_READER_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.metadataSql.existingSecret }}, key: metadata-reader-password }
+            {{- end }}
+            - { name: FDP_TRINO_URL, value: "http://fdp-trino:8080" }
+            {{- if .Values.layerController.enabled }}
+            # Managed layers' Trino live in <prefix>-<layer id>; same value as the controller.
+            - { name: FDP_LAYER_NAMESPACE_PREFIX, value: {{ include "fdp.layerNamespacePrefix" . | quote }} }
+            {{- if .Values.trust.caBundleSecret }}
+            - { name: FDP_LAYER_TRUST_BUNDLE, value: "true" }
+            {{- end }}
+            {{- end }}
+            - { name: FDP_K8S_NAMESPACE, value: {{ .Values.runtime.namespace | quote }} }
+            {{- with .Values.runtime.storageClass }}
+            - { name: FDP_K8S_STORAGE_CLASS, value: {{ . | quote }} }
+            {{- end }}
+            {{- if .Values.trust.caBundleSecret }}
+            - { name: FDP_K8S_TRUST_CONFIGMAP, value: fdp-trust }
+            {{- end }}
+            {{- if and .Values.traefik.enabled (ne .Values.tls.mode "disabled") }}
+            {{- /* Served gateway certificates, checked through the gateway service with each public name. */}}
+            {{- $gateway := printf "%s-traefik.%s.svc" .Release.Name .Release.Namespace }}
+            {{- $public := regexReplaceAll ":[0-9]+$" (urlParse .Values.publicUrl).host "" }}
+            {{- $api := regexReplaceAll ":[0-9]+$" (urlParse .Values.apiGateway.publicUrl).host "" }}
+            - { name: FDP_GATEWAY_TLS_ENDPOINTS, value: {{ printf "public=%s:443/%s,api=%s:%v/%s" $gateway $public $gateway .Values.traefik.ports.apigateway.port $api | quote }} }
+            - { name: FDP_CERTIFICATE_CHECK_INTERVAL_SECONDS, value: {{ .Values.certificateMonitoring.intervalSeconds | quote }} }
+            {{- end }}
+            - { name: FDP_IMAGE_WORKSPACE_VSCODE, value: {{ .Values.runtime.images.vscode | quote }} }
+            - { name: FDP_IMAGE_WORKSPACE_RSTUDIO, value: {{ .Values.runtime.images.rstudio | quote }} }
+            - { name: FDP_IMAGE_WORKSPACE_SQL, value: {{ .Values.runtime.images.sql | quote }} }
+            - { name: FDP_IMAGE_COMPUTE_PYTHON, value: {{ .Values.runtime.images.computePython | quote }} }
+            - { name: FDP_IMAGE_COMPUTE_R, value: {{ .Values.runtime.images.computeR | quote }} }
+            {{- with .Values.registryCredentials.existingSecret }}
+            # Copied by the control plane into the runtime and layer namespaces; pods there pull with it.
+            - { name: FDP_IMAGE_PULL_SECRET, value: {{ . | quote }} }
+            - name: FDP_IMAGE_PULL_CONFIG
+              valueFrom: { secretKeyRef: { name: {{ . | quote }}, key: .dockerconfigjson } }
+            {{- end }}
+            {{- if .Values.web.enabled }}
+            - { name: FDP_WEB_URL, value: "http://fdp-web.{{ .Release.Namespace }}.svc:8080" }
+            {{- end }}
+            - { name: FDP_RELEASE, value: {{ .Values.image.tag | quote }} }
+            - { name: FDP_R_ENABLED, value: {{ .Values.r.enabled | quote }} }
+            - { name: FDP_DEFAULT_PYTHON_VERSION, value: {{ .Values.runtime.versions.python | quote }} }
+            - { name: FDP_DEFAULT_R_VERSION, value: {{ .Values.runtime.versions.r | quote }} }
+            - { name: FDP_DEFAULT_DBT_VERSION, value: {{ .Values.runtime.versions.dbt | quote }} }
+            - { name: FDP_DEFAULT_AIRFLOW_VERSION, value: {{ .Values.runtime.versions.airflow | quote }} }
+            - { name: FDP_IMAGE_COMPUTE_DBT, value: {{ .Values.runtime.images.computeDbt | quote }} }
+            - { name: FDP_IMAGE_AIRFLOW, value: {{ .Values.runtime.images.airflow | quote }} }
+            - { name: FDP_IMAGE_AIRFLOW_BROKER, value: {{ .Values.runtime.images.airflowBroker | quote }} }
+            - { name: FDP_IMAGE_AIRFLOW_METADATA, value: {{ .Values.runtime.images.airflowMetadata | quote }} }
+            {{- if .Values.egressProxy.enabled }}
+            - { name: FDP_EGRESS_PROXY_URL, value: "http://fdp-egress-proxy.{{ .Release.Namespace }}.svc:3128" }
+            {{- end }}
+            - { name: FDP_PACKAGE_DIR, value: /var/lib/fdp/packages }
+            - { name: FDP_PACKAGE_MAX_UPLOAD_MB, value: {{ .Values.packages.maxUploadMb | quote }} }
+            - { name: FDP_PACKAGE_UPSTREAM_PYPI, value: {{ .Values.packages.upstream.pypi | quote }} }
+            - { name: FDP_PACKAGE_UPSTREAM_CRAN, value: {{ .Values.packages.upstream.cran | quote }} }
+            - { name: FDP_PACKAGE_PYTHON_VERSIONS, value: {{ .Values.packages.pythonVersions | quote }} }
+            - { name: FDP_PACKAGE_PLATFORMS, value: {{ .Values.packages.platforms | quote }} }
+            - { name: FDP_PACKAGE_GLIBC, value: {{ .Values.packages.glibc | quote }} }
+            - { name: FDP_WORKSPACE_CPU, value: {{ .Values.runtime.workspaceCpu | quote }} }
+            - { name: FDP_WORKSPACE_MEMORY_GB, value: {{ .Values.runtime.workspaceMemoryGb | quote }} }
+            - { name: FDP_WORKSPACE_IDLE_TIMEOUT_SECONDS, value: {{ .Values.runtime.idleTimeoutSeconds | quote }} }
+            - { name: FDP_MAX_RUNNING_WORKSPACES_PER_USER, value: {{ .Values.runtime.maxRunningPerUser | quote }} }
+            - { name: FDP_OIDC_ISSUER, value: {{ include "fdp.issuer" . | quote }} }
+            - { name: FDP_OIDC_AUDIENCE, value: {{ .Values.oidc.audience | quote }} }
+            - { name: FDP_OIDC_CLIENT_ID, value: {{ .Values.oidc.clientId | quote }} }
+            {{- if .Values.keycloak.enabled }}
+            - { name: FDP_OIDC_JWKS_URL, value: "http://fdp-keycloak.{{ .Release.Namespace }}.svc:8080/realms/{{ .Values.keycloak.realm }}/protocol/openid-connect/certs" }
+            - { name: FDP_IDENTITY_PROXY_URL, value: "http://fdp-keycloak.{{ .Release.Namespace }}.svc:8080" }
+            {{- else }}
+            {{- with .Values.oidc.jwksUrl }}
+            - { name: FDP_OIDC_JWKS_URL, value: {{ . | quote }} }
+            {{- end }}
+            {{- end }}
+            - { name: FDP_OIDC_ROLES_CLAIM, value: {{ .Values.oidc.rolesClaim | quote }} }
+            - { name: FDP_OIDC_GROUPS_CLAIM, value: {{ .Values.oidc.groupsClaim | quote }} }
+            - { name: FDP_OIDC_USERNAME_CLAIM, value: {{ .Values.oidc.usernameClaim | quote }} }
+            - { name: FDP_DIRECTORY_MODE, value: {{ .Values.oidc.directoryMode | quote }} }
+            - { name: FDP_ADMIN_ROLE, value: {{ .Values.oidc.adminRole | quote }} }
+            - { name: FDP_SECRETS_BACKEND, value: {{ .Values.secretManagement.backend | quote }} }
+            {{- if eq .Values.secretManagement.backend "kubernetes" }}
+            - { name: FDP_K8S_SECRET_NAMESPACE, value: {{ include "fdp.secretNamespace" . | quote }} }
+            {{- end }}
+            - { name: FDP_OPENBAO_ADDR, value: {{ .Values.openbao.addr | quote }} }
+            - { name: FDP_OPENBAO_KV_MOUNT, value: {{ .Values.openbao.kvMount | quote }} }
+            - { name: FDP_DATA_VOLUME, value: fdp-data }
+            {{- if not .Values.dataVolume.enabled }}
+            - { name: FDP_SHARED_DATA_VOLUME, value: "false" }
+            {{- end }}
+            - { name: FDP_GITOPS_INTERVAL_SECONDS, value: {{ .Values.gitopsIntervalSeconds | quote }} }
+          volumeMounts:
+            {{- if .Values.trust.caBundleSecret }}
+            - { name: trust, mountPath: /etc/fdp/trust, readOnly: true }
+            {{- end }}
+            - { name: data, mountPath: /fdp-data }
+            - { name: git-cache, mountPath: /var/lib/fdp/git }
+            - { name: packages, mountPath: /var/lib/fdp/packages }
+          startupProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 120
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        {{- if .Values.trust.caBundleSecret }}
+        - name: trust
+          secret:
+            secretName: {{ .Values.trust.caBundleSecret | quote }}
+            items: [{ key: ca-bundle.pem, path: ca-bundle.pem }]
+        {{- end }}
+        - name: data
+          {{- if .Values.dataVolume.enabled }}
+          persistentVolumeClaim: { claimName: fdp-data }
+          {{- else }}
+          emptyDir: {}   # nothing shared: deployed files live on each managed layer's volume
+          {{- end }}
+        - name: git-cache   # bare clones; rebuilt on demand
+          emptyDir: {}
+        - name: packages
+          persistentVolumeClaim: { claimName: fdp-packages }
+{{- if gt (int .Values.replicas) 1 }}
+---
+# Voluntary disruptions (node drains, upgrades) keep at least one replica serving.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: fdp-control-plane
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-control-plane }
+{{- end }}
+---
+# Published and imported packages. Kept when the release is uninstalled.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fdp-packages
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [{{ .Values.packages.persistence.accessMode }}]
+  {{- with .Values.packages.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources: { requests: { storage: {{ .Values.packages.persistence.size }} } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-control-plane
+  namespace: {{ .Release.Namespace }}
+  labels: { app.kubernetes.io/name: fdp-control-plane }
+spec:
+  selector: { app.kubernetes.io/name: fdp-control-plane }
+  ports: [{ port: 8000, targetPort: http, name: http }]
+{{- if .Values.metrics.serviceMonitor.enabled }}
+---
+# Prometheus Operator: scrape every replica's /internal/metrics with the platform's metrics token.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: fdp-control-plane
+  namespace: {{ .Release.Namespace }}
+  labels: {{- toYaml .Values.metrics.serviceMonitor.labels | nindent 4 }}
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-control-plane }
+  endpoints:
+    - port: http
+      path: /internal/metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      authorization:
+        type: Bearer
+        credentials: { name: {{ .Values.existingSecret }}, key: FDP_METRICS_TOKEN }
+{{- end }}

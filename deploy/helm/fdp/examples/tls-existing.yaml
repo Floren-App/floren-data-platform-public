@@ -1,0 +1,4 @@
+# Provision fdp-public-tls in the release namespace using your secret manager.
+# It must contain tls.crt (including the chain) and tls.key, with SANs matching both URLs.
+tls:
+  mode: existing

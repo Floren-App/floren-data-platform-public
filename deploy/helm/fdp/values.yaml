@@ -1,0 +1,302 @@
+# How Floren Data Platform is INSTALLED: images, cluster resources, storage, networks, identity provider, secrets.
+# What the platform contains (layers, warehouses, limits, groups, roles, data sources, allowlists, extra runtimes)
+# is configured with OpenTofu or in the app, never here. A Helm upgrade never changes that configuration; where a
+# value below is only a default for it, that is said next to the value. See docs/configuration.md.
+
+image:
+  repository: fdp/control-plane
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# Private registry: a kubernetes.io/dockerconfigjson Secret in the release namespace (e.g. a GHCR token with
+# only read:packages). The platform's pods pull with it, and the control plane keeps a copy in the runtime
+# namespace and every managed layer namespace for workspaces, jobs, apps and layer helpers. Empty: public images.
+registryCredentials:
+  existingSecret: ""
+
+# Opt-in per-layer provisioning and execution. Admission waits for infrastructure,
+# verified Trino readiness and layer-local artifacts. Managed Airflow is still unsupported.
+layerController:
+  enabled: false
+  dnsNamespace: kube-system
+  # Required before allowing external data-source CIDRs. Include all IPv4/IPv6
+  # Pod and Service ranges, and node/host-network addresses, for this cluster.
+  network:
+    podCidrs: []
+    serviceCidrs: []
+    nodeCidrs: []
+    # Additional platform-only networks/endpoints outside the cluster, e.g. the
+    # external metadata database. These are also excluded from data-source grants.
+    protectedCidrs: []
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: "1", memory: 512Mi}
+
+publicUrl: https://fdp.example.com
+# Incoming program APIs use a separate TLS entry point so client certificates can be requested.
+apiGateway:
+  publicUrl: https://api.fdp.example.com:9443
+
+# Namespace where workspaces and compute runs are created (default-deny egress).
+# The app in the browser: the platform serves its own interface at publicUrl, so people need nothing installed
+# (the desktop app stays optional). Off: only the desktop app signs in.
+web:
+  enabled: true
+  image: fdp/web:0.1.0                  # nginx (BSD-2-Clause) with the app's static files
+  replicas: 1
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {cpu: 200m, memory: 128Mi}
+
+# R is an optional addition: RStudio workspaces, R and Shiny programs, and R packages. Its images contain GPL/AGPL
+# software (RStudio Server Open Source is AGPL-3.0; see THIRD_PARTY_LICENSES.md). Off: none of it is offered and
+# the R images (runtime.images.rstudio, computeR) are never pulled.
+r:
+  enabled: false
+
+runtime:
+  namespace: fdp-runtime
+  storageClass: ""          # must support ReadWriteMany (e.g. NFS, CephFS, Longhorn RWX)
+  images:
+    vscode: fdp/workspace-vscode:0.1.0
+    rstudio: fdp/workspace-rstudio:0.1.0
+    sql: fdp/workspace-sql:0.1.0          # CloudBeaver Community (Apache-2.0)
+    computePython: fdp/compute-python:0.1.0
+    computeR: fdp/compute-r:0.1.0
+    computeDbt: fdp/compute-dbt:1.9       # dbt Core (Apache-2.0) with the Trino adapter
+    airflow: fdp/airflow:0.1.0            # deployed Airflow (Apache-2.0)
+    airflowBroker: valkey/valkey:8.0.1    # Celery broker of distributed Airflow (BSD)
+    airflowMetadata: postgres:16.15-bookworm  # Airflow metadata database outside managed layers
+  # The versions the compute images above provide. They are the installation's runtimes: every upgrade applies
+  # these images to them. More versions are added with OpenTofu (fdp_runtime) or in the app, never here.
+  versions:
+    python: "3.12"
+    r: "4.4"
+    dbt: "1.9"
+    airflow: "2.10"
+  workspaceCpu: "0.5"
+  workspaceMemoryGb: "1"
+  idleTimeoutSeconds: 1800
+  maxRunningPerUser: 2      # default only: administrators change workspace limits in the app or with fdp_workspace_settings
+
+# Workspace internet access: VS Code and RStudio reach only the HTTPS host names administrators allow (in the
+# app, or with fdp_egress_allowlist). Disabled: workspaces have no internet access at all.
+egressProxy:
+  enabled: false
+  replicas: 1
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+
+# Any OIDC provider. Keycloak example shown; for Entra ID use
+#   issuer: https://login.microsoftonline.com/<tenant>/v2.0, rolesClaim: roles, usernameClaim: preferred_username
+oidc:
+  issuer: https://keycloak.example.com/realms/fdp
+  audience: fdp-api
+  clientId: fdp-desktop
+  jwksUrl: ""
+  rolesClaim: realm_access.roles
+  groupsClaim: groups
+  usernameClaim: preferred_username
+  adminRole: fdp-admin
+  directoryMode: scim  # provision users/admin roles via SCIM before sign-in; oidc permits claim-backed development identities
+
+# The package repository (Packages in the app): Python and R packages people publish or import from PyPI/CRAN.
+# Workspaces and programs install only from it. The control plane alone talks to the upstream repositories.
+packages:
+  persistence:
+    size: 20Gi
+    storageClass: ""            # empty: the cluster default
+    # ReadWriteOnce restarts the control plane in place on upgrades (one replica); ReadWriteMany
+    # (e.g. Longhorn, NFS, CephFS) allows rolling upgrades and more replicas.
+    accessMode: ReadWriteOnce
+  maxUploadMb: 200
+  upstream:
+    pypi: https://pypi.org/simple       # empty: no imports from PyPI (air-gapped)
+    cran: https://cloud.r-project.org   # empty: no imports from CRAN
+  # Imports fetch built packages (wheels) for these Python versions (plus the runtime catalog's) and CPU types.
+  pythonVersions: "3.11,3.12"           # 3.11: the VS Code image's Python (Debian bookworm)
+  platforms: "x86_64,aarch64"
+  glibc: "2.36"
+
+# Deployed runs' consoles/outputs and environment caches (see templates/data-volume.yaml).
+dataVolume:
+  # false: no shared NFS volume. Jobs and apps then run only in controller-managed layers,
+  # each with its own artifact volume; workspaces still work everywhere.
+  enabled: true
+  size: 200Gi
+  nfs:
+    server: nfs.example.com
+    path: /exports/fdp-data
+
+# GitOps: how often deployed branches are checked for new commits.
+gitopsIntervalSeconds: 60
+
+openbao:
+  addr: http://openbao.openbao.svc:8200
+  kvMount: fdp
+
+# Optional SCIM provisioning: add FDP_SCIM_TOKEN to the existing Secret.
+# Existing Secret: FDP_DATABASE_URL, FDP_SESSION_SIGNING_KEY,
+# FDP_OPENBAO_TOKEN, FDP_GATEWAY_CONFIG_TOKEN (a separate random gateway-only credential).
+existingSecret: fdp-control-plane
+
+bootstrap:
+  enabled: false                 # Generate and retain platform/Trino keys. Never rotates existing keys.
+secretManagement:
+  backend: openbao                # openbao (external) | kubernetes (bundled namespace)
+  namespace: ""                  # kubernetes: defaults to <release-namespace>-secrets
+
+keycloak:
+  enabled: false
+  image: quay.io/keycloak/keycloak:26.6.4
+  publicUrl: https://idp.example.com
+  realm: fdp
+  existingSecret: ""             # admin-password, initial-user-password, provisioner-client-secret
+  initialAdminUser: admin
+  passwordGrantEnabled: false
+  desktopRedirectUris:
+    - http://127.0.0.1/*
+    - tauri://localhost/*
+    - http://tauri.localhost/*
+  database:
+    existingSecret: ""           # jdbc-url, username, password; empty uses bundled metadata PostgreSQL
+  # Confidential client for infrastructure-as-code (OpenTofu/Terraform provider), with the
+  # platform admin role. Secret key: automation-client-secret. Realm import creates it only
+  # for new realms; add it manually to an existing realm.
+  automationClient:
+    enabled: false
+  directorySync:
+    enabled: true
+    intervalSeconds: 60
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 2Gi }
+
+# Optional platform metadata PostgreSQL. External deployments continue using
+# FDP_DATABASE_URL from existingSecret. Bundled passwords are generated once
+# and retained in a namespace-local Secret; supply existingSecret to manage them externally.
+metadataDatabase:
+  # Empty preserves the release namespace for existing installs. For a dedicated shared
+  # operational database namespace set e.g. fdp-system-data. Existing PVCs need migration.
+  namespace: ""
+  airflow:
+    enabled: false              # shared, private databases for standalone and distributed Airflow
+  enabled: false
+  image: postgres:16
+  existingSecret: ""             # keys: postgres-password, fdp-password
+  connectionSecret: ""           # external DB: database-url; otherwise read URL from platform existingSecret
+  storageClass: ""               # empty uses the cluster default
+  size: 10Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 1Gi }
+
+# Control plane replicas. Every replica serves requests; one at a time (the leader, chosen through the metadata
+# database) runs the background work, and another takes over within about half a minute if it fails. More than
+# one needs packages.persistence.accessMode ReadWriteMany. The gateway (traefik.deployment.replicas) and the
+# browser app (web.replicas) scale separately.
+replicas: 1
+# Public TLS is opt-in for compatibility with existing externally terminated ingress.
+# Both modes use the fixed, namespace-local Secret fdp-public-tls (tls.crt/tls.key).
+tls:
+  mode: disabled                 # disabled | existing | certManager
+  issuerRef:
+    name: ""
+    kind: Issuer                 # Issuer or ClusterIssuer
+  additionalDnsNames: []
+  duration: 2160h
+  renewBefore: 360h
+# Served gateway certificates are checked this often (sooner while one needs attention). Layer
+# certificates are checked by the layer controller on each reconciliation. See
+# docs/kubernetes-operations.md for the admin API and Prometheus metrics.
+# Prometheus metrics at /internal/metrics on every control plane replica (bearer FDP_METRICS_TOKEN from
+# existingSecret; generated by the bootstrap). Requests per replica; platform state from the leader only.
+metrics:
+  serviceMonitor:
+    enabled: false        # needs the Prometheus Operator's ServiceMonitor CRD
+    interval: 30s
+    labels: {}            # e.g. release: kube-prometheus-stack, to match your Prometheus
+
+certificateMonitoring:
+  intervalSeconds: 600
+trust:
+  # PEM bundle including required public roots and private CAs; key ca-bundle.pem.
+  # Mounted read-only. Never put a CA private key in this bundle.
+  caBundleSecret: ""
+metadataSql:
+  enabled: false                 # Compose enables this automatically on bundled PostgreSQL.
+  catalog: fdp_metadata
+  bootstrapReader: false         # Production: provision the SELECT-only reader with your DBA.
+  readerUser: fdp_metadata_reader
+  # Keys metadata-jdbc-url and metadata-reader-password. Never database owner credentials.
+  existingSecret: fdp-metadata-sql
+trino:
+  enabled: true
+  image: trinodb/trino:484
+  heapSize: 2G
+  # gateway.hmac: base64 text of FDP_TRINO_SIGNING_KEY from the control-plane secret.
+  # internal-secret: independent random secret for Trino node communication.
+  existingSecret: fdp-trino
+  # One <catalog>.properties entry per data source, with engine-only credentials.
+  catalogSecret: fdp-trino-catalogs
+  resources:
+    requests: { cpu: "1", memory: 2Gi }
+    limits: { memory: 3Gi }
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { memory: 512Mi }
+
+traefik:
+  enabled: true
+  # The gateway uses HTTP/file providers; it must not receive cluster-wide Secret access.
+  rbac:
+    enabled: false
+  # The gateway reads no Ingresses, so it must not claim (or become the default) IngressClass of a shared cluster.
+  ingressClass:
+    enabled: false
+  providers:
+    kubernetesCRD: { enabled: false }
+    kubernetesIngress: { enabled: false }
+    file:
+      enabled: false              # Parent chart renders the configuration and projected volume.
+  deployment:
+    additionalVolumes:
+      - name: gateway-dynamic
+        projected:
+          sources:
+            - configMap: { name: fdp-gateway-tls }
+            - secret:
+                name: fdp-public-tls
+                optional: true
+                items:
+                  - { key: tls.crt, path: tls.crt }
+                  - { key: tls.key, path: tls.key }
+  additionalVolumeMounts:
+    - name: gateway-dynamic
+      mountPath: /etc/traefik/dynamic
+      readOnly: true
+  ports:
+    websecure:
+      asDefault: true
+    apigateway:
+      port: 9443
+      expose: { default: true }
+      exposedPort: 9443
+      protocol: TCP
+      tls:
+        enabled: true
+        options: api-gateway@file
+  env:
+    - name: POD_NAMESPACE
+      valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+    - name: FDP_GATEWAY_CONFIG_TOKEN
+      valueFrom:
+        secretKeyRef: { name: fdp-control-plane, key: FDP_GATEWAY_CONFIG_TOKEN }
+  additionalArguments:
+    - --providers.file.directory=/etc/traefik/dynamic
+    - --providers.file.watch=true
+    - --providers.http.endpoint=http://fdp-control-plane.$(POD_NAMESPACE).svc:8000/internal/traefik/config
+    - --providers.http.pollInterval=2s
+    - --providers.http.headers.X-FDP-Gateway-Config=$(FDP_GATEWAY_CONFIG_TOKEN)
+

@@ -1,0 +1,59 @@
+{{- if eq .Values.runtime.namespace .Release.Namespace }}
+{{- fail "runtime.namespace must differ from the platform release namespace" }}
+{{- end }}
+{{- if and .Values.keycloak.enabled (not .Values.metadataDatabase.enabled) (not .Values.keycloak.database.existingSecret) }}
+{{- fail "bundled Keycloak requires metadataDatabase.enabled or keycloak.database.existingSecret" }}
+{{- end }}
+{{- if .Values.keycloak.enabled }}
+{{- if not (hasPrefix "https://" .Values.keycloak.publicUrl) }}
+{{- fail "keycloak.publicUrl must be an HTTPS URL; configure a trusted certificate or external TLS termination" }}
+{{- end }}
+{{- $idpHost := regexReplaceAll ":[0-9]+$" (urlParse .Values.keycloak.publicUrl).host "" }}
+{{- $appHost := regexReplaceAll ":[0-9]+$" (urlParse .Values.publicUrl).host "" }}
+{{- $apiHost := regexReplaceAll ":[0-9]+$" (urlParse .Values.apiGateway.publicUrl).host "" }}
+{{- if or (eq $idpHost $appHost) (eq $idpHost $apiHost) }}
+{{- fail "keycloak.publicUrl must have a separate hostname from publicUrl and apiGateway.publicUrl" }}
+{{- end }}
+{{- if .Values.keycloak.directorySync.enabled }}
+{{- if ne .Values.oidc.directoryMode "scim" }}
+{{- fail "bundled Keycloak directory synchronization requires oidc.directoryMode=scim" }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if and .Values.bootstrap.enabled (not .Values.metadataDatabase.enabled) (not .Values.metadataDatabase.connectionSecret) }}
+{{- fail "automatic platform bootstrap requires metadataDatabase.enabled or metadataDatabase.connectionSecret" }}
+{{- end }}
+{{- if and .Values.bootstrap.enabled (eq .Values.secretManagement.backend "openbao") }}
+{{- fail "automatic platform bootstrap uses secretManagement.backend=kubernetes; external OpenBao uses a managed platform existingSecret with its token" }}
+{{- end }}
+{{- if and .Values.metadataDatabase.enabled .Values.metadataSql.bootstrapReader }}
+{{- fail "bundled metadata uses a non-superuser app role; set metadataSql.bootstrapReader=false and provision its SELECT-only reader separately" }}
+{{- end }}
+{{- if .Values.traefik.enabled }}
+{{- $gatewaySecret := "" }}
+{{- range .Values.traefik.env }}
+{{- if eq .name "FDP_GATEWAY_CONFIG_TOKEN" }}
+{{- $gatewaySecret = dig "valueFrom" "secretKeyRef" "name" "" . }}
+{{- end }}
+{{- end }}
+{{- if ne $gatewaySecret .Values.existingSecret }}
+{{- fail "Traefik's FDP_GATEWAY_CONFIG_TOKEN must reference existingSecret; update traefik.env when using a custom platform Secret" }}
+{{- end }}
+{{- end }}
+{{- /* Every image must name an explicit version: "latest" or no tag makes upgrades unpredictable. */}}
+{{- $images := dict "image.tag" (printf "%s:%s" .Values.image.repository (toString .Values.image.tag)) "keycloak.image" .Values.keycloak.image "metadataDatabase.image" .Values.metadataDatabase.image "trino.image" .Values.trino.image }}
+{{- range $key, $ref := .Values.runtime.images }}{{- $_ := set $images (printf "runtime.images.%s" $key) $ref }}{{- end }}
+{{- range $name, $ref := $images }}
+{{- $tag := regexReplaceAll "^.*?(:([^:/@]+))?(@sha256:[a-f0-9]+)?$" (toString $ref) "${2}" }}
+{{- $digest := contains "@sha256:" (toString $ref) }}
+{{- if and (not $digest) (or (eq $tag "") (eq $tag "latest")) }}
+{{- fail (printf "%s must pin an explicit version (got %q); \"latest\" and untagged images make upgrades unpredictable" $name (toString $ref)) }}
+{{- end }}
+{{- end }}
+{{- if and (gt (int .Values.replicas) 1) (ne .Values.packages.persistence.accessMode "ReadWriteMany") }}
+{{- fail "replicas > 1 needs packages.persistence.accessMode=ReadWriteMany (every control plane replica serves the package repository)" }}
+{{- end }}
+
+{{- if and .Values.metadataDatabase.airflow.enabled (not .Values.metadataDatabase.enabled) }}
+{{- fail "metadataDatabase.airflow.enabled requires metadataDatabase.enabled; external Airflow metadata uses FDP_AIRFLOW_METADATA_URL" }}
+{{- end }}

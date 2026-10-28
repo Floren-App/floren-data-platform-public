@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: stg_sales
+    description: Sales cleaned up from the raw warehouse table.
+    columns:
+      - name: sale_id
+        tests: [unique, not_null]
+      - name: region
+        tests:
+          - accepted_values:
+              values: [north, south, east, west]
+
+  - name: sales_by_month
+    description: Monthly revenue per region and product. Built daily.
+    columns:
+      - name: month
+        tests: [not_null]
+      - name: revenue_eur
+        description: Sum of sale amounts in EUR.
+
+  - name: region_totals
+    description: Revenue per region, for the sales dashboard.
+    columns:
+      - name: region
+        tests: [unique, not_null]

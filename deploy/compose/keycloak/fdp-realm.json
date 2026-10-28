@@ -1,0 +1,92 @@
+{
+  "realm": "fdp",
+  "enabled": true,
+  "displayName": "Floren Data Platform (test realm)",
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 28800,
+  "ssoSessionMaxLifespan": 43200,
+  "roles": {
+    "realm": [
+      {
+        "name": "fdp-admin",
+        "description": "Manage data sources, grants and compute pools"
+      }
+    ]
+  },
+  "groups": [],
+  "clients": [
+    {
+      "clientId": "fdp-api",
+      "name": "Floren Data Platform API",
+      "enabled": true,
+      "bearerOnly": true
+    },
+    {
+      "clientId": "fdp-desktop",
+      "name": "Floren Data Platform desktop app",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "https://localhost:1420/*",
+        "http://localhost:1420/*",
+        "http://127.0.0.1/*",
+        "tauri://localhost/*",
+        "http://tauri.localhost/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-fdp-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "fdp-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@fdp.test",
+      "emailVerified": true,
+      "firstName": "Platform",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "fdp-admin",
+        "default-roles-fdp"
+      ],
+      "groups": []
+    }
+  ]
+}

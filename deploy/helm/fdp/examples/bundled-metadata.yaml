@@ -1,0 +1,6 @@
+# Keep your existing platform Secret and IdP/secret-backend configuration.
+# Database passwords and retained storage are provisioned automatically.
+metadataDatabase:
+  enabled: true
+  size: 10Gi
+  # storageClass: your-default-or-specific-storage-class

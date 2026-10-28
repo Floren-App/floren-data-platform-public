@@ -1,0 +1,11 @@
+version: 2
+sources:
+  - name: tcgdex
+    database: "{{ target.database }}"
+    schema: "{{ env_var('POKEMON_RAW_SCHEMA', 'pokemon_raw') }}"
+    description: Append-only JSON records and manifests loaded from immutable API landing files.
+    tables:
+      - name: records
+      - name: files
+      - name: load_commits
+      - name: process_events

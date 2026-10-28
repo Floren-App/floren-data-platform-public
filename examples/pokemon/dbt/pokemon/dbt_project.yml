@@ -1,0 +1,17 @@
+name: pokemon
+version: '2.0.0'
+config-version: 2
+profile: fdp
+model-paths: [models]
+test-paths: [tests]
+models:
+  pokemon:
+    +materialized: table
+    +tags: [Pokemon, daily]
+    staging:
+      +tags: [engineering]
+    history:
+      +tags: [engineering]
+    marts:
+      +schema: "{{ env_var('POKEMON_PRODUCT_SCHEMA', 'reporting') }}"
+      +tags: [product]

@@ -1,0 +1,3 @@
+# One CRAN package per line. Installed once into a cached library on the warehouse.
+# Packages already in the compute image (DBI, RPostgres, dplyr, ggplot2, ...) need not be listed.
+glue

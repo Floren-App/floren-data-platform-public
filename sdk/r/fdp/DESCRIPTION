@@ -1,0 +1,21 @@
+Package: fdp
+Title: Floren Data Platform SDK for R
+Version: 0.2.0
+Description: Governed data connections, fdp.json programs and warehouse runs from
+    inside a Floren Data Platform workspace. Credentials are fetched at call time and never stored.
+License: Apache License (== 2.0)
+Encoding: UTF-8
+Imports:
+    httr2,
+    rappdirs,
+    openssl,
+    jsonlite,
+    methods,
+    DBI
+Suggests:
+    shiny,
+    httpuv,
+    rstudioapi,
+    RPostgres,
+    RMariaDB,
+    odbc

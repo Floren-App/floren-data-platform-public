@@ -1,0 +1,408 @@
+{
+  "version": 1,
+  "warehouse": "xsmall",
+  "programs": {
+    "bootstrap-test": {
+      "warehouse": "xsmall",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "entrypoint": "ingestion/bootstrap.py",
+      "data_sources": [
+        "lake"
+      ],
+      "description": "One-time append-only raw table setup; separate privileged identity"
+    },
+    "extract-test": {
+      "warehouse": "xsmall",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "entrypoint": "ingestion/extract.py",
+      "data_sources": [
+        "pokemon-landing-test"
+      ],
+      "args": [
+        {
+          "name": "run_id",
+          "label": "Pipeline run ID",
+          "type": "string",
+          "required": true,
+          "help": "Use the same ID for extraction and loading; retries reuse it."
+        }
+      ],
+      "description": "Managed TCGdex API to immutable S3 response files and completion manifest"
+    },
+    "load-test": {
+      "warehouse": "xsmall",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "entrypoint": "ingestion/load_raw.py",
+      "data_sources": [
+        "pokemon-landing-test",
+        "lake"
+      ],
+      "args": [
+        {
+          "name": "run_id",
+          "label": "Pipeline run ID",
+          "type": "string",
+          "required": true,
+          "help": "Use the same ID for extraction and loading; retries reuse it."
+        }
+      ],
+      "description": "S3 to append-only raw JSON records with file, record and load provenance"
+    },
+    "process-event-test": {
+      "warehouse": "xsmall",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "entrypoint": "ingestion/process_event.py",
+      "data_sources": [
+        "lake"
+      ],
+      "args": [
+        {
+          "name": "run_id",
+          "label": "Pipeline run ID",
+          "type": "string",
+          "required": true,
+          "help": "Use the same ID for extraction and loading; retries reuse it."
+        },
+        {
+          "name": "status",
+          "type": "choice",
+          "choices": [
+            "succeeded",
+            "failed"
+          ],
+          "required": true
+        },
+        {
+          "name": "task_history",
+          "type": "text",
+          "default": "[]"
+        }
+      ],
+      "description": "Append Airflow terminal pipeline outcome"
+    },
+    "models-test": {
+      "warehouse": "small",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "kind": "dbt",
+      "entrypoint": "dbt/pokemon",
+      "dbt": {
+        "data_source": "lake",
+        "schema": "pokemon_history",
+        "dev_schema": "dbt_{user}",
+        "threads": 2
+      },
+      "description": "Full observed SCD2, nested records, file evidence and tested analyst products"
+    },
+    "explorer-test": {
+      "warehouse": "xsmall",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "kind": "app",
+      "entrypoint": "dashboards/cards.py",
+      "data_sources": [
+        "lake"
+      ],
+      "description": "Analyst card data product; reporting schema only"
+    },
+    "monitor-test": {
+      "warehouse": "xsmall",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "kind": "app",
+      "entrypoint": "dashboards/process.py",
+      "data_sources": [
+        "lake"
+      ],
+      "description": "Engineer process flow, append-only events, SCD2 and file traceability"
+    },
+    "pipelines-test": {
+      "warehouse": "small",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "kind": "airflow",
+      "entrypoint": "airflow",
+      "airflow_settings": {
+        "mode": "standalone"
+      },
+      "description": "API \u2192 S3 \u2192 raw \u2192 dbt build/tests \u2192 process history; one active run"
+    },
+    "bootstrap-prod": {
+      "warehouse": "xsmall",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "entrypoint": "ingestion/bootstrap.py",
+      "data_sources": [
+        "lake-prod"
+      ],
+      "description": "One-time append-only raw table setup; separate privileged identity"
+    },
+    "extract-prod": {
+      "warehouse": "xsmall",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "entrypoint": "ingestion/extract.py",
+      "data_sources": [
+        "pokemon-landing-prod"
+      ],
+      "args": [
+        {
+          "name": "run_id",
+          "label": "Pipeline run ID",
+          "type": "string",
+          "required": true,
+          "help": "Use the same ID for extraction and loading; retries reuse it."
+        }
+      ],
+      "description": "Managed TCGdex API to immutable S3 response files and completion manifest"
+    },
+    "load-prod": {
+      "warehouse": "xsmall",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "entrypoint": "ingestion/load_raw.py",
+      "data_sources": [
+        "pokemon-landing-prod",
+        "lake-prod"
+      ],
+      "args": [
+        {
+          "name": "run_id",
+          "label": "Pipeline run ID",
+          "type": "string",
+          "required": true,
+          "help": "Use the same ID for extraction and loading; retries reuse it."
+        }
+      ],
+      "description": "S3 to append-only raw JSON records with file, record and load provenance"
+    },
+    "process-event-prod": {
+      "warehouse": "xsmall",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "entrypoint": "ingestion/process_event.py",
+      "data_sources": [
+        "lake-prod"
+      ],
+      "args": [
+        {
+          "name": "run_id",
+          "label": "Pipeline run ID",
+          "type": "string",
+          "required": true,
+          "help": "Use the same ID for extraction and loading; retries reuse it."
+        },
+        {
+          "name": "status",
+          "type": "choice",
+          "choices": [
+            "succeeded",
+            "failed"
+          ],
+          "required": true
+        },
+        {
+          "name": "task_history",
+          "type": "text",
+          "default": "[]"
+        }
+      ],
+      "description": "Append Airflow terminal pipeline outcome"
+    },
+    "models-prod": {
+      "warehouse": "small",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "kind": "dbt",
+      "entrypoint": "dbt/pokemon",
+      "dbt": {
+        "data_source": "lake-prod",
+        "schema": "pokemon_history",
+        "dev_schema": "dbt_{user}",
+        "threads": 2
+      },
+      "description": "Full observed SCD2, nested records, file evidence and tested analyst products"
+    },
+    "explorer-prod": {
+      "warehouse": "xsmall",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "kind": "app",
+      "entrypoint": "dashboards/cards.py",
+      "data_sources": [
+        "lake-prod"
+      ],
+      "description": "Analyst card data product; reporting schema only"
+    },
+    "monitor-prod": {
+      "warehouse": "xsmall",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "kind": "app",
+      "entrypoint": "dashboards/process.py",
+      "data_sources": [
+        "lake-prod"
+      ],
+      "description": "Engineer process flow, append-only events, SCD2 and file traceability"
+    },
+    "pipelines-prod": {
+      "warehouse": "small",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting"
+      },
+      "kind": "airflow",
+      "entrypoint": "airflow",
+      "airflow_settings": {
+        "mode": "standalone"
+      },
+      "description": "API \u2192 S3 \u2192 raw \u2192 dbt build/tests \u2192 process history; one active run"
+    }
+  }
+}

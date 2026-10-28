@@ -1,0 +1,24 @@
+{{- if .Values.traefik.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fdp-gateway-tls
+  namespace: {{ .Release.Namespace }}
+data:
+  config.yml: |
+    tls:
+      {{- if ne .Values.tls.mode "disabled" }}
+      certificates:
+        - certFile: /etc/traefik/dynamic/tls.crt
+          keyFile: /etc/traefik/dynamic/tls.key
+      stores:
+        default:
+          defaultCertificate:
+            certFile: /etc/traefik/dynamic/tls.crt
+            keyFile: /etc/traefik/dynamic/tls.key
+      {{- end }}
+      options:
+        api-gateway:
+          clientAuth:
+            clientAuthType: RequestClientCert
+{{- end }}

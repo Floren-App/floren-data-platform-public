@@ -1,0 +1,250 @@
+{{- if .Values.metadataDatabase.enabled }}
+{{- $secret := default "fdp-metadata-db" .Values.metadataDatabase.existingSecret }}
+{{- $dataNamespace := include "fdp.databaseNamespace" . }}
+{{- if ne $dataNamespace .Release.Namespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $dataNamespace }}
+  annotations: { helm.sh/resource-policy: keep }
+  labels:
+    fdp.floren.app/installation: {{ include "fdp.installation" . }}
+    pod-security.kubernetes.io/enforce: restricted
+---
+{{- end }}
+{{- if not .Values.metadataDatabase.existingSecret }}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $secret }}
+{{- if not $existing }}{{- $existing = lookup "v1" "Secret" $dataNamespace $secret }}{{- end }}
+{{- $keys := list "postgres-password" "fdp-password" }}
+{{- if and .Values.keycloak.enabled (not .Values.keycloak.database.existingSecret) }}
+{{- $keys = append $keys "keycloak-password" }}
+{{- end }}
+{{- if .Values.metadataDatabase.airflow.enabled }}{{- $keys = append $keys "airflow-provisioner-password" }}{{- end }}
+{{- $credentials := dict }}
+{{- range $key := $keys }}
+{{- if and $existing (not (hasKey $existing.data $key)) (has $key (list "postgres-password" "fdp-password")) }}
+{{- fail (printf "retained metadata Secret is missing %s; restore its original credentials before upgrading" $key) }}
+{{- end }}
+{{- if and $existing (hasKey $existing.data $key) }}
+{{- $_ := set $credentials $key (index $existing.data $key) }}
+{{- else }}
+{{- $_ := set $credentials $key (randAlphaNum 48 | b64enc) }}
+{{- end }}
+{{- end }}
+{{- range $namespace := uniq (list .Release.Namespace $dataNamespace) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secret }}
+  namespace: {{ $namespace }}
+  annotations: { helm.sh/resource-policy: keep }
+type: Opaque
+data: {{- toYaml $credentials | nindent 2 }}
+---
+{{- end }}
+{{- end }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fdp-metadata-db
+  namespace: {{ $dataNamespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.metadataDatabase.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests: { storage: {{ .Values.metadataDatabase.size | quote }} }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: fdp-metadata-db
+  namespace: {{ $dataNamespace }}
+spec:
+  serviceName: fdp-metadata-db
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: fdp-metadata-db }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: fdp-metadata-db }
+    spec:
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 999, runAsGroup: 999, fsGroup: 999, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: postgres
+          image: {{ .Values.metadataDatabase.image | quote }}
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          ports: [{ name: postgres, containerPort: 5432 }]
+          env:
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: postgres-password }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+          startupProbe:
+            exec: { command: [pg_isready, -U, postgres] }
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec: { command: [pg_isready, -U, postgres] }
+          resources: {{- toYaml .Values.metadataDatabase.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: fdp-metadata-db }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-metadata-db
+  namespace: {{ $dataNamespace }}
+spec:
+  selector: { app.kubernetes.io/name: fdp-metadata-db }
+  ports: [{ name: postgres, port: 5432, targetPort: postgres }]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fdp-metadata-bootstrap
+  namespace: {{ $dataNamespace }}
+data:
+  init.sql: |
+    \getenv app_password APP_PASSWORD
+    SELECT format('CREATE ROLE fdp LOGIN PASSWORD %L', :'app_password')
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'fdp')
+    \gexec
+    SELECT 'CREATE DATABASE fdp OWNER fdp'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'fdp')
+    \gexec
+    REVOKE ALL ON DATABASE fdp FROM PUBLIC;
+    GRANT CONNECT ON DATABASE fdp TO fdp;
+    {{- if .Values.metadataDatabase.airflow.enabled }}
+    \getenv airflow_password AIRFLOW_PASSWORD
+    SELECT format('CREATE ROLE airflow_provisioner LOGIN NOINHERIT CREATEDB CREATEROLE PASSWORD %L', :'airflow_password')
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'airflow_provisioner')
+    \gexec
+    {{- end }}
+    {{- if and .Values.keycloak.enabled (not .Values.keycloak.database.existingSecret) }}
+    \getenv keycloak_password KEYCLOAK_PASSWORD
+    SELECT format('CREATE ROLE keycloak LOGIN PASSWORD %L', :'keycloak_password')
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'keycloak')
+    \gexec
+    SELECT 'CREATE DATABASE keycloak OWNER keycloak'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak')
+    \gexec
+    REVOKE ALL ON DATABASE keycloak FROM PUBLIC;
+    GRANT CONNECT ON DATABASE keycloak TO keycloak;
+    {{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fdp-metadata-bootstrap-{{ .Release.Revision }}
+  namespace: {{ $dataNamespace }}
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: fdp-metadata-bootstrap }
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 999, runAsGroup: 999, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: bootstrap
+          image: {{ .Values.metadataDatabase.image | quote }}
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          command: [sh, -ec]
+          args:
+            - |
+              until pg_isready -h fdp-metadata-db -U postgres; do sleep 2; done
+              psql -X -h fdp-metadata-db -U postgres -d postgres -v ON_ERROR_STOP=1 --file=/bootstrap/init.sql
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: postgres-password }
+            {{- if .Values.metadataDatabase.airflow.enabled }}
+            - name: AIRFLOW_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: airflow-provisioner-password }
+            {{- end }}
+            - name: APP_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: fdp-password }
+            {{- if and .Values.keycloak.enabled (not .Values.keycloak.database.existingSecret) }}
+            - name: KEYCLOAK_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ $secret }}, key: keycloak-password }
+            {{- end }}
+          volumeMounts:
+            - { name: script, mountPath: /bootstrap, readOnly: true }
+      volumes:
+        - name: script
+          configMap: { name: fdp-metadata-bootstrap }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fdp-metadata-db-ingress
+  namespace: {{ $dataNamespace }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: fdp-metadata-db }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- range $component := list "fdp-control-plane" "fdp-layer-controller" "fdp-keycloak" "fdp-trino" }}
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ $.Release.Namespace }} } }
+          podSelector: { matchLabels: { app.kubernetes.io/name: {{ $component }} } }
+        {{- end }}
+        - podSelector: { matchLabels: { app.kubernetes.io/name: fdp-metadata-bootstrap } }
+      ports: [{ port: 5432, protocol: TCP }]
+    {{- if .Values.metadataDatabase.airflow.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels: { fdp.floren.app/installation: {{ include "fdp.installation" . }} }
+          podSelector:
+            matchExpressions:
+              - { key: fdp.floren.app/airflow-role, operator: In, values: [standalone, scheduler, web, worker] }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.runtime.namespace }} } }
+          podSelector:
+            matchExpressions:
+              - { key: fdp.floren.app/airflow-role, operator: In, values: [standalone, scheduler, web, worker] }
+      ports: [{ port: 5432, protocol: TCP }]
+    {{- end }}
+{{- if ne $dataNamespace .Release.Namespace }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ $dataNamespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bootstrap-egress
+  namespace: {{ $dataNamespace }}
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: fdp-metadata-bootstrap } }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: fdp-metadata-db } }
+      ports: [{ port: 5432, protocol: TCP }]
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.layerController.dnsNamespace }} } }
+          podSelector: { matchLabels: { k8s-app: kube-dns } }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+{{- end }}
+{{- end }}

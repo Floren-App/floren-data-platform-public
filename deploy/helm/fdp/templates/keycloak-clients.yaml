@@ -1,0 +1,42 @@
+{{- if .Values.keycloak.enabled }}
+{{- $secret := default "fdp-keycloak" .Values.keycloak.existingSecret }}
+{{- /* Keycloak imports the realm only once; this applies the app client's redirect addresses from the current
+       values after every install and upgrade (e.g. the browser app's address). Nothing else is changed. */}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fdp-keycloak-clients
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: fdp-keycloak-clients }
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      {{- include "fdp.imagePullSecrets" . | nindent 6 }}
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: sync
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [python, -m, app.keycloak_clients]
+          env:
+            - { name: KEYCLOAK_URL, value: "http://fdp-keycloak.{{ .Release.Namespace }}.svc:8080" }
+            - { name: KEYCLOAK_REALM, value: {{ .Values.keycloak.realm | quote }} }
+            - { name: KEYCLOAK_CLIENT_ID, value: {{ .Values.oidc.clientId | quote }} }
+            - { name: KEYCLOAK_ADMIN_USER, value: bootstrap-admin }
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: admin-password } }
+            - { name: KEYCLOAK_REDIRECT_URIS, value: {{ include "fdp.appRedirectUris" . | quote }} }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources: { requests: { cpu: 10m, memory: 64Mi }, limits: { cpu: 200m, memory: 128Mi } }
+{{- end }}

@@ -1,0 +1,111 @@
+{{- $ns := .Values.runtime.namespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  labels:
+    # baseline (not restricted) because RStudio's init starts as root; Python images run as uid 1000.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+---
+# The control plane may manage pods, services, PVCs and network policies in the runtime namespace only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: fdp-orchestrator
+  namespace: {{ $ns }}
+rules:
+  - apiGroups: [""]
+    resources: [pods, pods/log, services, persistentvolumeclaims, secrets]
+    verbs: [get, list, watch, create, delete]
+  # Read fdp.json, run consoles and outputs from the owner's workspace pod.
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create, get]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [get, list, create, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: fdp-orchestrator
+  namespace: {{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: fdp-control-plane
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: fdp-orchestrator
+---
+# Default: workloads may only reach DNS and the control plane. Each data source adds its own
+# allow-policy (created by the control plane) for pods labelled fdp.floren.app/ds-<name>=true.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: {{ $ns }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector: { matchLabels: { k8s-app: kube-dns } }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Release.Namespace }} }
+          podSelector: { matchLabels: { app.kubernetes.io/name: fdp-control-plane } }
+      ports: [{ port: 8000, protocol: TCP }]
+---
+# Only the gateway may talk to workloads, plus the control plane's editor readiness checks.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-from-gateway
+  namespace: {{ $ns }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Release.Namespace }} }
+          podSelector: { matchLabels: { app.kubernetes.io/name: traefik } }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Release.Namespace }} }
+          podSelector: { matchLabels: { app.kubernetes.io/name: fdp-control-plane } }
+{{- if .Values.trust.caBundleSecret }}
+{{- /* Copy only the public bundle into the shared runtime namespace; refreshed on helm upgrade. */}}
+{{- $bundle := lookup "v1" "Secret" .Release.Namespace .Values.trust.caBundleSecret }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fdp-trust
+  namespace: {{ $ns }}
+data:
+  ca-bundle.pem: {{ if $bundle }}{{ index $bundle.data "ca-bundle.pem" | b64dec | quote }}{{ else }}""{{ end }}
+{{- end }}
+
+{{- if and .Values.metadataDatabase.enabled .Values.metadataDatabase.airflow.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: airflow-shared-metadata
+  namespace: {{ $ns }}
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: fdp.floren.app/airflow-role, operator: In, values: [standalone, scheduler, web, worker] }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ include "fdp.databaseNamespace" . }} } }
+          podSelector: { matchLabels: { app.kubernetes.io/name: fdp-metadata-db } }
+      ports: [{ port: 5432, protocol: TCP }]
+{{- end }}
