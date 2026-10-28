@@ -82,20 +82,6 @@ resource "fdp_role_assignment" "engineers_api" {
   role         = "Admin"
 }
 
-# Distinct fixed identities are granted before deployment. Granting only the
-# workload's post-deploy identity would create a bootstrapping permission cycle.
-resource "fdp_service_account" "job" {
-  for_each    = local.jobs
-  name        = "pokemon-${each.key}-${var.environment}"
-  layer_id    = var.layer_id
-  description = "Pokemon ${each.key}, ${var.environment}; never shared with another environment."
-}
-data "fdp_principal" "job" {
-  for_each   = local.jobs
-  name       = fdp_service_account.job[each.key].name
-  kind       = "service"
-  depends_on = [fdp_service_account.job]
-}
 locals {
   data_grants = {
     bootstrap_raw     = { job = "bootstrap", resource = fdp_schema.raw.id, role = "Admin" }
@@ -113,20 +99,8 @@ locals {
     monitor_history   = { job = "monitor", resource = fdp_schema.history.id, role = "Reader" }
   }
 }
-resource "fdp_role_assignment" "job_data" {
-  for_each     = local.data_grants
-  resource_id  = each.value.resource
-  principal_id = data.fdp_principal.job[each.value.job].id
-  role         = each.value.role
-}
-resource "fdp_role_assignment" "extract_api" {
-  resource_id  = fdp_api.tcgdex.resource_id
-  principal_id = data.fdp_principal.job["extract"].id
-  role         = "Consumer"
-}
-
-# Apps/dbt need their data grants at deploy time. Airflow is deployed separately
-# after its run grants, so a newly scheduled DAG cannot race authorization setup.
+# Each workload owns one built-in managed identity. Inline grants avoid a
+# deployment/identity dependency cycle on a clean installation.
 resource "fdp_workload" "job" {
   for_each       = setsubtract(local.jobs, ["pipelines"])
   repository_id  = fdp_repository.this.id
@@ -138,15 +112,12 @@ resource "fdp_workload" "job" {
   layer_id       = var.layer_id
   folder_id      = fdp_folder.this.id
   execution_mode = "fixed"
-  run_as         = fdp_service_account.job[each.key].name
   auto_update    = true
-  depends_on     = [fdp_role_assignment.job_data, fdp_role_assignment.extract_api, fdp_api_operation.get]
-}
-resource "fdp_role_assignment" "orchestrate" {
-  for_each     = toset(["extract", "load", "models", "process-event"])
-  resource_id  = fdp_workload.job[each.key].resource_id
-  principal_id = data.fdp_principal.job["pipelines"].id
-  role         = "Executor"
+  managed_identity_grants = merge(
+    { for grant in local.data_grants : grant.resource => grant.role if grant.job == each.key },
+    each.key == "extract" ? { (fdp_api.tcgdex.resource_id) = "Consumer" } : {}
+  )
+  depends_on = [fdp_api_operation.get]
 }
 resource "fdp_workload" "pipelines" {
   repository_id  = fdp_repository.this.id
@@ -158,8 +129,9 @@ resource "fdp_workload" "pipelines" {
   layer_id       = var.layer_id
   folder_id      = fdp_folder.this.id
   execution_mode = "fixed"
-  run_as         = fdp_service_account.job["pipelines"].name
-  depends_on     = [fdp_role_assignment.orchestrate]
+  managed_identity_grants = {
+    for name in ["extract", "load", "models", "process-event"] : fdp_workload.job[name].resource_id => "Executor"
+  }
 }
 resource "fdp_role_assignment" "analysts_dashboard" {
   resource_id  = fdp_workload.job["explorer"].resource_id

@@ -28,7 +28,7 @@ CONTROL_PLANE = ROOT / 'services/control-plane'
 SECRET_MARKERS = ('tf-acceptance-git-token', 'tf-acceptance-db-password', 'tf-acceptance-secret-value', 'PRIVATE KEY')
 # After import, write-only credentials cannot be read back: these resend them once on the next apply.
 CREDENTIAL_RESOURCES = {'fdp_data_source.warehouse', 'fdp_repository.analytics',
-                        'fdp_secret.api_key', 'fdp_secret.partner_ca'}
+                        'fdp_secret.api_key', 'fdp_secret.partner_ca', 'fdp_workload.report'}
 
 
 def step(message):
@@ -355,6 +355,8 @@ resource "fdp_workload" "report" {{
   layer_id      = fdp_layer.nonprod.id
   folder_id     = fdp_folder.finance.id
   warehouse     = fdp_compute_pool.small.name
+  execution_mode = "fixed"
+  managed_identity_grants = {{ (fdp_schema.reporting.id) = "{'Contributor' if v2 else 'Reader'}" }}
   env           = {{ REPORT_MODE = "{'delta' if v2 else 'full'}" }}
 }}
 
@@ -566,7 +568,7 @@ def main():
             resent = empty_plan('plan after import', allowed=CREDENTIAL_RESOURCES)
             tofu('apply', '-auto-approve', '-input=false')
             empty_plan('plan after re-recording credential versions')
-            step(f'Imported {len(current)} resources; only credential holders resent once: {sorted(resent)}')
+            step(f'Imported {len(current)} resources; credential versions and inline grant ownership recorded once: {sorted(resent)}')
 
             step('Drift: change objects outside configuration')
             api.put('/v1/admin/pools/tf-small', json={'name': 'tf-small', 'cpu': 4, 'memory_gb': 3}).raise_for_status()
@@ -577,13 +579,17 @@ def main():
             governance = by_address['fdp_catalog_governance.report']['id']
             current_gov = api.get(f'/v1/catalog/assets/{governance}').json()['governance']
             api.put(f'/v1/catalog/assets/{governance}/governance', json={**current_gov, 'domain': 'Marketing'}).raise_for_status()
-            drifted = empty_plan('drift', allowed={'fdp_compute_pool.small', 'fdp_api.orders', 'fdp_catalog_governance.report'})
-            require(drifted == {'fdp_compute_pool.small', 'fdp_api.orders', 'fdp_catalog_governance.report'},
+            report_identity = by_address['fdp_workload.report']['service_principal_id']
+            reporting_id = by_address['fdp_schema.reporting']['id']
+            api.put(f'/v1/rbac/resources/{reporting_id}/assignments',
+                    json={'principal_id': report_identity, 'role': 'Reader'}).raise_for_status()
+            drifted = empty_plan('drift', allowed={'fdp_compute_pool.small', 'fdp_api.orders', 'fdp_catalog_governance.report', 'fdp_workload.report'})
+            require(drifted == {'fdp_compute_pool.small', 'fdp_api.orders', 'fdp_catalog_governance.report', 'fdp_workload.report'},
                     f'drift not detected on every changed object: {sorted(drifted)}')
             tofu('apply', '-auto-approve', '-input=false')
             empty_plan('after repairing drift')
             require(api.get(f'/v1/apis/{orders}').json()['name'] == 'Orders API', 'API name not restored')
-            step('Drift on pool, API and governance detected and repaired')
+            step('Drift on pool, API, governance and managed identity grants detected and repaired')
 
             step('Guardrails: promotion rules and a non-admin automation identity')
             def refused(name, body, expected, token_value=token):

@@ -9,7 +9,6 @@ import { DataListing } from "../components/DataBrowser";
 import { MetadataSql } from "../components/MetadataSql";
 import { ProductIcon } from "../components/ProductIcon";
 import { IconBranch, IconPlus, IconDeployed } from "../components/Icons";
-import { OriginBadge } from "./Directory";
 import { PageHeader } from "../components/Page";
 
 interface ObjectProps { tab: TabRef; hub: Hub; openTab: OpenTab }
@@ -265,16 +264,37 @@ export function OrganizationSettings({ resource, hub, openTab }: { resource: Acc
 
 export function ServicesView({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const [search, setSearch] = useState("");
-  const services = hub.resources.filter((r) => r.kind === "service" && (r.config.service_account || hub.workloads.some((p) => p.resource_id === r.id && p.status !== "stopped")) && r.name.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return <><PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Services" subtitle="Registered programs, apps, and service accounts. Open a service to manage its permissions."
+  const [accounts, setAccounts] = useState<ServiceAccount[]>([]);
+  const [showRetired, setShowRetired] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    api.serviceAccounts().then((rows) => { if (!cancelled) setAccounts(rows); })
+      .catch((e: Error) => { if (!cancelled) setError(e.message); });
+    return () => { cancelled = true; };
+  }, []);
+  const services = hub.resources.filter((r) => r.kind === "service"
+    && (r.config.service_account
+      ? showRetired || accounts.some((a) => a.id === r.object_id && !a.disabled)
+      : hub.workloads.some((p) => p.resource_id === r.id && p.status !== "stopped"))
+    && r.name.toLowerCase().includes(search.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
+  return <><PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Services"
+      subtitle="Each workload has a built-in managed identity. Separate service accounts are only needed for external clients or shared identities."
       actions={hub.me?.is_admin && <button className="btn secondary" onClick={() => openTab({ kind: "admin-service-accounts", title: "Service accounts" })}><IconPlus size={14} />Create service account</button>} />
-    <div className="object-toolbar"><input type="search" aria-label="Search services" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search services…" /></div>
-    <table><thead><tr><th>Service</th><th>Type</th><th>Identity source</th><th /></tr></thead><tbody>{services.map((r) => <tr key={r.id}>
-      <td><button className="text-button object-name" onClick={() => openTab(resourceTab(r))}><ProductIcon kind={r.config.service_account ? "identity" : hub.workloads.find((p) => p.resource_id === r.id)?.kind} runtime={hub.workloads.find((p) => p.resource_id === r.id)?.runtime} size={16} />{r.name}</button></td>
-      <td>{r.config.service_account ? "Service account" : hub.workloads.find((p) => p.resource_id === r.id)?.kind ?? "Workload"}</td><td><OriginBadge /></td>
-      <td className="table-actions"><button className="btn sm secondary" onClick={() => openTab(resourceTab(r, "permissions"))}>Permissions</button></td>
-    </tr>)}{!services.length && <tr><td colSpan={4} className="muted">No services match.</td></tr>}</tbody></table>
+    <div className="object-toolbar"><input type="search" aria-label="Search services" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search services…" />
+      {accounts.some((a) => a.disabled) && <label><input type="checkbox" checked={showRetired} onChange={(e) => setShowRetired(e.target.checked)} /> Show retired service accounts</label>}
+    </div>
+    {error && <p className="error" role="alert">{error}</p>}
+    <table><thead><tr><th>Service</th><th>Type</th><th>Execution identity</th><th /></tr></thead><tbody>{services.map((r) => {
+      const workload = hub.workloads.find((p) => p.resource_id === r.id);
+      const account = accounts.find((a) => a.id === r.object_id);
+      return <tr key={r.id}>
+        <td><button className="text-button object-name" onClick={() => openTab(resourceTab(r))}><ProductIcon kind={r.config.service_account ? "identity" : workload?.kind} runtime={workload?.runtime} size={16} />{r.name}</button>{account?.disabled && <span className="muted"> · retired</span>}</td>
+        <td>{r.config.service_account ? "Service account" : workload?.kind ?? "Workload"}</td>
+        <td>{r.config.service_account ? "External / shared identity" : workload?.execution_mode === "caller" ? "Caller for data requests" : workload?.run_as ? `Service account: ${workload.run_as}` : "Built-in managed identity"}</td>
+        <td className="table-actions"><button className="btn sm secondary" onClick={() => openTab(resourceTab(r, "permissions"))}>Permissions</button></td>
+      </tr>;
+    })}{!services.length && <tr><td colSpan={4} className="muted">No services match.</td></tr>}</tbody></table>
   </>;
 }
 

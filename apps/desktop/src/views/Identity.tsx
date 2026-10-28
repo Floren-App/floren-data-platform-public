@@ -346,8 +346,7 @@ export function AdminServiceAccounts({ hub, openTab }: { hub: Hub; openTab: Open
   return (
     <>
       <PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Service accounts"
-        subtitle={<>Identities for data products: deployed dashboards, dbt and Airflow can <b>run as</b> one instead of a person, so production keeps working when people change roles.
-          Manage execution rights and tokens on the service account itself. Grant data roles to its app groups on data sources and schemas.</>}
+        subtitle={<>Workloads use their built-in managed identities by default. Create a separate service account for an external client or an intentionally shared identity. Manage its tokens here and grant data access directly on schemas or APIs.</>}
         actions={<button className="btn" aria-expanded={open && !editing} onClick={() => { setForm(empty); setOpen(!(open && !editing)); }}><IconPlus size={14} />New service account</button>} />
       {error && <p className="error" role="alert">{error}</p>}
       {open && <form className="card" onSubmit={(e) => { e.preventDefault(); void save(); }}>

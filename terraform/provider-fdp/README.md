@@ -98,3 +98,23 @@ make test-terraform   # go vet, then create / re-plan / update / import / drift 
 The acceptance test starts a temporary control plane (SQLite, in-memory secrets, fake
 orchestrator) with a simulated OIDC issuer. `make test-e2e-install` exercises the provider
 against a real Kubernetes installation.
+
+### Workload managed identities
+
+Use `execution_mode = "fixed"` without `run_as` for the workload's built-in identity.
+`managed_identity_grants` maps resource IDs to built-in roles. The provider installs
+these grants immediately after registration, before waiting for the deployment to
+become live; this avoids requiring an extra service account on a fresh installation.
+Normal server-side permission, layer and append-only validation still applies.
+
+```hcl
+managed_identity_grants = {
+  (fdp_schema.raw.id) = "Reader"
+  (fdp_schema.history.id) = "Admin"
+}
+```
+
+The map manages only its listed direct assignments, detects revoked/changed grants
+on refresh and removes assignments when keys are removed. Do not manage those same
+assignments through `fdp_role_assignment`. Separate service accounts remain available
+for external clients or deliberately shared execution identities.

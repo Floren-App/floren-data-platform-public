@@ -166,27 +166,28 @@ func (r *repositoryResource) Delete(ctx context.Context, req resource.DeleteRequ
 type workloadResource struct{ api *client.Client }
 
 type workloadModel struct {
-	ID                 types.String   `tfsdk:"id"`
-	RepositoryID       types.String   `tfsdk:"repository_id"`
-	Branch             types.String   `tfsdk:"branch"`
-	Program            types.String   `tfsdk:"program"`
-	Slug               types.String   `tfsdk:"slug"`
-	LayerID            types.String   `tfsdk:"layer_id"`
-	FolderID           types.String   `tfsdk:"folder_id"`
-	Title              types.String   `tfsdk:"title"`
-	Warehouse          types.String   `tfsdk:"warehouse"`
-	ExecutionMode      types.String   `tfsdk:"execution_mode"`
-	RunAs              types.String   `tfsdk:"run_as"`
-	AutoUpdate         types.Bool     `tfsdk:"auto_update"`
-	Env                types.Map      `tfsdk:"env"`
-	Secrets            types.Map      `tfsdk:"secrets"`
-	Kind               types.String   `tfsdk:"kind"`
-	Status             types.String   `tfsdk:"status"`
-	DeployedSHA        types.String   `tfsdk:"deployed_sha"`
-	URL                types.String   `tfsdk:"url"`
-	ResourceID         types.String   `tfsdk:"resource_id"`
-	ServicePrincipalID types.String   `tfsdk:"service_principal_id"`
-	Timeouts           timeouts.Value `tfsdk:"timeouts"`
+	ID                    types.String   `tfsdk:"id"`
+	RepositoryID          types.String   `tfsdk:"repository_id"`
+	Branch                types.String   `tfsdk:"branch"`
+	Program               types.String   `tfsdk:"program"`
+	Slug                  types.String   `tfsdk:"slug"`
+	LayerID               types.String   `tfsdk:"layer_id"`
+	FolderID              types.String   `tfsdk:"folder_id"`
+	Title                 types.String   `tfsdk:"title"`
+	Warehouse             types.String   `tfsdk:"warehouse"`
+	ExecutionMode         types.String   `tfsdk:"execution_mode"`
+	RunAs                 types.String   `tfsdk:"run_as"`
+	AutoUpdate            types.Bool     `tfsdk:"auto_update"`
+	Env                   types.Map      `tfsdk:"env"`
+	Secrets               types.Map      `tfsdk:"secrets"`
+	Kind                  types.String   `tfsdk:"kind"`
+	Status                types.String   `tfsdk:"status"`
+	DeployedSHA           types.String   `tfsdk:"deployed_sha"`
+	URL                   types.String   `tfsdk:"url"`
+	ResourceID            types.String   `tfsdk:"resource_id"`
+	ServicePrincipalID    types.String   `tfsdk:"service_principal_id"`
+	ManagedIdentityGrants types.Map      `tfsdk:"managed_identity_grants"`
+	Timeouts              timeouts.Value `tfsdk:"timeouts"`
 }
 
 type workloadOut struct {
@@ -243,12 +244,14 @@ func (r *workloadResource) Schema(ctx context.Context, _ resource.SchemaRequest,
 			"title":          schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: computed},
 			"warehouse":      schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: computed},
 			"execution_mode": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("caller")},
-			"run_as":         schema.StringAttribute{Optional: true, Description: "Service account to run as; empty runs as the deployer."},
+			"run_as":         schema.StringAttribute{Optional: true, Description: "Optional service account override. With execution_mode = fixed and no override, runs as this workload's built-in managed identity."},
 			"auto_update":    schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true)},
 			"env": schema.MapAttribute{ElementType: types.StringType, Optional: true, Computed: true,
 				Default: mapdefault.StaticValue(mapValue(nil))},
 			"secrets": schema.MapAttribute{ElementType: types.StringType, Optional: true, Computed: true,
 				Default: mapdefault.StaticValue(mapValue(nil)), Description: "Environment variable -> secret reference (never values)."},
+			"managed_identity_grants": schema.MapAttribute{ElementType: types.StringType, Optional: true, Computed: true,
+				Default: mapdefault.StaticValue(mapValue(nil)), Description: "Resource ID -> role for this workload's built-in managed identity. Grants are installed before waiting for deployment readiness and reconciled on refresh. Do not also manage the same assignments with fdp_role_assignment."},
 			"kind":                 schema.StringAttribute{Computed: true, PlanModifiers: computed},
 			"status":               schema.StringAttribute{Computed: true},
 			"deployed_sha":         schema.StringAttribute{Computed: true},
@@ -356,7 +359,12 @@ func (r *workloadResource) Create(ctx context.Context, req resource.CreateReques
 	}
 	plan.apply(&out)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...) // tracked even if it fails to go live
-	final, err := r.wait(ctx, out.ID, timeout)
+	grants := stringMap(ctx, plan.ManagedIdentityGrants, &resp.Diagnostics)
+	if err := r.reconcileIdentityGrants(ctx, plan.ServicePrincipalID.ValueString(), nil, grants); err != nil {
+		apiError(&resp.Diagnostics, "granting managed identity access", err)
+		return
+	}
+	final, err := r.waitWithIdentityGrants(ctx, out.ID, timeout, len(grants) > 0)
 	if final != nil {
 		plan.apply(final)
 	}
@@ -381,6 +389,13 @@ func (r *workloadResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 	state.apply(&out)
+	declared := stringMap(ctx, state.ManagedIdentityGrants, &resp.Diagnostics)
+	actual, err := r.readIdentityGrants(ctx, state.ServicePrincipalID.ValueString(), declared)
+	if err != nil {
+		apiError(&resp.Diagnostics, "reading managed identity grants", err)
+		return
+	}
+	state.ManagedIdentityGrants = mapValue(actual)
 	if state.RepositoryID.IsNull() || state.RepositoryID.ValueString() == "" {
 		// After import: the API names the repository; resolve it to the ID configuration refers to.
 		if repo, err := findRepo(ctx, r.api, out.Repo); err == nil {
@@ -408,13 +423,19 @@ func (r *workloadResource) Update(ctx context.Context, req resource.UpdateReques
 	if !plan.Warehouse.IsUnknown() && !plan.Warehouse.IsNull() {
 		body["warehouse"] = plan.Warehouse.ValueString()
 	}
+	grants := stringMap(ctx, plan.ManagedIdentityGrants, &resp.Diagnostics)
+	previous := stringMap(ctx, state.ManagedIdentityGrants, &resp.Diagnostics)
+	if err := r.reconcileIdentityGrants(ctx, state.ServicePrincipalID.ValueString(), previous, grants); err != nil {
+		apiError(&resp.Diagnostics, "updating managed identity grants", err)
+		return
+	}
 	var out workloadOut
 	if err := r.api.Do(ctx, "PATCH", "/v1/workloads/"+state.ID.ValueString(), body, &out); err != nil {
 		apiError(&resp.Diagnostics, "updating workload", err)
 		return
 	}
 	plan.ID = state.ID
-	final, err := r.wait(ctx, state.ID.ValueString(), timeout)
+	final, err := r.waitWithIdentityGrants(ctx, state.ID.ValueString(), timeout, len(grants) > 0)
 	if final != nil {
 		plan.apply(final)
 	}
@@ -429,5 +450,9 @@ func (r *workloadResource) Delete(ctx context.Context, req resource.DeleteReques
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if err := r.api.Do(ctx, "DELETE", "/v1/workloads/"+state.ID.ValueString(), nil, nil); err != nil && !client.IsNotFound(err) {
 		apiError(&resp.Diagnostics, "undeploying", err)
+		return
+	}
+	if err := r.reconcileIdentityGrants(ctx, state.ServicePrincipalID.ValueString(), stringMap(ctx, state.ManagedIdentityGrants, &resp.Diagnostics), nil); err != nil {
+		apiError(&resp.Diagnostics, "revoking managed identity grants", err)
 	}
 }
