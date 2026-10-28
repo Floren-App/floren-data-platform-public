@@ -72,21 +72,30 @@ highly available services where you need high availability.
 | A governed SQL path into the storage you register | A secrets manager |
 | GitOps publishing from your repositories | A hosted service or a cloud-specific product |
 
-```text
-             People and automation
-                     │ OIDC
-                     ▼
- ┌──────── Floren Data Platform: the compute layer ────────┐
- │ Gateway · Control plane · Workspaces · Jobs and apps    │
- │ dbt · Airflow · Governed SQL (Trino) · IAM · Catalog    │
- │ Lineage · Quality and SLAs                              │
- └───┬──────────────┬───────────────┬──────────────┬───────┘
-     │ OIDC+SCIM    │ KV v2 / K8s   │ PostgreSQL   │ PostgreSQL,
-     ▼              ▼               ▼              ▼ S3, Iceberg
- Identity       Secret store    Metadata DB    Data storage
- provider
-
- Each one: yours, or the optional bundled component.
+```mermaid
+flowchart TB
+    people(["People and automation"])
+    subgraph fdp["Floren Data Platform: the compute layer"]
+        direction TB
+        cp["<b>Control plane</b><br/>gateway · API · IAM · catalog · lineage · admission"]
+        layers["<b>Isolated layers</b><br/>workspaces · jobs · apps · dbt · Airflow · Trino"]
+        cp -- "provisions, admits and governs" --> layers
+    end
+    subgraph byo["Your infrastructure, or the optional bundled component"]
+        direction LR
+        idp["Identity provider<br/><i>OIDC + SCIM</i>"]
+        secrets["Secret store<br/><i>OpenBao · Vault · Kubernetes<br/>AWS · Azure · Google</i>"]
+        meta[("Metadata database<br/><i>PostgreSQL</i>")]
+        data[("Data storage<br/><i>PostgreSQL · S3 · Iceberg REST</i>")]
+        idp ~~~ secrets ~~~ meta ~~~ data
+    end
+    people -- "OIDC" --> fdp
+    fdp -- "open interfaces only" --> byo
+    classDef byo stroke-dasharray: 5 5
+    class idp,secrets,meta,data byo
 ```
+
+Each dashed service can be replaced independently. The split between the control plane and the layers
+is described in [control plane and layers](control-plane-and-layers.md).
 
 Continue with [system components](components.md) for the request and execution paths.

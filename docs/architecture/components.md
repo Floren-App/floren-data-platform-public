@@ -7,23 +7,37 @@ you register. See [design principles](index.md) for the reasoning and
 
 ## Request and execution paths
 
-```text
-Browser / desktop ──OIDC──> Identity provider
-        │ HTTPS
-        ▼
-Gateway ──authorization──> Control plane ──> Metadata PostgreSQL (yours or bundled)
-   │                            │          Secret store (OpenBao or Kubernetes Secrets)
-   │                            │          Git repositories
-   │                            ▼
-   │                     Layer orchestration
-   │                            │
-   ├──> Private workspace       ├──> Jobs / published apps / Airflow
-   │                            │              │ managed execution context
-   └──> Published app           └──> Governed SQL / managed APIs / files
-                                              │
-                                 Registered storage: PostgreSQL,
-                                 S3-compatible buckets, Iceberg
+```mermaid
+flowchart TB
+    client(["Browser · desktop app"])
+    idp["Identity provider"]
+    subgraph cp["Control plane"]
+        direction LR
+        gw["Gateway"] --> api["Control plane API<br/>IAM · admission · catalog"]
+        api --> orch["Layer orchestration"]
+        api --> sqlgw["SQL gateway · managed APIs<br/>file credentials"]
+    end
+    subgraph deps["Platform dependencies"]
+        direction LR
+        meta[("Metadata PostgreSQL")] ~~~ secrets["Secret store"] ~~~ git["Git repositories"]
+    end
+    subgraph layer["Layer"]
+        direction LR
+        ws["Private workspace"] ~~~ runs["Jobs · apps · Airflow"] ~~~ trino["Trino"]
+    end
+    storage[("Registered storage<br/>PostgreSQL · S3 · Iceberg")]
+    client -- "OIDC" --> idp
+    client -- "HTTPS" --> gw
+    api --> deps
+    orch -- "starts admitted pods" --> layer
+    gw -- "editors and apps" --> layer
+    runs -- "execution token" --> sqlgw
+    sqlgw -- "signed context" --> trino
+    trino --> storage
 ```
+
+See [control plane and layers](control-plane-and-layers.md) for what runs where and how the two sides
+interact.
 
 ## Control-plane responsibilities
 
