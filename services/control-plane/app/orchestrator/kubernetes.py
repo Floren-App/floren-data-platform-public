@@ -15,7 +15,8 @@ from kubernetes.client.exceptions import ApiException
 from kubernetes.stream import stream
 
 from ..config import Settings
-from .base import CapacityError, Placement, ExecutionHandle, ExecutionSpec, list_files_command, parse_list, parse_read, read_file_command
+from .base import (HOME_SUBPATH, CapacityError, Placement, ExecutionHandle, ExecutionSpec,
+                   list_files_command, parse_list, parse_read, prepare_home_command, read_file_command)
 
 
 TRUST_DIR = "/etc/fdp/trust"
@@ -99,7 +100,7 @@ class KubernetesOrchestrator:
         if spec.gpu:
             limits["nvidia.com/gpu"] = str(spec.gpu)
 
-        volumes, mounts = [], []
+        volumes, mounts, init_containers = [], [], []
         env = dict(spec.env)
         trust = placement.trust_configmap if placement else self.trust_configmap
         if trust:
@@ -114,7 +115,21 @@ class KubernetesOrchestrator:
                 name="home",
                 persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(claim_name=spec.home_volume),
             ))
-            mounts.append(client.V1VolumeMount(name="home", mount_path="/workspace"))
+            # Only the initializer sees the volume root (including ext4's lost+found).
+            # Editors and workspace compute jobs receive exactly the same private subdirectory.
+            init_containers.append(client.V1Container(
+                name="prepare-home", image=spec.image,
+                command=prepare_home_command("/fdp-home-volume"),
+                volume_mounts=[client.V1VolumeMount(name="home", mount_path="/fdp-home-volume")],
+                resources=client.V1ResourceRequirements(
+                    requests={"cpu": "10m", "memory": "16Mi"}, limits={"cpu": "100m", "memory": "64Mi"}),
+                security_context=client.V1SecurityContext(
+                    run_as_non_root=True, run_as_user=1000, run_as_group=1000,
+                    allow_privilege_escalation=False, read_only_root_filesystem=True,
+                    capabilities=client.V1Capabilities(drop=["ALL"]),
+                    seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault")),
+            ))
+            mounts.append(client.V1VolumeMount(name="home", mount_path="/workspace", sub_path=HOME_SUBPATH))
         claims: dict = {}
         for m in spec.mounts:
             vol_name = claims.setdefault(m.volume, f"data-{len(claims)}")
@@ -152,6 +167,7 @@ class KubernetesOrchestrator:
             metadata=client.V1ObjectMeta(name=spec.name, labels=labels),
             spec=client.V1PodSpec(
                 containers=[container],
+                init_containers=init_containers or None,
                 volumes=volumes,
                 restart_policy="Never" if spec.port is None else "Always",
                 image_pull_secrets=[client.V1LocalObjectReference(name=self.pull_secret)] if self.pull_secret else None,
@@ -214,7 +230,10 @@ class KubernetesOrchestrator:
         for condition in status.conditions or []:
             if condition.type == "PodScheduled" and condition.status == "False":
                 return "waiting for cluster capacity: " + _scheduling(condition.message or "")
-        for container in status.container_statuses or []:
+        for container in [*(getattr(status, "init_container_statuses", None) or []), *(status.container_statuses or [])]:
+            terminated = container.state.terminated if container.state else None
+            if container.name == "prepare-home" and terminated and terminated.exit_code:
+                return "workspace storage initialization failed; check the prepare-home container logs for layout or permission errors"
             waiting = container.state.waiting if container.state else None
             if waiting and waiting.reason in IMAGE_PROBLEMS:
                 return f"its image {container.image} cannot be pulled ({waiting.reason})"

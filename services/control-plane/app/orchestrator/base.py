@@ -6,6 +6,34 @@ import shlex
 from typing import Dict, List, Optional, Protocol, Tuple
 
 
+HOME_SUBPATH = "workspace"
+
+
+def prepare_home_command(root: str) -> List[str]:
+    """Initialize a private home inside a volume without hiding or moving legacy files."""
+    return ["sh", "-ec", r'''
+root=$1
+marker="$root/.fdp-home-layout-v1"
+home="$root/workspace"
+if [ -L "$marker" ] || [ -L "$home" ]; then
+    echo "FDP workspace storage must not use symlinks for its layout." >&2
+    exit 1
+fi
+if [ -f "$marker" ]; then
+    test -d "$home"
+    exit
+fi
+for entry in "$root"/* "$root"/.[!.]* "$root"/..?*; do
+    if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then continue; fi
+    if [ "$entry" = "$root/lost+found" ] && [ -d "$entry" ]; then continue; fi
+    echo "FDP workspace volume uses the old layout. Migrate or explicitly reset it before starting; no files were changed." >&2
+    exit 1
+done
+mkdir -m 0700 "$home"
+touch "$marker"
+''', "fdp-home-init", root]
+
+
 @dataclass
 class VolumeMount:
     """A (sub)directory of a shared volume: Docker named volume or Kubernetes PVC."""
@@ -45,7 +73,7 @@ class ExecutionSpec:
     command: Optional[List[str]] = None
     env: Dict[str, str] = field(default_factory=dict)
     labels: Dict[str, str] = field(default_factory=dict)
-    # Persistent per-user volume (claim/volume name) mounted at /workspace.
+    # Persistent per-workspace volume; only HOME_SUBPATH is mounted at /workspace.
     home_volume: Optional[str] = None
     # None = image default. RStudio's s6 init must start as root and drops to uid 1000 itself.
     run_as_user: Optional[int] = 1000

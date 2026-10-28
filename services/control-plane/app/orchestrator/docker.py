@@ -9,7 +9,8 @@ from docker.errors import NotFound, APIError
 from docker.types import Mount
 
 from ..config import Settings
-from .base import ExecutionHandle, ExecutionSpec, list_files_command, parse_list, parse_read, read_file_command
+from .base import (HOME_SUBPATH, ExecutionHandle, ExecutionSpec, list_files_command,
+                   parse_list, parse_read, prepare_home_command, read_file_command)
 
 _STATES = {"created": "pending", "restarting": "pending", "running": "running", "paused": "running"}
 
@@ -68,10 +69,19 @@ class DockerOrchestrator:
             self.client.containers.get(spec.name).remove(force=True)
         except NotFound:
             pass
-        volumes = {}
-        if spec.home_volume:
-            volumes[spec.home_volume] = {"bind": "/workspace", "mode": "rw"}
         mounts = []
+        if spec.home_volume:
+            # Mount at the image's /workspace for Docker's initial volume ownership copy-up.
+            # This credential-free helper exits before the editor/job is launched.
+            self.client.containers.run(
+                spec.image, entrypoint=prepare_home_command("/workspace"), command=[],
+                user="1000:1000", working_dir="/", network_mode="none", remove=True,
+                read_only=True, cap_drop=["ALL"], security_opt=["no-new-privileges"],
+                volumes={spec.home_volume: {"bind": "/workspace", "mode": "rw"}},
+            )
+            home = Mount(target="/workspace", source=spec.home_volume, type="volume")
+            home["VolumeOptions"] = {"Subpath": HOME_SUBPATH}
+            mounts.append(home)
         for m in spec.mounts:
             mount = Mount(target=m.target, source=m.volume, type="volume")
             if m.subpath:
@@ -88,7 +98,6 @@ class DockerOrchestrator:
             nano_cpus=int(spec.cpu * 1e9),
             mem_limit=f"{int(spec.memory_gb * 1024)}m",
             network=self._workload_network(spec.labels.get("fdp.floren.app/environment", ""),spec.labels.get("fdp.floren.app/workspace","")),
-            volumes=volumes,
             mounts=mounts,
             working_dir=spec.working_dir or ("/workspace" if spec.home_volume else None),
             user=f"{spec.run_as_user or 1000}:{spec.run_as_group}" if spec.run_as_group is not None else None,
