@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, AppGroup, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput } from "../api";
+import { api, ApiError, AppGroup, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput, WORKLOAD_KINDS, WorkloadKind, usablePools } from "../api";
 import type { Hub } from "../hub";
 import { OpenTab, resourceTab } from "../components/Permissions";
 import { PageHeader } from "../components/Page";
@@ -247,6 +247,17 @@ export function AdminPools({ hub }: { hub: Hub }) {
             <input id="p-groups" value={form.allowed_groups.join(", ")} onChange={(e) => setForm({ ...form, allowed_groups: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} /></div>
           <label className="row"><input type="checkbox" checked={!!form.dedicated} onChange={(e) => setForm({ ...form, dedicated: e.target.checked })} />
             Dedicated to these groups: not a shared on-demand warehouse, no slot limit and never waits in line. Make sure the cluster has nodes for it.</label>
+          <fieldset className="field"><legend>For layers <small className="muted">(none checked = every layer)</small></legend>
+            <div className="row wrap">{hub.layers.map((layer) => <label key={layer.id} className="row"><input type="checkbox"
+              checked={!!form.layer_ids?.includes(layer.id)} onChange={(e) => setForm({ ...form, layer_ids: e.target.checked
+                ? [...(form.layer_ids ?? []), layer.id] : (form.layer_ids ?? []).filter((id) => id !== layer.id) })} />{layer.name}</label>)}</div>
+          </fieldset>
+          <fieldset className="field"><legend>For kinds of work <small className="muted">(none checked = every kind)</small></legend>
+            <div className="row wrap">{WORKLOAD_KINDS.map((kind) => <label key={kind} className="row"><input type="checkbox"
+              checked={!!form.workload_kinds?.includes(kind)} onChange={(e) => setForm({ ...form, workload_kinds: e.target.checked
+                ? [...(form.workload_kinds ?? []), kind] : (form.workload_kinds ?? []).filter((k) => k !== kind) })} />{kind}</label>)}</div>
+            <small className="muted">With groups, this says e.g. "dbt projects of the data engineers in Prod". Work outside the scope is refused here; a program that declares this warehouse falls back to the default for its layer and kind.</small>
+          </fieldset>
           <div className="form-actions">
             <button className="btn" disabled={!form.name || (!!form.dedicated && !form.allowed_groups.length)}>Save</button>
             <button type="button" className="btn secondary" onClick={() => setForm(null)}>Cancel</button>
@@ -254,23 +265,53 @@ export function AdminPools({ hub }: { hub: Hub }) {
         </form>
       )}
       <table>
-        <thead><tr><th>Name</th><th>vCPU</th><th>Memory</th><th>GPU</th><th>In use / max</th><th>Auto-suspend</th><th>Groups</th><th /></tr></thead>
+        <thead><tr><th>Name</th><th>vCPU</th><th>Memory</th><th>GPU</th><th>In use / max</th><th>Auto-suspend</th><th>Groups</th><th>For</th><th /></tr></thead>
         <tbody>
           {pools.map((p) => (
             <tr key={p.id}>
               <td><b>{p.name}</b>{p.default && <span className="badge" title="Work without a warehouse runs here">default</span>}
-                {!!p.trino_layers?.length && <span className="badge" title={`Trino workers of ${p.trino_layers.join(", ")}; only Trino uses it`}>Trino · {p.trino_layers.join(", ")}</span>}</td><td>{p.cpu}</td><td>{p.memory_gb} GB</td><td>{p.gpu}</td><td>{p.dedicated ? `${p.in_use ?? 0} · dedicated, no limit` : `${p.in_use ?? 0} / ${p.max_concurrent}${p.queued ? ` · ${p.queued} waiting` : ""}`}</td>
+                {!!p.trino_layers?.length && <span className="badge" title={`Trino workers of ${p.trino_layers.join(", ")}; only Trino uses it`}>Trino · {p.trino_layers.join(", ")}</span>}
+                {p.default_for?.map((d) => <span key={`${d.layer_id}/${d.workload_kind}`} className="badge" title="Default for this work">default · {[d.layer_name, d.workload_kind].filter(Boolean).join(" · ")}</span>)}</td><td>{p.cpu}</td><td>{p.memory_gb} GB</td><td>{p.gpu}</td><td>{p.dedicated ? `${p.in_use ?? 0} · dedicated, no limit` : `${p.in_use ?? 0} / ${p.max_concurrent}${p.queued ? ` · ${p.queued} waiting` : ""}`}</td>
               <td>{Math.round(p.auto_suspend_seconds / 60)} min</td><td>{p.allowed_groups.join(", ") || "everyone"}</td>
+              <td>{[p.layer_names?.join(", ") || "every layer", p.workload_kinds?.join(", ") || "every kind"].join(" · ")}</td>
               <td className="table-actions"><div className="row">
-                {!p.default && !p.dedicated && !p.trino_layers?.length && <button className="btn sm secondary" onClick={() => void api.admin.setDefaultWarehouse(p.name).then(() => { reload(); hub.refresh(); }).catch((e: Error) => setError(e.message))}>Make default</button>}
+                {!p.default && !p.dedicated && !p.trino_layers?.length && !p.layer_ids?.length && !p.workload_kinds?.length && <button className="btn sm secondary" onClick={() => void api.admin.setDefaultWarehouse(p.name).then(() => { reload(); hub.refresh(); }).catch((e: Error) => setError(e.message))}>Make default</button>}
                 <button className="btn sm secondary" onClick={() => { const { id: _id, ...rest } = p; setForm(rest); }}>Edit</button></div></td>
             </tr>
           ))}
         </tbody>
       </table>
+      <ScopedDefaults hub={hub} pools={pools} onChanged={() => { reload(); hub.refresh(); }} />
       <WorkspaceLimits pools={pools} />
     </>
   );
+}
+
+/** Defaults per layer and/or kind of work: the most specific match wins (layer and kind, the layer, the kind). */
+function ScopedDefaults({ hub, pools, onChanged }: { hub: Hub; pools: Pool[]; onChanged: () => void }) {
+  const [layerId, setLayerId] = useState("");
+  const [kind, setKind] = useState<WorkloadKind | "">("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const entries = pools.flatMap((p) => (p.default_for ?? []).map((d) => ({ ...d, name: p.name })));
+  const choices = usablePools(pools, layerId || null, kind || null).filter((p) => !p.dedicated);
+  const act = (work: Promise<unknown>) => void work.then(() => { setError(""); onChanged(); }).catch((e: Error) => setError(e.message));
+  return <section className="card">
+    <h3>Defaults by layer and kind of work</h3>
+    <p className="muted">Work that names no warehouse, or names one not meant for it, runs on the most specific default: for its layer and kind, its layer, its kind, then the default above.</p>
+    {error && <p className="error" role="alert">{error}</p>}
+    <table><thead><tr><th>Layer</th><th>Kind</th><th>Warehouse</th><th /></tr></thead><tbody>
+      {entries.map((d) => <tr key={`${d.layer_id}/${d.workload_kind}`}><td>{d.layer_name ?? "any"}</td><td>{d.workload_kind ?? "any"}</td><td>{d.name}</td>
+        <td className="table-actions"><button className="btn sm secondary" onClick={() => act(api.admin.clearDefaultWarehouse({ layer_id: d.layer_id, workload_kind: d.workload_kind }))}>Clear</button></td></tr>)}
+      {!entries.length && <tr><td colSpan={4} className="muted">None: work without a warehouse uses the default above.</td></tr>}
+    </tbody></table>
+    <form className="row wrap" onSubmit={(e) => { e.preventDefault(); act(api.admin.setDefaultWarehouse(name, { ...(layerId ? { layer_id: layerId } : {}), ...(kind ? { workload_kind: kind } : {}) })); }}>
+      <label className="field">Layer<select value={layerId} onChange={(e) => setLayerId(e.target.value)}><option value="">any</option>{hub.layers.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+      <label className="field">Kind<select value={kind} onChange={(e) => setKind(e.target.value as WorkloadKind | "")}><option value="">any</option>{WORKLOAD_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></label>
+      <label className="field">Warehouse<select value={name} onChange={(e) => setName(e.target.value)}><option value="">— choose —</option>{choices.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}</select></label>
+      <button className="btn" disabled={!name || (!layerId && !kind)}>Set default</button>
+    </form>
+  </section>;
 }
 
 function WorkspaceLimits({ pools }: { pools: Pool[] }) {

@@ -17,6 +17,41 @@ Pools apply within the placement and layer rules of the requesting object. A lar
 pool never authorizes another layer's data or identity. Runtime images and Python/R
 dependency versions are configured separately.
 
+## Scope warehouses by layer and kind of work
+
+A warehouse can be limited to layers and kinds of work (`script`, `notebook`, `app`, `dbt`, `airflow`), next to
+its groups. Together they express rules such as "this warehouse is for dbt projects of the data engineers in
+Prod". Empty means every layer or every kind.
+
+```hcl
+resource "fdp_compute_pool" "prod_dbt" {
+  name           = "prod-dbt"
+  cpu            = 8
+  memory_gb      = 32
+  allowed_groups = [fdp_app_group.data_engineers.id]
+  layer_ids      = [fdp_layer.prod.id]
+  workload_kinds = ["dbt"]
+}
+
+# dbt work in Prod that names no warehouse (or one not meant for it) runs here.
+resource "fdp_default_warehouse" "prod_dbt" {
+  name          = fdp_compute_pool.prod_dbt.name
+  layer_id      = fdp_layer.prod.id
+  workload_kind = "dbt"
+}
+```
+
+- **Admission** checks the scope for every run, deployment, Airflow worker and Airflow-triggered task, and
+  refuses work outside it with the reason ("is for dbt work, not app").
+- **Choices** in the app only offer warehouses meant for the layer and kind at hand; `GET /v1/pools?layer_id=&kind=`
+  does the same for other clients.
+- **Defaults** can be set per layer, per kind or both. Work that names no warehouse, or names one in
+  `fdp.json` that is not meant for it, runs on the most specific default: layer and kind, then the layer, then
+  the kind, then the installation default. An explicit choice is never replaced; it is refused instead.
+- **Safety**: the installation default, the workspace warehouse and Trino warehouses (other than to their own
+  layers) cannot be scoped, and a warehouse cannot be narrowed while deployed workloads or defaults rely on it
+  outside the new scope.
+
 ## Understand activity
 
 A serving dashboard or Airflow deployment occupies resources while its process is

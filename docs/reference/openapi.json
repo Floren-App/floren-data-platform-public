@@ -740,11 +740,42 @@
       },
       "DefaultWarehouseIn": {
         "properties": {
+          "layer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only for work in this layer",
+            "title": "Layer Id"
+          },
           "name": {
             "maxLength": 64,
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "workload_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "script",
+                  "notebook",
+                  "app",
+                  "dbt",
+                  "airflow"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only for this kind of work",
+            "title": "Workload Kind"
           }
         },
         "required": [
@@ -1436,6 +1467,29 @@
           }
         },
         "title": "JwtAuth",
+        "type": "object"
+      },
+      "KindUse": {
+        "properties": {
+          "in_use": {
+            "default": 0,
+            "title": "In Use",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "queued": {
+            "default": 0,
+            "title": "Queued",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "KindUse",
         "type": "object"
       },
       "LayerIceberg": {
@@ -2561,6 +2615,15 @@
             "title": "Gpu",
             "type": "integer"
           },
+          "layer_ids": {
+            "description": "Layers whose work may use this warehouse; empty: every layer",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Layer Ids",
+            "type": "array"
+          },
           "max_concurrent": {
             "default": 10,
             "minimum": 1.0,
@@ -2577,6 +2640,21 @@
             "pattern": "^[a-z][a-z0-9-]{1,40}$",
             "title": "Name",
             "type": "string"
+          },
+          "workload_kinds": {
+            "description": "Kinds of work that may use this warehouse; empty: every kind",
+            "items": {
+              "enum": [
+                "script",
+                "notebook",
+                "app",
+                "dbt",
+                "airflow"
+              ],
+              "type": "string"
+            },
+            "title": "Workload Kinds",
+            "type": "array"
           }
         },
         "required": [
@@ -2664,6 +2742,24 @@
             "title": "Default",
             "type": "boolean"
           },
+          "default_for": {
+            "description": "Scoped defaults that point here: {layer_id, layer_name, workload_kind}",
+            "items": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "title": "Default For",
+            "type": "array"
+          },
           "gpu": {
             "default": 0,
             "maximum": 8.0,
@@ -2686,6 +2782,23 @@
             ],
             "description": "Containers counted against max_concurrent now",
             "title": "In Use"
+          },
+          "layer_ids": {
+            "description": "Layers whose work may use this warehouse; empty: every layer",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Layer Ids",
+            "type": "array"
+          },
+          "layer_names": {
+            "description": "Names of layer_ids, in the same order",
+            "items": {
+              "type": "string"
+            },
+            "title": "Layer Names",
+            "type": "array"
           },
           "max_concurrent": {
             "default": 10,
@@ -2728,6 +2841,21 @@
             "default": false,
             "title": "Usage Available",
             "type": "boolean"
+          },
+          "workload_kinds": {
+            "description": "Kinds of work that may use this warehouse; empty: every kind",
+            "items": {
+              "enum": [
+                "script",
+                "notebook",
+                "app",
+                "dbt",
+                "airflow"
+              ],
+              "type": "string"
+            },
+            "title": "Workload Kinds",
+            "type": "array"
           }
         },
         "required": [
@@ -4182,6 +4310,30 @@
             "title": "In Use",
             "type": "integer"
           },
+          "kinds": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/KindUse"
+            },
+            "title": "Kinds",
+            "type": "array"
+          },
+          "layer_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Layer Ids",
+            "type": "array"
+          },
+          "layer_names": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Layer Names",
+            "type": "array"
+          },
           "layers": {
             "items": {
               "$ref": "#/components/schemas/LayerUse"
@@ -4221,6 +4373,14 @@
           "queued": {
             "title": "Queued",
             "type": "integer"
+          },
+          "workload_kinds": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Workload Kinds",
+            "type": "array"
           },
           "workspaces": {
             "anyOf": [
@@ -7675,8 +7835,41 @@
     },
     "/v1/admin/settings/default-warehouse": {
       "delete": {
+        "description": "Clear the installation default, or with layer_id and/or workload_kind only that scoped default.",
         "operationId": "delete_v1_admin_settings_default-warehouse",
         "parameters": [
+          {
+            "in": "query",
+            "name": "layer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Layer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workload_kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workload Kind"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
@@ -7715,9 +7908,41 @@
         ]
       },
       "get": {
-        "description": "Where work without a warehouse runs, and what warehouse choices start with.",
+        "description": "Where work without a warehouse runs, and what warehouse choices start with. With layer_id and/or\nworkload_kind: that scoped default only (null when none is set). Without: the installation default and\nevery scoped default.",
         "operationId": "get_v1_admin_settings_default-warehouse",
         "parameters": [
+          {
+            "in": "query",
+            "name": "layer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Layer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workload_kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workload Kind"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
@@ -8201,6 +8426,55 @@
         },
         "summary": "Set Workspace Settings",
         "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/siem": {
+      "get": {
+        "description": "SIEM destinations: configured or not, events sent, how far exported and the last (sanitized) error.",
+        "operationId": "get_v1_admin_siem",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Siem Status",
+        "tags": [
+          "observability",
           "admin"
         ]
       }
@@ -13446,9 +13720,48 @@
     },
     "/v1/pools": {
       "get": {
-        "description": "Warehouses this user may run on. Works with execution tokens (editor runner panels).",
+        "description": "Warehouses this user may run on. Works with execution tokens (editor runner panels). With layer_id and/or\nkind, only warehouses meant for that work; an editor's own layer applies when no layer is given.",
         "operationId": "get_v1_pools",
         "parameters": [
+          {
+            "in": "query",
+            "name": "layer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Layer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "script",
+                    "notebook",
+                    "app",
+                    "dbt",
+                    "airflow"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",

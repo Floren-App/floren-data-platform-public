@@ -67,6 +67,10 @@ class ComputePool(Base):
     auto_suspend_seconds: Mapped[int] = mapped_column(Integer, default=600)
     # Empty list = every user may use this pool.
     allowed_groups: Mapped[list] = mapped_column(JSON, default=list)
+    # Scope: the layers (ids) and kinds of work (script, notebook, app, dbt, airflow) this warehouse is for.
+    # Empty = every layer / every kind. Admission checks both, next to allowed_groups.
+    layer_ids: Mapped[list] = mapped_column(JSON, default=list)
+    workload_kinds: Mapped[list] = mapped_column(JSON, default=list)
     owner_group_id: Mapped[Optional[str]] = mapped_column(ForeignKey("app_groups.id"), nullable=True)
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -246,13 +246,33 @@ def reset_workspace_settings(db: Session = Depends(get_db), admin: User = Depend
 
 class DefaultWarehouseIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
+    layer_id: Optional[str] = Field(default=None, description="Only for work in this layer")
+    workload_kind: Optional[Literal["script", "notebook", "app", "dbt", "airflow"]] = Field(
+        default=None, description="Only for this kind of work")
+
+
+def _scoped_out(db: Session, entry: dict) -> dict:
+    from .. import capacity
+    return {"layer_id": entry.get("layer_id"), "layer_name": capacity.layer_name(db, entry["layer_id"]) if entry.get("layer_id") else None,
+            "workload_kind": entry.get("workload_kind"), "name": entry["warehouse"]}
 
 
 @router.get("/settings/default-warehouse")
-def default_warehouse_setting(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    """Where work without a warehouse runs, and what warehouse choices start with."""
-    from ..capacity import default_warehouse
-    return {"name": default_warehouse(db)}
+def default_warehouse_setting(layer_id: Optional[str] = None, workload_kind: Optional[str] = None,
+                              db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """Where work without a warehouse runs, and what warehouse choices start with. With layer_id and/or
+    workload_kind: that scoped default only (null when none is set). Without: the installation default and
+    every scoped default."""
+    from .. import capacity
+    if layer_id or workload_kind:
+        from ..layers import canonical
+        layer_id = canonical(db, layer_id) if layer_id else None
+        match = next((e for e in capacity.scoped_defaults(db)
+                      if e.get("layer_id") == layer_id and e.get("workload_kind") == workload_kind), None)
+        return {"name": match["warehouse"] if match else None, "layer_id": layer_id, "workload_kind": workload_kind}
+    stored = capacity._setting(db).get("default")
+    return {"name": capacity.default_warehouse(db) if stored else None,
+            "scoped": [_scoped_out(db, e) for e in capacity.scoped_defaults(db)]}
 
 
 @router.put("/settings/default-warehouse")
@@ -266,21 +286,50 @@ def set_default_warehouse(body: DefaultWarehouseIn, db: Session = Depends(get_db
         raise HTTPException(422, f"{body.name} is dedicated to its groups; choose a shared warehouse as the default")
     capacity.refuse_trino_warehouse(db, pool.name)
     row = db.get(PlatformSetting, capacity.WAREHOUSES) or PlatformSetting(key=capacity.WAREHOUSES)
-    row.value = {"default": pool.name}
+    value = dict(row.value or {})
+    if body.layer_id or body.workload_kind:
+        from ..layers import canonical
+        layer_id = canonical(db, body.layer_id) if body.layer_id else None
+        if not capacity.fits(pool, layer_id, body.workload_kind):
+            raise HTTPException(422, f"{body.name} is not meant for that layer or kind of work")
+        scoped = [e for e in value.get("scoped") or []
+                  if not (e.get("layer_id") == layer_id and e.get("workload_kind") == body.workload_kind)]
+        scoped.append({"layer_id": layer_id, "workload_kind": body.workload_kind, "warehouse": pool.name})
+        value["scoped"] = scoped
+        audit(db, admin.username, "pool.default", pool.name, layer_id=layer_id, workload_kind=body.workload_kind)
+        result = {"name": pool.name, "layer_id": layer_id, "workload_kind": body.workload_kind}
+    else:
+        if pool.layer_ids or pool.workload_kinds:
+            raise HTTPException(422, f"{body.name} is limited to layers or kinds of work; the default for all work cannot be")
+        value["default"] = pool.name
+        audit(db, admin.username, "pool.default", pool.name)
+        result = {"name": pool.name}
+    row.value = value
     db.add(row)
-    audit(db, admin.username, "pool.default", pool.name)
     db.commit()
-    return {"name": pool.name}
+    return result
 
 
 @router.delete("/settings/default-warehouse", status_code=204)
-def clear_default_warehouse(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+def clear_default_warehouse(layer_id: Optional[str] = None, workload_kind: Optional[str] = None,
+                            db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """Clear the installation default, or with layer_id and/or workload_kind only that scoped default."""
     from ..models import PlatformSetting
     from .. import capacity
     row = db.get(PlatformSetting, capacity.WAREHOUSES)
     if row:
-        db.delete(row)
-    audit(db, admin.username, "pool.default.clear", capacity.WAREHOUSES)
+        value = dict(row.value or {})
+        if layer_id or workload_kind:
+            from ..layers import canonical
+            layer_id = canonical(db, layer_id) if layer_id else None
+            value["scoped"] = [e for e in value.get("scoped") or []
+                               if not (e.get("layer_id") == layer_id and e.get("workload_kind") == workload_kind)]
+        else:
+            value.pop("default", None)
+        row.value = value
+        if not value.get("default") and not value.get("scoped"):
+            db.delete(row)
+    audit(db, admin.username, "pool.default.clear", capacity.WAREHOUSES, layer_id=layer_id, workload_kind=workload_kind)
     db.commit()
 
 
@@ -327,6 +376,43 @@ def set_egress_allowlist(body: EgressAllowlistIn, db: Session = Depends(get_db),
     return _egress_out(db)
 
 
+def _scope(db: Session, name: str, body: PoolIn, engines: List[str]):
+    """Validated (layer ids, kinds) for a warehouse. Scoping must not strand what already relies on it."""
+    from .. import capacity
+    from ..layers import canonical
+    from ..models import Workload
+    layer_ids = list(dict.fromkeys(canonical(db, ident) for ident in body.layer_ids))
+    kinds = list(dict.fromkeys(body.workload_kinds))
+    if not layer_ids and not kinds:
+        return layer_ids, kinds
+    if capacity.default_warehouse(db) == name:
+        raise HTTPException(422, "this is the default warehouse for all work, so it cannot be limited to layers or kinds; "
+                                 "set a default per layer or kind instead")
+    if capacity.workspace_settings(db)["warehouse"] == name:
+        raise HTTPException(422, "workspaces of every layer use this warehouse; it cannot be limited to layers or kinds")
+    if engines:
+        from ..layer_infrastructure import trino_workers
+        trino_layers = {layer.id for layer, warehouse, _ in trino_workers(db) if warehouse == name}
+        if kinds or (layer_ids and not trino_layers <= set(layer_ids)):
+            raise HTTPException(422, f"Trino workers of {', '.join(engines)} use this warehouse; it may only be limited "
+                                     "to their layers, not to kinds of work")
+    candidate = ComputePool(name=name, layer_ids=layer_ids, workload_kinds=kinds)
+    from .. import rbac
+    from ..layers import info
+    stranded = []
+    for w in db.scalars(select(Workload).where(Workload.status != "stopped")):
+        worker = ((w.program_def or {}).get("airflow_settings") or {}).get("worker_warehouse")
+        if name in (w.warehouse, worker) and not capacity.fits(candidate, info(db, rbac.workload_resource(db, w))["layer_id"], w.kind):
+            stranded.append(w.slug)
+    if stranded:
+        raise HTTPException(409, f"deployed workloads use this warehouse outside that scope: {', '.join(stranded[:5])}"
+                                 + (" and more" if len(stranded) > 5 else "") + "; move them first")
+    for entry in capacity.scoped_defaults(db):
+        if entry["warehouse"] == name and not capacity.fits(candidate, entry.get("layer_id"), entry.get("workload_kind")):
+            raise HTTPException(422, "this warehouse is a default outside that scope; change that default first")
+    return layer_ids, kinds
+
+
 @router.get("/pools", response_model=List[PoolOut])
 def list_pools(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     from .common import describe_pools
@@ -352,10 +438,12 @@ def upsert_pool(name: str, body: PoolIn, db: Session = Depends(get_db), admin: U
             raise HTTPException(422, f"Trino workers of {', '.join(engines)} use this warehouse; a dedicated warehouse is for its groups' work")
         if workspace_settings(db)["warehouse"] == name:
             raise HTTPException(422, "workspaces use this warehouse; a dedicated warehouse is for its groups' work")
+    values = body.model_dump()
+    values["layer_ids"], values["workload_kinds"] = _scope(db, name, body, engines)
     if not pool.id:
         from ..ownership import require_create
         pool.owner_group_id = require_create(db,admin).id
-    for field, value in body.model_dump().items():
+    for field, value in values.items():
         setattr(pool, field, value)
     db.add(pool)
     audit(db, admin.username, "pool.upsert", name)
@@ -379,6 +467,9 @@ def delete_pool(name: str, db: Session = Depends(get_db), admin: User = Depends(
         raise HTTPException(409, "workspaces use this warehouse; choose another in the workspace settings first")
     if default_warehouse(db) == name:
         raise HTTPException(409, "this is the default warehouse; choose another default first")
+    from ..capacity import scoped_defaults
+    if any(e["warehouse"] == name for e in scoped_defaults(db)):
+        raise HTTPException(409, "this warehouse is a default for a layer or kind of work; choose another default first")
     db.delete(pool)
     audit(db, admin.username, "pool.delete", name)
     db.commit()

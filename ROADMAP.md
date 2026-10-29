@@ -1,6 +1,6 @@
 ## Next (planned 2026-10-29, in no fixed order)
 
-[] Warehouses scoped by layer and workload type: "this warehouse is for dbt projects of the data engineers in Prod".
+[x] Warehouses scoped by layer and workload type: "this warehouse is for dbt projects of the data engineers in Prod".
     - Today: a warehouse can be limited to groups, dedicated to them, or reserved for Trino workers; it is usable in
       every layer and by every kind of work.
     - Plan: optional `layers` and `workload_kinds` (script, notebook, app, dbt, airflow, kafka, model) on a
@@ -8,6 +8,10 @@
       deployments and Airflow tasks, with a clear refusal naming the missing match. Run forms and `fdp.json`
       choices only offer matching warehouses; a default warehouse per layer and kind replaces the single default.
     - The compute overview groups usage by layer and kind. Existing warehouses keep working (empty means any).
+    - Built (2026-10-29): `layer_ids` and `workload_kinds` on warehouses (API, admin page, `fdp_compute_pool`),
+      checked at admission for runs, deployments, Airflow workers and tasks; defaults per layer and/or kind
+      (`fdp_default_warehouse` with `layer_id`/`workload_kind`); filtered choices in the app; usage by kind in
+      the compute overview.
 
 [] Semantic layer on Apache Ossie (incubating; formerly Open Semantic Interchange, OSI).
     - Ossie is the vendor-neutral YAML specification for semantic models: datasets, relationships, fields,

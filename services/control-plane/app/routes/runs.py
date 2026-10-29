@@ -97,7 +97,9 @@ def _plan(body: RunIn, db: Session, orch: Orchestrator, ws: Workspace, user: Use
     if body.program is None:
         entry = safe_entrypoint(body.entrypoint or "")
         rt = runtime_for(entry)
-        return RunPlan(kind=body.kind or "script", entrypoint=entry, runtime=rt, image_kind=rt), capacity.choose_warehouse(db, body.pool)
+        kind = body.kind or "script"
+        return (RunPlan(kind=kind, entrypoint=entry, runtime=rt, image_kind=rt),
+                capacity.choose_warehouse(db, body.pool, None, _layer_of(db, ws), kind))
 
     cfg_out, programs = load_config(db, orch, ws)
     if not cfg_out.exists:
@@ -109,7 +111,12 @@ def _plan(body: RunIn, db: Session, orch: Orchestrator, ws: Workspace, user: Use
         raise HTTPException(404, f"program {body.program!r} is not available in this workspace's layer")
     plan = checked_plan(body.program, resolved.program, body.args, granted, db=db, actor=user)
     plan.workdir = f"{WORKSPACE}/{resolved.folder}" if resolved.folder else WORKSPACE
-    return plan, capacity.choose_warehouse(db, body.pool, resolved.program.warehouse)
+    return plan, capacity.choose_warehouse(db, body.pool, resolved.program.warehouse, _layer_of(db, ws), plan.kind)
+
+
+def _layer_of(db, ws: Workspace) -> Optional[str]:
+    from ..layers import canonical
+    return canonical(db, ws.environment_id)
 
 
 def checked_plan(name: str, program: Program, values: Dict[str, Any], granted: Set[str], *,
@@ -147,6 +154,7 @@ def start_run(db: Session, orch: Orchestrator, user: User, plan: RunPlan, pool_n
     if not pool or (pool.allowed_groups and not set(pool.allowed_groups) & set(user.groups)):
         raise HTTPException(404, f"warehouse {pool_name!r} not available")
     capacity.refuse_trino_warehouse(db, pool.name)
+    capacity.require_scope(db, pool, user.environment_id, plan.kind)  # its layers and kinds of work
 
     try:
         rt = resolve_runtime(db, plan.image_kind, plan.version)

@@ -53,6 +53,15 @@ class PoolIn(BaseModel):
     auto_suspend_seconds: int = Field(default=600, ge=60)
     allowed_groups: List[str] = Field(default_factory=list)
     dedicated: bool = Field(default=False, description="Dedicated to allowed_groups: no slot limit (max_concurrent does not apply), never queues")
+    layer_ids: List[str] = Field(default_factory=list, max_length=50,
+                                 description="Layers whose work may use this warehouse; empty: every layer")
+    workload_kinds: List[Literal["script", "notebook", "app", "dbt", "airflow"]] = Field(
+        default_factory=list, description="Kinds of work that may use this warehouse; empty: every kind")
+
+    @field_validator("allowed_groups", "layer_ids", "workload_kinds", mode="before")
+    @classmethod
+    def _unscoped(cls, value):
+        return [] if value is None else value  # warehouses from before scoping: every layer, every kind
 
 
 class PoolOut(ORM, PoolIn):
@@ -66,6 +75,9 @@ class PoolOut(ORM, PoolIn):
     queued: Optional[int] = Field(default=None, description="Jobs and deploys waiting for this warehouse")
     default: bool = Field(default=False, description="Work without a warehouse runs here")
     trino_layers: List[str] = Field(default_factory=list, description="Layers whose Trino workers run here; only Trino uses it")
+    layer_names: List[str] = Field(default_factory=list, description="Names of layer_ids, in the same order")
+    default_for: List[Dict[str, Optional[str]]] = Field(default_factory=list,
+        description="Scoped defaults that point here: {layer_id, layer_name, workload_kind}")
 
 
 class WorkspaceIn(BaseModel):

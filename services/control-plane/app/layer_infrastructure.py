@@ -290,7 +290,7 @@ def configure(db, layer_id, change, retry=False):
     desired = change.spec.model_dump(mode='json')
     current = InfrastructureSpec.model_validate(layer.config.get('infrastructure', {})).model_dump(mode='json')
     if change.spec.enabled and not change.spec.retired:
-        require_worker_warehouse(db, change.spec)
+        require_worker_warehouse(db, change.spec, layer.id)
     if desired == current and not retry:
         return state(db, layer)
     if current['enabled'] and not desired['enabled']:
@@ -341,7 +341,7 @@ def configure(db, layer_id, change, retry=False):
     return state(db, layer)
 
 
-def require_worker_warehouse(db, spec):
+def require_worker_warehouse(db, spec, layer_id=None):
     from .models import ComputePool
     name = spec.trino.workers.warehouse
     pool = db.scalar(select(ComputePool).where(ComputePool.name == name)) if name else None
@@ -352,6 +352,10 @@ def require_worker_warehouse(db, spec):
                                  f'{name} has {pool.memory_gb} GB')
     if pool.dedicated:
         raise HTTPException(422, f'{name} is dedicated to its groups; choose a shared warehouse for Trino workers')
+    if pool.workload_kinds:
+        raise HTTPException(422, f'{name} is limited to {", ".join(pool.workload_kinds)} work; Trino workers need a warehouse of their own')
+    if pool.layer_ids and layer_id not in pool.layer_ids:
+        raise HTTPException(422, f'{name} is limited to other layers; choose a warehouse meant for this layer')
     # Trino's warehouse is Trino's alone: nothing else may be placed on it.
     from .capacity import default_warehouse, workspace_settings
     from .models import Workload

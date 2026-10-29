@@ -99,7 +99,7 @@ export function DeployWizard({ hub, openTab, initialFolder }: { hub: Hub; openTa
     }
     setSlug(address);
     setTitle(def?.description ? name : name);
-    setWarehouse(startingPool(hub.me?.pools, def?.warehouse));
+    setWarehouse(startingPool(hub.me?.pools, def?.warehouse, selectedLayer, def?.kind));
   };
 
   const deploy = async () => {
@@ -201,7 +201,7 @@ export function DeployWizard({ hub, openTab, initialFolder }: { hub: Hub; openTa
               <label htmlFor="pub-wh">Warehouse</label>
               <select id="pub-wh" value={warehouse} onChange={(e) => setWarehouse(e.target.value)}>
                 {!warehouse && <option value="">— choose —</option>}
-                {usablePools(hub.me?.pools).map((p) => <option key={p.id} value={p.name}>{p.name} · {p.cpu} vCPU · {p.memory_gb} GB{p.default ? " (default)" : ""}</option>)}
+                {usablePools(hub.me?.pools, selectedLayer, pulled?.programs[program]?.kind).map((p) => <option key={p.id} value={p.name}>{p.name} · {p.cpu} vCPU · {p.memory_gb} GB{p.default ? " (default)" : ""}</option>)}
               </select>
             </div>
             <div className="field">
@@ -276,7 +276,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
   useEffect(() => {
     if (!pub) return;
     setValues(Object.fromEntries(pub.program_def.args?.map((a) => [a.name, a.default ?? (a.type === "boolean" ? false : "")]) ?? []) as Record<string, string | boolean>);
-    setPool(startingPool(hub.me?.pools, pub.warehouse));
+    setPool(startingPool(hub.me?.pools, pub.warehouse, pub.layer_id, pub.kind));
   }, [pub?.deployed_sha]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loadError && !pub) return <AccessError error={loadError} openTab={openTab} />;
@@ -398,7 +398,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
             <div className="field">
               <label htmlFor="pubrun-pool">Warehouse</label>
               <select id="pubrun-pool" value={pool} onChange={(e) => setPool(e.target.value)}>
-                {usablePools(hub.me?.pools).map((p) => <option key={p.id} value={p.name}>{p.name} · {p.cpu} vCPU · {p.memory_gb} GB{p.name === pub.warehouse ? " (its warehouse)" : p.default ? " (default)" : ""}</option>)}
+                {usablePools(hub.me?.pools, pub.layer_id, pub.kind).map((p) => <option key={p.id} value={p.name}>{p.name} · {p.cpu} vCPU · {p.memory_gb} GB{p.name === pub.warehouse ? " (its warehouse)" : p.default ? " (default)" : ""}</option>)}
               </select>
             </div>
           </div>

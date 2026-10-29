@@ -42,6 +42,12 @@ class LayerUse(BaseModel):
     queued: int = 0
 
 
+class KindUse(BaseModel):
+    kind: str                         # script, notebook, app, dbt, airflow, or workers (Trino)
+    in_use: int = 0
+    queued: int = 0
+
+
 class WorkspaceUse(BaseModel):
     running: int
     queued: int
@@ -57,9 +63,14 @@ class WarehouseOverview(BaseModel):
     # Dedicated to these groups: no slot limit, never queues (max_concurrent does not apply).
     dedicated: bool = False
     allowed_groups: List[str] = []
+    # Scope: empty means every layer / every kind of work.
+    layer_ids: List[str] = []
+    layer_names: List[str] = []
+    workload_kinds: List[str] = []
     in_use: int
     queued: int
     layers: List[LayerUse]
+    kinds: List[KindUse] = []
     occupants: List[Occupant]
     others_in_use: int = 0            # slots taken by work the viewer may not see
     others_queued: int = 0
@@ -142,14 +153,18 @@ def warehouses(db: Session = Depends(get_db), user: User = Depends(get_current_u
     out = []
     for pool in pools:
         layers: Dict[Optional[str], LayerUse] = {}
+        kinds: Dict[str, KindUse] = {}
         visible, others_in_use, others_queued = [], 0, 0
         for occupant, shown in seen.get(pool.name, []):
             if occupant.category != "workspace":
                 use = layers.setdefault(occupant.layer_id, LayerUse(layer_id=occupant.layer_id, layer_name=occupant.layer_name))
+                by_kind = kinds.setdefault(occupant.kind, KindUse(kind=occupant.kind))
                 if occupant.state == "running":
                     use.in_use += occupant.slots
+                    by_kind.in_use += occupant.slots
                 else:
                     use.queued += 1
+                    by_kind.queued += 1
             if shown:
                 visible.append(occupant)
             elif occupant.category != "workspace":
@@ -163,6 +178,8 @@ def warehouses(db: Session = Depends(get_db), user: User = Depends(get_current_u
         out.append(WarehouseOverview(
             name=pool.name, cpu=pool.cpu, memory_gb=pool.memory_gb, gpu=pool.gpu, max_concurrent=pool.max_concurrent,
             dedicated=pool.dedicated, allowed_groups=pool.allowed_groups or [],
+            layer_ids=pool.layer_ids or [], layer_names=[capacity.layer_name(db, l) for l in pool.layer_ids or []],
+            workload_kinds=pool.workload_kinds or [], kinds=sorted(kinds.values(), key=lambda k: k.kind),
             in_use=in_use.get(pool.name, 0), queued=len(capacity.queue(db, pool.name)),
             layers=sorted(layers.values(), key=lambda l: l.layer_name or ""), occupants=visible,
             others_in_use=others_in_use, others_queued=others_queued, workspaces=workspaces))

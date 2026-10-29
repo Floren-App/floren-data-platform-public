@@ -27,6 +27,8 @@ type computePoolModel struct {
 	AutoSuspendSeconds types.Int64   `tfsdk:"auto_suspend_seconds"`
 	AllowedGroups      types.List    `tfsdk:"allowed_groups"`
 	Dedicated          types.Bool    `tfsdk:"dedicated"`
+	LayerIDs           types.List    `tfsdk:"layer_ids"`
+	WorkloadKinds      types.List    `tfsdk:"workload_kinds"`
 }
 
 type poolOut struct {
@@ -39,6 +41,8 @@ type poolOut struct {
 	AutoSuspendSeconds int64    `json:"auto_suspend_seconds"`
 	AllowedGroups      []string `json:"allowed_groups"`
 	Dedicated          bool     `json:"dedicated"`
+	LayerIDs           []string `json:"layer_ids"`
+	WorkloadKinds      []string `json:"workload_kinds"`
 }
 
 func NewComputePoolResource() resource.Resource { return &computePoolResource{} }
@@ -64,6 +68,14 @@ func (r *computePoolResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"dedicated": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
 				Description: "Dedicated to allowed_groups (required): not a shared on-demand warehouse, so max_concurrent does not apply " +
 					"and its work never queues or counts elsewhere. Make sure the cluster has nodes for it."},
+			"layer_ids": schema.ListAttribute{ElementType: types.StringType, Optional: true, Computed: true,
+				Default:     listdefault.StaticValue(listValue(nil)),
+				Description: "Layers whose work may use this warehouse (fdp_layer ids). Empty: every layer."},
+			"workload_kinds": schema.ListAttribute{ElementType: types.StringType, Optional: true, Computed: true,
+				Default: listdefault.StaticValue(listValue(nil)),
+				Description: "Kinds of work that may use it: script, notebook, app, dbt, airflow. Empty: every kind. " +
+					"With allowed_groups: \"dbt projects of the data engineers in Prod\". A declared warehouse outside the scope " +
+					"falls back to the default for the layer and kind (fdp_default_warehouse)."},
 		},
 	}
 }
@@ -80,7 +92,8 @@ func (r *computePoolResource) put(ctx context.Context, m *computePoolModel, diag
 	body := map[string]any{"name": m.Name.ValueString(), "cpu": m.CPU.ValueFloat64(), "memory_gb": m.MemoryGB.ValueFloat64(),
 		"gpu": m.GPU.ValueInt64(), "max_concurrent": m.MaxConcurrent.ValueInt64(),
 		"auto_suspend_seconds": m.AutoSuspendSeconds.ValueInt64(), "allowed_groups": stringList(ctx, m.AllowedGroups, diags.d),
-		"dedicated": m.Dedicated.ValueBool()}
+		"dedicated": m.Dedicated.ValueBool(), "layer_ids": stringList(ctx, m.LayerIDs, diags.d),
+		"workload_kinds": stringList(ctx, m.WorkloadKinds, diags.d)}
 	var out poolOut
 	if err := r.api.Do(ctx, "PUT", "/v1/admin/pools/"+m.Name.ValueString(), body, &out); err != nil {
 		apiError(diags.d, "saving compute pool", err)
@@ -95,6 +108,7 @@ func (m *computePoolModel) apply(out *poolOut) {
 	m.GPU, m.MaxConcurrent = types.Int64Value(out.GPU), types.Int64Value(out.MaxConcurrent)
 	m.AutoSuspendSeconds, m.AllowedGroups = types.Int64Value(out.AutoSuspendSeconds), listValue(out.AllowedGroups)
 	m.Dedicated = types.BoolValue(out.Dedicated)
+	m.LayerIDs, m.WorkloadKinds = listValue(out.LayerIDs), listValue(out.WorkloadKinds)
 }
 
 func (r *computePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

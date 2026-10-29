@@ -155,6 +155,12 @@ def _deploy_distributed_airflow(db: Session, orch: Orchestrator, pub: Workload, 
         from .capacity import trino_warehouses
         if worker_pool.name in trino_warehouses(db):
             return False, f"worker warehouse {worker_pool.name!r} runs Trino workers; only Trino uses it"
+        from . import rbac
+        from .capacity import scope_problem
+        from .layers import info
+        problem = scope_problem(db, worker_pool, info(db, rbac.workload_resource(db, pub))["layer_id"], "airflow")
+        if problem:
+            return False, f"worker {problem}"
     store = get_secret_store()
     keys = deployment_keys(store, pub.id)
     if layer and not s.airflow_metadata_url:

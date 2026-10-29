@@ -91,12 +91,13 @@ export function ProgramRunner({ workspaceId, running, hub, onStarted, openTab }:
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const declared = program?.warehouse || cfg?.config?.warehouse || "";
-  const defaultPool = startingPool(hub.me?.pools, declared);
-  const missing = declared && !usablePools(hub.me?.pools).some((p) => p.name === declared);
+  const layerId = hub.workspaces.find((w) => w.id === workspaceId)?.layer_id;
+  const defaultPool = startingPool(hub.me?.pools, declared, layerId, program?.kind);
+  const missing = declared && !usablePools(hub.me?.pools, layerId, program?.kind).some((p) => p.name === declared);
   useEffect(() => {
     if (program) {
       setValues(initial(program));
-      setPool(startingPool(hub.me?.pools, program.warehouse || cfg?.config?.warehouse || ""));
+      setPool(startingPool(hub.me?.pools, program.warehouse || cfg?.config?.warehouse || "", layerId, program.kind));
       setFieldErrors({});
       setRunError(null);
     }
@@ -179,7 +180,7 @@ export function ProgramRunner({ workspaceId, running, hub, onStarted, openTab }:
           <label htmlFor="program-pool">Warehouse</label>
           <select id="program-pool" value={pool} onChange={(e) => setPool(e.target.value)}>
             {!pool && <option value="">— choose —</option>}
-            {usablePools(hub.me?.pools).map((p) => (
+            {usablePools(hub.me?.pools, layerId, program?.kind).map((p) => (
               <option key={p.id} value={p.name}>
                 {p.name} · {p.cpu} vCPU · {p.memory_gb} GB{p.gpu ? ` · ${p.gpu} GPU` : ""}{p.default ? " (default)" : ""}
               </option>

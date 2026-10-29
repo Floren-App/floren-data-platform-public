@@ -131,12 +131,18 @@ function PoolView({ name, hub, openTab }: { name?: string; hub: Hub; openTab: (t
           <dt>In use</dt><dd>{view?.in_use ?? pool.in_use ?? "—"} containers</dd></>
           : <><dt>In use</dt><dd>{view ? <Usage used={view.in_use} max={view.max_concurrent} /> : `${pool.in_use ?? "—"} of ${pool.max_concurrent}`} slots{(view?.queued ?? pool.queued) ? ` · ${view?.queued ?? pool.queued} waiting` : ""}</dd></>}
         {view?.workspaces && <><dt>Workspaces</dt><dd>Editors are sized by this warehouse · {view.workspaces.running} running{view.workspaces.max_running ? ` of ${view.workspaces.max_running}` : ""}{view.workspaces.queued ? ` · ${view.workspaces.queued} waiting` : ""} (separate limit)</dd></>}
+        <dt>For</dt><dd>{pool.layer_names?.length ? pool.layer_names.join(", ") : "every layer"} · {pool.workload_kinds?.length ? pool.workload_kinds.join(", ") : "every kind of work"}</dd>
         <dt>Running containers</dt><dd>{pool.active_executions ?? "—"} in the cluster</dd>
         <dt>Auto-suspend</dt><dd>{Math.round(pool.auto_suspend_seconds / 60)} min</dd></dl></section>
       {view && view.layers.length > 0 && <>
         <div className="section-heading"><h2>By layer</h2></div>
         <table aria-label="Use by layer"><thead><tr><th>Layer</th><th>Slots in use</th><th>Waiting</th></tr></thead><tbody>
           {view.layers.map((l) => <tr key={l.layer_id ?? "none"}><td>{l.layer_name ?? "—"}</td><td>{l.in_use}</td><td>{l.queued || "—"}</td></tr>)}
+        </tbody></table></>}
+      {view && view.kinds?.length > 0 && <>
+        <div className="section-heading"><h2>By kind of work</h2></div>
+        <table aria-label="Use by kind of work"><thead><tr><th>Kind</th><th>Slots in use</th><th>Waiting</th></tr></thead><tbody>
+          {view.kinds.map((k) => <tr key={k.kind}><td>{k.kind === "workers" ? "Trino workers" : k.kind}</td><td>{k.in_use}</td><td>{k.queued || "—"}</td></tr>)}
         </tbody></table></>}
       {view && <>
         <div className="section-heading"><h2>Using this warehouse</h2></div>

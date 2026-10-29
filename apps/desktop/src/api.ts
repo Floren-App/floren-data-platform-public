@@ -126,6 +126,9 @@ export interface DataChild {
 export interface DataChildren { children: DataChild[]; next_cursor: string | null }
 export interface DataLocation { schemaId: string; table?: string; path?: string; item?: DataChild }
 
+export type WorkloadKind = "script" | "notebook" | "app" | "dbt" | "airflow";
+export const WORKLOAD_KINDS: WorkloadKind[] = ["script", "notebook", "app", "dbt", "airflow"];
+
 export interface Pool {
   id: string;
   name: string;
@@ -141,6 +144,11 @@ export interface Pool {
   default?: boolean;
   /** Layers whose Trino workers run here: only Trino uses this warehouse. */
   trino_layers?: string[];
+  /** Scope: the layers (ids) and kinds of work this warehouse is for; empty = every layer / kind. */
+  layer_ids?: string[]; layer_names?: string[];
+  workload_kinds?: WorkloadKind[];
+  /** Scoped defaults that point here. */
+  default_for?: { layer_id: string | null; layer_name: string | null; workload_kind: WorkloadKind | null }[];
   usage_available?: boolean; active_runs?: number | null; active_services?: number | null;
   active_executions?: number | null; active_products?: number | null;
   /** Containers counted against max_concurrent (jobs, apps, Airflow components), and work waiting for a slot. */
@@ -169,7 +177,9 @@ export interface WarehouseOverview {
   name: string; cpu: number; memory_gb: number; gpu: number;
   max_concurrent: number; in_use: number; queued: number;
   dedicated: boolean; allowed_groups: string[];
+  layer_ids: string[]; layer_names: string[]; workload_kinds: string[];
   layers: { layer_id: string | null; layer_name: string | null; in_use: number; queued: number }[];
+  kinds: { kind: string; in_use: number; queued: number }[];
   /** Work you may see; the rest is counted in others_*. */
   occupants: WarehouseOccupant[];
   others_in_use: number; others_queued: number;
@@ -177,11 +187,20 @@ export interface WarehouseOverview {
 }
 
 /** Warehouses work can be placed on: all but those that run Trino workers. */
-export const usablePools = (pools?: Pool[]) => (pools ?? []).filter((p) => !p.trino_layers?.length);
-/** The warehouse a choice starts with: the declared one if it exists and is usable, else the default warehouse. */
-export function startingPool(pools: Pool[] | undefined, declared?: string | null): string {
-  const usable = usablePools(pools);
-  return declared && usable.some((p) => p.name === declared) ? declared : usable.find((p) => p.default)?.name ?? "";
+/** Warehouses work may choose: not Trino's, and meant for its layer and kind when those are known. */
+export const usablePools = (pools?: Pool[], layerId?: string | null, kind?: string | null) => (pools ?? []).filter((p) =>
+  !p.trino_layers?.length
+  && (!layerId || !p.layer_ids?.length || p.layer_ids.includes(layerId))
+  && (!kind || !p.workload_kinds?.length || p.workload_kinds.includes(kind as WorkloadKind)));
+/** The warehouse a choice starts with: the declared one if it exists and is meant for the work, else the most
+ *  specific default (layer and kind, the layer, the kind), else the installation default. */
+export function startingPool(pools: Pool[] | undefined, declared?: string | null, layerId?: string | null, kind?: string | null): string {
+  const usable = usablePools(pools, layerId, kind);
+  if (declared && usable.some((p) => p.name === declared)) return declared;
+  const scoped = (l: string | null, k: string | null) => usable.find((p) => p.default_for?.some((d) => d.layer_id === l && d.workload_kind === k));
+  const match = (layerId && kind ? scoped(layerId, kind) : undefined) ?? (layerId ? scoped(layerId, null) : undefined)
+    ?? (kind ? scoped(null, kind) : undefined);
+  return match?.name ?? usable.find((p) => p.default)?.name ?? "";
 }
 
 /** "2nd in line" for queued work. */
@@ -792,7 +811,12 @@ export const api = {
       request<DataSource>("DELETE", `/v1/admin/datasources/${name}/grants/${encodeURIComponent(group)}`),
     pools: () => request<Pool[]>("GET", "/v1/admin/pools"),
     upsertPool: (p: Omit<Pool, "id">) => request<Pool>("PUT", `/v1/admin/pools/${p.name}`, p),
-    setDefaultWarehouse: (name: string) => request<{ name: string }>("PUT", "/v1/admin/settings/default-warehouse", { name }),
+    setDefaultWarehouse: (name: string, scope: { layer_id?: string; workload_kind?: WorkloadKind } = {}) =>
+      request<{ name: string }>("PUT", "/v1/admin/settings/default-warehouse", { name, ...scope }),
+    clearDefaultWarehouse: (scope: { layer_id?: string | null; workload_kind?: string | null } = {}) => {
+      const q = new URLSearchParams(Object.entries(scope).filter(([, v]) => v) as [string, string][]).toString();
+      return request<void>("DELETE", `/v1/admin/settings/default-warehouse${q ? `?${q}` : ""}`);
+    },
     workspaceSettings: () => request<WorkspaceSettings>("GET", "/v1/admin/settings/workspaces"),
     saveWorkspaceSettings: (s: WorkspaceSettings) => request<WorkspaceSettings>("PUT", "/v1/admin/settings/workspaces",
       { warehouse: s.warehouse, max_running: s.max_running, max_running_per_user: s.max_running_per_user }),

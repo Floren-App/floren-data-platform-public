@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy import select
@@ -230,9 +230,16 @@ def delete_workspace(
 
 
 @router.get("/pools", response_model=List[PoolOut])
-def list_pools(db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    """Warehouses this user may run on. Works with execution tokens (editor runner panels)."""
-    return pools_for(db, user.groups)
+def list_pools(layer_id: Optional[str] = None, kind: Optional[Literal["script", "notebook", "app", "dbt", "airflow"]] = None,
+               db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Warehouses this user may run on. Works with execution tokens (editor runner panels). With layer_id and/or
+    kind, only warehouses meant for that work; an editor's own layer applies when no layer is given."""
+    if layer_id:
+        from ..layers import canonical
+        layer_id = canonical(db, layer_id)
+    elif kind and user.environment_id:
+        layer_id = user.environment_id
+    return pools_for(db, user.groups, layer_id, kind)
 
 
 @router.get("/workspaces/{ws_id}/config", response_model=ConfigOut)

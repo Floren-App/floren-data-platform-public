@@ -154,7 +154,8 @@ export function NewRunForm({ hub, workspaceId, onDone }: { hub: Hub; workspaceId
   const [ws, setWs] = useState(workspaceId ?? hub.workspaces[0]?.id ?? "");
   const [entrypoint, setEntrypoint] = useState("");
   const [kind, setKind] = useState<RunKind>("script");
-  const [pool, setPool] = useState(startingPool(hub.me?.pools));
+  const [pool, setPool] = useState(startingPool(hub.me?.pools, undefined, hub.workspaces.find((w) => w.id === (workspaceId ?? hub.workspaces[0]?.id))?.layer_id, "script"));
+  const layerId = hub.workspaces.find((w) => w.id === ws)?.layer_id;
 
   const submit = async () => {
     if (await hub.act(() => api.createRun(ws, pool, kind, entrypoint.trim()))) {
@@ -190,7 +191,7 @@ export function NewRunForm({ hub, workspaceId, onDone }: { hub: Hub; workspaceId
         <label htmlFor="run-pool">Warehouse</label>
         <select id="run-pool" value={pool} onChange={(e) => setPool(e.target.value)}>
           {!pool && <option value="">— choose —</option>}
-          {usablePools(hub.me?.pools).map((p) => <option key={p.id} value={p.name}>{p.name} · {p.cpu} vCPU · {p.memory_gb} GB{p.gpu ? ` · ${p.gpu} GPU` : ""}{p.default ? " (default)" : ""}</option>)}
+          {usablePools(hub.me?.pools, layerId, kind).map((p) => <option key={p.id} value={p.name}>{p.name} · {p.cpu} vCPU · {p.memory_gb} GB{p.gpu ? ` · ${p.gpu} GPU` : ""}{p.default ? " (default)" : ""}</option>)}
         </select>
       </div>
       <div className="form-actions">

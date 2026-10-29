@@ -1017,6 +1017,52 @@ test("warehouse choices start with the default and never offer Trino's warehouse
   expect(state.errors).toEqual([]);
 });
 
+test("warehouse choices only offer warehouses meant for the layer and kind, starting with the scoped default", async ({ page }) => {
+  const state = await setup(page);
+  const pool = (id: string, name: string, extra: object = {}) => ({ id, name, cpu: 1, memory_gb: 2, max_concurrent: 6, auto_suspend_seconds: 600, allowed_groups: [], ...extra });
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "admin", is_admin: true, groups: [], data_sources: [], available_groups: [],
+    pools: [pool("a", "shared", { default: true }), pool("b", "dbt-only", { workload_kinds: ["dbt"] }),
+      pool("c", "prod-only", { layer_ids: ["1a0000000001"], layer_names: ["Prod"] }),
+      pool("d", "nonprod-scripts", { layer_ids: ["1a0000000002"], workload_kinds: ["script"],
+        default_for: [{ layer_id: "1a0000000002", layer_name: "Non-Prod", workload_kind: "script" }] })] } }));
+  await page.route("https://iam.test/api/v1/workspaces", (route) => route.fulfill({ json: [{ id: "ws-1", owner: "admin", name: "Notebook", editor: "vscode", status: "running",
+    layer_id: "1a0000000002", layer_name: "Non-Prod", last_activity_at: "2026-10-20T10:00:00Z", created_at: "2026-10-20T10:00:00Z" }] }));
+  await page.reload();
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workspaces", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Workspace runs", exact: true }).click();
+  await page.locator(".main").getByRole("button", { name: "New run", exact: true }).click();
+  const choice = page.locator(".main").getByLabel("Warehouse", { exact: true });
+  await expect(choice).toHaveValue("nonprod-scripts");
+  await expect(choice.locator("option")).toHaveText(["shared · 1 vCPU · 2 GB (default)", "nonprod-scripts · 1 vCPU · 2 GB"]);
+  expect(state.errors).toEqual([]);
+});
+
+test("administrators limit a warehouse to layers and kinds of work", async ({ page }) => {
+  const state = await setup(page);
+  const saved: any[] = [];
+  await page.route("https://iam.test/api/v1/admin/pools", (route) => route.fulfill({ json: [{ id: "p1", name: "etl", cpu: 4, memory_gb: 16, gpu: 0,
+    max_concurrent: 6, auto_suspend_seconds: 600, allowed_groups: [], layer_ids: [], workload_kinds: [], layer_names: [], default_for: [] }] }));
+  await page.route("https://iam.test/api/v1/admin/pools/*", async (route) => {
+    saved.push(route.request().postDataJSON());
+    await route.fulfill({ json: route.request().postDataJSON() });
+  });
+  await page.route("https://iam.test/api/v1/admin/settings/workspaces", (route) => route.fulfill({ json: { warehouse: null, max_running: null, max_running_per_user: 3 } }));
+  const main = page.locator(".main");
+  await page.getByRole("button", { name: "Compute pools", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: /small/ }).click();
+  await main.getByRole("button", { name: "Configure pools", exact: true }).click();
+  await expect(main.getByRole("cell", { name: "every layer · every kind", exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Edit", exact: true }).click();
+  const form = main.locator("form.card").filter({ hasText: "Edit etl" });
+  await form.getByRole("group", { name: /For layers/ }).getByLabel("Prod", { exact: true }).check();
+  await form.getByRole("group", { name: /For kinds of work/ }).getByLabel("dbt", { exact: true }).check();
+  await form.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => saved.length).toBe(1);
+  expect(saved[0]).toMatchObject({ name: "etl", layer_ids: ["1a0000000001"], workload_kinds: ["dbt"] });
+  await expect(main.getByRole("heading", { name: "Defaults by layer and kind of work" })).toBeVisible();
+  expect(state.errors).toEqual([]);
+});
+
 test("storage integrations are created by choosing a type and its required location", async ({ page }) => {
   const state = await setup(page);
   const types = [

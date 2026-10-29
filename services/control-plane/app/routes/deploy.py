@@ -235,11 +235,15 @@ def create_workload(body: DeployIn, db: Session = Depends(get_db), orch: Orchest
         raise HTTPException(403, data_access_issue(db, ident, missing, user))
     _check_env(body.env, body.secrets)
     from .. import capacity
-    warehouse = capacity.choose_warehouse(db, body.warehouse, program.warehouse)
+    warehouse = capacity.choose_warehouse(db, body.warehouse, program.warehouse, layer_id, program.kind)
     if not warehouse:
         raise HTTPException(422, "choose a warehouse (no default warehouse is configured; an administrator can set one)")
     from .common import require_warehouse
-    require_warehouse(db, warehouse, user)  # e.g. a team's dedicated warehouse: only its groups deploy there
+    pool = require_warehouse(db, warehouse, user)  # e.g. a team's dedicated warehouse: only its groups deploy there
+    capacity.require_scope(db, pool, layer_id, program.kind)
+    worker = getattr(program.airflow_settings, "worker_warehouse", None) if program.kind == "airflow" else None
+    if worker:
+        capacity.require_scope(db, require_warehouse(db, worker, user), layer_id, program.kind)
 
     if existing:  # a stopped workload frees its slug
         if existing.resource_id:
@@ -303,7 +307,10 @@ def update_workload(pub_id: str, body: WorkloadPatch, db: Session = Depends(get_
     _check_env(changes.get("env", {}), changes.get("secrets", {}))
     if "warehouse" in changes:
         from .common import require_warehouse
-        require_warehouse(db, changes["warehouse"], user)
+        from .. import capacity
+        from ..layers import info
+        pool = require_warehouse(db, changes["warehouse"], user)
+        capacity.require_scope(db, pool, info(db, resource)["layer_id"], pub.kind)
     for field, value in changes.items():
         setattr(pub, field, value)
     redeploy = any(k in changes for k in ("run_as", "execution_mode", "env", "secrets", "warehouse"))
@@ -424,8 +431,8 @@ def _start_deployed(db: Session, orch: Orchestrator, pub: Workload, user: User, 
     with_workload_settings(plan, pub.env or {}, pub.secrets or {})
     plan.workload_id, plan.commit_sha = pub.id, pub.deployed_sha
     from .. import capacity
-    return start_run(db, orch, user, plan, capacity.choose_warehouse(db, pool, pub.warehouse), None, pub.program,
-                     initiated_by=initiator, initiator_id=initiator_id)
+    return start_run(db, orch, user, plan, capacity.choose_warehouse(db, pool, pub.warehouse, user.environment_id, plan.kind),
+                     None, pub.program, initiated_by=initiator, initiator_id=initiator_id)
 
 
 @router.post("/orchestrate/runs", response_model=RunOut, status_code=201)
@@ -465,7 +472,10 @@ def orchestrate(body: OrchestrateIn, db: Session = Depends(get_db), orch: Orches
         with_workload_settings(plan, pub.env or {}, pub.secrets or {})
         plan.workload_id, plan.commit_sha = pub.id, pub.deployed_sha
         from .. import capacity
-        return run_out(start_run(db, orch, caller, plan, capacity.choose_warehouse(db, body.warehouse, program.warehouse), None, body.program))
+        from ..environments import bind
+        layer_id = bind(db, caller, rbac.workload_resource(db, pub)).environment_id
+        return run_out(start_run(db, orch, caller, plan,
+                                 capacity.choose_warehouse(db, body.warehouse, program.warehouse, layer_id, plan.kind), None, body.program))
 
     if wl.workspace_id:  # a test deployment running from a workspace
         from ..models import Workspace

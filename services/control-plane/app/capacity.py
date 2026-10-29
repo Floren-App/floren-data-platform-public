@@ -123,7 +123,7 @@ def position(db, kind: str, ident: str, pool_name: Optional[str]) -> Optional[in
 
 # --- which warehouse work runs on -----------------------------------------------------------------
 
-WAREHOUSES = "warehouses"  # platform setting: {"default": warehouse name}
+WAREHOUSES = "warehouses"  # platform setting: {"default": name, "scoped": [{"layer_id", "workload_kind", "warehouse"}]}
 
 
 def trino_warehouses(db) -> Dict[str, List[str]]:
@@ -143,20 +143,77 @@ def refuse_trino_warehouse(db, name: Optional[str]) -> None:
                                  "Choose another warehouse")
 
 
-def default_warehouse(db) -> Optional[str]:
+WORKLOAD_KINDS = ("script", "notebook", "app", "dbt", "airflow")
+
+
+def layer_name(db, layer_id: Optional[str]) -> str:
+    from .models import Resource
+    layer = db.get(Resource, layer_id) if layer_id else None
+    return layer.name if layer is not None else (layer_id or "no layer")
+
+
+def fits(pool: ComputePool, layer_id: Optional[str], kind: Optional[str]) -> bool:
+    """Whether work may use the warehouse; an unknown (None) layer or kind is not checked."""
+    return ((layer_id is None or not pool.layer_ids or layer_id in pool.layer_ids)
+            and (kind is None or not pool.workload_kinds or kind in pool.workload_kinds))
+
+
+def scope_problem(db, pool: ComputePool, layer_id: Optional[str], kind: str) -> Optional[str]:
+    """Why work of this kind in this layer may not use the warehouse (strict: no layer never matches a layer
+    scope), or None."""
+    if pool.layer_ids and (layer_id or "") not in pool.layer_ids:
+        allowed = ", ".join(layer_name(db, l) for l in pool.layer_ids)
+        return f"warehouse {pool.name!r} is for work in {allowed}, not {layer_name(db, layer_id)}"
+    if pool.workload_kinds and kind not in pool.workload_kinds:
+        return f"warehouse {pool.name!r} is for {', '.join(pool.workload_kinds)} work, not {kind}"
+    return None
+
+
+def require_scope(db, pool: ComputePool, layer_id: Optional[str], kind: str) -> None:
+    from fastapi import HTTPException
+    problem = scope_problem(db, pool, layer_id, kind)
+    if problem:
+        raise HTTPException(422, problem + "; choose another warehouse")
+
+
+def _setting(db) -> dict:
     stored = db.get(PlatformSetting, WAREHOUSES)
-    name = (stored.value or {}).get("default") if stored else None
-    return name if name and db.scalar(select(ComputePool.id).where(ComputePool.name == name)) else None
+    return dict(stored.value or {}) if stored else {}
 
 
-def choose_warehouse(db, explicit: Optional[str], declared: Optional[str] = None) -> Optional[str]:
+def scoped_defaults(db) -> List[dict]:
+    """[{"layer_id": id|None, "workload_kind": kind|None, "warehouse": name}]: defaults for one layer, kind or both."""
+    return [dict(e) for e in _setting(db).get("scoped") or []]
+
+
+def default_warehouse(db, layer_id: Optional[str] = None, kind: Optional[str] = None) -> Optional[str]:
+    """The warehouse for work that names none: the most specific default for its layer and kind (both, then the
+    layer, then the kind), else the installation default. Only existing warehouses count."""
+    def exists(name):
+        return bool(name) and bool(db.scalar(select(ComputePool.id).where(ComputePool.name == name)))
+    scoped = scoped_defaults(db)
+    for want_layer, want_kind in ((layer_id, kind), (layer_id, None), (None, kind)):
+        if want_layer is None and want_kind is None:
+            continue
+        for entry in scoped:
+            if entry.get("layer_id") == want_layer and entry.get("workload_kind") == want_kind and exists(entry.get("warehouse")):
+                return entry["warehouse"]
+    name = _setting(db).get("default")
+    return name if exists(name) else None
+
+
+def choose_warehouse(db, explicit: Optional[str], declared: Optional[str] = None,
+                     layer_id: Optional[str] = None, kind: Optional[str] = None) -> Optional[str]:
     """The warehouse for new work: an explicit choice; else the one fdp.json or the workload declares, if it
-    exists; else the default warehouse. None when there is nothing to fall back to."""
+    exists and is meant for this layer and kind; else the default for the layer and kind. None when there is
+    nothing to fall back to. Admission still checks access and scope."""
     if explicit:
         return explicit
-    if declared and db.scalar(select(ComputePool.id).where(ComputePool.name == declared)):
-        return declared
-    return default_warehouse(db)
+    if declared:
+        pool = db.scalar(select(ComputePool).where(ComputePool.name == declared))
+        if pool is not None and fits(pool, layer_id, kind):
+            return declared
+    return default_warehouse(db, layer_id, kind)
 
 
 # --- workspaces: their own limits ---------------------------------------------------------------

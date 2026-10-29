@@ -45,15 +45,22 @@ def require_warehouse(db: Session, name: str, user) -> ComputePool:
     return pool
 
 
-def pools_for(db: Session, groups: List[str]) -> List[PoolOut]:
-    pools = db.scalars(select(ComputePool).order_by(ComputePool.cpu)).all()
+def pools_for(db: Session, groups: List[str], layer_id: Optional[str] = None, kind: Optional[str] = None) -> List[PoolOut]:
+    """Warehouses these groups may use; with a layer and/or kind, only those meant for that work."""
+    from ..capacity import fits
+    pools = [p for p in db.scalars(select(ComputePool).order_by(ComputePool.cpu)).all() if fits(p, layer_id, kind)]
     return [p for p in describe_pools(db, pools) if not p.allowed_groups or set(p.allowed_groups) & set(groups)]
 
 
 def describe_pools(db: Session, pools) -> List[PoolOut]:
     """Warehouses with what uses them now, which one is the default and which run Trino workers."""
-    from ..capacity import default_warehouse, held, queue, trino_warehouses
-    in_use, default, trino = held(db), default_warehouse(db), trino_warehouses(db)
-    return [PoolOut.model_validate(p).model_copy(update={"in_use": in_use.get(p.name, 0), "queued": len(queue(db, p.name)),
-                                                         "default": p.name == default, "trino_layers": trino.get(p.name, [])})
+    from ..capacity import default_warehouse, held, layer_name, queue, scoped_defaults, trino_warehouses
+    in_use, default, trino, scoped = held(db), default_warehouse(db), trino_warehouses(db), scoped_defaults(db)
+    def default_for(name):
+        return [{"layer_id": e.get("layer_id"), "layer_name": layer_name(db, e["layer_id"]) if e.get("layer_id") else None,
+                 "workload_kind": e.get("workload_kind")} for e in scoped if e["warehouse"] == name]
+    return [PoolOut.model_validate(p).model_copy(update={
+                "in_use": in_use.get(p.name, 0), "queued": len(queue(db, p.name)), "default": p.name == default,
+                "trino_layers": trino.get(p.name, []), "layer_names": [layer_name(db, l) for l in p.layer_ids or []],
+                "default_for": default_for(p.name)})
             for p in pools]

@@ -20,10 +20,10 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
-| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 | `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -218,6 +218,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `GET` | `/v1/admin/settings/query-log` | Query Log Settings |
 | `PUT` | `/v1/admin/settings/query-log` | Set Query Log Settings |
 | `DELETE` | `/v1/admin/settings/query-log` | Reset Query Log Settings |
+| `GET` | `/v1/admin/siem` | Siem Status |
 | `GET` | `/v1/query-log` | List Queries |
 
 ## packages
@@ -255,8 +256,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/pages/{token}` | Page |
+| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |
