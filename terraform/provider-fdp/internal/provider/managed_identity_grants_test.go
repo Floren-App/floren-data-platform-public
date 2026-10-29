@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/floren/terraform-provider-fdp/internal/client"
+	"github.com/Floren-App/terraform-provider-fdp/internal/client"
 )
 
 func TestIdentityGrantsReconcileAndDrift(t *testing.T) {

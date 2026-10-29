@@ -101,6 +101,7 @@ nav:
       - Storage integrations: storage-integrations.md
       - Catalog and lineage: catalog.md
       - KPIs, quality and SLAs: metrics-and-slas.md
+      - Audit trail and SIEM: audit-and-siem.md
       - Metadata SQL: metadata-sql.md
       - SQL workspace: sql-workspace.md
   - Reference:
@@ -112,3 +113,4 @@ nav:
   - Contribute:
       - Local development environment: local-development.md
       - Maintaining the docs: contributing-docs.md
+      - Releases and verification: releases.md

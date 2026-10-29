@@ -161,7 +161,7 @@ def config(repo, cert, version=1):
     return f"""
 terraform {{
   required_providers {{
-    fdp = {{ source = "registry.opentofu.org/floren/fdp" }}
+    fdp = {{ source = "registry.opentofu.org/floren-app/fdp" }}
   }}
 }}
 
@@ -437,7 +437,7 @@ def main():
         step('Building the provider')
         plugins = work / 'plugins'
         run(['go', 'build', '-o', str(plugins / 'terraform-provider-fdp'), '.'], cwd=PROVIDER)
-        (work / 'tofurc').write_text(f'provider_installation {{\n  dev_overrides {{ "registry.opentofu.org/floren/fdp" = "{plugins}" }}\n  direct {{}}\n}}\n')
+        (work / 'tofurc').write_text(f'provider_installation {{\n  dev_overrides {{ "registry.opentofu.org/floren-app/fdp" = "{plugins}" }}\n  direct {{}}\n}}\n')
         issuer, port, database = Issuer(), free_port(), work / 'fdp.db'
         packages = PackageIndex()
         repo, cert = git_repository(work), certificate()
@@ -595,7 +595,7 @@ def main():
             def refused(name, body, expected, token_value=token):
                 case = work / name
                 case.mkdir()
-                (case / 'main.tf').write_text('terraform {\n  required_providers {\n    fdp = { source = "registry.opentofu.org/floren/fdp" }\n  }\n}\n'
+                (case / 'main.tf').write_text('terraform {\n  required_providers {\n    fdp = { source = "registry.opentofu.org/floren-app/fdp" }\n  }\n}\n'
                                               'provider "fdp" {}\n' + body)
                 result = run(['tofu', 'apply', '-auto-approve', '-input=false', '-no-color'], cwd=case,
                              env={**tofu_env, 'FDP_TOKEN': token_value}, check=False)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/floren/terraform-provider-fdp/internal/client"
+	"github.com/Floren-App/terraform-provider-fdp/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"

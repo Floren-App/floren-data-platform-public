@@ -118,6 +118,26 @@
           "locations":{"type":"array","items":{"type":"string","minLength":1}}}}
       }
     },
+    "siem": {
+      "type":"object", "additionalProperties":false,
+      "properties":{
+        "stdout":{"type":"boolean"},
+        "syslog":{"type":"object","additionalProperties":false,"properties":{
+          "address":{"type":"string","pattern":"^$|^(\\[[0-9a-fA-F:]+\\]|[A-Za-z0-9.-]+):[0-9]{1,5}$"},
+          "transport":{"type":"string","enum":["tls","tcp","udp"]},
+          "facility":{"type":"integer","minimum":0,"maximum":23},
+          "clientCertSecret":{"type":"string"}}},
+        "http":{"type":"object","additionalProperties":false,"properties":{
+          "url":{"type":"string","pattern":"^$|^https?://"},
+          "format":{"type":"string","enum":["generic","splunk","elastic"]},
+          "index":{"type":"string","minLength":1}}},
+        "otlp":{"type":"object","additionalProperties":false,"properties":{
+          "endpoint":{"type":"string","pattern":"^$|^https?://"}}},
+        "includeQueries":{"type":"boolean"},
+        "includeSqlText":{"type":"boolean"},
+        "start":{"type":"string","enum":["beginning","now"]}
+      }
+    },
     "serviceAccount": {
       "type":"object", "additionalProperties":false,
       "properties":{"annotations":{"type":"object","additionalProperties":{"type":"string"}}}

@@ -1,19 +1,42 @@
 # Terraform and OpenTofu
 
 The FDP provider manages application configuration through the same validated API
-as the UI. Use OpenTofu 1.11+ for write-only credential inputs. The provider source
-address is `registry.opentofu.org/floren/fdp`, but a public registry release is not
-assumed: install a local filesystem mirror until distribution is configured.
+as the UI. Use OpenTofu 1.11+ for write-only credential inputs. The provider is
+published from [Floren-App/terraform-provider-fdp](https://github.com/Floren-App/terraform-provider-fdp)
+under the address `floren-app/fdp`.
 
-## Install the provider from source
+## Install the provider
+
+Each release on GitHub contains zipped binaries for Linux, macOS, Windows and FreeBSD, a
+`SHA256SUMS` file signed with the provider's GPG key (`signing-key.asc` in that repository)
+and the registry manifest. Once the provider is listed in the OpenTofu registry:
+
+```hcl
+terraform {
+  required_providers {
+    fdp = { source = "floren-app/fdp", version = "~> 0.2" }
+  }
+}
+```
+
+Until then, or in an air-gapped installation, download a release into a filesystem mirror, or
+build it from source as below. Verify a download first:
+
+```sh
+gpg --import signing-key.asc
+gpg --verify terraform-provider-fdp_0.2.0_SHA256SUMS.sig terraform-provider-fdp_0.2.0_SHA256SUMS
+sha256sum --check --ignore-missing terraform-provider-fdp_0.2.0_SHA256SUMS
+```
+
+## Build the provider from source
 
 From the checked-out FDP source, with the Go version in the provider's `go.mod`:
 
 ```sh
-mkdir -p "$PWD/.providers/registry.opentofu.org/floren/fdp/0.2.0/$(go env GOOS)_$(go env GOARCH)"
+mkdir -p "$PWD/.providers/registry.opentofu.org/floren-app/fdp/0.2.0/$(go env GOOS)_$(go env GOARCH)"
 cd terraform/provider-fdp
 go build -ldflags '-X main.version=0.2.0' \
-  -o "../../.providers/registry.opentofu.org/floren/fdp/0.2.0/$(go env GOOS)_$(go env GOARCH)/terraform-provider-fdp_v0.2.0" .
+  -o "../../.providers/registry.opentofu.org/floren-app/fdp/0.2.0/$(go env GOOS)_$(go env GOARCH)/terraform-provider-fdp_v0.2.0" .
 cd ../..
 ```
 
@@ -24,10 +47,10 @@ with the absolute `.providers` directory created above:
 provider_installation {
   filesystem_mirror {
     path    = "/absolute/path/to/fdp/.providers"
-    include = ["registry.opentofu.org/floren/fdp"]
+    include = ["registry.opentofu.org/floren-app/fdp"]
   }
   direct {
-    exclude = ["registry.opentofu.org/floren/fdp"]
+    exclude = ["registry.opentofu.org/floren-app/fdp"]
   }
 }
 ```
@@ -38,7 +61,7 @@ Set `TF_CLI_CONFIG_FILE` to its absolute filename. In each configuration root:
 terraform {
   required_providers {
     fdp = {
-      source  = "registry.opentofu.org/floren/fdp"
+      source  = "registry.opentofu.org/floren-app/fdp"
       version = "0.2.0"
     }
   }

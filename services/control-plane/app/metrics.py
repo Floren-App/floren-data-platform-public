@@ -75,6 +75,17 @@ def render(db: Session, leader: bool) -> str:
 
 
 def _platform(db: Session, out: Out) -> None:
+    from datetime import timezone
+    from .models import SiemCursor
+    for cursor in db.scalars(select(SiemCursor)):
+        out.metric("fdp_siem_events_sent_total", "counter", "Audit and data-access events delivered, by SIEM destination.",
+                   cursor.seq, sink=cursor.sink)
+        if cursor.last_success_at is not None:
+            at = cursor.last_success_at if cursor.last_success_at.tzinfo else cursor.last_success_at.replace(tzinfo=timezone.utc)
+            out.metric("fdp_siem_last_success_timestamp_seconds", "gauge", "Last accepted SIEM delivery.",
+                       at.timestamp(), sink=cursor.sink)
+        out.metric("fdp_siem_failing", "gauge", "1 while the last delivery to this SIEM destination failed.",
+                   int(bool(cursor.last_error)), sink=cursor.sink)
     from .models import ComputePool, PackageImport, QueryLog, Run, Workload, Workspace, utcnow
     for status, count in db.execute(select(Workspace.status, func.count()).group_by(Workspace.status)):
         out.metric("fdp_workspaces", "gauge", "Workspaces by status.", count, status=status)

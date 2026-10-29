@@ -8,6 +8,28 @@ Terraform itself has been under the Business Source License since 1.6, so this p
 and tested with [OpenTofu](https://opentofu.org) (MPL-2.0). It uses HashiCorp's MPL-licensed
 plugin framework and works with any tool that speaks the same plugin protocol.
 
+## Installation
+
+```hcl
+terraform {
+  required_providers {
+    fdp = { source = "floren-app/fdp", version = "~> 0.2" }
+  }
+}
+```
+
+Releases contain binaries for Linux, macOS, Windows and FreeBSD. Their `SHA256SUMS` file is signed with
+the key in [`signing-key.asc`](signing-key.asc) (fingerprint `AD3A 4658 4EB1 012F 07D2 B6BC 182A 3416 0F87 F08F`):
+
+```sh
+gpg --import signing-key.asc
+gpg --verify terraform-provider-fdp_0.2.0_SHA256SUMS.sig terraform-provider-fdp_0.2.0_SHA256SUMS
+```
+
+Development happens in [floren-data-platform-public](https://github.com/Floren-App/floren-data-platform-public)
+(`terraform/provider-fdp`); this repository receives each release from its pipeline. Open issues and pull
+requests there.
+
 ## Authentication
 
 Use an **automation identity** with the platform-admin role, never a person's account.

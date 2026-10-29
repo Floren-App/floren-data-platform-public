@@ -220,6 +220,31 @@ spec:
             - { name: FDP_GCP_SECRETS_LOCATIONS, value: {{ join "," . | quote }} }
             {{- end }}
             {{- end }}
+            {{- with .Values.siem }}
+            {{- if .stdout }}
+            - { name: FDP_SIEM_STDOUT, value: "true" }
+            {{- end }}
+            {{- if .syslog.address }}
+            - { name: FDP_SIEM_SYSLOG_ADDRESS, value: {{ .syslog.address | quote }} }
+            - { name: FDP_SIEM_SYSLOG_TRANSPORT, value: {{ .syslog.transport | quote }} }
+            - { name: FDP_SIEM_SYSLOG_FACILITY, value: {{ .syslog.facility | quote }} }
+            {{- if .syslog.clientCertSecret }}
+            - { name: FDP_SIEM_SYSLOG_CLIENT_CERT_FILE, value: /etc/fdp/siem/tls.crt }
+            - { name: FDP_SIEM_SYSLOG_CLIENT_KEY_FILE, value: /etc/fdp/siem/tls.key }
+            {{- end }}
+            {{- end }}
+            {{- if .http.url }}
+            - { name: FDP_SIEM_HTTP_URL, value: {{ .http.url | quote }} }
+            - { name: FDP_SIEM_HTTP_FORMAT, value: {{ .http.format | quote }} }
+            - { name: FDP_SIEM_HTTP_INDEX, value: {{ .http.index | quote }} }
+            {{- end }}
+            {{- if .otlp.endpoint }}
+            - { name: FDP_SIEM_OTLP_ENDPOINT, value: {{ .otlp.endpoint | quote }} }
+            {{- end }}
+            - { name: FDP_SIEM_INCLUDE_QUERIES, value: {{ .includeQueries | quote }} }
+            - { name: FDP_SIEM_INCLUDE_SQL_TEXT, value: {{ .includeSqlText | quote }} }
+            - { name: FDP_SIEM_START, value: {{ .start | quote }} }
+            {{- end }}
             - { name: FDP_DATA_VOLUME, value: fdp-data }
             {{- if not .Values.dataVolume.enabled }}
             - { name: FDP_SHARED_DATA_VOLUME, value: "false" }
@@ -232,6 +257,9 @@ spec:
             - { name: data, mountPath: /fdp-data }
             - { name: git-cache, mountPath: /var/lib/fdp/git }
             - { name: packages, mountPath: /var/lib/fdp/packages }
+            {{- if .Values.siem.syslog.clientCertSecret }}
+            - { name: siem-client, mountPath: /etc/fdp/siem, readOnly: true }
+            {{- end }}
           startupProbe:
             httpGet: { path: /readyz, port: http }
             periodSeconds: 5
@@ -248,6 +276,12 @@ spec:
             failureThreshold: 3
           resources: {{- toYaml .Values.resources | nindent 12 }}
       volumes:
+        {{- if .Values.siem.syslog.clientCertSecret }}
+        - name: siem-client
+          secret:
+            secretName: {{ .Values.siem.syslog.clientCertSecret | quote }}
+            items: [{ key: tls.crt, path: tls.crt }, { key: tls.key, path: tls.key }]
+        {{- end }}
         {{- if .Values.trust.caBundleSecret }}
         - name: trust
           secret:

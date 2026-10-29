@@ -5,6 +5,7 @@ Confirm the source revision, configuration and integration checks for your deplo
 
 | Capability | Current boundary |
 |---|---|
+| Audit export | Audit trail and SQL data access to stdout, syslog (TLS), HTTPS (generic, Splunk, Elastic) and OTLP, hash-chained and HMAC-signed |
 | Secret stores | Bundled OpenBao (Kubernetes or KMS auto-unseal), your OpenBao/Vault, Kubernetes Secrets, AWS, Azure and Google secret managers; one store per installation |
 | Workspaces | VS Code, RStudio and SQL editors; private subdirectory storage; root/direct-repository config discovery |
 | Layer isolation | Managed layers: own namespace, default-deny network policies and layer-local services; requires a CNI that enforces policy. Unmanaged layers are an authorization boundary only |
@@ -16,7 +17,7 @@ Confirm the source revision, configuration and integration checks for your deplo
 | Lineage | Program observations and native dbt/Airflow evidence; completeness depends on executed/instrumented paths and captured artifacts |
 | SLA enforcement | Configurable evidence and input gates; external notification delivery is not a complete incident-management system |
 | Bundled services | Keycloak, PostgreSQL and RustFS are optional and single-instance, not highly available; bring your own for HA |
-| Provider distribution | Source/local mirror supported; do not assume a published OpenTofu registry package |
+| Provider distribution | Signed GitHub releases of Floren-App/terraform-provider-fdp, prepared for the OpenTofu and Terraform registries; listing there is a separate submission |
 | Documentation versions | This site follows main; historical Markdown is available at source commits |
 | Kafka / agent framework | Not required platform components; no generic agent control plane or managed Kafka service is promised |
 

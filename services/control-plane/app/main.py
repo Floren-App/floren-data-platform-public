@@ -106,6 +106,9 @@ async def lifespan(app: FastAPI):
                  lambda: import_loop(SessionLocal)]
         from .query_log import retention_loop
         loops.append(lambda: retention_loop(SessionLocal))
+        from .siem import siem_loop, sinks_safe
+        if sinks_safe(s):   # audit trail and data access to the configured SIEM destinations
+            loops.append(lambda: siem_loop(SessionLocal, s))
         if s.layer_namespace_prefix:  # managed layers: scale their Trino workers with load
             from .trino_scaler import scale_loop
             loops.append(lambda: scale_loop(SessionLocal))

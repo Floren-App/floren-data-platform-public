@@ -1,4 +1,4 @@
-module github.com/floren/terraform-provider-fdp
+module github.com/Floren-App/terraform-provider-fdp
 
 go 1.27.3
 

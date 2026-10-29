@@ -206,6 +206,26 @@ secretManagement:
     prefix: fdp-
     locations: []                # replica locations; empty: automatic replication
 
+# Stream the audit trail and data-access events to your SIEM (docs/audit-and-siem.md). Each destination
+# receives the same hash-chained events. Secrets come from existingSecret: FDP_SIEM_HTTP_TOKEN,
+# FDP_SIEM_OTLP_HEADERS and FDP_SIEM_SIGNING_KEY (HMAC signature on every event; recommended).
+siem:
+  stdout: false                  # JSON lines on the control plane log, for any log collector
+  syslog:
+    address: ""                  # host:port, RFC 5424
+    transport: tls               # tls | tcp | udp; TLS trusts trust.caBundleSecret and the system roots
+    facility: 13                 # 13: log audit
+    clientCertSecret: ""         # Secret with tls.crt and tls.key for mutual TLS
+  http:
+    url: ""                      # generic endpoint, Splunk HEC URL (.../services/collector/event) or Elastic base URL
+    format: generic              # generic | splunk | elastic
+    index: fdp-audit             # elastic: index or data stream
+  otlp:
+    endpoint: ""                 # OpenTelemetry collector, e.g. http://otel-collector.observability:4318
+  includeQueries: true           # every completed SQL query: identity, tables, rows, outcome
+  includeSqlText: false          # SQL text as well, when the query log stores it
+  start: beginning               # beginning | now: where a newly added destination starts
+
 # Control plane identity, e.g. for cloud secret managers or KMS:
 #   AWS IRSA: eks.amazonaws.com/role-arn · GKE: iam.gke.io/gcp-service-account ·
 #   Azure: azure.workload.identity/client-id (and podLabels azure.workload.identity/use: "true")

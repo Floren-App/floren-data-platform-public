@@ -7,7 +7,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/floren/terraform-provider-fdp/internal/provider"
+	"github.com/Floren-App/terraform-provider-fdp/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
@@ -18,7 +18,7 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "run with support for debuggers")
 	flag.Parse()
 	err := providerserver.Serve(context.Background(), provider.New(version), providerserver.ServeOpts{
-		Address: "registry.opentofu.org/floren/fdp",
+		Address: "registry.opentofu.org/floren-app/fdp",
 		Debug:   debug,
 	})
 	if err != nil {

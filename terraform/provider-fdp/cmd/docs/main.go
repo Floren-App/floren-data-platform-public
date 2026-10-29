@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/floren/terraform-provider-fdp/internal/provider"
+	"github.com/Floren-App/terraform-provider-fdp/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	ps "github.com/hashicorp/terraform-plugin-framework/provider"

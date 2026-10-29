@@ -4,7 +4,7 @@
 
 terraform {
   required_providers {
-    fdp = { source = "registry.opentofu.org/floren/fdp" }
+    fdp = { source = "registry.opentofu.org/floren-app/fdp" }
   }
 }
 

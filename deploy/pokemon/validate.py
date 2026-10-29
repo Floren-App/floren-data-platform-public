@@ -21,13 +21,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='pokemon-config-') as directory:
         work = Path(directory)
         platform = '_'.join(subprocess.check_output(['go','env','GOOS','GOARCH'], text=True).split())
-        target = work/'mirror/registry.opentofu.org/floren/fdp/0.1.0'/platform
+        target = work/'mirror/registry.opentofu.org/floren-app/fdp/0.1.0'/platform
         target.mkdir(parents=True)
         run(['go','build','-o',str(target/'terraform-provider-fdp_v0.1.0'),'.'], cwd=ROOT/'terraform/provider-fdp')
         config = work/'tofurc'
         config.write_text('provider_installation {\n filesystem_mirror {\n path = "'+str(work/'mirror')+'"\n'
-                          ' include = ["registry.opentofu.org/floren/fdp"]\n }\n'
-                          ' direct { exclude = ["registry.opentofu.org/floren/fdp"] }\n}\n')
+                          ' include = ["registry.opentofu.org/floren-app/fdp"]\n }\n'
+                          ' direct { exclude = ["registry.opentofu.org/floren-app/fdp"] }\n}\n')
         folders = ['terraform/modules/pokemon']
         for folder in folders:
             checkout = work/'repo'/folder

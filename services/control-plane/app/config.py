@@ -192,6 +192,29 @@ class Settings(BaseSettings):
     data_dir: str = "/fdp-data"        # where the control plane itself mounts that volume
     app_start_timeout_seconds: int = 600     # a new app version must answer within this to go live
 
+    # --- SIEM: the audit trail and data-access events, streamed to security monitoring ---
+    siem_stdout: bool = False                  # JSON lines on stdout, for any log collector
+    siem_syslog_address: str = ""              # host:port; RFC 5424
+    siem_syslog_transport: Literal["tls", "tcp", "udp"] = "tls"
+    siem_syslog_facility: int = 13             # 13: log audit
+    siem_syslog_ca_file: Optional[str] = None  # receiver CA; default: system roots plus SSL_CERT_FILE
+    siem_syslog_client_cert_file: Optional[str] = None   # mutual TLS to the receiver
+    siem_syslog_client_key_file: Optional[str] = None
+    siem_http_url: str = ""                    # HTTPS collector
+    siem_http_format: Literal["generic", "splunk", "elastic"] = "generic"
+    siem_http_token: Optional[str] = None      # bearer, Splunk HEC token or Elastic API key
+    siem_http_index: str = "fdp-audit"         # elastic: index or data stream
+    siem_otlp_endpoint: str = ""               # OpenTelemetry collector base URL (OTLP/HTTP, JSON)
+    siem_otlp_headers: Optional[str] = None    # "key=value,key2=value2", as OTEL_EXPORTER_OTLP_HEADERS
+    siem_signing_key: Optional[str] = None     # HMAC-SHA256 over each event's chain hash
+    siem_include_queries: bool = True          # data access: every completed SQL query, its identity and tables
+    siem_include_sql_text: bool = False        # SQL text only when the query log stores it and this is on
+    siem_interval_seconds: int = 10
+    siem_batch_size: int = 500
+    siem_start: Literal["beginning", "now"] = "beginning"   # where a new destination starts
+    siem_gap_wait_seconds: int = 60            # wait this long for an out-of-order audit commit before skipping its id
+    siem_query_settle_seconds: int = 60        # export a query log row once it is this old
+
     # --- Secrets: where secret values live ---
     secrets_backend: Literal["openbao", "vault", "kubernetes", "aws", "azure", "gcp", "memory"] = "openbao"
     k8s_secret_namespace: str = 'fdp-secrets'

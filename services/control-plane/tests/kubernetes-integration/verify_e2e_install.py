@@ -399,7 +399,7 @@ def https_proxy(gateway_port, routes=None):
 TOFU_CONFIG = """
 terraform {
   required_providers {
-    fdp = { source = "registry.opentofu.org/floren/fdp" }
+    fdp = { source = "registry.opentofu.org/floren-app/fdp" }
   }
 }
 
@@ -564,7 +564,7 @@ output "ids" {
 def tofu_runner(p, workdir, client_secret=None, config=None):
     plugins = workdir / 'plugins'
     command(['go', 'build', '-o', str(plugins / 'terraform-provider-fdp'), '.'], cwd=PROVIDER, timeout=600)
-    (workdir / 'tofurc').write_text('provider_installation {\n  dev_overrides { "registry.opentofu.org/floren/fdp" = "%s" }\n'
+    (workdir / 'tofurc').write_text('provider_installation {\n  dev_overrides { "registry.opentofu.org/floren-app/fdp" = "%s" }\n'
                                     '  direct {}\n}\n' % plugins)
     tf = workdir / 'tofu'
     tf.mkdir()

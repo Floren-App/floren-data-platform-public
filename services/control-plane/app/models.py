@@ -512,6 +512,22 @@ class AuditEvent(Base):
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class SiemCursor(Base):
+    """How far each SIEM destination has received the audit trail, and the tip of its hash chain."""
+
+    __tablename__ = "siem_cursors"
+
+    sink: Mapped[str] = mapped_column(String(32), primary_key=True)
+    audit_id: Mapped[int] = mapped_column(Integer, default=0)
+    query_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    query_id: Mapped[str] = mapped_column(String(12), default="")
+    seq: Mapped[int] = mapped_column(Integer, default=0)
+    last_hash: Mapped[str] = mapped_column(String(64), default="")
+    last_success_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str] = mapped_column(String(300), default="")
+    last_error_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class DirectoryPrincipal(Base):
     """Stable identity facts. SCIM-managed identities never refresh from stale token claims."""
     __tablename__ = "directory_principals"

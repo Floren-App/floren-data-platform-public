@@ -71,7 +71,8 @@ Git, and data moves through governed paths.
 Configuration changes, permission changes, denied and outbound API calls and SQL
 admissions are recorded with their identities, without storing query values or
 credentials. The bundled OpenBao audits every secret-store request, with values
-HMAC-hashed. Signing keys rotate with an overlap period. Certificates are monitored from
+HMAC-hashed. Both streams can be exported to your SIEM as hash-chained, signed events (see
+[audit trail and SIEM](../audit-and-siem.md)). Signing keys rotate with an overlap period. Certificates are monitored from
 real TLS handshakes. Backup and restore procedures are part of the automated
 installation test.
 

@@ -91,8 +91,7 @@ identity provider; the directory sync provisions them within a minute.
 
 ## 4. Configure with OpenTofu
 
-First follow [provider installation from source](terraform.md#install-the-provider-from-source).
-The provider address alone does not imply a published registry binary. Adapt the
+First install the provider ([registry, release download or source](terraform.md#install-the-provider)). Adapt the
 getting-started example's version, addresses, storage and directory group lookups
 to your installation before applying it.
 

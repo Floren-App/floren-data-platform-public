@@ -2,7 +2,7 @@
 
 Floren Data Platform has two layers of configuration. Each setting lives in **one** of them.
 
-| | **Helm values** (`deploy/helm/fdp/values.yaml`) | **OpenTofu** (`registry.opentofu.org/floren/fdp`) or the app |
+| | **Helm values** (`deploy/helm/fdp/values.yaml`) | **OpenTofu** (`registry.opentofu.org/floren-app/fdp`) or the app |
 |---|---|---|
 | What | **How the platform is installed**: images, cluster resources, storage, networks, identity provider connection, secrets, ports | **What the platform contains and its policies**: layers, warehouses, limits, groups, roles, data sources, workloads, allowlists |
 | Stored in | Kubernetes objects and the control plane's environment | The platform's metadata database |

@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/floren/terraform-provider-fdp/internal/client"
+	"github.com/Floren-App/terraform-provider-fdp/internal/client"
 )
 
 // Only assignments declared here are owned; unrelated grants are never replaced.

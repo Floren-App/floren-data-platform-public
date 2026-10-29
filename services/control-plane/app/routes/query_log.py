@@ -20,6 +20,14 @@ from .common import audit
 router = APIRouter(tags=["observability"])
 
 
+@router.get("/v1/admin/siem", tags=["admin"])
+def siem_status(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """SIEM destinations: configured or not, events sent, how far exported and the last (sanitized) error."""
+    from .. import siem
+    from ..config import get_settings
+    return {"destinations": siem.status(db, get_settings())}
+
+
 @router.post("/internal/trino/layers/{layer_id}/events", include_in_schema=False)
 async def trino_events(layer_id: str, request: Request, authorization: str = Header(default=""),
                        db: Session = Depends(get_db), orch: Orchestrator = Depends(get_orchestrator)):

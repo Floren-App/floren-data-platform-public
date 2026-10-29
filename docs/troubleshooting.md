@@ -68,7 +68,7 @@ and DAG-run success are separate states. See [dbt and Airflow](dbt-and-airflow.m
 
 ## Terraform provider cannot be installed
 
-The provider source exists but registry distribution is not assumed. Follow the
-[local provider mirror setup](terraform.md#install-the-provider-from-source).
+Check that the provider is listed in your registry, or use a
+[release download or local mirror](terraform.md#install-the-provider).
 Inspect `TF_CLI_CONFIG_FILE`, the target OS/architecture and the exact version.
 Do not remove state or run a destroy to fix an installation problem.
