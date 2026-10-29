@@ -1,7 +1,10 @@
-# The build pipeline. Every pull request and push runs the tests: control plane, SDK, provider, web app and
-# editor extension, Helm chart and documentation. After the tests pass:
-#   main         builds the images, with SBOM and provenance, signs them (Sigstore, keyless) and pushes
-#                ghcr.io/floren-app/fdp-<image>:<commit sha> and :main
+# The build pipeline. Every pull request and push runs the tests its changes can affect (control plane, SDK,
+# provider, web app and editor extension, Helm chart, documentation); release tags, the nightly run, manual runs
+# and changes to this file run all of them. After the tests pass:
+#   main         builds the images whose inputs changed, with SBOM and provenance, signs them (Sigstore, keyless)
+#                and pushes ghcr.io/floren-app/fdp-<image>:<commit sha> and :main; unchanged images get the new
+#                tags on their existing, already signed build (found by a content tag of their inputs); every
+#                image is rebuilt at least weekly for base-image updates, or on demand (workflow_dispatch rebuild)
 #   v1.2.3       also tags the images 1.2.3 and 1.2, and publishes a GitHub release with the signed Helm chart
 #                pinned to those images
 #   provider-v1.2.3  publishes the OpenTofu provider: Floren-App/terraform-provider-fdp receives the source
@@ -14,6 +17,13 @@ on:
     branches: [main]
     tags: ['v*', 'provider-v*']
   workflow_dispatch:
+    inputs:
+      rebuild:
+        description: Rebuild every image, even those whose inputs did not change
+        type: boolean
+        default: false
+  schedule:
+    - cron: '17 3 * * *'   # nightly: every test, whatever changed
 
 permissions:
   contents: read
@@ -26,8 +36,54 @@ env:
   REGISTRY: ghcr.io/floren-app
 
 jobs:
+  changes:
+    name: Select tests
+    runs-on: ubuntu-24.04
+    outputs:
+      control-plane: ${{ steps.select.outputs.control-plane }}
+      sdk: ${{ steps.select.outputs.sdk }}
+      provider: ${{ steps.select.outputs.provider }}
+      web: ${{ steps.select.outputs.web }}
+      chart: ${{ steps.select.outputs.chart }}
+      docs: ${{ steps.select.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: select
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Each suite runs when anything its tests read changed. The control-plane tests also render the chart,
+          # seed the Compose stack and read the SDK, schemas, examples and image files, so their scope is wide.
+          full=false; reason=""
+          case "$EVENT" in schedule|workflow_dispatch) full=true; reason="$EVENT run";; esac
+          [[ "$GITHUB_REF" == refs/tags/* ]] && { full=true; reason="release tag"; }
+          range=""
+          if [ "$full" = false ]; then
+            if [ -n "$PR_BASE" ]; then range="$PR_BASE...HEAD"
+            elif [[ -n "$BEFORE" && ! "$BEFORE" =~ ^0+$ ]] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then range="$BEFORE..HEAD"
+            else full=true; reason="no earlier commit to compare with"; fi
+          fi
+          changed() { [ "$full" = true ] || ! git diff --quiet "$range" -- "$@"; }
+          if [ "$full" = false ] && changed .github/workflows/pipeline.yml; then full=true; reason="the pipeline changed"; fi
+          suite() {
+            if changed "${@:2}"; then echo "$1=true" >> "$GITHUB_OUTPUT"; echo "| $1 | runs |" >> "$GITHUB_STEP_SUMMARY"
+            else echo "$1=false" >> "$GITHUB_OUTPUT"; echo "| $1 | skipped: nothing it tests changed |" >> "$GITHUB_STEP_SUMMARY"; fi
+          }
+          { echo "### Tests for this change"; [ "$full" = true ] && echo "All suites: $reason."; echo; echo "| Suite | |"; echo "|---|---|"; } >> "$GITHUB_STEP_SUMMARY"
+          suite control-plane services/control-plane deploy sdk schemas images examples terraform scripts
+          suite sdk sdk/python
+          suite provider terraform/provider-fdp docs/reference/terraform
+          suite web apps/desktop extensions/vscode-fdp
+          suite chart deploy/helm scripts/release_chart.py
+          suite docs docs mkdocs.yml requirements-docs.txt scripts
+
   control-plane:
     name: Control plane tests
+    needs: changes
+    if: needs.changes.outputs.control-plane == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -44,10 +100,12 @@ jobs:
           helm dependency build deploy/helm/fdp
       - run: pip install -e 'services/control-plane[dev]'
       - working-directory: services/control-plane
-        run: python -m pytest -q
+        run: python -m pytest -q -n auto   # in parallel: the tests share no state across processes
 
   sdk:
     name: Python SDK tests
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +117,8 @@ jobs:
 
   provider:
     name: OpenTofu provider
+    needs: changes
+    if: needs.changes.outputs.provider == 'true'
     runs-on: ubuntu-24.04
     defaults:
       run: { working-directory: terraform/provider-fdp }
@@ -75,6 +135,8 @@ jobs:
 
   web:
     name: Web app and editor extension
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -92,6 +154,8 @@ jobs:
 
   chart:
     name: Helm chart
+    needs: changes
+    if: needs.changes.outputs.chart == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -114,6 +178,8 @@ jobs:
 
   docs:
     name: Documentation
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -124,8 +190,12 @@ jobs:
 
   images:
     name: Image ${{ matrix.image }}
-    needs: [control-plane, sdk, provider, web, chart, docs]
-    if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/provider-v')
+    needs: [changes, control-plane, sdk, provider, web, chart, docs]
+    # After the selected tests: none may have failed (skipped ones did not apply to this change).
+    if: >-
+      always() && !cancelled() && !contains(needs.*.result, 'failure')
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && !startsWith(github.ref, 'refs/tags/provider-v')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -135,15 +205,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { image: control-plane,     context: services/control-plane, dockerfile: services/control-plane/Dockerfile }
-          - { image: compute-python,    context: ., dockerfile: images/compute-python/Dockerfile }
-          - { image: compute-r,         context: ., dockerfile: images/compute-r/Dockerfile }
-          - { image: compute-dbt,       context: ., dockerfile: images/compute-dbt/Dockerfile }
-          - { image: airflow,           context: ., dockerfile: images/airflow/Dockerfile }
-          - { image: workspace-vscode,  context: ., dockerfile: images/workspace-vscode/Dockerfile }
-          - { image: workspace-rstudio, context: ., dockerfile: images/workspace-rstudio/Dockerfile }
-          - { image: workspace-sql,     context: ., dockerfile: images/workspace-sql/Dockerfile }
-          - { image: web,               context: ., dockerfile: images/web/Dockerfile }
+          # inputs: every file the image is built from; an image is rebuilt only when they change.
+          - { image: control-plane,     context: services/control-plane, dockerfile: services/control-plane/Dockerfile,
+              inputs: services/control-plane/app services/control-plane/pyproject.toml services/control-plane/Dockerfile }
+          - { image: compute-python,    context: ., dockerfile: images/compute-python/Dockerfile, inputs: images/compute-python sdk/python }
+          - { image: compute-r,         context: ., dockerfile: images/compute-r/Dockerfile,
+              inputs: images/compute-r sdk/r/fdp images/common/Rprofile-packages.site }
+          - { image: compute-dbt,       context: ., dockerfile: images/compute-dbt/Dockerfile, inputs: images/compute-dbt sdk/python }
+          - { image: airflow,           context: ., dockerfile: images/airflow/Dockerfile, inputs: images/airflow sdk/python }
+          - { image: workspace-vscode,  context: ., dockerfile: images/workspace-vscode/Dockerfile,
+              inputs: images/workspace-vscode images/common schemas extensions/vscode-fdp sdk/python }
+          - { image: workspace-rstudio, context: ., dockerfile: images/workspace-rstudio/Dockerfile,
+              inputs: images/workspace-rstudio images/common sdk/r/fdp }
+          - { image: workspace-sql,     context: ., dockerfile: images/workspace-sql/Dockerfile, inputs: images/workspace-sql }
+          - { image: web,               context: ., dockerfile: images/web/Dockerfile,
+              inputs: "images/web apps/desktop :(exclude)apps/desktop/tests" }
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -163,21 +239,47 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
           labels: |
             org.opencontainers.image.licenses=Apache-2.0
+      - id: inputs
+        name: Find an existing build of the same inputs
+        env: { INPUTS: '${{ matrix.inputs }}' }
+        run: |
+          # A content tag: the hash of every input file's blob id and the ISO week, so equal inputs give the same
+          # tag, and every image is still rebuilt weekly for base-image security updates (or on demand).
+          [ "${{ inputs.rebuild }}" = true ] && week="run-$GITHUB_RUN_ID" || week="$(date -u +%G-W%V)"
+          tag="inputs-$({ git ls-files -s -- $INPUTS; echo "$week"; } | sha256sum | cut -c1-20)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if docker buildx imagetools inspect "$REGISTRY/fdp-${{ matrix.image }}:$tag" > /dev/null 2>&1; then
+            echo "reuse=true" >> "$GITHUB_OUTPUT"
+            echo "${{ matrix.image }}: inputs unchanged; reusing the signed build $tag" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Tag the existing build for this commit
+        if: steps.inputs.outputs.reuse == 'true'
+        env: { TAGS: '${{ steps.meta.outputs.tags }}' }
+        run: |
+          args=(); for tag in $TAGS; do args+=(-t "$tag"); done
+          docker buildx imagetools create "${args[@]}" "$REGISTRY/fdp-${{ matrix.image }}:${{ steps.inputs.outputs.tag }}"
       - id: build
+        if: steps.inputs.outputs.reuse != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ env.REGISTRY }}/fdp-${{ matrix.image }}:${{ steps.inputs.outputs.tag }}
           labels: ${{ steps.meta.outputs.labels }}
           sbom: true
           provenance: mode=max
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
       - uses: sigstore/cosign-installer@v3
+        if: steps.inputs.outputs.reuse != 'true'
       - name: Sign the image (keyless, recorded in the public transparency log)
+        if: steps.inputs.outputs.reuse != 'true'
         run: cosign sign --yes "${REGISTRY}/fdp-${{ matrix.image }}@${{ steps.build.outputs.digest }}"
 
   release:

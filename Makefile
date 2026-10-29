@@ -92,7 +92,7 @@ desktop-web:
 	cd apps/desktop && npm install && npm run dev
 
 test:
-	cd $(CP) && (test -d .venv || python3 -m venv .venv) && .venv/bin/pip install -q -e '.[dev]' && .venv/bin/pytest -q
+	cd $(CP) && (test -d .venv || python3 -m venv .venv) && .venv/bin/pip install -q -e '.[dev]' && .venv/bin/pytest -q -n auto
 	cd apps/desktop && npm install --no-fund --no-audit && npm run build
 	cd extensions/vscode-fdp && npm install --no-fund --no-audit && npm run compile
 

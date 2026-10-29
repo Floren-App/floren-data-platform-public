@@ -15,6 +15,13 @@ releases are only produced from tested commits.
 | Helm chart | `helm lint` and rendering of every example profile, and of a release-pinned chart |
 | Documentation | A strict build with link checks, and that no installation material is published |
 
+Each change runs only the suites it can affect: a first job compares it with the previous push (or a
+pull request's base) and lists in the run summary which suites run and which were skipped. A documentation
+change runs only the documentation job; the control-plane suite runs when anything its tests read changes,
+including the chart, Compose files, SDK, schemas, examples and images. Release tags, the nightly run
+(03:17 UTC), manual runs and changes to the pipeline itself run every suite. The control-plane tests run in
+parallel (`pytest -n auto`, also in `make test`).
+
 ## What is published
 
 | Trigger | Result |
@@ -22,6 +29,11 @@ releases are only produced from tested commits.
 | Push to `main` | Every image as `ghcr.io/floren-app/fdp-<image>:<commit sha>` and `:main` |
 | Tag `v1.2.3` | The same images also as `:1.2.3` and `:1.2`, and a GitHub release with the Helm chart pinned to them |
 | Tag `provider-v1.2.3` | Release `v1.2.3` of [terraform-provider-fdp](https://github.com/Floren-App/terraform-provider-fdp) |
+
+Images are only rebuilt when the files they are built from change. Each build also gets a content tag
+(`inputs-<hash>` of its input files and the ISO week); when that tag already exists, the commit's tags are
+added to the existing, already signed image instead. Every image is still rebuilt at least weekly, for
+base-image security updates, and a manual run with `rebuild` rebuilds all of them.
 
 Images carry an SBOM and SLSA provenance, and are signed with Sigstore (keyless, recorded in the
 public transparency log). Charts are signed the same way; provider releases with the provider's GPG key.

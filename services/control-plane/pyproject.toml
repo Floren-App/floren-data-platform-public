@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "moto[secretsmanager]>=5.0"]   # moto: in-process AWS API (Apache-2.0)
+dev = ["pytest>=8.0", "pytest-xdist>=3.6", "moto[secretsmanager]>=5.0"]   # xdist: parallel tests (MIT); moto: in-process AWS API (Apache-2.0)
 
 [build-system]
 requires = ["setuptools>=69"]
