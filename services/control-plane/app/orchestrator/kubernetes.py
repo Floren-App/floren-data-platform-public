@@ -248,8 +248,8 @@ class KubernetesOrchestrator:
             return ""
 
     def _exec_api(self):
-        """A private client per exec: kubernetes.stream swaps the request method of the client it is given
-        for the duration of the stream, so on the shared client every concurrent call (status checks,
+        """A private client per exec: kubernetes.stream swaps a request method of the client it is given
+        (request, or call_api in newer clients) for the duration of the stream, so on the shared client every concurrent call (status checks,
         inventory) would be sent as a websocket request and fail."""
         shared = getattr(self.core, "api_client", None)
         if not isinstance(shared, client.ApiClient):

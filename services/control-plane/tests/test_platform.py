@@ -118,7 +118,7 @@ def test_secrets_scopes_injection_and_masking(client):
     assert r.status_code == 403 and "may not use secret group:finance/smtp" in r.json()["detail"]
 
 
-def make_certificate(cn="api.finance.test", issuer_key=None, issuer_name=None):
+def make_certificate(cn="api.finance.test", issuer_key=None, issuer_name=None, ca=False):
     from datetime import datetime, timedelta, timezone
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
@@ -130,8 +130,13 @@ def make_certificate(cn="api.finance.test", issuer_key=None, issuer_name=None):
     cert = (x509.CertificateBuilder().subject_name(name).issuer_name(issuer_name or name).public_key(key.public_key())
             .serial_number(x509.random_serial_number()).not_valid_before(now - timedelta(days=1))
             .not_valid_after(now + timedelta(days=30))
-            .add_extension(x509.SubjectAlternativeName([x509.DNSName(cn)]), critical=False)
-            .sign(issuer_key or key, hashes.SHA256()))
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName(cn)]), critical=False))
+    if ca:   # OpenSSL 3 refuses a trust anchor without these as an "invalid CA certificate"
+        cert = (cert.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                .add_extension(x509.KeyUsage(digital_signature=True, content_commitment=False, key_encipherment=False,
+                                             data_encipherment=False, key_agreement=False, key_cert_sign=True,
+                                             crl_sign=True, encipher_only=False, decipher_only=False), critical=True))
+    cert = cert.sign(issuer_key or key, hashes.SHA256())
     pem = cert.public_bytes(serialization.Encoding.PEM).decode()
     return cert, key, pem
 

@@ -221,7 +221,7 @@ def tls_material(tmp_path):
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.x509.oid import NameOID
-    ca, ca_key, ca_pem = make_certificate("Backend CA")
+    ca, ca_key, ca_pem = make_certificate("Backend CA", ca=True)
     now = datetime.now(timezone.utc)
 
     def issue(cn, san):

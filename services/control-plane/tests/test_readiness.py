@@ -5,10 +5,14 @@ from app import main
 
 def test_readiness_reports_initialization_and_metadata_recovery_without_liveness_failure(client, monkeypatch):
     assert client.get('/readyz').status_code == 200
-    monkeypatch.setattr(main.app.state, 'initialized', False)
-    assert client.get('/readyz').json() == {'ok': False, 'reason': 'Initializing'}
-    assert client.get('/readyz').status_code == 503
-    monkeypatch.setattr(main.app.state, 'initialized', True)
+    # Set app.state directly: Starlette's State raises KeyError (not AttributeError) on deleting a missing
+    # attribute, which monkeypatch's cleanup cannot handle.
+    main.app.state.initialized = False
+    try:
+        assert client.get('/readyz').json() == {'ok': False, 'reason': 'Initializing'}
+        assert client.get('/readyz').status_code == 503
+    finally:
+        main.app.state.initialized = True
     original = main.engine.connect
 
     def unavailable():
