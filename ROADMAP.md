@@ -1,3 +1,62 @@
+## Next (planned 2026-10-29, in no fixed order)
+
+[] Warehouses scoped by layer and workload type: "this warehouse is for dbt projects of the data engineers in Prod".
+    - Today: a warehouse can be limited to groups, dedicated to them, or reserved for Trino workers; it is usable in
+      every layer and by every kind of work.
+    - Plan: optional `layers` and `workload_kinds` (script, notebook, app, dbt, airflow, kafka, model) on a
+      warehouse, next to its groups (`fdp_compute_pool`, admin page). Admission checks all three for runs,
+      deployments and Airflow tasks, with a clear refusal naming the missing match. Run forms and `fdp.json`
+      choices only offer matching warehouses; a default warehouse per layer and kind replaces the single default.
+    - The compute overview groups usage by layer and kind. Existing warehouses keep working (empty means any).
+
+[] Semantic layer on Apache Ossie (incubating; formerly Open Semantic Interchange, OSI).
+    - Ossie is the vendor-neutral YAML specification for semantic models: datasets, relationships, fields,
+      metrics and AI context. Store models as governed catalog objects bound to registered tables, with the
+      same IAM, layer and lineage as the tables underneath; current KPI definitions become Ossie metrics.
+    - Import and export Ossie YAML in the app, the API and OpenTofu, and from Git (a semantic model in a workload
+      repository, deployed with GitOps). Automatic sync from APIs: pull models on a schedule from Ossie-speaking
+      sources (dbt's semantic layer, Apache Polaris' Semantic Model API, BI tools) through API management, with
+      review before changes replace a published model.
+    - Serve metrics: compile metric requests to SQL on the layer's Trino with the caller's permissions, so a
+      metric never reveals more than its tables would. Show models in lineage (table -> model -> metric -> app).
+    - Pin the supported Ossie version while the specification is incubating; keep vendor extensions intact.
+
+[] Apache Kafka as a workload type.
+    - Bring your own Kafka (registered as a storage integration, like PostgreSQL and S3) or an optional Kafka
+      per managed layer (KRaft, single broker or three for HA), in the layer's namespace and network boundary.
+    - Topics as governed resources: Producer and Consumer roles granted to groups and workload identities,
+      translated to Kafka ACLs; no shared credentials in code (SASL/mTLS issued per execution).
+    - New program kinds: stream consumers/producers (Python, with the SDK) and Kafka Connect connectors,
+      including an Iceberg sink to land streams as governed tables. Lineage between topics, programs and
+      tables; consumer lag and throughput in the compute overview and the catalog's SLAs.
+    - Kafka, Strimzi-style operators and Kafka Connect are Apache-2.0; no proprietary components.
+
+[] An all-in-one AI agent that knows the platform: bring your own license (Anthropic Claude or OpenAI), or a
+   model running in the platform (next item).
+    - Not only code: it searches the catalog and lineage, explains data and SLAs, writes and runs SQL, builds
+      programs, dbt models and Airflow DAGs in a workspace, deploys with GitOps, and sets up storage, grants and
+      warehouses where the person may.
+    - Grounded rather than trained: the platform's documentation, API schema, fdp.json schema and live metadata
+      as tools and context, so it stays correct across versions. The same tools as an MCP server, so external
+      agents (for example Claude Code) can use the platform too.
+    - Acts as the person, never more: every action goes through the API with their permissions and layer;
+      changes need confirmation; everything is audited (and sent to the SIEM). Production layers stay
+      read-only for it unless an administrator allows more.
+    - License keys live in the secret store, per installation or per group; data sent to an external model is
+      limited by policy (for example no tagged personal data), and the model choice is visible to users.
+
+[] Custom models running inside the platform, for data interpretation, flows and as the agent's model.
+    - A `model` workload: serve open-weight models with an OpenAI-compatible endpoint (for example vLLM or
+      llama.cpp, both open source) on GPU warehouses in a layer, so data never leaves the layer.
+    - Callable from programs, dbt and Airflow through API management (with IAM, quotas and audit), and
+      selectable as the agent's model instead of Claude or OpenAI.
+    - Uses: classification and tagging suggestions (for example personal data), explaining datasets, anomaly and
+      quality checks, and steps in pipelines. Prefer models with open (OSI-approved) licenses; show each model's
+      license, as for packages.
+
+Suggested order: warehouses by layer and kind (the base for GPU and Kafka placement), Kafka, the semantic layer,
+models in the platform, then the agent, which benefits from all of them.
+
 [] KPI definitions.
 [] SLA enformcement, shows risk or violation when the dataset does not fit a certain SLA. For example measure how often a dataset should be updated, and if that actually is the case. But see if thats possible.
 [] DBT tests to measure KPI's of data? is this an option.
@@ -180,6 +239,12 @@ Findings from the hands-on Kubernetes lab test (2026-10-22)
     data schemas stay as they are: the platform governs schemas, workloads create and change their own tables.
 [] Published artifacts: public, signed images for amd64 and arm64; the Helm chart and a signed OpenTofu
     provider in registries; signed, notarized desktop app builds.
+    - Built (2026-10-29): one pipeline (tests on every change; images with SBOM and provenance, signed with
+      Sigstore; signed chart releases on version tags) and the OpenTofu provider in Floren-App/terraform-provider-fdp
+      with a GPG-signed release v0.2.0. Open: the public pipeline's write access to the image packages, arm64
+      images, the OpenTofu and Terraform registry listings, and desktop app builds.
+[x] Bring your own secret store, with a bundled OpenBao (Kubernetes-Secret or KMS auto-unseal), and SIEM export of
+    the audit trail and data access (stdout, syslog, HTTPS, OpenTelemetry; hash-chained and signed).
 [] Later, not needed now: node placement options in the chart, more tested Kubernetes distributions (EKS, AKS,
     GKE, OpenShift), more data connectors, verified Entra ID and Okta, pod security level restricted, SBOMs.
 
