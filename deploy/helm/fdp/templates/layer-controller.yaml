@@ -32,6 +32,11 @@ rules:
   - apiGroups: [cert-manager.io]
     resources: [certificates]
     verbs: [get, create, patch]
+  {{- if include "fdp.layerCilium" . }}
+  - apiGroups: [cilium.io]
+    resources: [ciliumnetworkpolicies]
+    verbs: [get, create, patch]
+  {{- end }}
   - apiGroups: [kafka.strimzi.io]
     resources: [kafkas, kafkanodepools, kafkatopics]
     verbs: [get, create, patch]
@@ -151,6 +156,9 @@ spec:
             - {name: FDP_LAYER_POD_CIDRS, value: {{ .Values.layerController.network.podCidrs | toJson | quote }} }
             - {name: FDP_LAYER_SERVICE_CIDRS, value: {{ .Values.layerController.network.serviceCidrs | toJson | quote }} }
             - {name: FDP_LAYER_NODE_CIDRS, value: {{ .Values.layerController.network.nodeCidrs | toJson | quote }} }
+            {{- if include "fdp.layerCilium" . }}
+            - {name: FDP_LAYER_CILIUM, value: "true"}
+            {{- end }}
             - {name: FDP_LAYER_KAFKA_API_SERVER_CIDRS, value: {{ .Values.layerController.network.kafkaApiServerCidrs | toJson | quote }} }
             - {name: FDP_LAYER_PROTECTED_CIDRS, value: {{ .Values.layerController.network.protectedCidrs | toJson | quote }} }
             # Artifact holder: the control-plane image already has sh/find/head/base64/stat.

@@ -82,6 +82,20 @@ def test_network_policies_select_brokers_by_the_labels_strimzi_keeps():
     assert not selects(policies['kafka-topic-operator-api']['podSelector'], {**live,'fdp.floren.app/role':'stream'})
 
 
+def test_cilium_gets_the_api_server_entity_for_the_same_pods_only():
+    """Cilium does not match the API server by ipBlock; found on the live cluster."""
+    from dataclasses import replace
+    plain = manifests(ID, 'fdp-layer-'+ID, spec(), CONFIG, PLAN)
+    assert not [d for d in plain if d['kind']=='CiliumNetworkPolicy']
+    documents = manifests(ID, 'fdp-layer-'+ID, spec(), replace(CONFIG, cilium=True), PLAN)
+    [cilium] = [d for d in documents if d['kind']=='CiliumNetworkPolicy']
+    api = next(d for d in documents if d['metadata']['name']=='kafka-topic-operator-api')
+    assert cilium['spec']['endpointSelector'] == api['spec']['podSelector']
+    assert cilium['spec']['egress'] == [{'toEntities':['kube-apiserver'],'toPorts':[{'ports':[
+        {'port':'443','protocol':'TCP'},{'port':'6443','protocol':'TCP'}]}]}]
+    assert controller.RESOURCES['CiliumNetworkPolicy'][0] == '/apis/cilium.io/v2'
+
+
 def test_opt_in_requires_managed_tls_warehouse_and_authorizer():
     from pydantic import ValidationError
     for patch in ({'enabled':False}, {'kafka':{'enabled':True}},

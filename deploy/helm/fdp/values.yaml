@@ -34,6 +34,8 @@ layerController:
     podCidrs: []
     serviceCidrs: []
     nodeCidrs: []
+    # auto: also write CiliumNetworkPolicies (the kube-apiserver entity for Kafka) when Cilium's CRDs exist | true | false
+    cilium: auto
     # Kafka brokers and topic operator only: exact API service + API endpoint addresses.
     # Host CIDRs only (/32 IPv4, /128 IPv6), never whole Pod/Service ranges.
     kafkaApiServerCidrs: []

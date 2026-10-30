@@ -48,6 +48,7 @@ RESOURCES = {
     'Deployment': ('/apis/apps/v1', 'deployments', True),
     'Service': ('/api/v1', 'services', True),
     'Certificate': ('/apis/cert-manager.io/v1', 'certificates', True),
+    'CiliumNetworkPolicy': ('/apis/cilium.io/v2', 'ciliumnetworkpolicies', True),
 }
 
 
@@ -566,6 +567,7 @@ def main():
         kafka_policy_key=os.environ.get('FDP_SESSION_SIGNING_KEY', ''),
         kafka_api_server_cidrs=tuple(json.loads(os.environ.get('FDP_LAYER_KAFKA_API_SERVER_CIDRS', '[]'))),
         egress_proxy=os.environ.get('FDP_LAYER_EGRESS_PROXY', '') == 'true',
+        cilium=os.environ.get('FDP_LAYER_CILIUM', '') == 'true',
         trust_file=os.environ.get('FDP_LAYER_TRUST_FILE', ''),
         pod_cidrs=tuple(json.loads(os.environ.get('FDP_LAYER_POD_CIDRS', '[]'))),
         service_cidrs=tuple(json.loads(os.environ.get('FDP_LAYER_SERVICE_CIDRS', '[]'))),

@@ -17,7 +17,10 @@ operator upgrade procedure; Helm does not upgrade installed CRDs automatically.
 
 Set `layerController.network.kafkaApiServerCidrs` to exact Kubernetes API service
 and endpoint addresses: `/32` for IPv4, `/128` for IPv6. This allows only the brokers
-(Strimzi's config provider reads their certificate Secrets) and the topic operator to reach API ports 443/6443. Ordinary workloads receive no API access.
+(Strimzi's config provider reads their certificate Secrets) and the topic operator to reach API ports 443/6443.
+Cilium does not match the API server by `ipBlock`: with `layerController.network.cilium` (default
+`auto`, on when Cilium's CRDs exist) the controller adds a CiliumNetworkPolicy for the `kube-apiserver` entity
+for the same pods and ports. Ordinary workloads receive no API access.
 The remaining layer default-deny rules, namespace boundaries and client TLS still
 apply. Strimzi is a trusted cluster operator; its permissions belong to installation
 administration, not to tenant groups.
