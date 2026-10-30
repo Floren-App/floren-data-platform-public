@@ -4,18 +4,13 @@ Two English sets (`base1`, `base2`), separate **Test / Non-Prod** and **Prod / P
 `test` is the development branch; protected `main` is the production promotion branch.
 The source API is [TCGdex](https://tcgdex.dev/rest/set).
 
-Deployment status: source is published privately at
-`https://github.com/Floren-App/pokemon-data-product`. The current GitHub plan refused private
-branch protection (HTTP 403); `main` protection is therefore still pending. Keep promotion
-through a reviewed pull request. Floren enforces the production folder's `main` branch binding
-and separate layer identities, regardless of GitHub plan. The required platform upgrade was
-approved and deployed; both native pipelines and all four dashboards passed live verification. See
-`docs/pokemon-pipeline-progress.md` in the platform repository for the current checklist.
+The workload code (extraction, loader, dbt, Airflow and the two Streamlit apps) lives in its own Git
+repository, registered with read-only credentials. Protect `main` and promote through a reviewed pull
+request; the platform binds the production folder to `main` and gives each layer its own identities
+either way.
 
-The Floren installation overrides the module's `warehouses` input with dedicated, modest
-sizes for this initial allowlist: dashboards 0.125 CPU/0.75 GiB, batch/dbt jobs 0.25 CPU/1 GiB,
-and Airflow 0.25 CPU/1.5 GiB. Increase these for larger ingestions or dashboard concurrency;
-the module defaults continue to use the installation's `xsmall`/`small` warehouses.
+Warehouses default to the installation's `xsmall`/`small`. Pass `warehouses` (`app`, `job`,
+`orchestrator`) to use your own, for example a dedicated Airflow warehouse per layer.
 
 ```mermaid
 flowchart LR
@@ -168,9 +163,6 @@ SQL capture links loader → raw and apps → tables; the SDK records S3 file in
 managed API calls connect the API → extractor; native dbt artifacts add the model graph;
 Airflow adds the orchestration overlay. No manual per-file/table lineage lists are required.
 
-Legacy `deploy/pokemon/setup.py`, Compose overlays, Shiny and direct-to-database ingestion belong
-to the older example and are not used by this module.
-
 ## Verification
 
 Use the control-plane venv (including its development dependencies) and the SDK:
@@ -178,9 +170,8 @@ Use the control-plane venv (including its development dependencies) and the SDK:
 ```sh
 services/control-plane/.venv/bin/python -m pip install -r examples/pokemon/tests/requirements.txt
 PYTHONPATH=sdk/python services/control-plane/.venv/bin/python -m pytest -q examples/pokemon/tests
-python3 deploy/pokemon/validate.py  # copied files, temporary provider, backend disabled; no live state
+python3 examples/pokemon/validate.py  # copied files, temporary provider, backend disabled; no live state
 ```
 
 The tests execute the SCD2 window SQL against an isolated SQLite fixture and parse every model/test
-as Trino SQL; they do not substitute for a real Trino/dbt deployment run. Deployment progress and
-actual evidence are tracked in `docs/pokemon-pipeline-progress.md` in the platform repository.
+as Trino SQL; they do not substitute for a real Trino/dbt deployment run.

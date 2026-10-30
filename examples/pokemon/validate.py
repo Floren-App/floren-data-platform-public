@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+LOCAL_VERSION = '999.0.0'
 
 
 def run(args, **kwargs):
@@ -21,9 +22,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix='pokemon-config-') as directory:
         work = Path(directory)
         platform = '_'.join(subprocess.check_output(['go','env','GOOS','GOARCH'], text=True).split())
-        target = work/'mirror/registry.opentofu.org/floren-app/fdp/0.1.0'/platform
+        # A local build numbered above every release, so the module's minimum version accepts it.
+        target = work/'mirror/registry.opentofu.org/floren-app/fdp'/LOCAL_VERSION/platform
         target.mkdir(parents=True)
-        run(['go','build','-o',str(target/'terraform-provider-fdp_v0.1.0'),'.'], cwd=ROOT/'terraform/provider-fdp')
+        run(['go','build','-ldflags','-X main.version='+LOCAL_VERSION,'-o',str(target/('terraform-provider-fdp_v'+LOCAL_VERSION)),'.'],
+            cwd=ROOT/'terraform/provider-fdp')
         config = work/'tofurc'
         config.write_text('provider_installation {\n filesystem_mirror {\n path = "'+str(work/'mirror')+'"\n'
                           ' include = ["registry.opentofu.org/floren-app/fdp"]\n }\n'

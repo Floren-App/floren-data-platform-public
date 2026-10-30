@@ -10,20 +10,27 @@ plugin framework and works with any tool that speaks the same plugin protocol.
 
 ## Installation
 
+The provider is installed from its [GitHub releases](https://github.com/Floren-App/terraform-provider-fdp/releases),
+not from a public registry. Releases contain binaries for Linux, macOS, Windows and FreeBSD. Their `SHA256SUMS`
+file is signed with the key in [`signing-key.asc`](signing-key.asc) (fingerprint
+`AD3A 4658 4EB1 012F 07D2 B6BC 182A 3416 0F87 F08F`). From a checkout of the platform repository,
+`scripts/install-provider.sh 0.3.0 "$HOME/.fdp-providers"` verifies a release and places it in a filesystem
+mirror; point OpenTofu at that mirror (`provider_installation { filesystem_mirror { ... } }`) and declare:
+
 ```hcl
 terraform {
   required_providers {
-    fdp = { source = "floren-app/fdp", version = "~> 0.2" }
+    fdp = { source = "registry.opentofu.org/floren-app/fdp", version = "0.3.0" }
   }
 }
 ```
 
-Releases contain binaries for Linux, macOS, Windows and FreeBSD. Their `SHA256SUMS` file is signed with
-the key in [`signing-key.asc`](signing-key.asc) (fingerprint `AD3A 4658 4EB1 012F 07D2 B6BC 182A 3416 0F87 F08F`):
+To verify a download by hand:
 
 ```sh
 gpg --import signing-key.asc
-gpg --verify terraform-provider-fdp_0.2.0_SHA256SUMS.sig terraform-provider-fdp_0.2.0_SHA256SUMS
+gpg --verify terraform-provider-fdp_0.3.0_SHA256SUMS.sig terraform-provider-fdp_0.3.0_SHA256SUMS
+sha256sum --check --ignore-missing terraform-provider-fdp_0.3.0_SHA256SUMS
 ```
 
 Development happens in [floren-data-platform-public](https://github.com/Floren-App/floren-data-platform-public)

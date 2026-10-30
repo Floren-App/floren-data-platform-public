@@ -7,46 +7,22 @@ under the address `floren-app/fdp`.
 
 ## Install the provider
 
-Each release on GitHub contains zipped binaries for Linux, macOS, Windows and FreeBSD, a
-`SHA256SUMS` file signed with the provider's GPG key (`signing-key.asc` in that repository)
-and the registry manifest. Once the provider is listed in the OpenTofu registry:
-
-```hcl
-terraform {
-  required_providers {
-    fdp = { source = "floren-app/fdp", version = "~> 0.2" }
-  }
-}
-```
-
-Until then, or in an air-gapped installation, download a release into a filesystem mirror, or
-build it from source as below. Verify a download first:
+The provider is not listed in a public registry. Each [GitHub release](https://github.com/Floren-App/terraform-provider-fdp/releases)
+contains zipped binaries for Linux, macOS, Windows and FreeBSD and a `SHA256SUMS` file signed with the provider's
+GPG key (`terraform/provider-fdp/signing-key.asc`, fingerprint `AD3A 4658 4EB1 012F 07D2 B6BC 182A 3416 0F87 F08F`).
+Install a release into a local filesystem mirror; the script verifies the signature and checksum first:
 
 ```sh
-gpg --import signing-key.asc
-gpg --verify terraform-provider-fdp_0.2.0_SHA256SUMS.sig terraform-provider-fdp_0.2.0_SHA256SUMS
-sha256sum --check --ignore-missing terraform-provider-fdp_0.2.0_SHA256SUMS
+scripts/install-provider.sh 0.3.0 "$HOME/.fdp-providers"               # this machine
+scripts/install-provider.sh 0.3.0 "$HOME/.fdp-providers" linux_amd64   # for example a CI runner
 ```
 
-## Build the provider from source
-
-From the checked-out FDP source, with the Go version in the provider's `go.mod`:
-
-```sh
-mkdir -p "$PWD/.providers/registry.opentofu.org/floren-app/fdp/0.2.0/$(go env GOOS)_$(go env GOARCH)"
-cd terraform/provider-fdp
-go build -ldflags '-X main.version=0.2.0' \
-  -o "../../.providers/registry.opentofu.org/floren-app/fdp/0.2.0/$(go env GOOS)_$(go env GOARCH)/terraform-provider-fdp_v0.2.0" .
-cd ../..
-```
-
-Create a CLI configuration outside any credentials file. Replace the mirror path
-with the absolute `.providers` directory created above:
+Point OpenTofu at the mirror with a CLI configuration outside any credentials file:
 
 ```hcl title="provider-installation.tfrc"
 provider_installation {
   filesystem_mirror {
-    path    = "/absolute/path/to/fdp/.providers"
+    path    = "/home/you/.fdp-providers"
     include = ["registry.opentofu.org/floren-app/fdp"]
   }
   direct {
@@ -55,17 +31,29 @@ provider_installation {
 }
 ```
 
-Set `TF_CLI_CONFIG_FILE` to its absolute filename. In each configuration root:
+Set `TF_CLI_CONFIG_FILE` to its absolute filename (the `path` may also be relative to the directory you run
+`tofu` in). In each configuration root:
 
 ```hcl
 terraform {
   required_providers {
     fdp = {
       source  = "registry.opentofu.org/floren-app/fdp"
-      version = "0.2.0"
+      version = "0.3.0"
     }
   }
 }
+```
+
+### Build from source
+
+For an unreleased change, build into the same mirror layout from a checkout, with the Go version in the
+provider's `go.mod`:
+
+```sh
+target="$HOME/.fdp-providers/registry.opentofu.org/floren-app/fdp/0.3.1-dev/$(go env GOOS)_$(go env GOARCH)"
+mkdir -p "$target"
+(cd terraform/provider-fdp && go build -ldflags '-X main.version=0.3.1-dev' -o "$target/terraform-provider-fdp_v0.3.1-dev" .)
 ```
 
 Commit each root's dependency lock file. Do not commit the mirror binary, state,

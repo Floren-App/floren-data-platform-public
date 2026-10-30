@@ -9,6 +9,8 @@
 #                pinned to those images
 #   provider-v1.2.3  publishes the OpenTofu provider: Floren-App/terraform-provider-fdp receives the source
 #                and tag v1.2.3, and its own workflow builds the signed registry release
+# Only Floren-App/floren-data-platform-public publishes (images, releases, provider) and runs nightly; other copies
+# of this repository, such as a private development repository or a fork, run the tests only.
 name: pipeline
 
 on:
@@ -38,6 +40,7 @@ env:
 jobs:
   changes:
     name: Select tests
+    if: github.event_name != 'schedule' || github.repository == 'Floren-App/floren-data-platform-public'
     runs-on: ubuntu-24.04
     outputs:
       control-plane: ${{ steps.select.outputs.control-plane }}
@@ -196,6 +199,7 @@ jobs:
       always() && !cancelled() && !contains(needs.*.result, 'failure')
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && !startsWith(github.ref, 'refs/tags/provider-v')
+      && github.repository == 'Floren-App/floren-data-platform-public'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -285,7 +289,7 @@ jobs:
   release:
     name: Release ${{ github.ref_name }}
     needs: images
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'Floren-App/floren-data-platform-public'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -313,7 +317,7 @@ jobs:
   provider-release:
     name: Provider ${{ github.ref_name }}
     needs: provider
-    if: startsWith(github.ref, 'refs/tags/provider-v')
+    if: startsWith(github.ref, 'refs/tags/provider-v') && github.repository == 'Floren-App/floren-data-platform-public'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

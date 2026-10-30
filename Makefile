@@ -1,12 +1,7 @@
 # Floren Data Platform itself, with optional example storage for local testing (a PostgreSQL warehouse and
 # RustFS with Iceberg). Opt in with EXAMPLE_STORAGE=1 when running the examples.
 EXAMPLE_STORAGE ?= 0
-# Once installed, keep Pokemon's isolated warehouses/catalogs when restarting the platform.
-POKEMON_STORAGE ?= $(if $(wildcard deploy/pokemon/.env),1,0)
-ifeq ($(EXAMPLE_STORAGE)$(POKEMON_STORAGE),11)
-$(error Choose EXAMPLE_STORAGE=1 POKEMON_STORAGE=0 or the Pokemon overlay)
-endif
-COMPOSE := docker compose $(if $(filter 1,$(POKEMON_STORAGE)),--env-file deploy/pokemon/.env) -f deploy/compose/docker-compose.yml $(if $(filter 1,$(EXAMPLE_STORAGE)),-f deploy/compose/example-storage/docker-compose.yml) $(if $(filter 1,$(POKEMON_STORAGE)),-f deploy/pokemon/docker-compose.yml)
+COMPOSE := docker compose -f deploy/compose/docker-compose.yml $(if $(filter 1,$(EXAMPLE_STORAGE)),-f deploy/compose/example-storage/docker-compose.yml)
 CP := services/control-plane
 DOCS_VENV ?= .venv-docs
 DOCS_PYTHON ?= $(DOCS_VENV)/bin/python
@@ -28,7 +23,7 @@ docs-reference:
 	$(CP_PYTHON) scripts/docs_reference.py
 	cd terraform/provider-fdp && go run ./cmd/docs ../../docs/reference/terraform
 
-.PHONY: certs images runtime dev down seed storage-example desktop desktop-web test test-postgres test-sql test-ui test-helm test-helm-bootstrap test-layer-egress test-layer-tls test-certificate-renewal schema pokemon pokemon-verify
+.PHONY: certs images runtime dev down seed storage-example desktop desktop-web test test-postgres test-sql test-ui test-helm test-helm-bootstrap test-layer-egress test-layer-tls test-certificate-renewal schema
 
 # JSON Schema for fdp.json, generated from the control plane's models.
 schema:
@@ -168,10 +163,3 @@ test-e2e-install:
 # One-time browser setup: cd apps/desktop && npx playwright install chromium
 test-ui:
 	cd apps/desktop && npm run test:ui
-
-# English TCGdex project with isolated Test/Prod, managed identities and protected promotion.
-pokemon:
-	$(CP)/.venv/bin/python deploy/pokemon/setup.py
-
-pokemon-verify:
-	$(CP)/.venv/bin/python deploy/pokemon/verify.py
