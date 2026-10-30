@@ -11,7 +11,7 @@ import { SECURITY_PAGES, SecurityIcon } from "./Directory";
 import type { TabRef } from "./Tabs";
 import { ensureGitChoice } from "./GitCredentials";
 
-export type View = "home" | "apis" | "catalog" | "access" | "workspaces" | "workloads" | "data" | "compute" | "packages" | "admin";
+export type View = "home" | "apis" | "catalog" | "access" | "workspaces" | "workloads" | "data" | "kafka" | "compute" | "packages" | "admin";
 
 interface Props {
   view: View;
@@ -25,7 +25,7 @@ interface Props {
 export function Sidebar(props: Props) {
   const { view, hub } = props;
   const cache = useObjectCache();
-  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Security", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", compute: "Compute pools", packages: "Packages", admin: "Administration" }[view];
+  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Security", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Compute pools", packages: "Packages", admin: "Administration" }[view];
   return (
     <>
       <h2>
@@ -54,6 +54,7 @@ export function Sidebar(props: Props) {
         <p className="sidebar-note muted">Open a catalog object to explore lineage, governance, SLAs, or access. Results follow your current roles.</p>
       </>}
       {view === "data" && <DataPanel {...props} />}
+      {view === "kafka" && <KafkaPanel {...props} />}
       {view === "apis" && <ApisPanel {...props} />}
       {view === "compute" && <ComputePanel {...props} />}
       {view === "packages" && <PackagesPanel {...props} />}
@@ -292,9 +293,38 @@ function DataPanel({ hub, openTab, activeKey }: Props) {
       {sources.filter((s) => match(s.name) || accessibleSchemas(hub.resources, s.id).some((r) => match(r.name))).map((s) =>
         <SourceTreeNode key={s.id} source={s} hub={hub} search={search} activeKey={activeKey} openTab={openTab} />)}
     </ul>
-    {hub.resources.filter((r) => r.kind === "kafka" && match(r.name)).map((r) => <button key={r.id} className="nav-item" onClick={() => openTab(resourceTab(r))}><ProductIcon kind="kafka" size={16} />{r.name}</button>)}
     {!sources.length && <p className="sidebar-note muted">No data sources you can access. Ask a data source owner for access.</p>}
   </>;
+}
+
+function KafkaPanel({ hub, openTab, activeKey }: Props) {
+  const clusters = hub.resources.filter((r) => r.kind === "kafka");
+  return <>
+    <div className="section-title"><button className="section-link" onClick={() => openTab({ kind: "kafka-clusters", title: "Kafka" })}>All clusters</button></div>
+    <ul className="object-tree">{clusters.map((c) => <KafkaTreeNode key={c.id} cluster={c} activeKey={activeKey} openTab={openTab} />)}</ul>
+    {!clusters.length && <p className="sidebar-note muted">No Kafka clusters you can access. Ask a cluster owner for access.</p>}
+  </>;
+}
+
+/** A cluster with its topics, fetched when it is first expanded (a cluster can hold many topics). */
+function KafkaTreeNode({ cluster, activeKey, openTab }: { cluster: AccessResource; activeKey: string; openTab: Props["openTab"] }) {
+  const [open, setOpen] = useState(false);
+  const [topics, setTopics] = useState<AccessResource[]>();
+  const [error, setError] = useState("");
+  const layer = String(cluster.layer_id ?? cluster.config.layer_id ?? "");
+  const load = () => { setError(""); api.kafka.topics(layer).then(setTopics).catch((e: Error) => setError(e.message)); };
+  useEffect(() => { if (open && !topics) load(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <li><div className={`tree-node ${activeKey === `kafka:${cluster.id}` ? "selected" : ""}`}>
+    <button className="tree-expander" aria-label={`${open ? "Collapse" : "Expand"} Kafka cluster ${cluster.name}`} aria-expanded={open} onClick={() => setOpen(!open)}><IconChevron /></button>
+    <button className="tree-label tree-name" onClick={() => { setOpen(true); openTab(resourceTab(cluster)); }}><ProductIcon kind="kafka" size={16} />{cluster.name}</button>
+    <span className="muted tree-type">{cluster.layer_name ?? ""}</span>
+  </div>{open && <ul className="data-children" aria-label={`Topics in ${cluster.name}`}>
+    {error ? <li className="tree-message"><span className="error">{error}</span> <button className="text-button" onClick={load}>Retry</button></li>
+      : !topics ? <li className="tree-message muted" role="status">Loading…</li>
+      : !topics.length ? <li className="tree-message muted">No topics.</li>
+      : topics.map((t) => <li key={t.id}><button className={`tree-leaf ${activeKey === `kafka:${t.id}` ? "selected" : ""}`} onClick={() => openTab(resourceTab(t))}>
+          <ProductIcon kind="topic" size={16} /><span className="tree-name">{t.name}</span>{t.config.phase !== "Ready" && <span className="muted">{String(t.config.phase ?? "")}</span>}</button></li>)}
+  </ul>}</li>;
 }
 
 function SourceTreeNode({ source, hub, search, activeKey, openTab }: { source: AccessResource; hub: Hub; search: string; activeKey: string; openTab: Props["openTab"] }) {

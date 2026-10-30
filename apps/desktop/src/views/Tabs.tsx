@@ -23,9 +23,9 @@ import { PackageImportsView, PackagesView, PackageView } from "./Packages";
 import { QueryLogView } from "./QueryLog";
 import { rEnabled, type PackageKind } from "../api";
 
-import { KafkaView } from "./Kafka";
+import { KafkaClustersView, KafkaView } from "./Kafka";
 
-export type TabKind = "kafka" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
+export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
   | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
 
 export interface TabRef {
@@ -68,6 +68,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "run": return <RunTab id={tab.ref!} hub={hub} openTab={openTab} />;
     case "source": return <SourceView tab={tab} hub={hub} openTab={openTab} />;
     case "kafka": return <KafkaView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
+    case "kafka-clusters": return <KafkaClustersView hub={hub} openTab={openTab} />;
     case "data": return <DataSourcesView hub={hub} openTab={openTab} />;
     case "schema": return <SchemaView tab={tab} hub={hub} openTab={openTab} />;
     case "data-object": return <DataObjectView tab={tab} hub={hub} openTab={openTab} />;

@@ -193,12 +193,20 @@ test("Kafka opens topics lazily and keeps data roles on the topic permission pag
     return route.fulfill({ status: 404, json: {} });
   });
   await page.reload();
+  // Kafka has its own activity; Storage no longer lists it.
   await page.getByRole("button", { name: "Storage", exact: true }).click();
-  await expect(page.locator(".sidebar").getByRole("button", { name: "Event streaming", exact: true })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("button", { name: "Event streaming", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Kafka", exact: true }).click();
+  await expect(page.locator(".main").getByRole("button", { name: "Event streaming", exact: true })).toBeVisible();
+  const sidebar = page.locator(".sidebar");
+  await expect(sidebar.getByRole("button", { name: "Event streaming", exact: true })).toBeVisible();
   expect(topicLists).toBe(0);
-  await page.locator(".sidebar").getByRole("button", { name: "Event streaming", exact: true }).click();
-  await expect(page.locator(".main").getByRole("button", { name: "pokemon.cards", exact: true })).toBeVisible();
+  // Expanding the cluster in the tree loads its topics, aligned like other trees.
+  await sidebar.getByRole("button", { name: "Expand Kafka cluster Event streaming" }).click();
+  await expect(sidebar.getByRole("list", { name: "Topics in Event streaming" }).getByRole("button", { name: "pokemon.cards" })).toBeVisible();
   expect(topicLists).toBeGreaterThan(0); // React StrictMode may repeat effects in the dev server.
+  await sidebar.getByRole("button", { name: "Event streaming", exact: true }).click();
+  await expect(page.locator(".main").getByRole("button", { name: "pokemon.cards", exact: true })).toBeVisible();
   await page.locator(".main").getByRole("button", { name: "pokemon.cards", exact: true }).click();
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Permissions", exact: true }).click();
   const panel = page.getByRole("region", { name: "Permissions for pokemon.cards" });
@@ -1696,7 +1704,7 @@ test("Home starts with scoped activity and submits global search into the catalo
   const main = page.locator(".main"), nav = page.getByRole("navigation", { name: "Views" });
   await expect(main.getByRole("tab", { name: "Home", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(nav.locator(":scope > button").first()).toHaveAttribute("aria-label", /Home/); // The first section is Home.
-  expect(await nav.locator(":scope > button").evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label")))).toEqual(["Home", "Workspaces", "Workloads", "Storage", "APIs", "Packages", "Catalog", "Security", "Compute pools", "Documentation", "Administration"]);
+  expect(await nav.locator(":scope > button").evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label")))).toEqual(["Home", "Workspaces", "Workloads", "Storage", "Kafka", "APIs", "Packages", "Catalog", "Security", "Compute pools", "Documentation", "Administration"]);
   await expect(page.getByRole("button", { name: "Runs & apps", exact: true })).toHaveCount(0);
   await expect(main.getByRole("region", { name: "Your workspaces", exact: true })).toContainText("Pokemon Test workspace");
   await expect(main.getByRole("region", { name: "Recent runs", exact: true }).locator("li").first()).toContainText("Daily report");

@@ -4,7 +4,7 @@ import { currentUser, getServer, onSessionExpired, resetManager, setServer, sign
 import { useHub } from "./hub";
 import { ObjectCacheProvider } from "./cache";
 import {
-  IconPin, IconHome, IconBook, IconAccount, IconAdmin, IconCatalog, IconClose, IconCompute, IconApi, IconPackage, IconData, IconDeployed, IconSettings, IconWorkspaces,
+  IconPin, IconHome, IconBook, IconAccount, IconAdmin, IconCatalog, IconClose, IconCompute, IconApi, IconPackage, IconData, IconStream, IconDeployed, IconSettings, IconWorkspaces,
 } from "./components/Icons";
 import { MenuButton } from "./components/Menu";
 import { ProductIcon } from "./components/ProductIcon";
@@ -24,7 +24,8 @@ const viewForTab = (tab: TabRef): View => {
   if (["run", "runs", "workload", "deploy", "folder", "docs"].includes(tab.kind)) return "workloads";
   if (tab.kind.startsWith("catalog")) return "catalog";
   if (["apis", "api"].includes(tab.kind)) return "apis";
-  if (["data", "source", "schema", "data-object", "kafka"].includes(tab.kind)) return "data";
+  if (["kafka", "kafka-clusters"].includes(tab.kind)) return "kafka";
+  if (["data", "source", "schema", "data-object"].includes(tab.kind)) return "data";
   if (tab.kind === "pool") return "compute";
   if (tab.kind.startsWith("package")) return "packages";
   if (tab.kind.startsWith("admin-")) return "admin";
@@ -138,6 +139,8 @@ function Shell({ user }: { user: User }) {
     { id: "workspaces", label: "Workspaces", icon: <IconWorkspaces /> },
     { id: "workloads", label: "Workloads", icon: <IconDeployed /> },
     { id: "data", label: "Storage", icon: <IconData /> },
+    // Kafka is optional per layer: shown once a cluster is visible, or to admins who register one.
+    ...(hub.me?.is_admin || hub.resources.some((r) => r.kind === "kafka") ? [{ id: "kafka" as View, label: "Kafka", icon: <IconStream /> }] : []),
     { id: "apis", label: "APIs", icon: <IconApi /> },
     { id: "packages", label: "Packages", icon: <IconPackage /> },
     { id: "catalog", label: "Catalog", icon: <IconCatalog /> },
@@ -161,6 +164,7 @@ function Shell({ user }: { user: User }) {
       catalog: { kind: "catalog", title: "Catalog" },
       apis: { kind: "apis", ref: "internal", title: "API management" },
       data: { kind: "data", title: "Storage" },
+      kafka: { kind: "kafka-clusters", title: "Kafka" },
       compute: { kind: "pool", title: "Compute pools" },
       admin: { kind: "admin-sources", title: "Storage integrations" },
     };
