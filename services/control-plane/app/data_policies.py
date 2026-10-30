@@ -128,8 +128,9 @@ def mask_sql(method, expression, column, column_type, groups):
     elif method == "hash" and text:
         value = "to_hex(sha256(to_utf8(%s)))" % col
     elif method == "partial" and text:
-        value = ("CASE WHEN %(c)s IS NULL THEN NULL ELSE concat(repeat('*', greatest(length(%(c)s) - 4, 0)), "
-                 "substr(%(c)s, greatest(length(%(c)s) - 3, 1))) END") % {"c": col}
+        # Trino's repeat() builds arrays: pad with rpad. Values of 4 characters or fewer are fully hidden.
+        value = ("CASE WHEN %(c)s IS NULL THEN NULL WHEN length(%(c)s) <= 4 THEN rpad('', length(%(c)s), '*') "
+                 "ELSE concat(rpad('', length(%(c)s) - 4, '*'), substr(%(c)s, length(%(c)s) - 3)) END") % {"c": col}
     else:
         value = "NULL"
     return "CAST(%s AS %s)" % (value, kind)

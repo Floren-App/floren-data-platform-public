@@ -477,7 +477,7 @@ SAFE_SYSTEM_PROPERTIES = {"query_max_run_time", "query_max_execution_time", "que
                           "join_distribution_type", "join_reordering_strategy"}
 
 
-def validate_statement(text, prepared="", depth=0, on_create=None):
+def validate_statement(text, prepared="", depth=0, on_create=None, on_stats=None):
     """Require invoker security on views, even through client-side SQL wrappers.
 
     Engine access control handles table privileges. The engine's CreateView callback
@@ -498,6 +498,8 @@ def validate_statement(text, prepared="", depth=0, on_create=None):
         tokens = GatewayTokenizer().tokenize(text)
         if len(nodes) != 1 or nodes[0] is None:
             raise ValueError()
+        if on_stats and len(tokens) > 1 and tokens[0].text.upper() == "SHOW" and tokens[1].text.upper() == "STATS":
+            on_stats()
         for create in nodes[0].find_all(exp.Create):
             if on_create:
                 on_create(create)
@@ -508,7 +510,7 @@ def validate_statement(text, prepared="", depth=0, on_create=None):
         if tokens[0].text.upper() == "PREPARE":
             if len(tokens) < 4 or tokens[2].text.upper() != "FROM":
                 raise ValueError()
-            validate_statement(text[tokens[3].start:], depth=depth+1, on_create=on_create)
+            validate_statement(text[tokens[3].start:], depth=depth+1, on_create=on_create, on_stats=on_stats)
         if tokens[0].text.upper() == "EXPLAIN":
             i = 1
             while i < len(tokens) and tokens[i].text.upper() in {"ANALYZE", "VERBOSE"}:
@@ -521,7 +523,7 @@ def validate_statement(text, prepared="", depth=0, on_create=None):
                     i += 1
             if i >= len(tokens):
                 raise ValueError()
-            validate_statement(text[tokens[i].start:], prepared, depth=depth+1, on_create=on_create)
+            validate_statement(text[tokens[i].start:], prepared, depth=depth+1, on_create=on_create, on_stats=on_stats)
         if tokens[0].text.upper() == "EXECUTE":
             if len(tokens) < 2:
                 raise ValueError()
@@ -529,18 +531,18 @@ def validate_statement(text, prepared="", depth=0, on_create=None):
                 from sqlglot.tokens import TokenType
                 if len(tokens) < 3 or tokens[2].token_type != TokenType.STRING:
                     raise ValueError()
-                validate_statement(tokens[2].text, depth=depth+1, on_create=on_create)
+                validate_statement(tokens[2].text, depth=depth+1, on_create=on_create, on_stats=on_stats)
             else:
                 definitions = dict(p.split("=", 1) for p in prepared.split(",") if "=" in p)
                 definition = definitions.get(tokens[1].text)
                 if not definition:
                     raise HTTPException(422, "prepared statement definition is required")
-                validate_statement(unquote_plus(definition), depth=depth+1, on_create=on_create)
+                validate_statement(unquote_plus(definition), depth=depth+1, on_create=on_create, on_stats=on_stats)
         # A client can carry prepared definitions into later EXECUTE requests.
         if prepared:
             for part in prepared.split(","):
                 if "=" in part:
-                    validate_statement(unquote_plus(part.split("=", 1)[1]), depth=depth+1, on_create=on_create)
+                    validate_statement(unquote_plus(part.split("=", 1)[1]), depth=depth+1, on_create=on_create, on_stats=on_stats)
     except HTTPException:
         raise
     except (sqlglot.errors.SqlglotError, ValueError, IndexError):
@@ -555,6 +557,11 @@ def authorize_initial_creates(query, text, prepared='', catalog='', schema=''):
     """
     from copy import deepcopy
     from sqlglot import exp
+    if any(item.get("policies") for item in query.scope.values()) and "STATS" in (text + prepared).upper():
+        # Table statistics come from all rows and the real values, past row filters and column masks.
+        def refuse():
+            raise HTTPException(403, "SHOW STATS is not available while column masks or row filters apply to you")
+        validate_statement(text, prepared, on_stats=refuse)
     if "CREATE" not in text.upper() and not prepared:
         return
     scope = deepcopy(query.scope)

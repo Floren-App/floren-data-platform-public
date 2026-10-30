@@ -38,7 +38,8 @@ def test_is_member_resolves_per_caller():
     ('redact', 'date', 'CAST(NULL AS date)'),
     ('hash', 'varchar', 'CAST(to_hex(sha256(to_utf8("email"))) AS varchar)'),
     ('hash', 'bigint', 'CAST(NULL AS bigint)'),
-    ('partial', 'char(16)', "substr(\"email\", greatest(length(\"email\") - 3, 1))"),
+    ('partial', 'char(16)', "WHEN length(\"email\") <= 4 THEN rpad('', length(\"email\"), '*')"),
+    ('partial', 'varchar', "concat(rpad('', length(\"email\") - 4, '*'), substr(\"email\", length(\"email\") - 3))"),
     ('null', 'varchar); DROP TABLE x; --', 'CAST(NULL AS varchar)'),
 ])
 def test_mask_sql(method, column_type, expected):
@@ -187,3 +188,22 @@ def test_normalize_endpoint(governed):
     response = client.post('/v1/data-policies/normalize', headers=as_('ana'), json={'expression': "region='EU' -- x"})
     assert response.json() == {'expression': "region = 'EU'", 'member_groups': []}
     assert client.post('/v1/data-policies/normalize', headers=as_('ana'), json={'expression': '(SELECT 1)'}).status_code == 422
+
+
+def test_statistics_are_refused_while_policies_apply(governed, monkeypatch):
+    client, schema_id, readers, auditors = governed
+    assert policy(client, schema_id, table='customers', kind='row_filter', expression="region = 'EU'",
+                  exempt_groups=[auditors]).status_code == 201
+    admitted(client, monkeypatch, 'bob')  # exempt: nothing applies, so statistics stay available
+    with SessionLocal() as db:
+        exempt = db.scalars(select(SqlQuery).order_by(SqlQuery.created_at.desc())).first()
+        sql_access.authorize_initial_creates(exempt, 'SHOW STATS FOR finance.reporting.customers')
+    admitted(client, monkeypatch, 'ana')
+    with SessionLocal() as db:
+        query = db.scalars(select(SqlQuery).order_by(SqlQuery.created_at.desc())).first()
+        for text in ('SHOW STATS FOR finance.reporting.customers', 'show  stats for (SELECT * FROM customers)',
+                     'EXPLAIN SHOW STATS FOR customers', "EXECUTE IMMEDIATE 'SHOW STATS FOR customers'"):
+            with pytest.raises(HTTPException) as refused:
+                sql_access.authorize_initial_creates(query, text)
+            assert refused.value.status_code == 403, text
+        sql_access.authorize_initial_creates(query, 'SELECT stats FROM customers')

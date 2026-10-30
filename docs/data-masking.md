@@ -16,7 +16,7 @@ HTTP API. A workload sees what its identity is allowed to see.
 | `null` | `NULL` | any |
 | `redact` | `****` | text; other types show `NULL` |
 | `hash` | SHA-256 of the value, as hex: equal values stay equal, so joins and counts still work | text; other types show `NULL` |
-| `partial` | the last four characters, the rest as `*` (`************4242`) | text; other types show `NULL` |
+| `partial` | the last four characters, the rest as `*` (`************4242`); values of four characters or fewer are fully hidden | text; other types show `NULL` |
 | `expression` | your own Trino SQL expression over the table's columns | any; cast to the column's type |
 
 Examples of expressions:
@@ -107,6 +107,8 @@ Every change is recorded in the [audit trail](audit-and-siem.md) as `data_policy
 - **Iceberg metadata tables** (`customers$files`, `customers$partitions` and the others) expose
   column bounds and partition values, so they are refused for a table with policies that apply
   to the caller.
+- **Statistics**: `SHOW STATS` is refused while a mask or filter applies to the caller, because table
+  statistics (value ranges, null counts) come from all rows and the real values.
 - **Native database logins** (the legacy direct PostgreSQL connections) are refused for schemas
   with policies; those schemas are reachable only through governed SQL. Iceberg storage is
   already reachable only through SQL.
