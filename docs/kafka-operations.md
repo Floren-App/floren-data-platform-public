@@ -52,7 +52,7 @@ kafka = {
 
 Merge this with the layer's existing infrastructure configuration. Configure the
 issuer in the layer namespace first. Alternatively supply an existing `kafka-tls`
-Secret containing `tls.crt` and `tls.key`. The certificate needs the bootstrap
+Secret containing `tls.crt` and `tls.key` (PKCS#8: Kafka cannot read SEC1 `EC PRIVATE KEY`). The certificate needs the bootstrap
 service DNS and broker headless-service DNS names; see the generated Certificate.
 The issuing CA must be in the platform's public trust bundle, which is propagated
 to SDK runtimes. Broker private keys stay in the layer.

@@ -96,6 +96,15 @@ def test_cilium_gets_the_api_server_entity_for_the_same_pods_only():
     assert controller.RESOURCES['CiliumNetworkPolicy'][0] == '/apis/cilium.io/v2'
 
 
+def test_cert_manager_key_is_pkcs8_for_kafka():
+    """Kafka's PEM keystore cannot read SEC1 EC keys; found on the live cluster."""
+    documents = manifests(ID, 'fdp-layer-'+ID, spec(kafka={'enabled':True,'warehouse':'streaming','replicas':3,
+        'image':'fdp/kafka:1','tls':{'mode':'cert_manager','secret_name':'kafka-tls',
+        'issuer':{'name':'layers','kind':'ClusterIssuer'}}}), CONFIG, PLAN)
+    certificate = next(d for d in documents if d['kind']=='Certificate')
+    assert certificate['spec']['privateKey']['encoding'] == 'PKCS8'
+
+
 def test_opt_in_requires_managed_tls_warehouse_and_authorizer():
     from pydantic import ValidationError
     for patch in ({'enabled':False}, {'kafka':{'enabled':True}},

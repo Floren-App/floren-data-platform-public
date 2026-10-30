@@ -95,7 +95,8 @@ def manifests(layer_id, namespace, spec, config, plan):
         docs.insert(0, obj('Certificate', 'fdp-kafka', {'spec':{'secretName':k.tls.secret_name,
             'issuerRef':k.tls.issuer.model_dump(), 'dnsNames':sans,
             'duration':f'{k.tls.duration_hours}h', 'renewBefore':f'{k.tls.renew_before_hours}h',
-            'privateKey':{'algorithm':'ECDSA','size':256,'rotationPolicy':'Always'}}}, 'cert-manager.io/v1'))
+            # Kafka's PEM keystore reads PKCS#8 only (cert-manager's default for ECDSA is SEC1).
+            'privateKey':{'algorithm':'ECDSA','size':256,'encoding':'PKCS8','rotationPolicy':'Always'}}}, 'cert-manager.io/v1'))
     # Retiring pauses Strimzi reconciliation first; brokers must be stopped explicitly
     # by the operator because an empty KRaft quorum is not a valid normal desired state.
     if spec.retired:
