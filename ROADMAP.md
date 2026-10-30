@@ -7,38 +7,8 @@ issue to discuss one.
 
 ## Next
 
-Suggested order: column masking and row filters, Kafka, the semantic layer, models in the platform, then the
-agent, which benefits from all of them. Warehouses scoped by layer and kind of work, the base for placing these,
-are available.
-
-### Column masking and row filters
-
-Today access is granted per schema; everyone who may read a table sees all of its rows and columns.
-
-- Column masks: a mask per column (null, hash, partial such as the last four characters, redact, or a SQL
-  expression), applied unless the caller holds an unmasking grant; assigned by role, and by tag once tags exist
-  (for example every column tagged as personal data).
-- Row filters: a SQL condition per table for groups or identities, which may use identity attributes from the
-  IdP (for example only rows of the caller's region), so people and workloads see only their rows.
-- Enforced by each layer's Trino through its access-control column masks and row filters, so the same rules
-  apply in the SQL editor, apps, dbt, Airflow and the API; workloads get the masks of the identity they run as.
-- Managed in the app, the API and OpenTofu, visible in the catalog, audited and exported to the SIEM; direct
-  database access that would bypass Trino is refused for protected tables. Tests show views and joins cannot
-  get around a mask or filter.
-
-### Semantic layer on Apache Ossie
-
-[Apache Ossie](https://incubator.apache.org/) (incubating, formerly Open Semantic Interchange) is the
-vendor-neutral YAML specification for semantic models: datasets, relationships, fields, metrics and AI context.
-
-- Semantic models as governed catalog objects bound to registered tables, with the same IAM, layer and lineage
-  as the tables underneath; KPI definitions become Ossie metrics.
-- Import and export Ossie YAML in the app, the API, OpenTofu and Git (deployed with GitOps), and sync models on
-  a schedule from Ossie-speaking sources (dbt's semantic layer, Apache Polaris, BI tools) through API
-  management, with review before a published model changes.
-- Metrics compiled to SQL on the layer's Trino with the caller's permissions, so a metric never reveals more
-  than its tables; models shown in lineage (table, model, metric, app).
-- A pinned Ossie version while the specification is incubating; vendor extensions kept intact.
+Suggested order: Kafka, the semantic layer, models in the platform, then the agent, which benefits from all of
+them. Warehouses scoped by layer and kind of work, and column masks and row filters, are available.
 
 ### Apache Kafka as a workload type
 
@@ -77,7 +47,8 @@ vendor-neutral YAML specification for semantic models: datasets, relationships, 
 ## Data governance
 
 - Tags on columns, tables, schemas and other data objects.
-- Masks and row filters assigned by tag (see column masking and row filters above).
+- Column masks and row filters assigned by tag (masks and filters per table are available).
+- Row filters on identity attributes from the IdP, for example a person's region.
 - Compliance forms attached to a group's access to data or programs.
 - Policies built on tags, such as "access to this tag needs a compliance form" or "workspaces never read this
   tag", with enforcement and visible risks or violations.
