@@ -66,6 +66,22 @@ def test_resources_validate_against_pinned_strimzi_crds():
     assert next(d for d in documents if d['kind']=='KafkaNodePool')['spec']['storage']['deleteClaim'] is False
 
 
+def test_network_policies_select_brokers_by_the_labels_strimzi_keeps():
+    """Strimzi replaces app.kubernetes.io/* labels on broker pods; found on the live cluster."""
+    documents = manifests(ID, 'fdp-layer-'+ID, spec(), CONFIG, PLAN)
+    kafka = next(d for d in documents if d['kind']=='Kafka')['spec']['kafka']
+    pod = kafka['template']['pod']['metadata']['labels']
+    live = {k:v for k,v in pod.items() if not k.startswith('app.kubernetes.io/')}
+    policies = {d['metadata']['name']:d['spec'] for d in documents if d['kind']=='NetworkPolicy'}
+    def selects(selector, labels):
+        return (all(labels.get(k)==v for k,v in selector.get('matchLabels',{}).items()) and
+                all(labels.get(e['key']) in e['values'] for e in selector.get('matchExpressions',[])))
+    assert selects(policies['kafka-internal']['podSelector'], live)
+    # Brokers read their certificate Secrets from the API at startup (Strimzi config provider).
+    assert selects(policies['kafka-topic-operator-api']['podSelector'], live)
+    assert not selects(policies['kafka-topic-operator-api']['podSelector'], {**live,'fdp.floren.app/role':'stream'})
+
+
 def test_opt_in_requires_managed_tls_warehouse_and_authorizer():
     from pydantic import ValidationError
     for patch in ({'enabled':False}, {'kafka':{'enabled':True}},
