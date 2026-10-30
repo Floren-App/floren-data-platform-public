@@ -34,6 +34,7 @@
             "podCidrs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"type":"string","minLength":3}},
             "serviceCidrs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"type":"string","minLength":3}},
             "nodeCidrs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"type":"string","minLength":3}},
+            "cilium":{"enum":["auto",true,false,"true","false"]},
             "kafkaApiServerCidrs":{"type":"array","maxItems":32,"uniqueItems":true,"items":{"type":"string","pattern":"^.+/(32|128)$"}},
             "protectedCidrs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"type":"string","minLength":3}}
           }

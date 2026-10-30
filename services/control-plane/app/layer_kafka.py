@@ -129,6 +129,13 @@ def manifests(layer_id, namespace, spec, config, plan):
             {'key':'fdp.floren.app/role','operator':'In','values':['kafka','kafka-operator']}]},
         'policyTypes':['Egress'], 'egress':[{'to':[{'ipBlock':{'cidr':str(n)}} for n in api_networks],
             'ports':[{'protocol':'TCP','port':443},{'protocol':'TCP','port':6443}]}]}},'networking.k8s.io/v1'))
+    if config.cilium:
+        # Cilium matches the API server only as its kube-apiserver entity, not by ipBlock (unless
+        # policy-cidr-match-mode includes nodes): the same pods, the same ports, nothing else.
+        docs.append(obj('CiliumNetworkPolicy','kafka-api-server',{'spec':{
+            'endpointSelector':docs[-1]['spec']['podSelector'],
+            'egress':[{'toEntities':['kube-apiserver'],'toPorts':[{'ports':[
+                {'port':'443','protocol':'TCP'},{'port':'6443','protocol':'TCP'}]}]}]}},'cilium.io/v2'))
     return docs
 
 

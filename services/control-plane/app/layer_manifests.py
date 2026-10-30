@@ -134,6 +134,8 @@ class ControllerConfig:
     shared_database_namespace: str = ""
     kafka_policy_key: str = field(default='', repr=False)
     kafka_api_server_cidrs: tuple = ()
+    # Cilium does not match the API server with ipBlock rules: also allow its kube-apiserver entity.
+    cilium: bool = False
 
     def __post_init__(self):
         for value in (self.platform_namespace, self.installation, self.namespace_prefix,

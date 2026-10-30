@@ -68,3 +68,9 @@ imagePullSecrets:
 {{- .Values.openbao.addr -}}
 {{- end -}}
 {{- end -}}
+
+{{/* "true" when the layer controller writes CiliumNetworkPolicies (layerController.network.cilium: auto detects Cilium). */}}
+{{- define "fdp.layerCilium" -}}
+{{- $cilium := toString (dig "cilium" "auto" .Values.layerController.network) -}}
+{{- if or (eq $cilium "true") (and (eq $cilium "auto") (.Capabilities.APIVersions.Has "cilium.io/v2/CiliumNetworkPolicy")) -}}true{{- end -}}
+{{- end -}}
