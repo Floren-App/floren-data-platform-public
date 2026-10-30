@@ -59,7 +59,6 @@ them. Warehouses scoped by layer and kind of work, and column masks and row filt
 
 - Versioned migrations of the platform's own metadata database across several releases.
 - arm64 images; signed, notarized desktop app builds.
-- Pod security level `restricted` for every platform pod.
 - Node placement options in the chart; more tested Kubernetes distributions (EKS, AKS, GKE, OpenShift); verified
   Microsoft Entra ID and Okta; more data connectors.
 
