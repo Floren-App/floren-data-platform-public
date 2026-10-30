@@ -80,6 +80,12 @@ def test_network_policies_select_brokers_by_the_labels_strimzi_keeps():
     # Brokers read their certificate Secrets from the API at startup (Strimzi config provider).
     assert selects(policies['kafka-topic-operator-api']['podSelector'], live)
     assert not selects(policies['kafka-topic-operator-api']['podSelector'], {**live,'fdp.floren.app/role':'stream'})
+    # The topic operator reaches the brokers' internal listener (found on the live cluster: egress denied).
+    operator = {**live,'fdp.floren.app/role':'kafka-operator'}
+    rule = policies['kafka-topic-operator']
+    assert selects(rule['podSelector'], operator) and not selects(rule['podSelector'], live)
+    assert [p['port'] for p in rule['egress'][0]['ports']] == [9091]
+    assert selects(rule['egress'][0]['to'][0]['podSelector'], live)
 
 
 def test_cilium_gets_the_api_server_entity_for_the_same_pods_only():
@@ -94,6 +100,15 @@ def test_cilium_gets_the_api_server_entity_for_the_same_pods_only():
     assert cilium['spec']['egress'] == [{'toEntities':['kube-apiserver'],'toPorts':[{'ports':[
         {'port':'443','protocol':'TCP'},{'port':'6443','protocol':'TCP'}]}]}]
     assert controller.RESOURCES['CiliumNetworkPolicy'][0] == '/apis/cilium.io/v2'
+
+
+def test_cert_manager_key_is_pkcs8_for_kafka():
+    """Kafka's PEM keystore cannot read SEC1 EC keys; found on the live cluster."""
+    documents = manifests(ID, 'fdp-layer-'+ID, spec(kafka={'enabled':True,'warehouse':'streaming','replicas':3,
+        'image':'fdp/kafka:1','tls':{'mode':'cert_manager','secret_name':'kafka-tls',
+        'issuer':{'name':'layers','kind':'ClusterIssuer'}}}), CONFIG, PLAN)
+    certificate = next(d for d in documents if d['kind']=='Certificate')
+    assert certificate['spec']['privateKey']['encoding'] == 'PKCS8'
 
 
 def test_opt_in_requires_managed_tls_warehouse_and_authorizer():
