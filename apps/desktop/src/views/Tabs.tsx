@@ -23,11 +23,14 @@ import { PackageImportsView, PackagesView, PackageView } from "./Packages";
 import { QueryLogView } from "./QueryLog";
 import { rEnabled, type PackageKind } from "../api";
 
-export type TabKind = "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
+import { KafkaView } from "./Kafka";
+
+export type TabKind = "kafka" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
   | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
 
 export interface TabRef {
   kind: TabKind;
+  kafkaKind?: "cluster" | "topic";
   ref?: string;
   title: string;
   section?: ObjectSection;
@@ -64,6 +67,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "workspace": return <WorkspaceTab id={tab.ref!} hub={hub} openTab={openTab} />;
     case "run": return <RunTab id={tab.ref!} hub={hub} openTab={openTab} />;
     case "source": return <SourceView tab={tab} hub={hub} openTab={openTab} />;
+    case "kafka": return <KafkaView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
     case "data": return <DataSourcesView hub={hub} openTab={openTab} />;
     case "schema": return <SchemaView tab={tab} hub={hub} openTab={openTab} />;
     case "data-object": return <DataObjectView tab={tab} hub={hub} openTab={openTab} />;
@@ -97,7 +101,7 @@ function Usage({ used, max }: { used: number; max: number }) {
   return <span className="warehouse-usage"><span className={`meter ${used >= max ? "full" : ""}`} role="meter" aria-valuemin={0} aria-valuemax={max} aria-valuenow={used} aria-label="Slots in use"><span style={{ width: `${share * 100}%` }} /></span>{used} / {max}</span>;
 }
 
-const CATEGORY: Record<WarehouseOccupant["category"], string> = { job: "Job", app: "App", airflow: "Airflow", trino: "SQL engine", workspace: "Workspace" };
+const CATEGORY: Record<WarehouseOccupant["category"], string> = { job: "Job", app: "App", airflow: "Airflow", trino: "SQL engine", kafka: "Kafka brokers", workspace: "Workspace" };
 
 function PoolView({ name, hub, openTab }: { name?: string; hub: Hub; openTab: (tab: TabRef) => void }) {
   const [overview, setOverview] = useState<WarehouseOverview[] | null>(null);

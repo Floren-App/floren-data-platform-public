@@ -5,6 +5,11 @@ type: application
 version: 0.1.0
 appVersion: "0.1.0"
 dependencies:
+  - name: strimzi-kafka-operator
+    alias: kafkaOperator
+    version: "1.2.0"
+    repository: https://strimzi.io/charts/
+    condition: kafkaOperator.enabled
   # MIT-licensed gateway; configured to read dynamic routes from the control plane.
   - name: traefik
     version: "32.1.1"

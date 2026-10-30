@@ -291,9 +291,14 @@ def resources(db: Session = Depends(get_db), user: User = Depends(get_actor)):
     db.commit()
     # Retain old IAM records for history, but never expose retired/missing workloads
     # as navigable objects. Packages have their own pages (and can be many). Service accounts have their own lifecycle and remain manageable.
-    all_resources = [r for r in db.scalars(select(Resource))
-                     if r.kind not in ("layer", "package") and (r.kind != "service" or r.config.get("service_account") or r.id in workload_resources)]
+    registry = list(db.scalars(select(Resource)))
+    all_resources = [r for r in registry
+                     if r.kind not in ("layer", "package", "topic") and not (r.kind == "kafka" and r.config.get("deleted")) and (r.kind != "service" or r.config.get("service_account") or r.id in workload_resources)]
     visible = {r.id for r in all_resources if browsing_allowed(db, user, r)}
+    # Kafka topics load lazily, but topic-only grants must still reveal the cluster
+    # name needed to navigate to them. No child topic metadata enters the hub payload.
+    visible.update(t.parent_id for t in registry
+                   if t.kind == 'topic' and not t.config.get('deleted') and browsing_allowed(db, user, t))
     # Show only names of ancestors required to navigate an authorized descendant.
     for r in all_resources:
         if r.id in visible:
@@ -438,6 +443,8 @@ def read_resource(resource_id: str, db: Session = Depends(get_db), user: User = 
     user = current(db, user)
     r = get_resource(db, resource_id)
     rbac.require(db, user, "read", r)
+    if r.kind in ('kafka', 'topic') and r.config.get('deleted'):
+        raise HTTPException(404, 'Kafka object not found')
     return resource_out(db, r, user)
 
 

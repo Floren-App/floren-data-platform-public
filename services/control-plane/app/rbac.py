@@ -193,7 +193,7 @@ def roles_for(resource: Resource) -> dict:
         return API_ROLES
     if resource.kind in PACKAGE_KINDS:
         return PACKAGE_ROLES
-    return DATA_ROLES if resource.kind in ("source", "schema") else PROGRAM_ROLES
+    return DATA_ROLES if resource.kind in ("source", "schema", "kafka", "topic") else PROGRAM_ROLES
 
 
 def role_grants(db: Session, user: User, resource_ids=None) -> list:

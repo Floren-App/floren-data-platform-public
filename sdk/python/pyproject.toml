@@ -7,10 +7,11 @@ license = { text = "Apache-2.0" }
 dependencies = ["httpx>=0.27"]
 
 [project.optional-dependencies]
+kafka = ["kafka-python>=2.3.3,<3"]
 sql = ["sqlalchemy>=2.0", "trino[sqlalchemy]>=0.336"]
 s3 = ["boto3>=1.34"]
 lake = ["boto3>=1.34", "pyiceberg>=0.9"]
-all = ["fdp[sql,lake]"]
+all = ["fdp[sql,lake,kafka]"]
 
 [project.scripts]
 fdp = "fdp.cli:main"

@@ -23,6 +23,16 @@ def resource(docs, kind, name):
     return next(doc for doc in docs if doc['kind']==kind and doc['metadata']['name']==name)
 
 
+def test_kafka_operator_is_opt_in_and_uses_restricted_operand_security():
+    assert not any(d['kind'] in ('Kafka','KafkaNodePool') for d in render())
+    assert not any(d['kind']=='Deployment' and d['metadata']['name']=='strimzi-cluster-operator' for d in render())
+    docs=render('--set','kafkaOperator.enabled=true','--set','layerController.enabled=true')
+    operator=resource(docs,'Deployment','strimzi-cluster-operator')
+    env={v['name']:v for v in operator['spec']['template']['spec']['containers'][0]['env']}
+    assert env['STRIMZI_POD_SECURITY_PROVIDER_CLASS']['value']=='io.strimzi.plugin.security.profiles.impl.RestrictedPodSecurityProvider'
+    assert not any(d['kind'] in ('Kafka','KafkaNodePool') for d in docs), 'Installing the operator must not start brokers'
+
+
 def test_control_plane_startup_and_readiness_use_metadata_checks_but_liveness_does_not():
     for docs in (render(), bundled()):
         container = resource(docs, 'Deployment', 'fdp-control-plane')['spec']['template']['spec']['containers'][0]
@@ -100,7 +110,8 @@ def test_layer_controller_is_opt_in_and_runtime_has_no_cluster_binding():
     binding = next(d for d in docs if d['kind'] == 'ClusterRoleBinding')
     assert binding['subjects'] == [{'kind': 'ServiceAccount', 'name': 'fdp-layer-controller', 'namespace': 'fdp'}]
     privileged = resource(docs, 'ClusterRole', binding['roleRef']['name'])
-    assert all('delete' not in r['verbs'] and '*' not in r['resources'] for r in privileged['rules'])
+    assert all('*' not in r['resources'] and ('delete' not in r['verbs'] or
+        (r['apiGroups'] == ['kafka.strimzi.io'] and r['resources'] == ['kafkatopics'])) for r in privileged['rules'])
     # Generated layer node secrets are create-only: the controller can never read one back.
     assert all(r['verbs'] == ['create'] for r in privileged['rules'] if 'secrets' in r['resources'])
     assert [r for r in privileged['rules'] if 'bind' in r['verbs']] == [{

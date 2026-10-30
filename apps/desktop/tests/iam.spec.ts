@@ -178,6 +178,36 @@ async function openSchema(page: Page, source = "finance-dw") {
   await expect(page.getByRole("region", { name: "Permissions for reporting" })).toBeVisible();
 }
 
+test("Kafka opens topics lazily and keeps data roles on the topic permission page", async ({ page }) => {
+  const state = await setup(page);
+  const cluster = resource("kafka-cluster", "kafka", "Event streaming", null, { layer_id: "1a0000000002", broker_count: 1 });
+  const topic = resource("card-topic", "topic", "pokemon.cards", cluster.id, { layer_id: "1a0000000002", phase: "Ready", partitions: 3, replication_factor: 1, retention_ms: 604800000, cleanup_policy: "delete" });
+  topic.actions.push("ddl"); cluster.actions.push("ddl");
+  state.resources.push(cluster);
+  let topicLists = 0;
+  await page.route("https://iam.test/api/v1/kafka/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/clusters/kafka-cluster")) return route.fulfill({ json: cluster });
+    if (path.endsWith("/topics/card-topic")) return route.fulfill({ json: topic });
+    if (path.endsWith("/topics")) { topicLists++; return route.fulfill({ json: [topic] }); }
+    return route.fulfill({ status: 404, json: {} });
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  await expect(page.locator(".sidebar").getByRole("button", { name: "Event streaming", exact: true })).toBeVisible();
+  expect(topicLists).toBe(0);
+  await page.locator(".sidebar").getByRole("button", { name: "Event streaming", exact: true }).click();
+  await expect(page.locator(".main").getByRole("button", { name: "pokemon.cards", exact: true })).toBeVisible();
+  expect(topicLists).toBeGreaterThan(0); // React StrictMode may repeat effects in the dev server.
+  await page.locator(".main").getByRole("button", { name: "pokemon.cards", exact: true }).click();
+  await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Permissions", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Permissions for pokemon.cards" });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByLabel("Role", { exact: true })).toHaveValue("Reader");
+  await expect(panel.getByRole("option", { name: /Executor/ })).toHaveCount(0);
+  await expect(panel).toContainText("Consumer groups are isolated by identity");
+});
+
 test("platform metadata has a SQL tab with results and validated mutation errors", async ({ page }) => {
   const state = await setup(page);
   const schema = state.resources.find((r) => r.id === "pg-reporting")!;
@@ -593,8 +623,9 @@ test("IAM has separate group user and service pages with explicit identity origi
   await expect(main.getByRole('cell', { name: 'Platform admin', exact: true })).toBeVisible();
   await expect(main.getByRole('heading', { name: 'App security groups', exact: true })).toBeVisible();
   await navigation.getByRole('button', { name: 'Services', exact: true }).click();
-  await expect(main.getByRole('columnheader', { name: 'Identity source', exact: true })).toBeVisible();
-  await expect(main.getByRole('cell', { name: 'App-managed', exact: true }).first()).toBeVisible();
+  await expect(main.getByRole('columnheader', { name: 'Execution identity', exact: true })).toBeVisible();
+  await expect(main.getByRole('cell', { name: 'Caller for data requests', exact: true }).first()).toBeVisible();
+  await expect(main.getByRole('cell', { name: 'External / shared identity', exact: true })).toBeVisible();
   expect(state.errors).toEqual([]);
   await page.screenshot({ path: test.info().outputPath('iam-services.png') });
 });
@@ -1665,7 +1696,7 @@ test("Home starts with scoped activity and submits global search into the catalo
   const main = page.locator(".main"), nav = page.getByRole("navigation", { name: "Views" });
   await expect(main.getByRole("tab", { name: "Home", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(nav.locator(":scope > button").first()).toHaveAttribute("aria-label", /Home/); // The first section is Home.
-  expect(await nav.locator(":scope > button").evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label")))).toEqual(["Home", "Workspaces", "Workloads", "Storage", "APIs", "Packages", "Catalog", "Security", "Compute pools", "Administration"]);
+  expect(await nav.locator(":scope > button").evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label")))).toEqual(["Home", "Workspaces", "Workloads", "Storage", "APIs", "Packages", "Catalog", "Security", "Compute pools", "Documentation", "Administration"]);
   await expect(page.getByRole("button", { name: "Runs & apps", exact: true })).toHaveCount(0);
   await expect(main.getByRole("region", { name: "Your workspaces", exact: true })).toContainText("Pokemon Test workspace");
   await expect(main.getByRole("region", { name: "Recent runs", exact: true }).locator("li").first()).toContainText("Daily report");

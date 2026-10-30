@@ -292,6 +292,7 @@ function DataPanel({ hub, openTab, activeKey }: Props) {
       {sources.filter((s) => match(s.name) || accessibleSchemas(hub.resources, s.id).some((r) => match(r.name))).map((s) =>
         <SourceTreeNode key={s.id} source={s} hub={hub} search={search} activeKey={activeKey} openTab={openTab} />)}
     </ul>
+    {hub.resources.filter((r) => r.kind === "kafka" && match(r.name)).map((r) => <button key={r.id} className="nav-item" onClick={() => openTab(resourceTab(r))}><ProductIcon kind="kafka" size={16} />{r.name}</button>)}
     {!sources.length && <p className="sidebar-note muted">No data sources you can access. Ask a data source owner for access.</p>}
   </>;
 }

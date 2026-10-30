@@ -159,7 +159,7 @@ def pub_out(pub: Workload, user: User, with_events: bool = False) -> WorkloadOut
     access_issue = data_access_issue(db, User(username=issue["username"], principal_id=issue.get("principal_id")),
                                    issue["sources"], user) if issue else None
     execution_state = "on_demand"
-    if pub.kind in ("app", "airflow"):
+    if pub.kind in ("app", "airflow", "stream"):
         try:
             execution_state = get_orchestrator().status(pub.execution_ref) if pub.execution_ref else "missing"
         except Exception:
@@ -226,6 +226,8 @@ def create_workload(body: DeployIn, db: Session = Depends(get_db), orch: Orchest
         raise HTTPException(422, {"message": f"program {body.program!r} not found at {commit.sha[:12]}",
                                   "errors": errors})
     layers.require_program_layer(db, program, layer_id)
+    if program.kind == 'stream' and body.execution_mode != 'fixed':
+        raise HTTPException(422, 'Continuous streams require a fixed managed identity; there is no interactive caller')
     ident = _identity_for(db, body.run_as, user) if body.run_as else user
     from ..environments import bind
     ident = bind(db, ident, Resource(kind="service", config={"layer_id": layer_id}))
@@ -293,6 +295,8 @@ def update_workload(pub_id: str, body: WorkloadPatch, db: Session = Depends(get_
     if not _can_manage(pub, user):
         raise HTTPException(403, "only the deployer or an admin can change this")
     changes = body.model_dump(exclude_none=True)
+    if pub.kind == 'stream' and changes.get('execution_mode', pub.execution_mode) != 'fixed':
+        raise HTTPException(422, 'Continuous streams require a fixed managed identity')
     resource = rbac.workload_resource(db, pub)
     if "allowed_groups" in changes:
         raise HTTPException(422, "manage visibility using app-group role assignments")
@@ -317,7 +321,7 @@ def update_workload(pub_id: str, body: WorkloadPatch, db: Session = Depends(get_
     deploying.event(db, pub, "settings_changed", f"{user.username} changed {', '.join(changes)}"
                      + (" — redeploying" if redeploy and pub.deployed_sha else ""))
     db.commit()
-    if redeploy and pub.deployed_sha and pub.kind in ("app", "airflow", "dbt"):
+    if redeploy and pub.deployed_sha and pub.kind in ("app", "airflow", "dbt", "stream"):
         deploying.schedule_deploy(SessionLocal, get_orchestrator(), pub.id, pub.deployed_sha, "settings changed")
     return pub_out(pub, user, with_events=True)
 
@@ -409,6 +413,8 @@ def run_deployed(pub_id: str, body: DeployedRunIn, db: Session = Depends(get_db)
 
 def _start_deployed(db: Session, orch: Orchestrator, pub: Workload, user: User, args: dict,
                      pool: Optional[str]):
+    if pub.kind == "stream":
+        raise HTTPException(409, "Continuous streams run as deployments; use deployment controls to update or stop them")
     if pub.kind in ("app", "airflow"):
         raise HTTPException(409, f"{pub.kind} workloads are opened, not run")
     if pub.status != "live" or not pub.deployed_sha:
@@ -465,7 +471,7 @@ def orchestrate(body: OrchestrateIn, db: Session = Depends(get_db), orch: Orches
         if program is None:
             raise HTTPException(404, f"program {body.program!r} is not in {pub.repo.name} at {pub.deployed_sha[:12]}"
                                      + (f" ({'; '.join(errors)})" if errors else ""))
-        if program.kind in ("app", "airflow"):
+        if program.kind in ("app", "airflow", "stream"):
             raise HTTPException(409, f"{program.kind} programs cannot be run as a task")
         plan = checked_plan(body.program, program, body.args, granted, db=db, actor=caller)
         # Same commit and production settings as the Airflow deployment itself.
@@ -486,7 +492,7 @@ def orchestrate(body: OrchestrateIn, db: Session = Depends(get_db), orch: Orches
             raise HTTPException(404, "workspace not found")
         req = RunIn(workspace_id=ws.id, program=body.program, args=body.args, pool=body.warehouse)
         plan, pool_name = _plan(req, db, orch, ws, caller, granted)
-        if plan.kind in ("app", "airflow"):
+        if plan.kind in ("app", "airflow", "stream"):
             raise HTTPException(409, f"{plan.kind} programs cannot be run as a task")
         return run_out(start_run(db, orch, caller, plan, pool_name, ws.id, body.program))
     raise HTTPException(422, "use 'workload' with a service token")

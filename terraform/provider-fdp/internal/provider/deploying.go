@@ -229,7 +229,7 @@ func (r *workloadResource) Schema(ctx context.Context, _ resource.SchemaRequest,
 	replace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 	computed := []planmodifier.String{stringplanmodifier.UseStateForUnknown()}
 	resp.Schema = schema.Schema{
-		Description: "A program deployed from a repository branch (job, app, dbt or Airflow), kept in sync with the " +
+		Description: "A program deployed from a repository branch (job, app, dbt, Airflow or continuous stream), kept in sync with the " +
 			"branch. Apply waits until it is live. Promotion, branch protection and execution-identity rules still apply. Import by ID.",
 		Attributes: map[string]schema.Attribute{
 			"id":            schema.StringAttribute{Computed: true, PlanModifiers: computed},

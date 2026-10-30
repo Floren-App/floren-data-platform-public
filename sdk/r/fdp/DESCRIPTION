@@ -13,6 +13,7 @@ Imports:
     methods,
     DBI
 Suggests:
+    reticulate,
     shiny,
     httpuv,
     rstudioapi,

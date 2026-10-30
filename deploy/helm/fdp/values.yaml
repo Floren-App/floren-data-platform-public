@@ -3,6 +3,15 @@
 # is configured with OpenTofu or in the app, never here. A Helm upgrade never changes that configuration; where a
 # value below is only a default for it, that is said next to the value. See docs/configuration.md.
 
+# Optional cluster-wide operator. Leave disabled when the cluster already has a
+# compatible Strimzi operator; enabling this does not create any layer brokers.
+kafkaOperator:
+  enabled: false
+  watchAnyNamespace: true
+  extraEnvs:
+    - name: STRIMZI_POD_SECURITY_PROVIDER_CLASS
+      value: io.strimzi.plugin.security.profiles.impl.RestrictedPodSecurityProvider
+
 image:
   repository: fdp/control-plane
   tag: "0.1.0"
@@ -25,6 +34,9 @@ layerController:
     podCidrs: []
     serviceCidrs: []
     nodeCidrs: []
+    # Kafka topic operator only: exact API service + API endpoint addresses.
+    # Host CIDRs only (/32 IPv4, /128 IPv6), never whole Pod/Service ranges.
+    kafkaApiServerCidrs: []
     # Additional platform-only networks/endpoints outside the cluster, e.g. the
     # external metadata database. These are also excluded from data-source grants.
     protectedCidrs: []

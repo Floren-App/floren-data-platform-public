@@ -77,8 +77,13 @@ class OIDCVerifier:
             )
         except (jwt.PyJWTError, httpx.HTTPError) as exc:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"invalid token: {exc}") from exc
+        username = claim(claims, s.oidc_username_claim) or claims["sub"]
+        # These prefixes select internal managed identities in the RBAC resolver.
+        # A verified IdP username is still an external name, never such an identity.
+        if not isinstance(username, str) or username.startswith(('service:', 'sa:')):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'IdP username uses a reserved managed-identity prefix')
         return User(
-            username=claim(claims, s.oidc_username_claim) or claims["sub"],
+            username=username,
             roles=list(claim(claims, s.oidc_roles_claim) or []),
             groups=normalize_groups(claim(claims, s.oidc_groups_claim)),
             admin_role=s.admin_role, subject=claims["sub"], issuer=claims["iss"],

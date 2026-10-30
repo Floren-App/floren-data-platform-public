@@ -19,7 +19,8 @@ Confirm the source revision, configuration and integration checks for your deplo
 | Bundled services | Keycloak, PostgreSQL and RustFS are optional and single-instance, not highly available; bring your own for HA |
 | Provider distribution | Signed GitHub releases of Floren-App/terraform-provider-fdp, installed into a filesystem mirror (`scripts/install-provider.sh`); not listed in a public registry |
 | Documentation versions | This site follows main; historical Markdown is available at source commits |
-| Kafka / AI agent | Not available yet; both are planned (see the roadmap) |
+| Kafka | Phase 1 (managed Kafka per layer, governed topics, stream workloads) is not yet accepted on a live cluster; connectors, schemas and external access are planned |
+| AI agent | Not available yet; planned (see the roadmap) |
 
 The [installation guide](kubernetes-install.md#what-is-not-supported-yet) and
 [SQL execution guide](query-execution.md) describe additional backend limitations. See

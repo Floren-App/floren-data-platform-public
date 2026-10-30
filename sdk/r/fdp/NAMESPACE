@@ -22,6 +22,8 @@ export(api_call)
 S3method(print, fdp_files)
 
 export(query)
+export(kafka_producer)
+export(kafka_consumer)
 import(DBI)
 exportClasses(FDPConnection, FDPResult)
 importFrom(methods, setClass, setMethod)

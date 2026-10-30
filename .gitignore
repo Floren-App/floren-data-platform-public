@@ -9,6 +9,7 @@ sdk/python/build/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 .DS_Store
+/images/kafka/authorizer/target/
 deploy/compose/certs/
 deploy/helm/fdp/charts/
 apps/desktop/test-results/

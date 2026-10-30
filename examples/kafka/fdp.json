@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "programs": {
+    "pokemon-publish": {
+      "kind": "script",
+      "entrypoint": "publish_cards.py",
+      "description": "Publish a small English TCGDex card inventory through a governed Kafka topic",
+      "requirements": "requirements.txt"
+    },
+    "pokemon-stream-landing": {
+      "kind": "stream",
+      "entrypoint": "land_cards.py",
+      "description": "Land governed card events as traceable JSON batches before committing offsets",
+      "requirements": "requirements.txt"
+    }
+  }
+}

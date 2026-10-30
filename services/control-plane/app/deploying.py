@@ -105,6 +105,8 @@ def _aware(dt: datetime) -> datetime:
 
 def _ready_path(pub: Workload) -> str:
     """Where a new version must answer before it goes live."""
+    if pub.kind == "stream":
+        return '/healthz'
     if pub.kind == "airflow":
         return f"/p/{pub.slug}/health"
     # Streamlit serves under its base URL path; Shiny is served at / behind a stripped prefix.
@@ -376,7 +378,7 @@ def deploy(db: Session, orch: Orchestrator, git: GitClient, pub: Workload, sha: 
             require_program_layer(db, program, resource_layer(db, workload_resource(db, pub)))
         except HTTPException as exc:
             problem = str(exc.detail)
-    if not problem and pub.kind in ("app", "dbt") and pub.execution_mode == "fixed":
+    if not problem and pub.kind in ("app", "dbt", "stream") and pub.execution_mode == "fixed":
         granted = {d.name for d in granted_sources(db, ident)}
         missing = [d for d in program.data_sources if d not in granted]
         if missing:
@@ -395,7 +397,7 @@ def deploy(db: Session, orch: Orchestrator, git: GitClient, pub: Workload, sha: 
     except SecretAccessError as exc:
         return _failed(db, pub, sha, f"secrets: {exc}")
     old_ref = None
-    if pub.kind in ("app", "airflow", "dbt"):
+    if pub.kind in ("app", "airflow", "dbt", "stream"):
         pool = db.scalar(select(ComputePool).where(ComputePool.name == pub.warehouse))
         if pool is None:
             return _failed(db, pub, sha, f"warehouse {pub.warehouse!r} no longer exists")
@@ -422,7 +424,7 @@ def deploy(db: Session, orch: Orchestrator, git: GitClient, pub: Workload, sha: 
                                               layer=_managed_layer(db, ident.environment_id))
         if not ok:
             return _failed(db, pub, sha, why)
-    elif pub.kind in ("app", "airflow"):
+    elif pub.kind in ("app", "airflow", "stream"):
         spec = deployed_service_spec(s, pub.id, pub.slug, sha, program, pool, rt.image, ident.username,
                                       ident.groups, granted_sources(db, ident),
                                       extra_env=pub.env or {}, secret_env=secret_env)
@@ -575,7 +577,7 @@ def check(db: Session, orch: Orchestrator, secrets: SecretStore, pub: Workload) 
         event(db, pub, "update_found", f"new commit on {pub.branch}: {git.commit(pub.repo.id, head).subject}", head)
         db.commit()
         return head, "update"
-    if pub.kind in ("app", "airflow") and pub.deployed_sha:
+    if pub.kind in ("app", "airflow", "stream") and pub.deployed_sha:
         refs = [r for r in {pub.execution_ref, *(pub.execution_refs or [])} if r] or [None]
         down = [r or "container" for r in refs if (orch.status(r) if r else "missing") != "running"]
         if down:

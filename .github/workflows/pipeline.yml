@@ -77,7 +77,7 @@ jobs:
           }
           { echo "### Tests for this change"; [ "$full" = true ] && echo "All suites: $reason."; echo; echo "| Suite | |"; echo "|---|---|"; } >> "$GITHUB_STEP_SUMMARY"
           suite control-plane services/control-plane deploy sdk schemas images examples terraform scripts
-          suite sdk sdk/python
+          suite sdk sdk/python examples/kafka
           suite provider terraform/provider-fdp docs/reference/terraform
           suite web apps/desktop extensions/vscode-fdp
           suite chart deploy/helm scripts/release_chart.py
@@ -100,6 +100,7 @@ jobs:
       - name: Chart dependencies (the chart tests render it)
         run: |
           helm repo add traefik https://traefik.github.io/charts
+          helm repo add strimzi https://strimzi.io/charts/
           helm dependency build deploy/helm/fdp
       - run: pip install -e 'services/control-plane[dev]'
       - working-directory: services/control-plane
@@ -117,6 +118,25 @@ jobs:
       - run: pip install -e 'sdk/python[all]' pytest
       - working-directory: sdk/python
         run: python -m pytest -q
+
+  kafka:
+    name: Kafka TLS, OAuth and IAM integration
+    needs: changes
+    if: needs.changes.outputs.control-plane == 'true' || needs.changes.outputs.sdk == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip, cache-dependency-path: services/control-plane/pyproject.toml }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven, cache-dependency-path: images/kafka/authorizer/pom.xml }
+      - run: pip install -e 'services/control-plane[dev]' -e 'sdk/python[kafka]'
+      - working-directory: images/kafka/authorizer
+        run: mvn -B -Pintegration verify dependency:build-classpath -Dmdep.outputFile="$RUNNER_TEMP/kafka-classpath"
+      - name: Real KRaft broker, isolated temporary data
+        env:
+          FDP_KAFKA_TEST_CLASSPATH: ${{ runner.temp }}/kafka-classpath
+        run: python -m pytest services/control-plane/tests/test_kafka_broker.py -q
 
   provider:
     name: OpenTofu provider
@@ -166,6 +186,7 @@ jobs:
         with: { version: v3.16.4 }
       - run: |
           helm repo add traefik https://traefik.github.io/charts
+          helm repo add strimzi https://strimzi.io/charts/
           helm dependency build deploy/helm/fdp
       - name: Lint and render every example profile
         run: |
@@ -193,7 +214,7 @@ jobs:
 
   images:
     name: Image ${{ matrix.image }}
-    needs: [changes, control-plane, sdk, provider, web, chart, docs]
+    needs: [changes, control-plane, sdk, kafka, provider, web, chart, docs]
     # After the selected tests: none may have failed (skipped ones did not apply to this change).
     if: >-
       always() && !cancelled() && !contains(needs.*.result, 'failure')
@@ -212,15 +233,16 @@ jobs:
           # inputs: every file the image is built from; an image is rebuilt only when they change.
           - { image: control-plane,     context: services/control-plane, dockerfile: services/control-plane/Dockerfile,
               inputs: services/control-plane/app services/control-plane/pyproject.toml services/control-plane/Dockerfile }
+          - { image: kafka, context: ., dockerfile: images/kafka/Dockerfile, inputs: images/kafka }
           - { image: compute-python,    context: ., dockerfile: images/compute-python/Dockerfile, inputs: images/compute-python sdk/python }
           - { image: compute-r,         context: ., dockerfile: images/compute-r/Dockerfile,
-              inputs: images/compute-r sdk/r/fdp images/common/Rprofile-packages.site }
+              inputs: images/compute-r sdk/python sdk/r/fdp images/common/Rprofile-packages.site }
           - { image: compute-dbt,       context: ., dockerfile: images/compute-dbt/Dockerfile, inputs: images/compute-dbt sdk/python }
           - { image: airflow,           context: ., dockerfile: images/airflow/Dockerfile, inputs: images/airflow sdk/python }
           - { image: workspace-vscode,  context: ., dockerfile: images/workspace-vscode/Dockerfile,
               inputs: images/workspace-vscode images/common schemas extensions/vscode-fdp sdk/python }
           - { image: workspace-rstudio, context: ., dockerfile: images/workspace-rstudio/Dockerfile,
-              inputs: images/workspace-rstudio images/common sdk/r/fdp }
+              inputs: images/workspace-rstudio images/common sdk/python sdk/r/fdp }
           - { image: workspace-sql,     context: ., dockerfile: images/workspace-sql/Dockerfile, inputs: images/workspace-sql }
           - { image: web,               context: ., dockerfile: images/web/Dockerfile,
               inputs: "images/web apps/desktop :(exclude)apps/desktop/tests" }
@@ -304,6 +326,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           python3 scripts/release_chart.py "$VERSION"
           helm repo add traefik https://traefik.github.io/charts
+          helm repo add strimzi https://strimzi.io/charts/
           helm dependency build deploy/helm/fdp
           helm package deploy/helm/fdp -d dist
           cosign sign-blob --yes --bundle "dist/fdp-$VERSION.tgz.sigstore.json" "dist/fdp-$VERSION.tgz"

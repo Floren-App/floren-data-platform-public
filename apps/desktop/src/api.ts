@@ -53,7 +53,7 @@ export type DataPolicyChange = Pick<DataPolicy, "method" | "expression" | "exemp
 export interface AccessResource {
   owner_group_id?: string | null; owner_group_name?: string | null;
   layer_id?: string | null; layer_name?: string | null;
-  id: string; name: string; kind: "root" | "folder" | "service" | "source" | "schema" | "api-root" | "api" | "api-group" | "api-operation" | "package-root" | "package";
+  id: string; name: string; kind: "root" | "folder" | "service" | "source" | "schema" | "kafka" | "topic" | "api-root" | "api" | "api-group" | "api-operation" | "package-root" | "package";
   parent_id: string | null; object_id: string | null; config: Record<string, unknown>; actions: string[];
   /** Sources and schemas: a data role here/on a parent, or protected Global Admin access. */
   data_access?: boolean;
@@ -133,8 +133,8 @@ export interface DataChild {
 export interface DataChildren { children: DataChild[]; next_cursor: string | null }
 export interface DataLocation { schemaId: string; table?: string; path?: string; item?: DataChild }
 
-export type WorkloadKind = "script" | "notebook" | "app" | "dbt" | "airflow";
-export const WORKLOAD_KINDS: WorkloadKind[] = ["script", "notebook", "app", "dbt", "airflow"];
+export type WorkloadKind = "script" | "notebook" | "app" | "dbt" | "airflow" | "stream" | "kafka";
+export const WORKLOAD_KINDS: WorkloadKind[] = ["script", "notebook", "app", "dbt", "airflow", "stream", "kafka"];
 
 export interface Pool {
   id: string;
@@ -170,7 +170,7 @@ export interface WorkspaceSettings {
 }
 
 export interface WarehouseOccupant {
-  category: "job" | "app" | "airflow" | "trino" | "workspace";
+  category: "job" | "app" | "airflow" | "trino" | "kafka" | "workspace";
   kind: string;
   state: "running" | "queued";
   slots: number;
@@ -261,7 +261,7 @@ export interface Workspace {
   created_at: string;
 }
 
-export type RunKind = "script" | "notebook" | "app" | "dbt" | "airflow";
+export type RunKind = "script" | "notebook" | "app" | "dbt" | "airflow" | "stream";
 
 export interface Run {
   initiated_by: string | null;
@@ -640,6 +640,16 @@ export interface OrchestratorRun { dag_id: string; run_id: string; state: string
 export interface OrchestratorHistory { runs: OrchestratorRun[]; dags: string[] }
 
 export const api = {
+  kafka: {
+    clusters: () => request<AccessResource[]>("GET", "/v1/kafka/clusters"),
+    cluster: (id: string) => request<AccessResource>("GET", `/v1/kafka/clusters/${id}`),
+    register: (layer: string) => request<AccessResource>("POST", `/v1/kafka/clusters/${layer}`),
+    topics: (layer: string) => request<AccessResource[]>("GET", `/v1/kafka/topics?${new URLSearchParams({ layer_id: layer })}`),
+    topic: (id: string) => request<AccessResource>("GET", `/v1/kafka/topics/${id}`),
+    create: (body: unknown) => request<AccessResource>("POST", "/v1/kafka/topics", body),
+    update: (id: string, body: unknown) => request<AccessResource>("PUT", `/v1/kafka/topics/${id}`, body),
+    remove: (id: string) => request<void>("DELETE", `/v1/kafka/topics/${id}`),
+  },
   warehouses: () => request<WarehouseOverview[]>("GET", "/v1/compute/warehouses"),
   selectActiveGroup: (group_id: string) => request<{active_group_id: string; name: string}>("PUT","/v1/me/active-group",{group_id}),
   layers: {

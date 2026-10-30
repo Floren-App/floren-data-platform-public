@@ -26,7 +26,7 @@ from sqlalchemy import and_, or_, select, update
 
 from .db import SessionLocal
 from .layer_infrastructure import InfrastructureSpec
-from .layer_manifests import (ControllerConfig, INTERNAL_SECRET, LAYER, OWNER, ProvisioningError, WorkerPlan,
+from .layer_manifests import (ControllerConfig, INTERNAL_SECRET, LAYER, OWNER, COMPONENT, ProvisioningError, WorkerPlan,
                               generated_credentials, manifests, worker_plan)
 from .models import LayerOperation, Resource, utcnow
 
@@ -34,6 +34,9 @@ LEASE_SECONDS = 90
 ACTIVE_PHASES = ('Pending', 'Provisioning', 'InfrastructureReady')
 READY_FILE = Path('/tmp/fdp-layer-controller-ready')
 RESOURCES = {
+    'Kafka': ('/apis/kafka.strimzi.io/v1', 'kafkas', True),
+    'KafkaNodePool': ('/apis/kafka.strimzi.io/v1', 'kafkanodepools', True),
+    'KafkaTopic': ('/apis/kafka.strimzi.io/v1', 'kafkatopics', True),
     'Namespace': ('/api/v1', 'namespaces', False),
     'NetworkPolicy': ('/apis/networking.k8s.io/v1', 'networkpolicies', True),
     'ResourceQuota': ('/api/v1', 'resourcequotas', True),
@@ -112,6 +115,8 @@ class KubernetesResources:
             try:
                 return self.request('POST', collection, document)
             except ApiException as create_error:
+                if document['kind'] in ('Kafka', 'KafkaNodePool', 'KafkaTopic') and create_error.status == 404:
+                    raise ProvisioningError('StrimziUnavailable', 'Install the supported Strimzi operator and v1 CRDs before enabling Kafka') from None
                 if document['kind'] == 'Certificate' and create_error.status == 404:
                     raise ProvisioningError('CertificateManagerUnavailable', 'Install cert-manager and its Certificate CRD before requesting certificate issuance') from None
                 raise
@@ -180,6 +185,16 @@ class KubernetesResources:
         except (OSError, ValueError):
             return False
 
+    def verify_kafka(self, hostname):
+        """Native TLS handshake only; no broker password or topic access needed."""
+        try:
+            context = ssl.create_default_context()
+            with socket.create_connection((hostname, 9093), timeout=5) as transport:
+                with context.wrap_socket(transport, server_hostname=hostname):
+                    return True
+        except (OSError, ValueError):
+            return False
+
 
 @dataclass(frozen=True)
 class Claim:
@@ -197,6 +212,7 @@ class Claim:
     workers: Optional[WorkerPlan] = None
     # Whether the layer allows workspaces (their editors start as root): sets the namespace's Pod Security level.
     workspaces: bool = True
+    kafka_workers: Optional[WorkerPlan] = None
 
 
 def claim_operation(session_factory=SessionLocal, now=None):
@@ -227,10 +243,12 @@ def claim_operation(session_factory=SessionLocal, now=None):
                 db.rollback()
                 continue
             spec = InfrastructureSpec.model_validate(layer.config.get('infrastructure', {}))
+            from .layer_kafka import broker_plan
             result = Claim(operation_id, layer.id, operation.generation, token, spec, ready=operation.phase == 'Ready',
                            source_catalogs=layer.config.get('source_catalogs', ''),
                            workers=worker_plan(db, spec, layer.config.get('trino_workers')),
-                           workspaces=bool(layer.config.get('workspaces', True)))
+                           workspaces=bool(layer.config.get('workspaces', True)),
+                           kafka_workers=broker_plan(db, spec, layer.id))
             # A periodic drift check keeps a ready layer admitting work while it runs.
             if operation.phase not in ('InfrastructureReady', 'Ready', 'Retired'):
                 operation.phase, operation.reason = 'Provisioning', 'Reconciling'
@@ -276,7 +294,8 @@ def monitor_certificates(claim, resources, namespace, issued, session_factory=Se
     from . import cert_monitor
     endpoints = [('trino', 8443, False, claim.spec.trino.tls.mode != 'disabled'),
                  ('postgres', 5432, True, claim.spec.postgres.enabled and claim.spec.postgres.tls.mode != 'disabled'),
-                 ('rustfs', 9000, False, claim.spec.rustfs.enabled and claim.spec.rustfs.tls.mode != 'disabled')]
+                 ('rustfs', 9000, False, claim.spec.rustfs.enabled and claim.spec.rustfs.tls.mode != 'disabled'),
+                 ('kafka-kafka-bootstrap', 9093, False, claim.spec.kafka.enabled)]
     try:
         with session_factory() as db:
             keys = []
@@ -344,11 +363,16 @@ def retire(claim, resources, config, session_factory):
         return
     try:
         for document in manifests(claim.layer_id, claim.generation, claim.spec, config, claim.source_catalogs,
-                                  claim.workers or _retired_workers(claim.spec), claim.workspaces):
+                                  claim.workers or _retired_workers(claim.spec), claim.workspaces, claim.kafka_workers):
             if document['kind'] == 'Deployment':
                 document['spec']['replicas'] = 0
             renew(claim, session_factory)
             resources.apply(document)
+        if claim.spec.kafka.enabled:
+            if not retire_kafka(claim, resources, namespace, config):
+                finish(claim, 'Provisioning', 'WaitingForKafkaPause',
+                       'Waiting for Strimzi to pause before stopping brokers; storage is retained', 10, session_factory)
+                return
     except ProvisioningError as exc:
         if exc.reason != 'ResourceTerminating':
             raise
@@ -371,7 +395,17 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
             return finish(claim, 'Retired', 'StorageRetained', 'Retirement check could not reach Kubernetes; retrying', 30, session_factory)
     try:
         documents = manifests(claim.layer_id, claim.generation, claim.spec, config, claim.source_catalogs, claim.workers,
-                              claim.workspaces)
+                              claim.workspaces, claim.kafka_workers)
+        if claim.spec.kafka.enabled:
+            try:
+                available = resources.request('GET', '/apis/kafka.strimzi.io/v1')
+            except ApiException as exc:
+                if exc.status == 404:
+                    raise ProvisioningError('StrimziUnavailable', 'Install the supported Strimzi operator and v1 CRDs before enabling Kafka') from None
+                raise
+            kinds = {r.get('name') for r in available.get('resources', [])}
+            if not {'kafkas', 'kafkanodepools', 'kafkatopics'} <= kinds:
+                raise ProvisioningError('StrimziUnavailable', 'The installed Strimzi API lacks required v1 resources')
         waiting = False
         certificate_waiting = False
         issued = {}  # cert-manager Certificate name -> status
@@ -398,12 +432,23 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
                           if not key.startswith('pod-security.')}
                 for name, values in generated_credentials(claim.spec):
                     resources.create_secret_once(namespace, name, labels, values())
+                if claim.spec.kafka.enabled:
+                    from .kafka_access import broker_credential
+                    from .layer_kafka import POLICY_SECRET
+                    resources.create_secret_once(namespace, POLICY_SECRET, labels,
+                        {'token':broker_credential(claim.layer_id, config.kafka_policy_key)})
+            if document['kind'] == 'Kafka':
+                state = applied.get('status', {})
+                waiting = waiting or not (state.get('observedGeneration', 0) >= applied['metadata'].get('generation', 1)
+                    and any(c.get('type') == 'Ready' and c.get('status') == 'True' for c in state.get('conditions', [])))
             if document['kind'] == 'Deployment':
                 for condition in applied.get('status', {}).get('conditions', []):
                     if condition.get('type') == 'Progressing' and condition.get('reason') == 'ProgressDeadlineExceeded':
                         raise ProvisioningError('StartupFailed', 'A layer deployment did not become ready before its startup deadline; check images, quota, volumes and pod events')
                 waiting = not deployment_ready(applied) or waiting
         monitor_certificates(claim, resources, namespace, issued, session_factory)
+        if claim.spec.kafka.enabled:
+            reconcile_kafka_topics(claim, resources, namespace, config, session_factory)
         if egress_problems:
             reason = egress_problems[0]
             message = ('Data-source egress is closed: configure layerController.network podCidrs, serviceCidrs and nodeCidrs, then retry layer provisioning'
@@ -422,6 +467,9 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
         elif claim.spec.trino.tls.mode != 'disabled' and not resources.verify_https('fdp-trino.%s.svc' % namespace):
             finish(claim, 'Provisioning', 'WaitingForVerifiedTLS',
                 'Trino HTTPS is not verified; check the platform CA bundle, layer certificate DNS/validity and endpoint connectivity', 10, session_factory)
+        elif claim.spec.kafka.enabled and not resources.verify_kafka('fdp-kafka-kafka-bootstrap.%s.svc' % namespace):
+            finish(claim, 'Provisioning', 'WaitingForVerifiedKafkaTLS',
+                'Kafka TLS is not verified; check trusted CA, broker certificate names and network policies', 10, session_factory)
         elif claim.spec.postgres.enabled and claim.spec.postgres.tls.mode != 'disabled' and not resources.verify_postgres('fdp-postgres.%s.svc' % namespace):
             finish(claim, 'Provisioning', 'WaitingForVerifiedPostgresTLS',
                 'PostgreSQL TLS is not verified; check the platform CA bundle, database certificate DNS/validity and endpoint connectivity', 10, session_factory)
@@ -442,6 +490,69 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
             30 if transient else 0, session_factory)
 
 
+def retire_kafka(claim, resources, namespace, config):
+    """After pausing Strimzi, stop its pod set without changing the retained quorum/PVCs."""
+    kafka = resources.request('GET', '/apis/kafka.strimzi.io/v1/namespaces/'+namespace+'/kafkas/fdp-kafka')
+    if not any(c.get('type') == 'ReconciliationPaused' and c.get('status') == 'True'
+               for c in kafka.get('status', {}).get('conditions', [])):
+        return False
+    selector = f'{OWNER}={config.installation},{LAYER}={claim.layer_id},{COMPONENT}=kafka'
+    for root, plural in (('/apis/core.strimzi.io/v1', 'strimzipodsets'),
+                         ('/apis/apps/v1', 'deployments')):
+        path = root+'/namespaces/'+namespace+'/'+plural
+        page = resources.api.call_api(path, 'GET', query_params=[('labelSelector', selector)])
+        for item in page.get('items', []):
+            meta = item['metadata']
+            if any(meta.get('labels', {}).get(k) != v for k, v in
+                   ((OWNER, config.installation), (LAYER, claim.layer_id), (COMPONENT, 'kafka'))):
+                raise ProvisioningError('OwnershipConflict', 'Refusing to stop an unowned Kafka resource')
+            # JSON Patch resourceVersion test prevents stopping a replaced object. No PVC deletion.
+            field, value = ('pods', []) if plural == 'strimzipodsets' else ('replicas', 0)
+            resources.api.call_api(path+'/'+meta['name'], 'PATCH', body=[
+                {'op':'test','path':'/metadata/resourceVersion','value':meta['resourceVersion']},
+                {'op':'replace','path':'/spec/'+field,'value':value}],
+                header_params={'Content-Type':'application/json-patch+json','Accept':'application/json'})
+    return True
+
+
+def reconcile_kafka_topics(claim, resources, namespace, config, session_factory):
+    from .layer_kafka import topic_manifest
+    with session_factory() as db:
+        identifiers = list(db.scalars(select(Resource.id).where(Resource.kind == 'topic',
+            Resource.config['layer_id'].as_string() == claim.layer_id,
+            Resource.config['phase'].as_string() != 'Deleted')))
+    for ident in identifiers:
+        renew(claim, session_factory, namespace)
+        with session_factory() as db:
+            topic = db.scalar(select(Resource).where(Resource.id == ident).with_for_update(skip_locked=True))
+            if topic is None:
+                continue
+            document = topic_manifest(topic, namespace, config.installation)
+            if topic.config.get('deleted'):
+                # Deletion is an explicit, authorized API operation, never implicit layer cleanup.
+                path = '/apis/kafka.strimzi.io/v1/namespaces/'+namespace+'/kafkatopics/'+document['metadata']['name']
+                try:
+                    found = resources.request('GET', path)
+                    if any(found.get('metadata', {}).get('labels', {}).get(k) != document['metadata']['labels'][k] for k in (OWNER,LAYER)):
+                        raise ProvisioningError('OwnershipConflict', 'Refusing to delete an unowned KafkaTopic')
+                    resources.request('DELETE', path, {'apiVersion':'v1','kind':'DeleteOptions',
+                        'preconditions':{'uid':found['metadata']['uid']}})
+                    phase = 'Deleting'
+                except ApiException as exc:
+                    if exc.status != 404:
+                        raise
+                    phase = 'Deleted'
+            else:
+                result = resources.apply(document)
+                state = result.get('status', {})
+                ready = state.get('observedGeneration', 0) >= result.get('metadata', {}).get('generation', 1) and any(
+                    c.get('type') == 'Ready' and c.get('status') == 'True' for c in state.get('conditions', []))
+                phase = 'Ready' if ready else 'Pending'
+            if topic.config.get('phase') != phase:
+                topic.config = {**topic.config, 'phase':phase}
+            db.commit()
+
+
 def main():
     config = ControllerConfig(
         platform_namespace=os.environ['FDP_LAYER_PLATFORM_NAMESPACE'],
@@ -452,6 +563,8 @@ def main():
         artifact_image=os.environ.get('FDP_LAYER_ARTIFACT_IMAGE', ''),
         shared_database_namespace=os.environ.get('FDP_LAYER_SHARED_DATABASE_NAMESPACE', ''),
         image_pull_secret=os.environ.get('FDP_LAYER_IMAGE_PULL_SECRET', ''),
+        kafka_policy_key=os.environ.get('FDP_SESSION_SIGNING_KEY', ''),
+        kafka_api_server_cidrs=tuple(json.loads(os.environ.get('FDP_LAYER_KAFKA_API_SERVER_CIDRS', '[]'))),
         egress_proxy=os.environ.get('FDP_LAYER_EGRESS_PROXY', '') == 'true',
         trust_file=os.environ.get('FDP_LAYER_TRUST_FILE', ''),
         pod_cidrs=tuple(json.loads(os.environ.get('FDP_LAYER_POD_CIDRS', '[]'))),

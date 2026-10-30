@@ -55,7 +55,7 @@ class PoolIn(BaseModel):
     dedicated: bool = Field(default=False, description="Dedicated to allowed_groups: no slot limit (max_concurrent does not apply), never queues")
     layer_ids: List[str] = Field(default_factory=list, max_length=50,
                                  description="Layers whose work may use this warehouse; empty: every layer")
-    workload_kinds: List[Literal["script", "notebook", "app", "dbt", "airflow"]] = Field(
+    workload_kinds: List[Literal["script", "notebook", "app", "dbt", "airflow", "stream", "kafka"]] = Field(
         default_factory=list, description="Kinds of work that may use this warehouse; empty: every kind")
 
     @field_validator("allowed_groups", "layer_ids", "workload_kinds", mode="before")

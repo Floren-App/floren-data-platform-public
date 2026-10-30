@@ -16,12 +16,24 @@ interface ObjectProps { tab: TabRef; hub: Hub; openTab: OpenTab }
 
 export function DataSourcesView({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const sources = accessibleSources(hub.resources);
+  const kafka = hub.resources.filter((r) => r.kind === "kafka");
+  const [registeringKafka, setRegisteringKafka] = useState(false);
+  const [kafkaLayer, setKafkaLayer] = useState("");
+  const [kafkaError, setKafkaError] = useState("");
+  const [kafkaBusy, setKafkaBusy] = useState(false);
   return <><PageHeader icon={<ProductIcon kind="data" size={22} />} title="Storage" subtitle="Storage connections contain schemas or storage namespaces. Expand them to browse tables, views, files and columns."
-      actions={hub.me?.is_admin && <button className="btn secondary" onClick={() => openTab({ kind: "admin-sources", title: "Storage integrations" })}>Storage integrations</button>} />
+      actions={hub.me?.is_admin && <><button className="btn secondary" onClick={() => setRegisteringKafka(!registeringKafka)}>Register Kafka</button><button className="btn secondary" onClick={() => openTab({ kind: "admin-sources", title: "Storage integrations" })}>Storage integrations</button></>} />
+    {registeringKafka && <form className="card" onSubmit={async (e) => {
+      e.preventDefault(); setKafkaBusy(true); setKafkaError("");
+      try { const result = await api.kafka.register(kafkaLayer); await hub.refresh(); setRegisteringKafka(false); openTab(resourceTab(result)); }
+      catch (e) { setKafkaError((e as Error).message); } finally { setKafkaBusy(false); }
+    }}><h2>Register managed Kafka</h2><p className="muted">Enable Kafka in this layer’s infrastructure with OpenTofu first. Registration makes its topics available for IAM and browsing.</p>
+      <label>Layer<select required value={kafkaLayer} onChange={(e) => setKafkaLayer(e.target.value)}><option value="">Choose a layer</option>{hub.layers.filter((l) => !kafka.some((r) => r.layer_id === l.id)).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+      {kafkaError && <p className="error" role="alert">{kafkaError}</p>}<button className="btn" disabled={kafkaBusy || !kafkaLayer}>{kafkaBusy ? "Registering…" : "Register"}</button></form>}
     <table><thead><tr><th>Storage connection</th><th>Type</th><th>Layer</th><th>Schemas you can access</th></tr></thead><tbody>{sources.map((s) => <tr key={s.id}>
       <td><button className="text-button object-name" onClick={() => openTab(resourceTab(s))}><ProductIcon kind={String(s.config.source_kind)} size={16} />{s.name}</button></td>
       <td>{String(s.config.source_kind ?? "")}</td><td>{s.layer_name || "—"}</td><td>{accessibleSchemas(hub.resources, s.id).length}</td>
-    </tr>)}{!sources.length && <tr><td colSpan={3} className="muted">No data sources you can access. Ask a data source owner for access.</td></tr>}</tbody></table>
+    </tr>)}{kafka.map((r) => <tr key={r.id}><td><button className="text-button object-name" onClick={() => openTab(resourceTab(r))}><ProductIcon kind="kafka" size={16} />{r.name}</button></td><td>Kafka</td><td>{r.layer_name}</td><td>Open to browse topics</td></tr>)}{!sources.length && !kafka.length && <tr><td colSpan={3} className="muted">No data sources you can access. Ask a data source owner for access.</td></tr>}</tbody></table>
   </>;
 }
 

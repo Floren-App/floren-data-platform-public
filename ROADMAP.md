@@ -14,8 +14,11 @@ them. Warehouses scoped by layer and kind of work, and column masks and row filt
 
 - Bring your own Kafka (registered like PostgreSQL and S3) or an optional Kafka per managed layer (KRaft), in
   the layer's namespace and network boundary.
-- Topics as governed resources: producer and consumer roles for groups and workload identities, translated to
-  Kafka ACLs; credentials issued per execution, never in code.
+- Topics as governed resources: roles for groups and workload identities, decided by the control plane for
+  every broker request (an authorizer plugin, like Trino's access control); short-lived platform tokens, never
+  credentials in code.
+- Status: the first phase is built (managed Kafka per layer with Strimzi, governed topics, SDKs, stream
+  workloads, app pages, OpenTofu) and is being accepted on a live cluster.
 - Stream programs (Python, with the SDK) and Kafka Connect connectors, including an Iceberg sink that lands
   streams as governed tables; lineage between topics, programs and tables; consumer lag in the compute
   overview and the catalog's SLAs.

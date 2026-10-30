@@ -143,11 +143,12 @@ class Program(BaseModel):
     description: str = ""
     layer: Optional[LayerReference] = Field(default=None, description="Layer name or stable ID. Only available in a matching workspace/workload layer; never grants access. Inherits the file's layer when omitted.")
     lineage: Optional[ProgramLineage] = Field(default=None, description="Optional manual dependencies for access outside Floren Data Platform. SQL, managed API calls, SDK files, dbt and Airflow capture lineage automatically. Does not grant data access.")
-    kind: Literal["script", "notebook", "app", "dbt", "airflow"] = Field(
+    kind: Literal["script", "notebook", "app", "dbt", "airflow", "stream"] = Field(
         default="script",
         description="script = run to completion; notebook = execute with papermill; app = Streamlit/Shiny server; "
                     "dbt = a dbt project (entrypoint = folder with dbt_project.yml); "
-                    "airflow = an Airflow deployment (entrypoint = folder with dags/).")
+                    "airflow = an Airflow deployment (entrypoint = folder with dags/); "
+                    "stream = a continuous Python/R consumer with managed identity and readiness.")
     entrypoint: str = Field(description="File or folder, relative to the fdp.json folder.")
     runtime: Optional[Literal["python", "r"]] = Field(default=None, description="Inferred from the entrypoint when omitted.")
     python: Optional[str] = Field(default=None, pattern=VERSION, description="Python version from the runtime catalog, e.g. 3.12.")
@@ -627,6 +628,9 @@ def program_command(kind: str, runtime: str, entrypoint: str, argv: List[str], a
         return [_DBT.format(project=e, main=main)]
     if kind == "airflow":
         return [_AIRFLOW.format(project=e, port=APP_PORT, base=base_path.rstrip("/"))]
+    if kind == "stream":
+        command = f"python {e} {rest}" if runtime == "python" else f"Rscript {e} {rest}"
+        return [f"python -m fdp.streaming -- {command}"]
     if kind == "script":
         return [f"python {e} {rest}" if runtime == "python" else f"Rscript {e} {rest}"]
     if kind == "notebook":

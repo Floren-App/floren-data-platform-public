@@ -88,6 +88,7 @@ export function DeployWizard({ hub, openTab, initialFolder }: { hub: Hub; openTa
   const choose = (name: string, p = pulled) => {
     setProgram(name);
     const def = p?.programs[name];
+    if (def?.kind === "stream") setExecutionMode("fixed");
     const base = slugify(name);
     const used = new Set(hub.workloads.map((pub) => pub.slug));
     let address = base;
@@ -218,7 +219,7 @@ export function DeployWizard({ hub, openTab, initialFolder }: { hub: Hub; openTa
           <div className="arg-grid">
             <div className="field">
               <label htmlFor="pub-mode">Data identity</label>
-              <select id="pub-mode" value={executionMode} onChange={(e) => setExecutionMode(e.target.value as "caller" | "fixed")}>
+              <select id="pub-mode" disabled={def?.kind === "stream"} value={executionMode} onChange={(e) => setExecutionMode(e.target.value as "caller" | "fixed")}>
                 <option value="fixed">Fixed service identity</option><option value="caller">Caller / logged-in viewer</option>
               </select>
             </div>
@@ -460,7 +461,7 @@ function ProductionSettings({ pub, onSave }: { pub: Workload; onSave: (patch: Pa
       {message && <p className="success-message" role="status">{message}</p>}
       <div className="arg-grid">
         <div className="field"><label htmlFor="ps-mode">Data identity</label>
-          <select id="ps-mode" value={mode} onChange={(e) => setMode(e.target.value as "caller" | "fixed")}>
+          <select id="ps-mode" disabled={pub.kind === "stream"} value={mode} onChange={(e) => setMode(e.target.value as "caller" | "fixed")}>
             <option value="caller">Caller / logged-in viewer</option><option value="fixed">Fixed service identity</option>
           </select></div>
         <div className="field"><label htmlFor="ps-runas">Run as</label>

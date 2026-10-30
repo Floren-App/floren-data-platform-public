@@ -193,6 +193,30 @@ class LayerIceberg(Contract):
     bucket: str = Field(default='lake', pattern=BUCKET)
 
 
+class KafkaInfrastructure(Contract):
+    """Opt-in Strimzi/KRaft cluster. The image must contain FDP's policy authorizer."""
+    enabled: bool = False
+    image: Optional[str] = Field(default=None, min_length=1, max_length=512)
+    version: Literal['4.3.1'] = '4.3.1'
+    warehouse: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    replicas: Literal[1, 3, 5] = 1
+    storage_class: Optional[str] = Field(default=None, max_length=253, pattern=DNS_NAME)
+    size: str = Field(default='20Gi', pattern=QUANTITY)
+    tls: CertificatePolicy = Field(default_factory=CertificatePolicy)
+    token_ttl_seconds: int = Field(default=300, ge=30, le=300)
+
+    @model_validator(mode='after')
+    def secured(self):
+        if self.enabled:
+            if not self.image or self.image.endswith(':latest') or (':' not in self.image.rsplit('/', 1)[-1] and '@sha256:' not in self.image):
+                raise ValueError('Kafka requires a pinned FDP Kafka image containing its authorizer')
+            if not self.warehouse:
+                raise ValueError('Kafka requires a warehouse for broker sizing')
+            if self.tls.mode == 'disabled':
+                raise ValueError('Kafka requires TLS with a platform-trusted certificate')
+        return self
+
+
 class InfrastructureSpec(Contract):
     version: Literal[1] = 1
     enabled: bool = False
@@ -205,9 +229,12 @@ class InfrastructureSpec(Contract):
     postgres: OptionalDatabase = Field(default_factory=OptionalDatabase)
     rustfs: OptionalObjectStore = Field(default_factory=OptionalObjectStore)
     iceberg: LayerIceberg = Field(default_factory=LayerIceberg)
+    kafka: KafkaInfrastructure = Field(default_factory=KafkaInfrastructure)
 
     @model_validator(mode='after')
     def managed_requirements(self):
+        if self.kafka.enabled and not self.enabled:
+            raise ValueError('Kafka requires managed layer infrastructure')
         if self.retired and not self.enabled:
             raise ValueError('only managed infrastructure can be retired')
         if self.iceberg.enabled:
@@ -291,6 +318,22 @@ def configure(db, layer_id, change, retry=False):
     current = InfrastructureSpec.model_validate(layer.config.get('infrastructure', {})).model_dump(mode='json')
     if change.spec.enabled and not change.spec.retired:
         require_worker_warehouse(db, change.spec, layer.id)
+        if change.spec.kafka.enabled:
+            from .kafka_access import broker_credential
+            broker_credential(layer.id)  # refuse known/weak development keys before queuing infrastructure
+            from .layer_kafka import broker_plan
+            from .layer_manifests import ProvisioningError
+            try:
+                broker_plan(db, change.spec, layer.id)
+            except ProvisioningError as exc:
+                raise HTTPException(422, exc.message) from None
+            if layer.config.get('production') and change.spec.kafka.replicas < 3:
+                raise HTTPException(422, 'Production Kafka requires at least three replicas')
+    if current.get('kafka', {}).get('enabled'):
+        if not desired['kafka']['enabled']:
+            raise HTTPException(409, 'Kafka storage cannot be disabled implicitly; retire it explicitly')
+        if any(current['kafka'][k] != desired['kafka'][k] for k in ('storage_class','size','replicas')):
+            raise HTTPException(409, 'Kafka storage and quorum changes require an explicit migration')
     if desired == current and not retry:
         return state(db, layer)
     if current['enabled'] and not desired['enabled']:
