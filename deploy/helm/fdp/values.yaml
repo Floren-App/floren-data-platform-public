@@ -34,7 +34,7 @@ layerController:
     podCidrs: []
     serviceCidrs: []
     nodeCidrs: []
-    # Kafka topic operator only: exact API service + API endpoint addresses.
+    # Kafka brokers and topic operator only: exact API service + API endpoint addresses.
     # Host CIDRs only (/32 IPv4, /128 IPv6), never whole Pod/Service ranges.
     kafkaApiServerCidrs: []
     # Additional platform-only networks/endpoints outside the cluster, e.g. the

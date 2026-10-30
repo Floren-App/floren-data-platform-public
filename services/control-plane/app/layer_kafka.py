@@ -105,14 +105,15 @@ def manifests(layer_id, namespace, spec, config, plan):
     clients = {'namespaceSelector':{'matchLabels':{'kubernetes.io/metadata.name':namespace}},
                'podSelector':{'matchExpressions':[{'key':'fdp.floren.app/role','operator':'In',
                    'values':['workspace','job','app','stream','workload']}]}}
-    brokers = {'podSelector':{'matchLabels':{OWNER:config.installation,LAYER:layer_id,COMPONENT:'kafka'}}}
+    # Strimzi replaces app.kubernetes.io/* labels on its pods: select brokers by FDP's role label.
+    brokers = {'podSelector':{'matchLabels':{OWNER:config.installation,LAYER:layer_id,'fdp.floren.app/role':'kafka'}}}
     operator = {'namespaceSelector':{'matchLabels':{'kubernetes.io/metadata.name':config.platform_namespace}},
                 'podSelector':{'matchLabels':{'strimzi.io/kind':'cluster-operator'}}}
     controller = {'namespaceSelector':{'matchLabels':{'kubernetes.io/metadata.name':config.platform_namespace}},
                   'podSelector':{'matchLabels':{'app.kubernetes.io/name':'fdp-layer-controller'}}}
     listener['networkPolicyPeers'] = [clients,controller]
     docs.append(obj('NetworkPolicy', 'kafka-internal', {'spec':{
-        'podSelector':{'matchLabels':{OWNER:config.installation,LAYER:layer_id,COMPONENT:'kafka'}},
+        'podSelector':brokers['podSelector'],
         'policyTypes':['Ingress','Egress'],
         'ingress':[{'from':[clients,controller],'ports':[{'protocol':'TCP','port':9093}]},
                    {'from':[brokers,operator],'ports':[{'protocol':'TCP','port':p} for p in (9090,9091,9093,8443,8080)]}],
@@ -121,8 +122,11 @@ def manifests(layer_id, namespace, spec, config, plan):
     docs.append(obj('NetworkPolicy','kafka-clients',{'spec':{
         'podSelector':clients['podSelector'], 'policyTypes':['Egress'],
         'egress':[{'to':[brokers],'ports':[{'protocol':'TCP','port':9093}]}]}}, 'networking.k8s.io/v1'))
+    # Brokers read their certificates through Strimzi's Kubernetes config provider; the topic operator
+    # reconciles KafkaTopics. Only these two reach the API, and only its exact addresses.
     docs.append(obj('NetworkPolicy','kafka-topic-operator-api',{'spec':{
-        'podSelector':{'matchLabels':{OWNER:config.installation,LAYER:layer_id,'fdp.floren.app/role':'kafka-operator'}},
+        'podSelector':{'matchLabels':{OWNER:config.installation,LAYER:layer_id},'matchExpressions':[
+            {'key':'fdp.floren.app/role','operator':'In','values':['kafka','kafka-operator']}]},
         'policyTypes':['Egress'], 'egress':[{'to':[{'ipBlock':{'cidr':str(n)}} for n in api_networks],
             'ports':[{'protocol':'TCP','port':443},{'protocol':'TCP','port':6443}]}]}},'networking.k8s.io/v1'))
     return docs
