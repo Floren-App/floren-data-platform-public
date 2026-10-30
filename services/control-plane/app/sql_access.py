@@ -284,6 +284,9 @@ def admit(db, who, catalog="", layer=""):
         raise HTTPException(404, "catalog not available")
     if not scope:
         raise HTTPException(403, "no SQL schema grants")
+    # Column masks and row filters that apply to this caller, fixed for the query like its grants.
+    from .data_policies import attach
+    scope = attach(db, who.user, scope)
     run = db.get(Run, who.execution.run_id) if who.execution and who.execution.run_id else None
     query = SqlQuery(principal_id=who.user.principal_id, actor=who.user.username,
                      initiator_id=(run.initiator_id or "") if run else who.user.principal_id,
@@ -614,6 +617,10 @@ def policy_allow(query, action):
         return (op in READ and schema in scope and
                 (not obj.get("tableName") or obj["tableName"] in metadata_scope.get("tables", [])))
     if [schema, obj.get("tableName")] in query.scope.get(catalog, {}).get("blocked_relations", []):
+        return False
+    from .data_policies import protected_base
+    if protected_base(query, obj) is not None:
+        # Iceberg metadata tables expose partition values and column bounds of masked or filtered tables.
         return False
     if schema == "information_schema" and catalog in query.scope:
         # Trino applies FilterSchemas/FilterTables/FilterColumns to information_schema rows.

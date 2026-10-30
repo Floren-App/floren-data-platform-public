@@ -409,7 +409,26 @@ def layer_row_filters(layer: str, body: Dict[str, Any], db=Depends(get_db)):
 
 
 def policy_row_filters(body, db, layer=""):
+    from ..data_policies import row_filters as table_filters
     payload = body.get("input") or {}
     query = sql.policy_query(db, payload, layer)
     table = (payload.get("action", {}).get("resource") or {}).get("table") or {}
-    return {"result": sql.metadata_filters(query, table)}
+    return {"result": sql.metadata_filters(query, table) + table_filters(query, table)}
+
+
+@router.post("/internal/trino/batch-column-masks", include_in_schema=False)
+def column_masks(body: Dict[str, Any], db=Depends(get_db)):
+    return policy_column_masks(body, db)
+
+
+@router.post("/internal/trino/layers/{layer}/batch-column-masks", include_in_schema=False)
+def layer_column_masks(layer: str, body: Dict[str, Any], db=Depends(get_db)):
+    return policy_column_masks(body, db, layer)
+
+
+def policy_column_masks(body, db, layer=""):
+    """Masks for a batch of columns. Errors propagate: Trino then fails the query instead of reading unmasked values."""
+    from ..data_policies import column_masks as masks
+    payload = body.get("input") or {}
+    query = sql.policy_query(db, payload, layer)
+    return {"result": masks(query, (payload.get("action") or {}).get("filterResources") or [])}

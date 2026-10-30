@@ -151,7 +151,11 @@ def credentials(db, source, scope, store, principal, run_id=None):
         return storage_credentials(source, schemas, scope, store, db=db)
     if source.kind != "postgres":
         raise HTTPException(409, f"governed credentials for {source.kind} require a native adapter; shared credentials are disabled")
-    ddl_schemas = [schema for schema, role in scope.items() if role in ("Admin", "Owner")]
+    from .data_policies import schema_has_policies
+    if schema_has_policies(db, [schemas[name].id for name in scope]):
+        # A native login would read past column masks and row filters, which only the SQL engine enforces.
+        raise HTTPException(409, "schemas with column masks or row filters are reachable only through governed SQL")
+    ddl_schemas =[schema for schema, role in scope.items() if role in ("Admin", "Owner")]
     if len(ddl_schemas) > 1:
         raise HTTPException(409, "select one schema when connecting with DDL authority")
     username, password = "dcl_" + secrets.token_hex(12), secrets.token_urlsafe(32)

@@ -451,6 +451,7 @@ def manifests(layer_id, generation, spec: InfrastructureSpec, config: Controller
     policy_root = opa + 'layers/' + layer_id + '/'
     access = ('access-control.name=opa\nopa.policy.uri=' + policy_root + 'allow\n'
         'opa.policy.batched-uri=' + policy_root + 'batch\nopa.policy.row-filters-uri=' + policy_root + 'row-filters\n'
+        'opa.policy.batch-column-masking-uri=' + policy_root + 'batch-column-masks\n'
         'opa.identity.extra-credentials-keys=dc_context\n'
         'opa.allow-permission-management-operations=false\nopa.log-requests=false\nopa.log-responses=false\n')
     sizes = {'coordinator': (spec.trino.coordinator.cpu, coordinator_memory), 'worker': (workers.cpu, worker_memory)}

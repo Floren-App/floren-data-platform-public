@@ -606,6 +606,27 @@ class ServiceRoleAssignment(Base):
     role: Mapped[str] = mapped_column(String(16))
 
 
+class DataPolicy(Base):
+    """A column mask or row filter on one table of a schema, enforced by the layer's Trino.
+
+    It applies to everyone who queries the table except the exempt groups and identities.
+    """
+    __tablename__ = "data_policies"
+    __table_args__ = (UniqueConstraint("schema_id", "table_name", "kind", "column_name"),)
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    schema_id: Mapped[str] = mapped_column(ForeignKey("rbac_resources.id", ondelete="CASCADE"), index=True)
+    table_name: Mapped[str] = mapped_column(String(256))
+    kind: Mapped[str] = mapped_column(String(16))  # column_mask | row_filter
+    column_name: Mapped[str] = mapped_column(String(256), default="")  # column masks only
+    method: Mapped[str] = mapped_column(String(16), default="")  # null | redact | hash | partial | expression
+    expression: Mapped[str] = mapped_column(Text, default="")  # custom mask, or the row filter condition
+    exempt_groups: Mapped[list] = mapped_column(JSON, default=list)  # app group IDs
+    exempt_principals: Mapped[list] = mapped_column(JSON, default=list)  # directory principal IDs
+    description: Mapped[str] = mapped_column(String(1024), default="")
+    updated_by: Mapped[str] = mapped_column(String(256), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class CatalogAsset(Base):
     """Metadata only. The owning RBAC resource is always the authorization boundary."""
     __tablename__ = "catalog_assets"

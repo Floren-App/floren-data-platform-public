@@ -2581,6 +2581,207 @@
         "title": "PackageAllowlistIn",
         "type": "object"
       },
+      "PolicyChange": {
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 1024,
+            "title": "Description",
+            "type": "string"
+          },
+          "exempt_groups": {
+            "description": "App group IDs that see the real values / all rows",
+            "items": {
+              "type": "string"
+            },
+            "title": "Exempt Groups",
+            "type": "array"
+          },
+          "exempt_principals": {
+            "description": "Identity IDs (people or managed identities) exempted",
+            "items": {
+              "type": "string"
+            },
+            "title": "Exempt Principals",
+            "type": "array"
+          },
+          "expression": {
+            "default": "",
+            "description": "The mask expression (method expression) or the row filter condition, in Trino SQL",
+            "maxLength": 4000,
+            "title": "Expression",
+            "type": "string"
+          },
+          "method": {
+            "default": "",
+            "description": "Column masks: null, redact, hash, partial or expression",
+            "title": "Method",
+            "type": "string"
+          }
+        },
+        "title": "PolicyChange",
+        "type": "object"
+      },
+      "PolicyIn": {
+        "properties": {
+          "column": {
+            "default": "",
+            "description": "Column masks: the masked column",
+            "maxLength": 256,
+            "title": "Column",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 1024,
+            "title": "Description",
+            "type": "string"
+          },
+          "exempt_groups": {
+            "description": "App group IDs that see the real values / all rows",
+            "items": {
+              "type": "string"
+            },
+            "title": "Exempt Groups",
+            "type": "array"
+          },
+          "exempt_principals": {
+            "description": "Identity IDs (people or managed identities) exempted",
+            "items": {
+              "type": "string"
+            },
+            "title": "Exempt Principals",
+            "type": "array"
+          },
+          "expression": {
+            "default": "",
+            "description": "The mask expression (method expression) or the row filter condition, in Trino SQL",
+            "maxLength": 4000,
+            "title": "Expression",
+            "type": "string"
+          },
+          "kind": {
+            "description": "column_mask or row_filter",
+            "title": "Kind",
+            "type": "string"
+          },
+          "method": {
+            "default": "",
+            "description": "Column masks: null, redact, hash, partial or expression",
+            "title": "Method",
+            "type": "string"
+          },
+          "schema_id": {
+            "description": "The governed schema (its resource ID)",
+            "title": "Schema Id",
+            "type": "string"
+          },
+          "table": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_id",
+          "table",
+          "kind"
+        ],
+        "title": "PolicyIn",
+        "type": "object"
+      },
+      "PolicyOut": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "exempt_groups": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Exempt Groups",
+            "type": "array"
+          },
+          "exempt_principals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Exempt Principals",
+            "type": "array"
+          },
+          "expression": {
+            "title": "Expression",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "member_groups": {
+            "description": "Groups named by is_member() in the expression",
+            "items": {
+              "type": "string"
+            },
+            "title": "Member Groups",
+            "type": "array"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "schema_id": {
+            "title": "Schema Id",
+            "type": "string"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "title": "Updated By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "schema_id",
+          "table",
+          "kind",
+          "column",
+          "method",
+          "expression",
+          "exempt_groups",
+          "exempt_principals",
+          "member_groups",
+          "description",
+          "updated_by",
+          "updated_at"
+        ],
+        "title": "PolicyOut",
+        "type": "object"
+      },
       "PoolIn": {
         "properties": {
           "allowed_groups": {
@@ -11707,6 +11908,386 @@
         "summary": "Connect",
         "tags": [
           "connect"
+        ]
+      }
+    },
+    "/v1/data-policies": {
+      "get": {
+        "operationId": "get_v1_data-policies",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schema_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Schema Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PolicyOut"
+                  },
+                  "title": "Response List Policies V1 Data Policies Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Policies",
+        "tags": [
+          "data policies"
+        ]
+      },
+      "post": {
+        "operationId": "post_v1_data-policies",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Policy",
+        "tags": [
+          "data policies"
+        ]
+      }
+    },
+    "/v1/data-policies/{policy_id}": {
+      "delete": {
+        "operationId": "delete_v1_data-policies_policy_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "title": "Policy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Policy",
+        "tags": [
+          "data policies"
+        ]
+      },
+      "get": {
+        "operationId": "get_v1_data-policies_policy_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "title": "Policy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Policy",
+        "tags": [
+          "data policies"
+        ]
+      },
+      "put": {
+        "description": "Change how a policy masks or filters and who is exempt. Table, kind and column are fixed.",
+        "operationId": "put_v1_data-policies_policy_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "title": "Policy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Policy",
+        "tags": [
+          "data policies"
         ]
       }
     },
