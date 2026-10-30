@@ -162,3 +162,44 @@ output "bootstrap_workload" { value = fdp_workload.job["bootstrap"].slug }
 output "pipeline_workload" { value = fdp_workload.pipelines.slug }
 output "product_dashboard" { value = fdp_workload.job["explorer"].url }
 output "monitoring_dashboard" { value = fdp_workload.job["monitor"].url }
+
+# Column masks and a row filter on the product, for demonstrations. The explorer dashboard runs as its own
+# identity, so it shows what analysts see. The pipeline identities that build the product are exempt: they
+# must process the real data.
+locals {
+  demo_policies = var.demo_data_policies ? {
+    price = {
+      kind        = "column_mask"
+      column      = "price_trend_eur"
+      method      = "expression"
+      expression  = "round(price_trend_eur)"
+      description = "Analysts see market prices rounded to whole euros."
+    }
+    illustrator = {
+      kind        = "column_mask"
+      column      = "illustrator"
+      method      = "partial"
+      expression  = ""
+      description = "Analysts see the last four characters of the illustrator's name."
+    }
+    rarity = {
+      kind        = "row_filter"
+      column      = ""
+      method      = ""
+      expression  = "rarity <> 'Rare'"
+      description = "Analysts do not see rare cards."
+    }
+  } : {}
+}
+resource "fdp_data_policy" "demo" {
+  for_each          = local.demo_policies
+  schema_id         = var.product_schema_id
+  table             = "cards_current"
+  kind              = each.value.kind
+  column            = each.value.column
+  method            = each.value.method
+  expression        = each.value.expression
+  description       = each.value.description
+  exempt_groups     = [var.engineers_group_id]
+  exempt_principals = [for name in ["bootstrap", "models"] : fdp_workload.job[name].service_principal_id]
+}

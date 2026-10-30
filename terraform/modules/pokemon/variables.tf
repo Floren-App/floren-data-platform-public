@@ -34,3 +34,8 @@ variable "warehouses" {
   default     = { app = "xsmall", job = "small", orchestrator = "small" }
   description = "Sizes for dashboards, batch/dbt jobs and persistent Airflow. Tune to available cluster capacity."
 }
+variable "demo_data_policies" {
+  type        = bool
+  default     = false
+  description = "Demonstrate column masks and a row filter on the product: analysts and the explorer dashboard see prices rounded, illustrators partly hidden and no rare cards; data engineers and the pipeline identities that build the product are exempt."
+}

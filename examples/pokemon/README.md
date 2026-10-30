@@ -12,6 +12,10 @@ either way.
 Warehouses default to the installation's `xsmall`/`small`. Pass `warehouses` (`app`, `job`,
 `orchestrator`) to use your own, for example a dedicated Airflow warehouse per layer.
 
+`demo_data_policies = true` adds column masks and a row filter to the product table for
+demonstrations; the identities that build the product are exempt (see the documentation's
+Pokémon example).
+
 ```mermaid
 flowchart LR
   API[Managed TCGdex API] --> Extract[Python extraction]

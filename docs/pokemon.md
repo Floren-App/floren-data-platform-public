@@ -67,6 +67,15 @@ must have independent workloads and grants, even if they share the source repo.
 An analyst may view a Prod dashboard without receiving permission to modify Prod
 or use a Prod execution identity from a Test workspace.
 
+### Masks and filters (demonstration)
+
+Set `demo_data_policies = true` on an environment to add [column masks and a row
+filter](data-masking.md) to `reporting.cards_current`: analysts and the explorer
+dashboard see prices rounded to whole euros, only the last four characters of the
+illustrator and no rare cards. Data engineers and the `bootstrap` and `models`
+identities that build the product are exempt, so the pipeline keeps processing real
+data. Compare the explorer dashboard with the same query run by an engineer.
+
 ## Apply and run
 
 Apply platform configuration first, then the independent Pokemon root. Inspect
