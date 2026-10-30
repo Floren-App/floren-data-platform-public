@@ -142,6 +142,14 @@ def warehouses(db: Session = Depends(get_db), user: User = Depends(get_current_u
                                         name="Trino workers", owner="platform", layer_id=layer.id, layer_name=layer.name), True))
 
     settings = capacity.workspace_settings(db)
+    from ..layers import all_layers
+    for layer in all_layers(db):
+        infrastructure = layer.config.get('infrastructure') or {}
+        kafka = infrastructure.get('kafka') or {}
+        name = kafka.get('warehouse')
+        if name in names and infrastructure.get('enabled') and not infrastructure.get('retired') and kafka.get('enabled'):
+            seen[name].append((Occupant(category='kafka', kind='brokers', state='running', slots=kafka.get('replicas',1),
+                name='Kafka brokers', owner='platform', layer_id=layer.id, layer_name=layer.name), True))
     if settings["warehouse"] in names:
         for ws in db.scalars(select(Workspace).where(Workspace.status.in_(("queued", "starting", "running")))):
             seen[settings["warehouse"]].append((Occupant(

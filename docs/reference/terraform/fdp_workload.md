@@ -2,7 +2,7 @@
 
 Generated from the current provider schema.
 
-A program deployed from a repository branch (job, app, dbt or Airflow), kept in sync with the branch. Apply waits until it is live. Promotion, branch protection and execution-identity rules still apply. Import by ID.
+A program deployed from a repository branch (job, app, dbt, Airflow or continuous stream), kept in sync with the branch. Apply waits until it is live. Promotion, branch protection and execution-identity rules still apply. Import by ID.
 
 | Attribute | Type | Behavior | Description |
 |---|---|---|---|

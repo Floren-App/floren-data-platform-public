@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import { IconApi } from "./Icons";
 
-export type ProductKind = "python" | "r" | "shiny" | "streamlit" | "airflow" | "dbt" | "iceberg" | "postgres" | "groups" | "users" | "identity" | "folder" | "table" | "data" | "file";
+export type ProductKind = "kafka" | "topic" | "python" | "r" | "shiny" | "streamlit" | "airflow" | "dbt" | "iceberg" | "postgres" | "groups" | "users" | "identity" | "folder" | "table" | "data" | "file";
 
 // Original SVG artwork, kept locally with the app. No remote assets or icon CDN.
 const paths: Record<ProductKind, { color: string; drawing: ReactNode }> = {
+  kafka: { color: "#abb8c9", drawing: <><circle cx="9" cy="12" r="3" /><circle cx="15" cy="4" r="2" /><circle cx="19" cy="12" r="2" /><circle cx="15" cy="20" r="2" /><path d="m11 10 3-4m-2 6h5m-6 2 3 4M6 12H2" /></> },
+  topic: { color: "#abb8c9", drawing: <><path d="M3 6h18M3 12h18M3 18h18" /><circle cx="8" cy="6" r="2" fill="currentColor" /><circle cx="15" cy="12" r="2" fill="currentColor" /><circle cx="10" cy="18" r="2" fill="currentColor" /></> },
   python: { color: "#4b9bd3", drawing: <><path d="M12 3H8a3 3 0 0 0-3 3v4h8V7h4V6a3 3 0 0 0-3-3z" /><path d="M12 21h4a3 3 0 0 0 3-3v-4h-8v3H7v1a3 3 0 0 0 3 3z" stroke="#d6b344" /><path d="M5 8H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4v-4h8V8h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1" /><circle cx="9" cy="6" r=".6" fill="currentColor" /><circle cx="15" cy="18" r=".6" fill="#d6b344" /></> },
   r: { color: "#5794db", drawing: <><ellipse cx="11" cy="11" rx="9" ry="6" /><path d="M9 19V8h5a3 3 0 0 1 0 6H9m5 0 5 6" strokeWidth="2.5" /></> },
   shiny: { color: "#71b3e5", drawing: <><path d="m12 2 8 4v12l-8 4-8-4V6z" /><path d="m13 6-5 7h4l-1 5 6-8h-4z" fill="currentColor" stroke="none" /></> },
@@ -29,6 +31,7 @@ export function productKind(kind?: string, runtime?: string): ProductKind {
   if (kind === "pg") return "postgres";
   if (kind === "s3") return "folder";
   if (kind === "app") return runtime === "r" ? "shiny" : "streamlit";
+  if (kind === "stream") return "topic";
   if (kind === "script" || kind === "notebook") return runtime === "r" ? "r" : "python";
   return kind && kind in paths ? kind as ProductKind : "data";
 }

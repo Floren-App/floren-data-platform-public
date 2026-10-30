@@ -1,5 +1,5 @@
 """Deterministic layer resources. No credential values or cross-namespace mounts."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from copy import deepcopy
 import hashlib
 import json
@@ -132,6 +132,8 @@ class ControllerConfig:
     # The platform runs the workspace egress proxy: VS Code and RStudio may reach it (and through it, allowed hosts).
     egress_proxy: bool = False
     shared_database_namespace: str = ""
+    kafka_policy_key: str = field(default='', repr=False)
+    kafka_api_server_cidrs: tuple = ()
 
     def __post_init__(self):
         for value in (self.platform_namespace, self.installation, self.namespace_prefix,
@@ -274,7 +276,8 @@ def catalog_volume(operator_secret, generated, external=False):
 
 
 def manifests(layer_id, generation, spec: InfrastructureSpec, config: ControllerConfig, source_catalogs='',
-              workers: 'WorkerPlan | None' = None, workspaces: bool = True):
+              workers: 'WorkerPlan | None' = None, workspaces: bool = True,
+              kafka_workers: 'WorkerPlan | None' = None):
     """source_catalogs: digest of the control-plane-written external source catalogs ('' for none).
     workers: the resolved worker warehouse (worker_plan); required."""
     """Order is intentional: isolation/budgets precede identities and compute."""
@@ -304,15 +307,20 @@ def manifests(layer_id, generation, spec: InfrastructureSpec, config: Controller
     s3_tls = s3 and spec.rustfs.tls.mode != 'disabled'  # adds the restart sidecar (100m / 128Mi limits)
     pg_databases = ('iceberg',) if spec.iceberg.enabled else ()
     pg_sidecars = int(pg_tls) + int(bool(pg_databases))  # 100m / 128Mi limits each
-    if (spec.trino.coordinator.cpu + workers.cpu * peak + (0.1 if tls else 0) * (1 + peak) + 0.2 +
+    if spec.kafka.enabled and kafka_workers is None:
+        raise ProvisioningError('KafkaWarehouseMissing', 'Kafka needs a resolved broker warehouse')
+    kafka_count = spec.kafka.replicas if spec.kafka.enabled else 0
+    kafka_cpu = kafka_workers.cpu * kafka_count + (0.5 if kafka_count else 0) if kafka_workers else 0
+    kafka_memory = int(kafka_workers.memory_gb * 2**30) * kafka_count + (512 * 2**20 if kafka_count else 0) if kafka_workers else 0
+    if (kafka_cpu + spec.trino.coordinator.cpu + workers.cpu * peak + (0.1 if tls else 0) * (1 + peak) + 0.2 +
             (spec.postgres.cpu + 0.1 * pg_sidecars if pg else 0) + (spec.rustfs.cpu + 0.1 + 0.1 * s3_tls if s3 else 0) > spec.quota.cpu or
-            coordinator_memory + worker_memory * peak + (128 * 2**20 if tls else 0) * (1 + peak) + 128 * 2**20 +
+            kafka_memory + coordinator_memory + worker_memory * peak + (128 * 2**20 if tls else 0) * (1 + peak) + 128 * 2**20 +
             (_bytes(spec.postgres.memory) + 128 * 2**20 * pg_sidecars if pg else 0) +
             (_bytes(spec.rustfs.memory) + 128 * 2**20 * (1 + s3_tls) if s3 else 0) > _bytes(spec.quota.memory) or
-            1 + peak + 1 + int(pg) + int(s3) > spec.quota.pods or
-            _bytes(spec.storage.artifact_size) + (_bytes(spec.postgres.size) if pg else 0) +
+            kafka_count + int(bool(kafka_count)) + 1 + peak + 1 + int(pg) + int(s3) > spec.quota.pods or
+            kafka_count * _bytes(spec.kafka.size) + _bytes(spec.storage.artifact_size) + (_bytes(spec.postgres.size) if pg else 0) +
             (_bytes(spec.rustfs.size) if s3 else 0) > _bytes(spec.quota.storage) or
-            1 + int(pg) + int(s3) > spec.quota.persistent_volume_claims):
+            kafka_count + 1 + int(pg) + int(s3) > spec.quota.persistent_volume_claims):
         raise ProvisioningError('InsufficientQuota', 'The layer quota must hold the Trino coordinator and the maximum number of workers')
 
     namespace = namespace_for(layer_id, config.namespace_prefix)
@@ -591,4 +599,7 @@ def manifests(layer_id, generation, spec: InfrastructureSpec, config: Controller
         for document in result:
             if document['kind'] in ('Deployment', 'StatefulSet'):
                 document['spec']['template']['spec']['imagePullSecrets'] = [{'name': config.image_pull_secret}]
+    if spec.kafka.enabled:
+        from .layer_kafka import manifests as kafka_manifests
+        result.extend(kafka_manifests(layer_id, namespace, spec, config, kafka_workers))
     return result

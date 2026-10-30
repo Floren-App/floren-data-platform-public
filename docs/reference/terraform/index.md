@@ -32,6 +32,8 @@ Configures Floren Data Platform through its API. Authenticate with a token, or w
 - [fdp_default_warehouse](fdp_default_warehouse.md)
 - [fdp_egress_allowlist](fdp_egress_allowlist.md)
 - [fdp_folder](fdp_folder.md)
+- [fdp_kafka_cluster](fdp_kafka_cluster.md)
+- [fdp_kafka_topic](fdp_kafka_topic.md)
 - [fdp_layer](fdp_layer.md)
 - [fdp_metric](fdp_metric.md)
 - [fdp_package](fdp_package.md)

@@ -5,12 +5,17 @@ FROM rocker/rstudio:4.4.1
 # System libraries for packages compiled from source (always the case on arm64, where no
 # prebuilt Linux binaries exist): curl/httr2 need libcurl+openssl, httpuv (shiny) needs zlib.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libpq-dev libcurl4-openssl-dev libssl-dev zlib1g-dev curl git \
+ && apt-get install -y --no-install-recommends python3 python3-venv libpq-dev libcurl4-openssl-dev libssl-dev zlib1g-dev curl git \
  && rm -rf /var/lib/apt/lists/*
 
 RUN install2.r --error --skipinstalled --ncpus -1 shiny DBI RPostgres httr2 dplyr ggplot2
 # Runner panel dependencies; a separate layer keeps the slow compile above cached.
-RUN install2.r --error --skipinstalled jsonlite rstudioapi rappdirs
+RUN install2.r --error --skipinstalled jsonlite rstudioapi rappdirs reticulate
+
+# The R streaming API delegates Kafka protocol handling to the same governed Python SDK.
+COPY sdk/python /tmp/sdk
+RUN python3 -m venv /opt/fdp-python && /opt/fdp-python/bin/pip install --no-cache-dir /tmp/sdk[kafka] && rm -rf /tmp/sdk
+ENV PATH="/opt/fdp-python/bin:${PATH}" RETICULATE_PYTHON=/opt/fdp-python/bin/python
 
 COPY sdk/r/fdp /tmp/fdp
 RUN R CMD INSTALL /tmp/fdp && rm -rf /tmp/fdp

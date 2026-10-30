@@ -12,12 +12,14 @@ never written to disk and never visible in the editor.
 
 from __future__ import annotations
 
+from . import kafka
+
 import os
 from typing import Any, Dict, List, NamedTuple, Optional
 
 import httpx
 
-__all__ = ["api", "certificate", "args", "output_dir", "connect", "credentials", "sources", "run", "run_program", "runs", "programs",
+__all__ = ["kafka", "api", "certificate", "args", "output_dir", "connect", "credentials", "sources", "run", "run_program", "runs", "programs",
            "query", "orchestrate", "run_logs", "run_status", "stop_run", "files",
            "measure_metric", "report_metric", "observe_dataset"]
 

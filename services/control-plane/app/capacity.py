@@ -32,7 +32,7 @@ def _worker_warehouse(pub: Workload) -> str:
 
 def workload_held(pub: Workload) -> Dict[str, int]:
     """Containers a deployed workload holds now, per warehouse name."""
-    if pub.status not in LIVE_WORKLOAD or pub.kind not in ("app", "airflow"):
+    if pub.status not in LIVE_WORKLOAD or pub.kind not in ("app", "airflow", "stream"):
         return {}
     refs = [r for r in dict.fromkeys([*(pub.execution_refs or []), pub.execution_ref]) if r]
     held: Dict[str, int] = defaultdict(int)
@@ -47,7 +47,7 @@ def demand(pub: Workload, program) -> Dict[str, int]:
     """Containers a version of the workload needs while it runs, per warehouse name."""
     if pub.kind == "dbt":
         return {pub.warehouse: 1}  # the docs job that takes the version live
-    if pub.kind not in ("app", "airflow"):
+    if pub.kind not in ("app", "airflow", "stream"):
         return {}
     settings = getattr(program, "airflow_settings", None)
     if pub.kind == "airflow" and settings and settings.mode == "distributed":
@@ -78,12 +78,18 @@ def held(db) -> Dict[str, int]:
     for pool_id, n in db.execute(select(Run.pool_id, func.count()).where(Run.status.in_(ACTIVE_RUN)).group_by(Run.pool_id)):
         if pool_id in names:
             counts[names[pool_id]] += n
-    for pub in db.scalars(select(Workload).where(Workload.status.in_(LIVE_WORKLOAD), Workload.kind.in_(("app", "airflow")))):
+    for pub in db.scalars(select(Workload).where(Workload.status.in_(LIVE_WORKLOAD), Workload.kind.in_(("app", "airflow", "stream")))):
         for name, n in workload_held(pub).items():
             counts[name] += n
     from .layer_infrastructure import trino_workers
     for _, name, n in trino_workers(db):
         counts[name] += n
+    from .models import Resource
+    for layer in db.scalars(select(Resource).where(Resource.kind == 'layer')):
+        infrastructure = layer.config.get('infrastructure') or {}
+        kafka = infrastructure.get('kafka') or {}
+        if infrastructure.get('enabled') and not infrastructure.get('retired') and kafka.get('enabled'):
+            counts[kafka['warehouse']] += kafka.get('replicas', 1)
     return dict(counts)
 
 
@@ -143,7 +149,7 @@ def refuse_trino_warehouse(db, name: Optional[str]) -> None:
                                  "Choose another warehouse")
 
 
-WORKLOAD_KINDS = ("script", "notebook", "app", "dbt", "airflow")
+WORKLOAD_KINDS = ("script", "notebook", "app", "dbt", "airflow", "stream", "kafka")
 
 
 def layer_name(db, layer_id: Optional[str]) -> str:

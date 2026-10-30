@@ -1342,6 +1342,9 @@
           "iceberg": {
             "$ref": "#/components/schemas/LayerIceberg"
           },
+          "kafka": {
+            "$ref": "#/components/schemas/KafkaInfrastructure"
+          },
           "postgres": {
             "$ref": "#/components/schemas/OptionalDatabase"
           },
@@ -1481,6 +1484,90 @@
           }
         },
         "title": "JwtAuth",
+        "type": "object"
+      },
+      "KafkaInfrastructure": {
+        "additionalProperties": false,
+        "description": "Opt-in Strimzi/KRaft cluster. The image must contain FDP's policy authorizer.",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "replicas": {
+            "default": 1,
+            "enum": [
+              1,
+              3,
+              5
+            ],
+            "title": "Replicas",
+            "type": "integer"
+          },
+          "size": {
+            "default": "20Gi",
+            "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+            "title": "Size",
+            "type": "string"
+          },
+          "storage_class": {
+            "anyOf": [
+              {
+                "maxLength": 253,
+                "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Class"
+          },
+          "tls": {
+            "$ref": "#/components/schemas/CertificatePolicy"
+          },
+          "token_ttl_seconds": {
+            "default": 300,
+            "maximum": 300.0,
+            "minimum": 30.0,
+            "title": "Token Ttl Seconds",
+            "type": "integer"
+          },
+          "version": {
+            "const": "4.3.1",
+            "default": "4.3.1",
+            "title": "Version",
+            "type": "string"
+          },
+          "warehouse": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warehouse"
+          }
+        },
+        "title": "KafkaInfrastructure",
         "type": "object"
       },
       "KindUse": {
@@ -2864,7 +2951,9 @@
                 "notebook",
                 "app",
                 "dbt",
-                "airflow"
+                "airflow",
+                "stream",
+                "kafka"
               ],
               "type": "string"
             },
@@ -3065,7 +3154,9 @@
                 "notebook",
                 "app",
                 "dbt",
-                "airflow"
+                "airflow",
+                "stream",
+                "kafka"
               ],
               "type": "string"
             },
@@ -4123,6 +4214,31 @@
         "title": "ServiceLevel",
         "type": "object"
       },
+      "SessionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "group": {
+            "default": "",
+            "maxLength": 180,
+            "pattern": "^[A-Za-z0-9._-]*$",
+            "title": "Group",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "produce",
+              "consume"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "SessionIn",
+        "type": "object"
+      },
       "TemplateIn": {
         "additionalProperties": false,
         "properties": {
@@ -4304,6 +4420,98 @@
           "stored_as"
         ],
         "title": "TokenOut",
+        "type": "object"
+      },
+      "TopicIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cleanup_policy": {
+            "default": "delete",
+            "enum": [
+              "delete",
+              "compact",
+              "compact,delete"
+            ],
+            "title": "Cleanup Policy",
+            "type": "string"
+          },
+          "layer_id": {
+            "pattern": "^[a-f0-9]{12}$",
+            "title": "Layer Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 249,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "partitions": {
+            "default": 3,
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Partitions",
+            "type": "integer"
+          },
+          "replication_factor": {
+            "default": 1,
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Replication Factor",
+            "type": "integer"
+          },
+          "retention_ms": {
+            "default": 604800000,
+            "maximum": 31536000000.0,
+            "minimum": 60000.0,
+            "title": "Retention Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "layer_id",
+          "name"
+        ],
+        "title": "TopicIn",
+        "type": "object"
+      },
+      "TopicSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "cleanup_policy": {
+            "default": "delete",
+            "enum": [
+              "delete",
+              "compact",
+              "compact,delete"
+            ],
+            "title": "Cleanup Policy",
+            "type": "string"
+          },
+          "partitions": {
+            "default": 3,
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Partitions",
+            "type": "integer"
+          },
+          "replication_factor": {
+            "default": 1,
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Replication Factor",
+            "type": "integer"
+          },
+          "retention_ms": {
+            "default": 604800000,
+            "maximum": 31536000000.0,
+            "minimum": 60000.0,
+            "title": "Retention Ms",
+            "type": "integer"
+          }
+        },
+        "title": "TopicSettings",
         "type": "object"
       },
       "TrinoCoordinator": {
@@ -13187,6 +13395,957 @@
         "summary": "Info",
         "tags": [
           "shared SQL"
+        ]
+      }
+    },
+    "/v1/kafka/clusters": {
+      "get": {
+        "operationId": "get_v1_kafka_clusters",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clusters",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/clusters/{ident}": {
+      "delete": {
+        "operationId": "delete_v1_kafka_clusters_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unregister Cluster",
+        "tags": [
+          "kafka"
+        ]
+      },
+      "get": {
+        "operationId": "get_v1_kafka_clusters_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cluster",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/clusters/{layer_id}": {
+      "post": {
+        "operationId": "post_v1_kafka_clusters_layer_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layer_id",
+            "required": true,
+            "schema": {
+              "title": "Layer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Cluster",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/resolve": {
+      "get": {
+        "operationId": "get_v1_kafka_resolve",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "topic",
+            "required": true,
+            "schema": {
+              "title": "Topic",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "layer_id",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Layer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Topic",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/topics": {
+      "get": {
+        "operationId": "get_v1_kafka_topics",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "layer_id",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Layer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Topics",
+        "tags": [
+          "kafka"
+        ]
+      },
+      "post": {
+        "operationId": "post_v1_kafka_topics",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Topic",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/topics/{ident}": {
+      "delete": {
+        "operationId": "delete_v1_kafka_topics_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Topic",
+        "tags": [
+          "kafka"
+        ]
+      },
+      "get": {
+        "operationId": "get_v1_kafka_topics_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Topic",
+        "tags": [
+          "kafka"
+        ]
+      },
+      "put": {
+        "operationId": "put_v1_kafka_topics_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Topic",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/topics/{ident}/deletion": {
+      "get": {
+        "operationId": "get_v1_kafka_topics_ident_deletion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deletion",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/topics/{ident}/observations": {
+      "post": {
+        "operationId": "post_v1_kafka_topics_ident_observations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Observation",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/topics/{ident}/session": {
+      "post": {
+        "operationId": "post_v1_kafka_topics_ident_session",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Session",
+        "tags": [
+          "kafka"
         ]
       }
     },

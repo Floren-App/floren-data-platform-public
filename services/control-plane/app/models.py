@@ -577,6 +577,20 @@ class IdentityBinding(Base):
     principal_id: Mapped[str] = mapped_column(ForeignKey("directory_principals.id"))
 
 
+class KafkaSession(Base):
+    """Short-lived broker principals; grants are re-evaluated for every broker decision."""
+    __tablename__ = 'kafka_sessions'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    principal_id: Mapped[str] = mapped_column(String(12), index=True)
+    username: Mapped[str] = mapped_column(String(256))
+    layer_id: Mapped[str] = mapped_column(String(12), index=True)
+    topic_id: Mapped[str] = mapped_column(String(12), index=True)
+    mode: Mapped[str] = mapped_column(String(16))
+    consumer_group: Mapped[str] = mapped_column(String(256), default='')
+    execution_context: Mapped[str] = mapped_column(String(64), default='')
+    expires_at: Mapped[int] = mapped_column(Integer, index=True)
+
+
 class Resource(Base):
     __tablename__ = "rbac_resources"
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)

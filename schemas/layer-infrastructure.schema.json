@@ -100,6 +100,93 @@
       "title": "IssuerRef",
       "type": "object"
     },
+    "KafkaInfrastructure": {
+      "additionalProperties": false,
+      "description": "Opt-in Strimzi/KRaft cluster. The image must contain FDP's policy authorizer.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image"
+        },
+        "version": {
+          "const": "4.3.1",
+          "default": "4.3.1",
+          "title": "Version",
+          "type": "string"
+        },
+        "warehouse": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Warehouse"
+        },
+        "replicas": {
+          "default": 1,
+          "enum": [
+            1,
+            3,
+            5
+          ],
+          "title": "Replicas",
+          "type": "integer"
+        },
+        "storage_class": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Storage Class"
+        },
+        "size": {
+          "default": "20Gi",
+          "pattern": "^[1-9][0-9]*(?:Mi|Gi|Ti)$",
+          "title": "Size",
+          "type": "string"
+        },
+        "tls": {
+          "$ref": "#/$defs/CertificatePolicy"
+        },
+        "token_ttl_seconds": {
+          "default": 300,
+          "maximum": 300,
+          "minimum": 30,
+          "title": "Token Ttl Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "KafkaInfrastructure",
+      "type": "object"
+    },
     "LayerIceberg": {
       "additionalProperties": false,
       "description": "Iceberg tables in a layer: metadata in the layer PostgreSQL, data in a layer RustFS bucket.",
@@ -615,6 +702,9 @@
     },
     "iceberg": {
       "$ref": "#/$defs/LayerIceberg"
+    },
+    "kafka": {
+      "$ref": "#/$defs/KafkaInfrastructure"
     }
   },
   "title": "InfrastructureSpec",

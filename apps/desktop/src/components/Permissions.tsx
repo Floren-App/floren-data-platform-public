@@ -25,6 +25,7 @@ export function resourceChain(resource: AccessResource, resources: AccessResourc
 const API_KINDS = ["api-root", "api", "api-group", "api-operation"];
 
 export function resourceTab(resource: AccessResource, section?: ObjectSection): TabRef {
+  if (resource.kind === "kafka" || resource.kind === "topic") return { kind: "kafka", kafkaKind: resource.kind === "kafka" ? "cluster" : "topic", ref: resource.id, title: resource.name, section };
   if (resource.kind === "api-root") return { kind: "apis", title: "API management" };
   if (API_KINDS.includes(resource.kind)) {
     // Groups and operations open their API, focused on them; permissions live on the same pages.
@@ -120,10 +121,11 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
   const [reloadVersion, setReloadVersion] = useState(0);
   const [groupId, setGroupId] = useState("");
   const [search, setSearch] = useState("");
-  const isData = resource.kind === "source" || resource.kind === "schema";
+  const isKafka = resource.kind === "kafka" || resource.kind === "topic";
+  const isData = resource.kind === "source" || resource.kind === "schema" || isKafka;
   const isApi = API_KINDS.includes(resource.kind);
   const isPackage = PACKAGE_KINDS.includes(resource.kind);
-  const roles: Record<string, string> = isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
+  const roles: Record<string, string> = isKafka ? { Reader: "Consume and commit offsets for own groups", Contributor: "Also produce messages", Admin: "Also create, alter and delete topics", Owner: "All topic permissions and role assignments" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
   const [role, setRole] = useState(isData ? "Reader" : isApi ? "Consumer" : isPackage ? (resource.kind === "package" ? "Maintainer" : "Publisher") : "Executor");
   const canRead = resource.actions.includes("read");
   const canAssign = resource.actions.includes("assign");
@@ -195,6 +197,8 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
     <p className="scope-note">{resource.kind === "source" ? "Grants apply to all registered schemas in this data source, including schemas registered later."
       : resource.kind === "schema" ? "Grants cover every current and future object in this schema."
+      : resource.kind === "kafka" ? "Grants apply to every current and future topic in this Kafka cluster."
+      : resource.kind === "topic" ? "Grants govern producing, consuming and managing this topic. Consumer groups are isolated by identity."
       : resource.kind === "folder" || resource.kind === "root" ? "Grants apply to this folder and every nested folder, program, and app."
       : resource.kind === "api-root" ? "Grants apply to every API, endpoint group and operation."
       : resource.kind === "api" ? "Grants apply to this API and all of its endpoint groups and operations."

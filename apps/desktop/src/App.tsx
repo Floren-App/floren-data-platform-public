@@ -24,7 +24,7 @@ const viewForTab = (tab: TabRef): View => {
   if (["run", "runs", "workload", "deploy", "folder", "docs"].includes(tab.kind)) return "workloads";
   if (tab.kind.startsWith("catalog")) return "catalog";
   if (["apis", "api"].includes(tab.kind)) return "apis";
-  if (["data", "source", "schema", "data-object"].includes(tab.kind)) return "data";
+  if (["data", "source", "schema", "data-object", "kafka"].includes(tab.kind)) return "data";
   if (tab.kind === "pool") return "compute";
   if (tab.kind.startsWith("package")) return "packages";
   if (tab.kind.startsWith("admin-")) return "admin";

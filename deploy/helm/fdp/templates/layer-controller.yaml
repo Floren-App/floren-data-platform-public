@@ -32,6 +32,18 @@ rules:
   - apiGroups: [cert-manager.io]
     resources: [certificates]
     verbs: [get, create, patch]
+  - apiGroups: [kafka.strimzi.io]
+    resources: [kafkas, kafkanodepools, kafkatopics]
+    verbs: [get, create, patch]
+  - apiGroups: [kafka.strimzi.io]
+    resources: [kafkatopics]
+    verbs: [delete]
+  - apiGroups: [core.strimzi.io]
+    resources: [strimzipodsets]
+    verbs: [get, list, patch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [list]
   - apiGroups: [rbac.authorization.k8s.io]
     resources: [rolebindings]
     verbs: [get, create, patch]
@@ -121,6 +133,11 @@ spec:
             - {name: FDP_LAYER_SHARED_DATABASE_NAMESPACE, value: {{ include "fdp.databaseNamespace" . | quote }} }
             {{- end }}
             - {name: FDP_LAYER_PLATFORM_NAMESPACE, value: {{ .Release.Namespace | quote }} }
+            - name: FDP_SESSION_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: FDP_SESSION_SIGNING_KEY
             - {name: FDP_LAYER_INSTALLATION, value: {{ $installation | quote }} }
             - {name: FDP_LAYER_NAMESPACE_PREFIX, value: {{ $prefix | quote }} }
             - {name: FDP_LAYER_RUNTIME_CLUSTER_ROLE, value: {{ $runtimeRole | quote }} }
@@ -134,6 +151,7 @@ spec:
             - {name: FDP_LAYER_POD_CIDRS, value: {{ .Values.layerController.network.podCidrs | toJson | quote }} }
             - {name: FDP_LAYER_SERVICE_CIDRS, value: {{ .Values.layerController.network.serviceCidrs | toJson | quote }} }
             - {name: FDP_LAYER_NODE_CIDRS, value: {{ .Values.layerController.network.nodeCidrs | toJson | quote }} }
+            - {name: FDP_LAYER_KAFKA_API_SERVER_CIDRS, value: {{ .Values.layerController.network.kafkaApiServerCidrs | toJson | quote }} }
             - {name: FDP_LAYER_PROTECTED_CIDRS, value: {{ .Values.layerController.network.protectedCidrs | toJson | quote }} }
             # Artifact holder: the control-plane image already has sh/find/head/base64/stat.
             - {name: FDP_LAYER_ARTIFACT_IMAGE, value: "{{ .Values.image.repository }}:{{ .Values.image.tag }}" }

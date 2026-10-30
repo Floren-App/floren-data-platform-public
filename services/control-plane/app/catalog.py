@@ -111,13 +111,25 @@ def sync_registry(db):
         if source:
             known.attributes = {**known.attributes, "source_kind": source.kind, "source": source.name}
             reindex(known)
+    kafka_clusters = {}
     for resource in resources:
+        if resource.kind in ('kafka', 'topic') and resource.config.get('deleted'):
+            continue
         if resource.kind in ("root", "api-root", "layer", "package-root", "package"):
             continue  # Navigation roots are not deployed products.
         if resource.kind == "service" and resource.object_id not in {p.id for p in pubs}:
             continue
-        upsert(db, resource, attributes={"source": by_id[resource.parent_id].name if resource.kind == "schema" and resource.parent_id in by_id else "",
+        indexed = upsert(db, resource, attributes={"source": by_id[resource.parent_id].name if resource.kind == "schema" and resource.parent_id in by_id else "",
                                       "source_kind": resource.config.get("source_kind", "")})
+        if resource.kind == 'topic' and resource.parent_id in by_id:
+            parent = by_id[resource.parent_id]
+            if not parent.config.get('deleted'):
+                if parent.id not in kafka_clusters:
+                    kafka_clusters[parent.id] = db.get(CatalogAsset, asset_id(parent.id)) or upsert(db,parent)
+                indexed.attributes = {**indexed.attributes, 'source_kind':'kafka'}
+                reindex(indexed)
+                edge(db, parent, kafka_clusters[parent.id], indexed,
+                     'contains', 'resource_hierarchy')
     for pub in pubs:
         resource = by_id[pub.resource_id]
         asset = upsert(db, resource, kind=pub.kind, attributes={"repo": pub.repo.name, "branch": pub.branch,
@@ -204,6 +216,7 @@ def readable_resources(db, user, browsing=False):
 def visible_assets(db, user, terms=(), condition=None):
     resources, allowed = readable_resources(db, user, browsing=True)
     stopped = {p.resource_id for p in db.scalars(select(Workload).where(Workload.status == "stopped"))}
+    stopped.update(r.id for r in resources.values() if r.kind in ('kafka', 'topic') and r.config.get('deleted'))
     statement = select(CatalogAsset).where(CatalogAsset.resource_id.in_(allowed - stopped))
     if condition is not None:
         statement = statement.where(condition)
@@ -234,7 +247,7 @@ def require_asset(db, ident, user, action="read"):
         asset = db.get(CatalogAsset, ident)
     resource = db.get(Resource, asset.resource_id) if asset else None
     pub = db.get(Workload, resource.object_id) if resource and resource.kind == "service" and not resource.config.get("service_account") else None
-    if not resource or asset.attributes.get("inactive") or (pub and pub.status == "stopped") or not rbac.allowed(db, user, "read", resource):
+    if not resource or resource.config.get('deleted') or asset.attributes.get("inactive") or (pub and pub.status == "stopped") or not rbac.allowed(db, user, "read", resource):
         raise HTTPException(404, "catalog object not available")
     from .measurements import dependencies_visible
     if not dependencies_visible(db, user, asset.attributes.get('dependency_asset_ids', [])):
@@ -578,7 +591,8 @@ def hierarchy_parents(assets, edges, focus):
         if e.relation != "contains":
             continue
         parent, child = assets[e.source_id], assets[e.target_id]
-        if ((parent.kind == "dbt" and child.kind in {"dbt_model", "dbt_seed", "dbt_snapshot"})
+        if ((parent.kind == "kafka" and child.kind == "topic")
+                or (parent.kind == "dbt" and child.kind in {"dbt_model", "dbt_seed", "dbt_snapshot"})
                 or (parent.kind == "airflow" and child.kind == "airflow_dag")
                 or (parent.kind == "airflow_dag" and child.kind == "airflow_task")):
             parents[child.id] = parent.id
@@ -645,6 +659,8 @@ def graph(db, user, focus, direction="both", depth=3, origin="", since=None, vie
     # through the container, which creates cycles around its own materializations.
     boundaries = {e["target"] for e in links if e["source"] in project_models and e["relation"] == "writes"}
     members = set(project_models)
+    if by_id[focus].kind == 'kafka':
+        members.update(e.target_id for e in membership_edges if e.source_id == focus and e.relation == 'contains')
     if by_id[focus].kind in {"schema", "source"}:
         boundary_ids = {by_id[focus].resource_id}
         if by_id[focus].kind == "source":
