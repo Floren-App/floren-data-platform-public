@@ -17,9 +17,9 @@ Confirm the source revision, configuration and integration checks for your deplo
 | Lineage | Program observations and native dbt/Airflow evidence; completeness depends on executed/instrumented paths and captured artifacts |
 | SLA enforcement | Configurable evidence and input gates; external notification delivery is not a complete incident-management system |
 | Bundled services | Keycloak, PostgreSQL and RustFS are optional and single-instance, not highly available; bring your own for HA |
-| Provider distribution | Signed GitHub releases of Floren-App/terraform-provider-fdp, prepared for the OpenTofu and Terraform registries; listing there is a separate submission |
+| Provider distribution | Signed GitHub releases of Floren-App/terraform-provider-fdp, installed into a filesystem mirror (`scripts/install-provider.sh`); not listed in a public registry |
 | Documentation versions | This site follows main; historical Markdown is available at source commits |
-| Kafka / agent framework | Not required platform components; no generic agent control plane or managed Kafka service is promised |
+| Kafka / AI agent | Not available yet; both are planned (see the roadmap) |
 
 The [installation guide](kubernetes-install.md#what-is-not-supported-yet) and
 [SQL execution guide](query-execution.md) describe additional backend limitations. See
