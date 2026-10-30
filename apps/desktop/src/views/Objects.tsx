@@ -1,6 +1,6 @@
 import { ObjectLineage } from "../components/ObjectLineage";
 import { useEffect, useState } from "react";
-import { accessibleSchemas, accessibleSources, api, AccessResource, ServiceAccount } from "../api";
+import { accessibleSchemas, accessibleSources, api, AccessResource, inLayer, ServiceAccount } from "../api";
 import type { Hub } from "../hub";
 import { ObjectBreadcrumbs, ObjectTabs, OpenTab, PermissionsPanel, resourceChain, resourcePath, resourceTab } from "../components/Permissions";
 import type { TabRef } from "./Tabs";
@@ -15,13 +15,15 @@ import { PageHeader } from "../components/Page";
 interface ObjectProps { tab: TabRef; hub: Hub; openTab: OpenTab }
 
 export function DataSourcesView({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
-  const sources = accessibleSources(hub.resources);
+  const all = accessibleSources(hub.resources);
+  const sources = all.filter((s) => inLayer(hub.layerId, s.layer_id));
   return <><PageHeader icon={<ProductIcon kind="data" size={22} />} title="Storage" subtitle="Storage connections contain schemas or storage namespaces. Expand them to browse tables, views, files and columns."
       actions={hub.me?.is_admin && <button className="btn secondary" onClick={() => openTab({ kind: "admin-sources", title: "Storage integrations" })}>Storage integrations</button>} />
     <table><thead><tr><th>Storage connection</th><th>Type</th><th>Layer</th><th>Schemas you can access</th></tr></thead><tbody>{sources.map((s) => <tr key={s.id}>
       <td><button className="text-button object-name" onClick={() => openTab(resourceTab(s))}><ProductIcon kind={String(s.config.source_kind)} size={16} />{s.name}</button></td>
       <td>{String(s.config.source_kind ?? "")}</td><td>{s.layer_name || "—"}</td><td>{accessibleSchemas(hub.resources, s.id).length}</td>
-    </tr>)}{!sources.length && <tr><td colSpan={4} className="muted">No data sources you can access. Ask a data source owner for access.</td></tr>}</tbody></table>
+    </tr>)}{!sources.length && <tr><td colSpan={4} className="muted">{all.length ? "No storage connections in this layer." : "No data sources you can access. Ask a data source owner for access."}</td></tr>}</tbody></table>
+    {all.length > sources.length && <p className="muted">{all.length - sources.length} more in other layers. Switch the layer in the top bar to see them.</p>}
   </>;
 }
 

@@ -567,6 +567,8 @@ class UserPreference(Base):
     __tablename__ = "user_preferences"
     principal_id: Mapped[str] = mapped_column(ForeignKey("directory_principals.id"), primary_key=True)
     active_group_id: Mapped[Optional[str]] = mapped_column(ForeignKey("app_groups.id"), nullable=True)
+    # The app's layer mode: lists show this layer and new work lands in it. A removed layer falls back to the default.
+    active_layer_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
 
 
 class IdentityBinding(Base):

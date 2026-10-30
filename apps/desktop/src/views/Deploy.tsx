@@ -1,7 +1,7 @@
 import { ObjectLineage } from "../components/ObjectLineage";
 import { objectKindLabel } from "../objectKinds";
 import { useCallback, useEffect, useState } from "react";
-import { openInWindow, api, AccessResource, ApiError, defaultLayerId, startingPool, usablePools, programRuntime, Workload, PullResult, Repo, Run, runtimeLabel, ServiceAccount, workloadStatus, workloadDot } from "../api";
+import { openInWindow, api, AccessResource, ApiError, startingPool, usablePools, programRuntime, Workload, PullResult, Repo, Run, runtimeLabel, ServiceAccount, workloadStatus, workloadDot } from "../api";
 import { AccessError } from "../components/AccessError";
 import { ProductIcon } from "../components/ProductIcon";
 import type { Hub } from "../hub";
@@ -46,7 +46,7 @@ export function DeployWizard({ hub, openTab, initialFolder }: { hub: Hub; openTa
   const [folderId, setFolderId] = useState(initialFolder ?? "workloads");
   const [layerId, setLayerId] = useState("");
   const inheritedLayer = folders.find((f) => f.id === folderId)?.layer_id;
-  const selectedLayer = inheritedLayer || layerId || defaultLayerId(hub.layers);
+  const selectedLayer = inheritedLayer || layerId || hub.layerId;
   const [executionMode, setExecutionMode] = useState<"caller" | "fixed">("caller");
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [accounts, setAccounts] = useState<ServiceAccount[]>([]);

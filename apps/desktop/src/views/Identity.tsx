@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, CertificateInfo, defaultLayerId, Runtime, RuntimeKind, runtimeLabel, Secret, SecretInput, ServiceAccount, ServiceToken } from "../api";
+import { api, ApiError, CertificateInfo, Runtime, RuntimeKind, runtimeLabel, Secret, SecretInput, ServiceAccount, ServiceToken } from "../api";
 import type { Hub } from "../hub";
 import { IconClose, IconKey, IconPlus, IconTrash } from "../components/Icons";
 import { PageHeader } from "../components/Page";
@@ -328,7 +328,7 @@ export function AdminRuntimes({ withR = true }: { withR?: boolean }) {
 /** Admin: service accounts (non-human identities for data products) and their tokens. */
 export function AdminServiceAccounts({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const { data: accounts, error, setError, reload } = useLoad(api.serviceAccounts, [] as ServiceAccount[]);
-  const empty = { name: "", description: "", layer_id: defaultLayerId(hub.layers) };
+  const empty = { name: "", description: "", layer_id: hub.layerId };
   const [form, setForm] = useState(empty);
   const [open, setOpen] = useState(false);
   const editing = accounts.some((a) => a.name === form.name);
@@ -373,7 +373,7 @@ export function AdminServiceAccounts({ hub, openTab }: { hub: Hub; openTab: Open
               <td>{a.layer_name || "—"}</td><td className="muted">{when(a.created_at)} · {a.created_by}</td>
               <td className="table-actions"><div className="row">
                 <button className="btn sm secondary" disabled={!serviceFor(a)} onClick={() => openTab(resourceTab(serviceFor(a)!, "permissions"))}>Permissions</button>
-                <button className="btn sm secondary" onClick={() => { setForm({ name: a.name, description: a.description, layer_id: a.layer_id || defaultLayerId(hub.layers) }); setOpen(true); }}>Edit</button>
+                <button className="btn sm secondary" onClick={() => { setForm({ name: a.name, description: a.description, layer_id: a.layer_id || hub.layerId }); setOpen(true); }}>Edit</button>
                 <button className="btn sm secondary" onClick={() => api.admin.upsertServiceAccount(a.name, { ...a, disabled: !a.disabled }).then(reload).catch((e: Error) => setError(e.message))}>{a.disabled ? "Enable" : "Disable"}</button>
                 <button className="icon-btn" aria-label={`Delete ${a.name}`} title="Delete service account" onClick={() => confirm(`Delete ${a.principal}? Its tokens stop working.`)
                   && api.admin.deleteServiceAccount(a.name).then(reload).catch((e: Error) => setError(e.message))}><IconTrash /></button>

@@ -9,7 +9,7 @@ import { AdminLayers, AdminAudit, AdminNetwork, AdminPools, AdminSources, AdminW
 import { ProgramRunner } from "./Programs";
 import { AdminRepos, WorkloadView, DeployWizard } from "./Deploy";
 import { AccessTab } from "./Access";
-import { IAMNavigation, UsersTab } from "./Directory";
+import { UsersTab } from "./Directory";
 import { ProductIcon } from "../components/ProductIcon";
 import { DataSourcesView, FolderView, SchemaView, ServiceView, ServicesView, SourceView } from "./Objects";
 import type { ObjectSection } from "../components/Permissions";
@@ -59,8 +59,8 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "api": return <ApiView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
     case "catalog": return <CatalogView openTab={openTab} initialKind={tab.ref} initialQuery={tab.search} />;
     case "catalog-object": return <CatalogObject tab={tab} hub={hub} openTab={openTab} />;
-    case "access": return <><IAMNavigation active="access" openTab={openTab} /><AccessTab hub={hub} openTab={openTab} groupId={tab.ref} bindingPrincipalId={tab.bindingPrincipalId} onSelect={(id, name) => openTab({ kind: "access", ref: id, title: name, bindingPrincipalId: tab.bindingPrincipalId })} /></>;
-    case "users": return <><IAMNavigation active="users" openTab={openTab} /><UsersTab hub={hub} selectedId={tab.ref} openTab={openTab} /></>;
+    case "access": return <AccessTab hub={hub} openTab={openTab} groupId={tab.ref} bindingPrincipalId={tab.bindingPrincipalId} onSelect={(id, name) => openTab({ kind: "access", ref: id, title: name, bindingPrincipalId: tab.bindingPrincipalId })} />;
+    case "users": return <UsersTab hub={hub} selectedId={tab.ref} openTab={openTab} />;
     case "home": return <Home hub={hub} openTab={openTab} />;
     case "workspaces": return <WorkspacesView hub={hub} openTab={openTab} />;
     case "runs": return <RecentRuns hub={hub} openTab={openTab} scope={tab.ref === "workspace" ? "workspace" : "deployed"} />;
@@ -74,8 +74,8 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "data-object": return <DataObjectView tab={tab} hub={hub} openTab={openTab} />;
     case "pool": return <PoolView name={tab.ref} hub={hub} openTab={openTab} />;
     case "folder": return <FolderView tab={tab} hub={hub} openTab={openTab} />;
-    case "service": return <><IAMNavigation active="services" openTab={openTab} /><ServiceView tab={tab} hub={hub} openTab={openTab} /></>;
-    case "services": return <><IAMNavigation active="services" openTab={openTab} /><ServicesView hub={hub} openTab={openTab} /></>;
+    case "service": return <ServiceView tab={tab} hub={hub} openTab={openTab} />;
+    case "services": return <ServicesView hub={hub} openTab={openTab} />;
     case "deploy": return <DeployWizard hub={hub} openTab={openTab} initialFolder={tab.ref} />;
     case "workload": return <WorkloadView tab={tab} id={tab.ref!} hub={hub} openTab={openTab} runTab={runTab} />;
     case "admin-layers": return <AdminLayers hub={hub} />;
@@ -83,7 +83,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "admin-repos": return <AdminRepos />;
     case "admin-runtimes": return <AdminRuntimes withR={rEnabled(hub.me)} />;
     case "admin-service-accounts": return <AdminServiceAccounts hub={hub} openTab={openTab} />;
-    case "secrets": return <><IAMNavigation active="secrets" openTab={openTab} /><SecretsTab hub={hub} selectedRef={tab.ref} creating={tab.intent === "create"} openTab={openTab} /></>;
+    case "secrets": return <SecretsTab hub={hub} selectedRef={tab.ref} creating={tab.intent === "create"} openTab={openTab} />;
     case "docs": return <DocsTab runId={tab.ref!} />;
     case "admin-pools": return <AdminPools hub={hub} />;
     case "admin-workspace-templates": return <AdminWorkspaceTemplates hub={hub} />;

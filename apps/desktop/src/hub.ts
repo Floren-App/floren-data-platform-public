@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, AccessResource, Layer, Me, Workload, Run, Workspace } from "./api";
+import { api, AccessResource, Layer, Me, modeLayerId, Workload, Run, Workspace } from "./api";
 import { useObjectCache } from "./cache";
 import { SessionExpiredError } from "./auth";
 
@@ -16,6 +16,9 @@ export interface Hub {
   error: string | null;
   refresh: () => Promise<void>;
   selectActiveGroup: (id: string) => Promise<void>;
+  /** The layer mode: lists show this layer and new work lands in it. */
+  layerId: string;
+  selectActiveLayer: (id: string) => Promise<void>;
   /** Runs an action, surfaces its error, and refreshes state afterwards. Resolves true on success. */
   act: (fn: () => Promise<unknown>) => Promise<boolean>;
   dismissError: () => void;
@@ -144,6 +147,14 @@ export function useHub(enabled: boolean): Hub {
     }
   }, [cache, update]);
 
+  const selectActiveLayer = useCallback(async (id: string) => {
+    const before = me;
+    setMe((m) => m && { ...m, active_layer_id: id });
+    try { setError(null); await api.selectActiveLayer(id); }
+    catch (e) { setMe(before); if (!(e instanceof SessionExpiredError)) setError((e as Error).message); }
+  }, [me]);
+  const layerId = modeLayerId(me, layers);
+
   const loadMoreRuns = useCallback(async () => {
     runLimit.current = Math.min(runLimit.current + RUN_PAGE, MAX_RUNS);
     await update(false);
@@ -168,5 +179,5 @@ export function useHub(enabled: boolean): Hub {
     };
   }, [enabled, refresh, update]);
 
-  return { me, workspaces, runs, hasMoreRuns, loadMoreRuns, workloads, resources, layers, error, refresh, selectActiveGroup, act, dismissError };
+  return { me, workspaces, runs, hasMoreRuns, loadMoreRuns, workloads, resources, layers, error, refresh, selectActiveGroup, layerId, selectActiveLayer, act, dismissError };
 }

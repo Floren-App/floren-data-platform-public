@@ -99,6 +99,10 @@ function Shell({ user }: { user: User }) {
     finally { setSwitchingGroup(false); }
   };
 
+  const openSearch = () => {
+    setView("catalog"); openTab({ kind: "catalog", title: "Catalog" });
+    requestAnimationFrame(() => document.getElementById("catalog-search")?.focus());
+  };
   const openTab = (t: TabRef) => {
     setView(viewForTab(t));
     setTabs((ts) => {
@@ -124,30 +128,34 @@ function Shell({ user }: { user: User }) {
   };
   useEffect(() => {
     const search = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault(); setView("catalog"); openTab({ kind: "catalog", title: "Catalog" });
-        requestAnimationFrame(() => document.getElementById("catalog-search")?.focus());
-      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); }
     };
     window.addEventListener("keydown", search);
     return () => window.removeEventListener("keydown", search);
   });
 
-  // Start → build → deploy → discover → govern → infrastructure.
-  const activities: { id: View; label: string; icon: JSX.Element }[] = [
-    { id: "home", label: "Home", icon: <IconHome /> },
-    { id: "workspaces", label: "Workspaces", icon: <IconWorkspaces /> },
-    { id: "workloads", label: "Workloads", icon: <IconDeployed /> },
-    { id: "data", label: "Storage", icon: <IconData /> },
-    // Kafka is optional per layer: shown once a cluster is visible, or to admins who register one.
-    ...(hub.me?.is_admin || hub.resources.some((r) => r.kind === "kafka") ? [{ id: "kafka" as View, label: "Kafka", icon: <IconStream /> }] : []),
-    { id: "apis", label: "APIs", icon: <IconApi /> },
-    { id: "packages", label: "Packages", icon: <IconPackage /> },
-    { id: "catalog", label: "Catalog", icon: <IconCatalog /> },
-    { id: "access", label: "Security", icon: <IconAdmin /> },
-    { id: "compute", label: "Compute pools", icon: <IconCompute /> },
+  type Activity = { id: View; label: string; icon: JSX.Element };
+  // Overview (look) → Build (make) → Integration (connect); access and administration sit at the bottom.
+  const groups: { label: string; items: Activity[] }[] = [
+    { label: "Overview", items: [
+      { id: "home", label: "Home", icon: <IconHome /> },
+      { id: "catalog", label: "Catalog", icon: <IconCatalog /> },
+      { id: "compute", label: "Usage", icon: <IconCompute /> },
+    ] },
+    { label: "Build", items: [
+      { id: "workspaces", label: "Workspaces", icon: <IconWorkspaces /> },
+      { id: "workloads", label: "Workloads", icon: <IconDeployed /> },
+      { id: "data", label: "Storage", icon: <IconData /> },
+      { id: "packages", label: "Packages", icon: <IconPackage /> },
+    ] },
+    { label: "Integration", items: [
+      // Kafka is optional per layer: shown once a cluster is visible, or to admins who register one.
+      ...(hub.me?.is_admin || hub.resources.some((r) => r.kind === "kafka") ? [{ id: "kafka" as View, label: "Kafka", icon: <IconStream /> }] : []),
+      { id: "apis", label: "APIs", icon: <IconApi /> },
+    ] },
   ];
-  const activityButton = (a: { id: View; label: string; icon: JSX.Element }) => (
+  const layer = hub.layers.find((l) => l.id === hub.layerId);
+  const activityButton = (a: Activity) => (
     <button key={a.id} title={a.label} aria-label={a.label} aria-current={view === a.id ? "page" : undefined}
             className={view === a.id ? "active" : ""} onClick={() => selectView(a.id)}>
       {a.icon}
@@ -165,7 +173,7 @@ function Shell({ user }: { user: User }) {
       apis: { kind: "apis", ref: "internal", title: "API management" },
       data: { kind: "data", title: "Storage" },
       kafka: { kind: "kafka-clusters", title: "Kafka" },
-      compute: { kind: "pool", title: "Compute pools" },
+      compute: { kind: "pool", title: "Usage" },
       admin: { kind: "admin-sources", title: "Storage integrations" },
     };
     if (defaults[next]) openTab(defaults[next]!);
@@ -174,14 +182,37 @@ function Shell({ user }: { user: User }) {
   const activeRuns = hub.runs.filter((r) => r.status === "running" || r.status === "pending").length;
 
   return (
-    <div className="shell">
+    <div className={`shell ${layer?.production ? "prod" : ""}`}>
+      <header className="topbar" aria-label="Working context">
+        <div className="topbar-field">
+          <label htmlFor="active-group"><ProductIcon kind="groups" size={14} />Group</label>
+          <select id="active-group" aria-label="Active group" value={hub.me?.active_group_id ?? ""} disabled={switchingGroup || !hub.me?.available_groups?.length}
+            title="Shows this group's objects and owns new objects. Secondary groups still authorize existing-object actions."
+            onChange={(e) => void switchGroup(e.target.value)}>
+            <option value="" disabled>{hub.me?.available_groups?.length ? "Choose active group" : "No groups available"}</option>
+            {hub.me?.available_groups?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        </div>
+        {!!hub.layers.length && <div className="topbar-field">
+          <label htmlFor="active-layer">Layer</label>
+          <select id="active-layer" aria-label="Layer mode" value={hub.layerId} title="Lists show this layer; what you create lands in it."
+            onChange={(e) => void hub.selectActiveLayer(e.target.value)}>
+            {!hub.layerId && <option value="" disabled>Choose a layer</option>}
+            {hub.layers.map((l) => <option key={l.id} value={l.id}>{l.name}{l.production ? " · production" : ""}</option>)}
+          </select>
+        </div>}
+        {layer?.production && <span className="topbar-note">Changes here affect production</span>}
+        <button className="topbar-search" onClick={openSearch}>Search the catalog<span className="kbd">⌘K</span></button>
+      </header>
       <nav className="activity" aria-label="Views">
-        {activities.map(activityButton)}
+        {groups.filter((g) => g.items.length).map((g, i) => <div key={g.label} className="activity-group" role="group" aria-label={g.label}>
+          {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />
+        {activityButton({ id: "access", label: "Security", icon: <IconAdmin /> })}
+        {hub.me?.is_admin && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}
         <button title="Documentation for this section" aria-label="Documentation" onClick={() => {
           void hub.act(() => openInWindow(documentationUrl(view), "FDP documentation", `fdp-help-${view}`));
         }}><IconBook /></button>
-        {hub.me?.is_admin && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}
         <MenuButton id="account-menu" label="Account" menuLabel="Account" className="" icon={<IconAccount />}>
           {(close) => <>
             <div className="menu-header"><strong>{user.profile.preferred_username ?? hub.me?.username}</strong>
@@ -194,16 +225,6 @@ function Shell({ user }: { user: User }) {
 
       <aside className="sidebar">
         <div className="sidebar-content"><Sidebar key={hub.me?.active_group_id ?? ""} view={view} hub={hub} openTab={openTab} activeKey={active} activeRef={current?.ref} activeIntent={current?.intent} /></div>
-        <div className="active-group-picker">
-          <label htmlFor="active-group"><ProductIcon kind="groups" size={14} />Active group</label>
-          <select id="active-group" value={hub.me?.active_group_id ?? ""} disabled={switchingGroup || !hub.me?.available_groups?.length}
-            title="Shows this group's objects and owns new objects. Secondary groups still authorize existing-object actions."
-            onChange={(e) => void switchGroup(e.target.value)}>
-            <option value="" disabled>{hub.me?.available_groups?.length ? "Choose active group" : "No groups available"}</option>
-            {hub.me?.available_groups?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-          <small>{switchingGroup ? "Switching group…" : "Browse and create as this group"}</small>
-        </div>
       </aside>
 
       <main className="main">
@@ -254,6 +275,7 @@ function Shell({ user }: { user: User }) {
       <footer className="statusbar">
         <span>{new URL(getServer()).host}</span>
         <span>{user.profile.preferred_username ?? hub.me?.username}</span>
+        {layer && <span>{hub.me?.available_groups?.find((g) => g.id === hub.me?.active_group_id)?.name ?? "No group"} · {layer.name}</span>}
         {hub.error && <span className="status-error" title={hub.error}>⚠ {hub.error}</span>}
         <div className="spacer" />
         <span>{runningWs} workspace{runningWs === 1 ? "" : "s"} running</span>
