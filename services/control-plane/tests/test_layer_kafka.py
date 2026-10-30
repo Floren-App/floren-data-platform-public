@@ -80,6 +80,12 @@ def test_network_policies_select_brokers_by_the_labels_strimzi_keeps():
     # Brokers read their certificate Secrets from the API at startup (Strimzi config provider).
     assert selects(policies['kafka-topic-operator-api']['podSelector'], live)
     assert not selects(policies['kafka-topic-operator-api']['podSelector'], {**live,'fdp.floren.app/role':'stream'})
+    # The topic operator reaches the brokers' internal listener (found on the live cluster: egress denied).
+    operator = {**live,'fdp.floren.app/role':'kafka-operator'}
+    rule = policies['kafka-topic-operator']
+    assert selects(rule['podSelector'], operator) and not selects(rule['podSelector'], live)
+    assert [p['port'] for p in rule['egress'][0]['ports']] == [9091]
+    assert selects(rule['egress'][0]['to'][0]['podSelector'], live)
 
 
 def test_cilium_gets_the_api_server_entity_for_the_same_pods_only():

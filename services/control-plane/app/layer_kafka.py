@@ -123,6 +123,11 @@ def manifests(layer_id, namespace, spec, config, plan):
     docs.append(obj('NetworkPolicy','kafka-clients',{'spec':{
         'podSelector':clients['podSelector'], 'policyTypes':['Egress'],
         'egress':[{'to':[brokers],'ports':[{'protocol':'TCP','port':9093}]}]}}, 'networking.k8s.io/v1'))
+    # The topic operator talks to the brokers over the internal TLS listener only.
+    docs.append(obj('NetworkPolicy','kafka-topic-operator',{'spec':{
+        'podSelector':{'matchLabels':{OWNER:config.installation,LAYER:layer_id,'fdp.floren.app/role':'kafka-operator'}},
+        'policyTypes':['Egress'], 'egress':[{'to':[brokers],'ports':[{'protocol':'TCP','port':9091}]}]}},
+        'networking.k8s.io/v1'))
     # Brokers read their certificates through Strimzi's Kubernetes config provider; the topic operator
     # reconciles KafkaTopics. Only these two reach the API, and only its exact addresses.
     docs.append(obj('NetworkPolicy','kafka-topic-operator-api',{'spec':{
