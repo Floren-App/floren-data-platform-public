@@ -9,6 +9,7 @@ export function documentationUrl(view: View): string {
     workspaces: "workspaces/",
     workloads: "deploying/",
     data: "storage-integrations/",
+    kafka: "",                      // no public Kafka guide yet: the site start page
     apis: "api-management/",
     packages: "packages/",
     catalog: "catalog/",
