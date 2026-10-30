@@ -956,6 +956,20 @@
         "title": "EgressHostIn",
         "type": "object"
       },
+      "ExpressionIn": {
+        "properties": {
+          "expression": {
+            "maxLength": 4000,
+            "title": "Expression",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expression"
+        ],
+        "title": "ExpressionIn",
+        "type": "object"
+      },
       "ExternalOperation": {
         "properties": {
           "headers": {
@@ -12064,6 +12078,80 @@
           }
         },
         "summary": "Create Policy",
+        "tags": [
+          "data policies"
+        ]
+      }
+    },
+    "/v1/data-policies/normalize": {
+      "post": {
+        "description": "How the platform would store an expression (so tools can compare without false changes).",
+        "operationId": "post_v1_data-policies_normalize",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpressionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Normalize",
         "tags": [
           "data policies"
         ]

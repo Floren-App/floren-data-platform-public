@@ -158,6 +158,8 @@ def config(repo, cert, version=1):
     """The whole configuration; version 2 changes an updatable setting on every resource type."""
     v2 = version == 2
     pem, key = cert
+    # Written unformatted on purpose: the platform stores it normalized, which must not show as a change.
+    region_filter = "region='EU' OR is_member('Analysts')" if v2 else "region='EU'"
     return f"""
 terraform {{
   required_providers {{
@@ -294,6 +296,22 @@ resource "fdp_role_assignment" "analysts_read" {{
   role         = "{'Contributor' if v2 else 'Reader'}"
 }}
 
+resource "fdp_data_policy" "email" {{
+  schema_id     = fdp_schema.reporting.id
+  table         = "customers"
+  kind          = "column_mask"
+  column        = "email"
+  method        = "{'hash' if v2 else 'partial'}"
+  exempt_groups = [fdp_app_group.analysts.id]
+}}
+
+resource "fdp_data_policy" "region" {{
+  schema_id  = fdp_schema.reporting.id
+  table      = "customers"
+  kind       = "row_filter"
+  expression = "{region_filter}"
+}}
+
 # The package repository: who publishes and imports (everyone installs).
 resource "fdp_role_assignment" "analysts_publish" {{
   resource_id  = "packages"
@@ -427,7 +445,7 @@ IMPORT_IDS = {
     'fdp_catalog_governance': lambda v: v['resource_id'], 'fdp_sla_policy': lambda v: v['resource_id'],
     'fdp_metric': lambda v: f"{v['resource_id']}/{v['key']}", 'fdp_workspace_settings': lambda v: 'workspaces',
     'fdp_default_layer': lambda v: 'default', 'fdp_default_warehouse': lambda v: 'default',
-    'fdp_workspace_template': lambda v: v['id'], 'fdp_egress_allowlist': lambda v: 'egress', 'fdp_runtime': lambda v: f"{v['kind']}/{v['version']}", 'fdp_query_log_settings': lambda v: 'query_log', 'fdp_package_allowlist': lambda v: 'package_allowlist', 'fdp_package': lambda v: f"{v['kind']}/{v['name']}/{v['version']}",
+    'fdp_workspace_template': lambda v: v['id'], 'fdp_data_policy': lambda v: v['id'], 'fdp_egress_allowlist': lambda v: 'egress', 'fdp_runtime': lambda v: f"{v['kind']}/{v['version']}", 'fdp_query_log_settings': lambda v: 'query_log', 'fdp_package_allowlist': lambda v: 'package_allowlist', 'fdp_package': lambda v: f"{v['kind']}/{v['name']}/{v['version']}",
 }
 
 
@@ -521,7 +539,7 @@ def main():
             secrets_absent()
             created = resources()
             types = sorted({r['type'] for r in created.values()})
-            require(len(types) == 26, f'expected 26 resource types, got {types}')
+            require(len(types) == 27, f'expected 27 resource types, got {types}')
             by_address = {a: r['values'] for a, r in created.items()}
             require(by_address['fdp_layer.nonprod']['phase'] == 'Ready', 'layer did not reach Ready')
             require(by_address['fdp_workload.report']['status'] == 'live', 'workload did not go live')
@@ -583,13 +601,19 @@ def main():
             reporting_id = by_address['fdp_schema.reporting']['id']
             api.put(f'/v1/rbac/resources/{reporting_id}/assignments',
                     json={'principal_id': report_identity, 'role': 'Reader'}).raise_for_status()
-            drifted = empty_plan('drift', allowed={'fdp_compute_pool.small', 'fdp_api.orders', 'fdp_catalog_governance.report', 'fdp_workload.report'})
-            require(drifted == {'fdp_compute_pool.small', 'fdp_api.orders', 'fdp_catalog_governance.report', 'fdp_workload.report'},
+            # Someone unmasks a column by hand: the next plan must put the mask back.
+            email = by_address['fdp_data_policy.email']['id']
+            api.put(f'/v1/data-policies/{email}', json={'method': 'null'}).raise_for_status()
+            drift_expected = {'fdp_compute_pool.small', 'fdp_api.orders', 'fdp_catalog_governance.report', 'fdp_workload.report',
+                              'fdp_data_policy.email'}
+            drifted = empty_plan('drift', allowed=drift_expected)
+            require(drifted == drift_expected,
                     f'drift not detected on every changed object: {sorted(drifted)}')
             tofu('apply', '-auto-approve', '-input=false')
             empty_plan('after repairing drift')
             require(api.get(f'/v1/apis/{orders}').json()['name'] == 'Orders API', 'API name not restored')
-            step('Drift on pool, API, governance and managed identity grants detected and repaired')
+            require(api.get(f'/v1/data-policies/{email}').json()['method'] == 'hash', 'column mask not restored')
+            step('Drift on pool, API, governance, managed identity grants and a column mask detected and repaired')
 
             step('Guardrails: promotion rules and a non-admin automation identity')
             def refused(name, body, expected, token_value=token):
@@ -662,7 +686,7 @@ resource "fdp_folder" "sneaky" {{
             accounts = {a['name']: a for a in api.get('/v1/service-accounts').json()}
             require('tf-etl' not in accounts or accounts['tf-etl']['disabled'], 'service account still enabled')
             require(not [s for s in api.get('/v1/secrets').json() if s['owner'] == 'tf-etl'], 'secrets remain')
-            step('PASSED: create, re-plan, update, import, drift repair, guardrails and destroy for all 26 resource types')
+            step('PASSED: create, re-plan, update, import, drift repair, guardrails and destroy for all 27 resource types')
         finally:
             stop.set()
             server.terminate()

@@ -180,3 +180,10 @@ def test_policies_follow_their_schema(governed):
     assert policy(client, schema_id, table='customers', kind='column_mask', column='email', method='null').status_code == 201
     with SessionLocal() as db:
         assert db.scalar(select(DataPolicy.schema_id)) == schema_id
+
+
+def test_normalize_endpoint(governed):
+    client, *_ = governed
+    response = client.post('/v1/data-policies/normalize', headers=as_('ana'), json={'expression': "region='EU' -- x"})
+    assert response.json() == {'expression': "region = 'EU'", 'member_groups': []}
+    assert client.post('/v1/data-policies/normalize', headers=as_('ana'), json={'expression': '(SELECT 1)'}).status_code == 422

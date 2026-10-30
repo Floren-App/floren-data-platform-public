@@ -114,6 +114,17 @@ def list_policies(schema_id: Optional[str] = Query(default=None), db: Session = 
     return result
 
 
+class ExpressionIn(BaseModel):
+    expression: str = Field(max_length=data_policies.MAX_EXPRESSION)
+
+
+@router.post("/normalize")
+def normalize(body: ExpressionIn, user: User = Depends(get_actor)):
+    """How the platform would store an expression (so tools can compare without false changes)."""
+    expression = data_policies.normalize_expression(body.expression)
+    return {"expression": expression, "member_groups": data_policies.member_groups(expression)}
+
+
 @router.get("/{policy_id}", response_model=PolicyOut)
 def get_policy(policy_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     policy = db.get(DataPolicy, policy_id)

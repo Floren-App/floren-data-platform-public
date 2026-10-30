@@ -57,6 +57,28 @@ administrator), because it decides who sees what. Everyone who may read the sche
 policies, so people know when a value is masked. Changes apply to queries that start afterwards;
 running queries keep the policies they started with.
 
+With OpenTofu ([`fdp_data_policy`](reference/terraform/fdp_data_policy.md)):
+
+```hcl
+resource "fdp_data_policy" "customer_email" {
+  schema_id     = fdp_schema.reporting.id
+  table         = "customers"
+  kind          = "column_mask"
+  column        = "email"
+  method        = "partial"
+  exempt_groups = [fdp_app_group.auditors.id]
+}
+
+resource "fdp_data_policy" "customer_region" {
+  schema_id  = fdp_schema.reporting.id
+  table      = "customers"
+  kind       = "row_filter"
+  expression = "region = 'EU' OR is_member('Global analysts')"
+}
+```
+
+Or through the HTTP API:
+
 ```sh
 curl -X POST "$FDP_API/v1/data-policies" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{
   "schema_id": "<schema id>", "table": "customers", "kind": "column_mask",
@@ -92,5 +114,4 @@ Every change is recorded in the [audit trail](audit-and-siem.md) as `data_policy
   subqueries or refer to other tables. Expressions are stored normalized (comments removed).
 - Conditions on identity attributes from the IdP (for example a person's region) are planned;
   use `is_member` with groups until then.
-- Policies are managed through the HTTP API for now; OpenTofu resources and pages in the app
-  follow.
+- Policies are managed with OpenTofu and the HTTP API; pages in the app follow.

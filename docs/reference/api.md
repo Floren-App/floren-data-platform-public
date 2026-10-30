@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
-| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
-| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
+| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `GET` | `/v1/egress/{slug}/{path}` | Egress |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -136,6 +136,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 |---|---|---|
 | `GET` | `/v1/data-policies` | List Policies |
 | `POST` | `/v1/data-policies` | Create Policy |
+| `POST` | `/v1/data-policies/normalize` | Normalize |
 | `GET` | `/v1/data-policies/{policy_id}` | Get Policy |
 | `PUT` | `/v1/data-policies/{policy_id}` | Update Policy |
 | `DELETE` | `/v1/data-policies/{policy_id}` | Delete Policy |

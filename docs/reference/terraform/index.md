@@ -26,6 +26,7 @@ Configures Floren Data Platform through its API. Authenticate with a token, or w
 - [fdp_app_group_member](fdp_app_group_member.md)
 - [fdp_catalog_governance](fdp_catalog_governance.md)
 - [fdp_compute_pool](fdp_compute_pool.md)
+- [fdp_data_policy](fdp_data_policy.md)
 - [fdp_data_source](fdp_data_source.md)
 - [fdp_default_layer](fdp_default_layer.md)
 - [fdp_default_warehouse](fdp_default_warehouse.md)
