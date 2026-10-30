@@ -398,3 +398,23 @@ def test_controller_generates_layer_node_secret_once_and_trino_uses_platform_jwk
     assert 'opa.policy.uri=http://fdp-control-plane.platform.svc:8000/internal/trino/layers/%s/allow' % layers.NON_PROD in access
     assert '/internal/trino/allow' not in access
     assert not any(o['kind'] == 'Secret' and o['metadata']['namespace'] != namespace for o in api.objects.values())
+
+
+def test_layers_without_workspaces_enforce_pod_security_restricted():
+    """Platform pods and programs meet "restricted"; only workspace editors start as root."""
+    spec = infra.InfrastructureSpec.model_validate({**managed(), 'trino': {'workers': {'warehouse': 'trino', 'min': 1, 'max': 1}}})
+    plan = WorkerPlan('trino', 1, 4, 1)
+    labels = lambda **kw: manifests(layers.PROD, 1, spec, CONFIG, workers=plan, **kw)[0]['metadata']['labels']
+    assert labels(workspaces=False)['pod-security.kubernetes.io/enforce'] == 'restricted'
+    assert labels(workspaces=True)['pod-security.kubernetes.io/enforce'] == 'baseline'
+    assert labels(workspaces=True)['pod-security.kubernetes.io/warn'] == 'restricted'
+
+
+def test_claims_carry_the_layer_workspace_setting(client):
+    from app.models import Resource
+    with SessionLocal() as db:
+        db.get(Resource, layers.NON_PROD).config = {**db.get(Resource, layers.NON_PROD).config, 'workspaces': False}
+        db.commit()
+    queue(client)
+    claim = controller.claim_operation()
+    assert claim.layer_id == layers.NON_PROD and claim.workspaces is False

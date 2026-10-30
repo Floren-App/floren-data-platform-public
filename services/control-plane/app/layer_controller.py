@@ -195,6 +195,8 @@ class Claim:
     source_catalogs: str = ''
     # Trino workers: their warehouse's size now, and how many run (None: the warehouse is missing).
     workers: Optional[WorkerPlan] = None
+    # Whether the layer allows workspaces (their editors start as root): sets the namespace's Pod Security level.
+    workspaces: bool = True
 
 
 def claim_operation(session_factory=SessionLocal, now=None):
@@ -227,7 +229,8 @@ def claim_operation(session_factory=SessionLocal, now=None):
             spec = InfrastructureSpec.model_validate(layer.config.get('infrastructure', {}))
             result = Claim(operation_id, layer.id, operation.generation, token, spec, ready=operation.phase == 'Ready',
                            source_catalogs=layer.config.get('source_catalogs', ''),
-                           workers=worker_plan(db, spec, layer.config.get('trino_workers')))
+                           workers=worker_plan(db, spec, layer.config.get('trino_workers')),
+                           workspaces=bool(layer.config.get('workspaces', True)))
             # A periodic drift check keeps a ready layer admitting work while it runs.
             if operation.phase not in ('InfrastructureReady', 'Ready', 'Retired'):
                 operation.phase, operation.reason = 'Provisioning', 'Reconciling'
@@ -341,7 +344,7 @@ def retire(claim, resources, config, session_factory):
         return
     try:
         for document in manifests(claim.layer_id, claim.generation, claim.spec, config, claim.source_catalogs,
-                                  claim.workers or _retired_workers(claim.spec)):
+                                  claim.workers or _retired_workers(claim.spec), claim.workspaces):
             if document['kind'] == 'Deployment':
                 document['spec']['replicas'] = 0
             renew(claim, session_factory)
@@ -367,7 +370,8 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
         except (ApiException, httpx.HTTPError, OSError):
             return finish(claim, 'Retired', 'StorageRetained', 'Retirement check could not reach Kubernetes; retrying', 30, session_factory)
     try:
-        documents = manifests(claim.layer_id, claim.generation, claim.spec, config, claim.source_catalogs, claim.workers)
+        documents = manifests(claim.layer_id, claim.generation, claim.spec, config, claim.source_catalogs, claim.workers,
+                              claim.workspaces)
         waiting = False
         certificate_waiting = False
         issued = {}  # cert-manager Certificate name -> status

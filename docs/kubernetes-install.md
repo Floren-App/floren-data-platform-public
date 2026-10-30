@@ -38,6 +38,8 @@ Pin reviewed image commits/digests; do not paste another installation's values.
 cp deploy/helm/fdp/examples/minimal.yaml installation-values.yaml
 # Edit installation-values.yaml as described above before installing.
 kubectl create namespace fdp
+# Every platform pod meets Pod Security "restricted": enforce it (the chart labels its other namespaces itself).
+kubectl label namespace fdp pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/warn=restricted
 kubectl -n fdp create secret tls fdp-public-tls --cert=tls.crt --key=tls.key
 # Optional private CA bundle (public certificates only, including the public roots you need):
 kubectl -n fdp create secret generic platform-ca --from-file=ca-bundle.pem

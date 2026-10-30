@@ -68,7 +68,11 @@ privilege escalation, with all Linux capabilities dropped and the runtime's defa
 profile: Pod Security "restricted". The one exception is optional: a small init container that
 hands the package folder to the control plane's user on volumes where `fsGroup` does not apply
 (ReadWriteMany). Once the folder is owned correctly, set `packages.persistence.fixPermissions: false`.
-Editors that must start as root (RStudio) run in the runtime namespace, which enforces "baseline".
+The platform's namespaces enforce "restricted": the release namespace (label it at install), the
+metadata database and secret store namespaces, and every managed layer that does not allow workspaces.
+Editors that must start as root (RStudio, the SQL editor) need "baseline", so the runtime namespace and
+layers that allow workspaces enforce "baseline" and still warn and audit at "restricted". When a layer's
+workspace setting changes, its namespace follows within a minute.
 
 ### Data stays on the server
 

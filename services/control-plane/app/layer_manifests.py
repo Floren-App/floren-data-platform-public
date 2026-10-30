@@ -274,7 +274,7 @@ def catalog_volume(operator_secret, generated, external=False):
 
 
 def manifests(layer_id, generation, spec: InfrastructureSpec, config: ControllerConfig, source_catalogs='',
-              workers: 'WorkerPlan | None' = None):
+              workers: 'WorkerPlan | None' = None, workspaces: bool = True):
     """source_catalogs: digest of the control-plane-written external source catalogs ('' for none).
     workers: the resolved worker warehouse (worker_plan); required."""
     """Order is intentional: isolation/budgets precede identities and compute."""
@@ -327,9 +327,10 @@ def manifests(layer_id, generation, spec: InfrastructureSpec, config: Controller
 
     result = [obj('Namespace', namespace, {}, namespaced=False)]
     result[0]['metadata']['labels'].update({
-        # baseline, not restricted: the RStudio and SQL editor images start their init as
-        # root before dropping to uid 1000. Restricted violations are still warned and audited.
-        'pod-security.kubernetes.io/enforce': 'baseline',
+        # Every platform pod and program meets "restricted". Layers that allow workspaces enforce only
+        # baseline: the RStudio and SQL editor images start their init as root before dropping to uid 1000.
+        # Restricted violations are still warned and audited there.
+        'pod-security.kubernetes.io/enforce': 'baseline' if workspaces else 'restricted',
         'pod-security.kubernetes.io/enforce-version': 'v1.31',
         'pod-security.kubernetes.io/audit': 'restricted',
         'pod-security.kubernetes.io/warn': 'restricted',
