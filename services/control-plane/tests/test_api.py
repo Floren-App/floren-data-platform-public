@@ -283,3 +283,18 @@ def test_the_platform_creates_no_warehouses_by_itself(monkeypatch):
     with TestClient(app):
         with SessionLocal() as db:
             assert db.query(ComputePool).count() == 0
+
+
+def test_public_api_routes_are_rate_limited_per_credential(client, monkeypatch):
+    from app.config import get_settings
+    def config():
+        return client.get("/internal/traefik/config", headers={"X-FDP-Gateway-Config": "test-gateway-config-token"}).json()["http"]
+    http = config()
+    assert http["middlewares"]["rate-limit"]["rateLimit"] == {"average": 100, "burst": 200, "period": "1s",
+                                                             "sourceCriterion": {"requestHeaderName": "Authorization"}}
+    for name in ("api", "sql", "gw"):
+        assert http["routers"][name]["middlewares"][0] == "rate-limit", name
+    assert "rate-limit" not in http["routers"].get("web", {}).get("middlewares", [])
+    monkeypatch.setattr(get_settings(), "rate_limit_average", 0)
+    http = config()
+    assert "rate-limit" not in http["middlewares"] and "rate-limit" not in http["routers"]["api"]["middlewares"]

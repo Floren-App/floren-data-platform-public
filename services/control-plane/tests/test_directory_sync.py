@@ -102,7 +102,7 @@ def test_bundled_idp_gateway_route_uses_its_own_host_and_preserves_platform_auth
     config=response.json()['http']
     assert config['routers']['identity']=={'rule':'Host(`idp.example.com`)','service':'identity','priority':10000}
     assert config['services']['identity']['loadBalancer']['servers']==[{'url':'http://fdp-keycloak:8080'}]
-    assert config['routers']['api']['middlewares']==['api-strip']
+    assert config['routers']['api']['middlewares']==['rate-limit','api-strip']
     assert config['middlewares']['fdp-auth']['forwardAuth']['address'].endswith('/internal/auth/forward')
 
 

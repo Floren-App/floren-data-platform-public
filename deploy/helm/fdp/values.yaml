@@ -36,6 +36,17 @@ publicUrl: https://fdp.example.com
 # Incoming program APIs use a separate TLS entry point so client certificates can be requested.
 apiGateway:
   publicUrl: https://api.fdp.example.com:9443
+  # API management calls external APIs from the control plane, and only at public addresses: anyone who can edit an
+  # API could otherwise reach the platform's own network. List private networks (CIDRs) holding internal APIs you
+  # register, for example ["10.20.0.0/16"]; keep the cluster's pod and service ranges out.
+  privateNetworks: []
+
+# Requests per second per credential (Authorization header) on the public API, SQL and API gateway routes; Traefik
+# answers 429 above it. Requests without credentials share one budget. Platform-internal traffic (workloads, Trino's
+# policy callbacks) does not pass Traefik and is not limited. average: 0 disables.
+rateLimit:
+  average: 100
+  burst: 200
 
 # Namespace where workspaces and compute runs are created (default-deny egress).
 # The app in the browser: the platform serves its own interface at publicUrl, so people need nothing installed
@@ -110,6 +121,10 @@ packages:
     # ReadWriteOnce restarts the control plane in place on upgrades (one replica); ReadWriteMany
     # (e.g. Longhorn, NFS, CephFS) allows rolling upgrades and more replicas.
     accessMode: ReadWriteOnce
+    # A small root init container hands the package folder to the control plane's user (uid 10001) at every start,
+    # for volumes where fsGroup does not apply (ReadWriteMany). It is the chart's only root container: once the
+    # folder belongs to 10001, set false and every platform pod meets Pod Security "restricted".
+    fixPermissions: true
   maxUploadMb: 200
   upstream:
     pypi: https://pypi.org/simple       # empty: no imports from PyPI (air-gapped)
@@ -335,6 +350,9 @@ resources:
 
 traefik:
   enabled: true
+  # Pod Security "restricted": the subchart's own user settings plus the runtime's default seccomp profile.
+  podSecurityContext:
+    seccompProfile: { type: RuntimeDefault }
   # The gateway uses HTTP/file providers; it must not receive cluster-wide Secret access.
   rbac:
     enabled: false

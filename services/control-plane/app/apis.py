@@ -20,7 +20,7 @@ import os
 from . import layers
 
 from typing import Dict, List, Literal, Optional, Tuple
-from urllib.parse import unquote, quote, urlsplit
+from urllib.parse import unquote, quote, urlsplit, urlunsplit
 from xml.sax.saxutils import escape
 
 from fastapi import HTTPException
@@ -524,6 +524,55 @@ def soap_media_type(version: str) -> str:
 _oauth_tokens: Dict[str, Tuple[str, float]] = {}
 
 
+def _private_networks():
+    import ipaddress
+    from .config import get_settings
+    networks = []
+    for item in (get_settings().api_private_networks or "").split(","):
+        if item.strip():
+            networks.append(ipaddress.ip_network(item.strip(), strict=False))
+    return networks
+
+
+def checked_address(url: str):
+    """Where an outbound call may connect, so API editors cannot reach the platform's own network.
+
+    Every address the host resolves to must be public, or inside a network an administrator allowed
+    (Helm apiGateway.privateNetworks). The call then connects to the checked address, keeping the
+    host name for the Host header and TLS, so DNS cannot change the answer in between.
+    Returns (url to connect to, extra headers, httpx request extensions).
+    """
+    import ipaddress
+    import socket
+    parsed = urlsplit(url)
+    host = parsed.hostname or ""
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        addresses, literal = [ipaddress.ip_address(host)], True
+    except ValueError:
+        literal = False
+        try:
+            infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        except (socket.gaierror, UnicodeError):
+            raise HTTPException(502, f"cannot resolve {host}") from None
+        addresses = [ipaddress.ip_address(info[4][0].split("%", 1)[0]) for info in infos]
+    allowed = _private_networks()
+    checked = []
+    for address in addresses:
+        if address.version == 6 and address.ipv4_mapped:
+            address = address.ipv4_mapped
+        if not address.is_global and not any(address in network for network in allowed):
+            raise HTTPException(403, f"{host} resolves to a non-public address ({address}); an administrator can "
+                                     "allow private networks for API management (Helm apiGateway.privateNetworks)")
+        checked.append(address)
+    if literal:
+        return url, {}, {}
+    target = checked[0]
+    netloc = (f"[{target}]" if target.version == 6 else str(target)) + (f":{parsed.port}" if parsed.port else "")
+    return (urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment)),
+            {"host": host + (f":{parsed.port}" if parsed.port else "")}, {"sni_hostname": host})
+
+
 def _oauth_token(api: ApiDefinition, auth: dict, store, user: User, verify) -> str:
     import httpx
     key = f"{api.id}:{auth['client_id']}:{auth['token_url']}:{auth.get('scope', '')}"
@@ -535,7 +584,9 @@ def _oauth_token(api: ApiDefinition, auth: dict, store, user: User, verify) -> s
     if auth.get("scope"):
         data["scope"] = auth["scope"]
     try:
-        r = httpx.post(auth["token_url"], data=data, timeout=15, verify=verify)
+        token_url, extra, extensions = checked_address(auth["token_url"])
+        with httpx.Client(verify=verify, timeout=15, follow_redirects=False, trust_env=False) as token_client:
+            r = token_client.post(token_url, data=data, headers=extra, extensions=extensions)
         r.raise_for_status()
         body = r.json()
     except (httpx.HTTPError, ValueError) as exc:
@@ -612,9 +663,11 @@ def call_external(api: ApiDefinition, op: ApiOperation, path: str, query: List[T
                 verify.load_cert_chain(cert_path, key_path)
                 cert = None
         timeout = op_cfg.get("timeout_seconds") or cfg.get("timeout_seconds", 30)
+        target, extra, extensions = checked_address(url)
         try:
-            with httpx.Client(verify=verify, cert=cert, timeout=timeout, follow_redirects=False) as client:
-                with client.stream(op.method, url, params=params, headers=headers, content=body or None) as r:
+            with httpx.Client(verify=verify, cert=cert, timeout=timeout, follow_redirects=False, trust_env=False) as client:
+                with client.stream(op.method, target, params=params, headers={**headers, **extra},
+                                   content=body or None, extensions=extensions) as r:
                     chunks, size = [], 0
                     for chunk in r.iter_bytes():
                         size += len(chunk)

@@ -107,6 +107,18 @@ are limited to 10 MB; transport/compression headers are rebuilt for the returned
 Backend TLS verification is on by default. Skipping verification is an explicit test
 setting. The control plane needs network access to the configured backend and token URL.
 
+Backends and token URLs must be at **public addresses**. Whoever can edit an API could otherwise point it
+at the platform's own network (the control plane, the Kubernetes API, the secret store, cloud metadata
+services) and read the answers. Every address a host name resolves to is checked when the call is made,
+and the call then connects to the checked address (keeping the host name for TLS), so a DNS change in
+between cannot redirect it. For internal APIs on private networks, an administrator lists those networks
+in the Helm values; keep the cluster's pod and service ranges out:
+
+```yaml
+apiGateway:
+  privateNetworks: ["10.20.0.0/16"]
+```
+
 ```python
 import fdp
 
@@ -150,6 +162,12 @@ state, restricted to readable operations. It does not store request/response bod
 API access does not grant access to the managed identity's general run logs or files.
 
 ## Gateway deployment
+
+The public API, SQL and API gateway routes are rate limited per credential (the `Authorization`
+header), so people behind one proxy or NAT do not share a budget: on average 100 requests per second
+with bursts of 200 by default, answered with HTTP 429 above that. Requests without credentials share
+one budget. Traffic inside the platform (workloads, Trino's policy callbacks) is not limited. Set
+`rateLimit.average` and `rateLimit.burst` in the Helm values; `average: 0` turns it off.
 
 Compose exposes the app on 8090 and incoming program APIs on 8091. A separate TLS entry
 point requests client certificates while allowing JWT-only APIs. Each API verifies its

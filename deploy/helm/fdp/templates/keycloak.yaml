@@ -46,7 +46,7 @@ spec:
         checksum/realm: {{ tpl (.Files.Get "files/keycloak-realm.json") . | sha256sum }}
     spec:
       automountServiceAccountToken: false
-      securityContext: { runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000 }
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: keycloak
           image: {{ .Values.keycloak.image | quote }}
@@ -149,7 +149,7 @@ spec:
     spec:
       {{- include "fdp.imagePullSecrets" . | nindent 6 }}
       automountServiceAccountToken: false
-      securityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001 }
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: directory-sync
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

@@ -37,10 +37,11 @@ spec:
       {{- end }}
       terminationGracePeriodSeconds: 30
       {{- include "fdp.imagePullSecrets" . | nindent 6 }}
-      securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001 }   # fsGroup: the package volume
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: { type: RuntimeDefault } }   # fsGroup: the package volume
+      {{- if .Values.packages.persistence.fixPermissions }}
       initContainers:
         # fsGroup does not reach every volume (e.g. Longhorn ReadWriteMany): hand the package folder to the
-        # control plane's user. Only CHOWN, nothing else.
+        # control plane's user. Only CHOWN, nothing else; the only root container in the chart (see values).
         - name: package-volume
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -53,10 +54,12 @@ spec:
           volumeMounts:
             - { name: packages, mountPath: /var/lib/fdp/packages }
           resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { cpu: 100m, memory: 64Mi } }
+      {{- end }}
       containers:
         - name: control-plane
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
           ports: [{ containerPort: 8000, name: http }]
           envFrom:
             - secretRef: { name: {{ .Values.existingSecret }} }
@@ -91,6 +94,9 @@ spec:
             - { name: FDP_PUBLIC_URL, value: {{ .Values.publicUrl | quote }} }
             - { name: FDP_API_GATEWAY_URL, value: {{ .Values.apiGateway.publicUrl | quote }} }
             - { name: FDP_API_GATEWAY_ENTRYPOINT, value: apigateway }
+            - { name: FDP_RATE_LIMIT_AVERAGE, value: {{ .Values.rateLimit.average | quote }} }
+            - { name: FDP_RATE_LIMIT_BURST, value: {{ .Values.rateLimit.burst | quote }} }
+            - { name: FDP_API_PRIVATE_NETWORKS, value: {{ join "," (.Values.apiGateway.privateNetworks | default list) | quote }} }
             - { name: FDP_INTERNAL_URL, value: "http://fdp-control-plane.{{ .Release.Namespace }}.svc:8000" }
             - { name: FDP_ORCHESTRATOR, value: kubernetes }
             - { name: FDP_QUERY_EXECUTOR, value: trino }

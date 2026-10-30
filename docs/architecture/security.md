@@ -58,6 +58,17 @@ Unknown SQL operations, native SQL pass-through, definer views and unreviewed ta
 properties are denied. Missing quality or freshness evidence counts as **unknown**, never
 healthy. An unavailable secret store returns a clear 503 rather than a degraded fallback.
 Internal endpoints without a configured token are switched off, not left open.
+External API calls only reach public addresses unless an administrator lists private networks,
+and the public routes are rate limited per credential.
+
+### Least-privileged containers
+
+Every platform pod and every program the platform starts runs as a non-root user without
+privilege escalation, with all Linux capabilities dropped and the runtime's default seccomp
+profile: Pod Security "restricted". The one exception is optional: a small init container that
+hands the package folder to the control plane's user on volumes where `fsGroup` does not apply
+(ReadWriteMany). Once the folder is owned correctly, set `packages.persistence.fixPermissions: false`.
+Editors that must start as root (RStudio) run in the runtime namespace, which enforces "baseline".
 
 ### Data stays on the server
 

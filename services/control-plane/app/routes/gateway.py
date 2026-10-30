@@ -117,10 +117,19 @@ def traefik_config(db: Session = Depends(get_db), x_fdp_gateway_config: str = He
         "gw-proof": {"headers": {"customRequestHeaders": {"X-FDP-Gateway-Proof": gateway_proof()}}},
         "fdp-auth": {"forwardAuth": {"address": f"{s.internal_url}/internal/auth/forward",
                                     "authResponseHeaders": ["X-FDP-User", "X-FDP-Viewer", "X-FDP-Team", "X-FDP-Display-Name"]}},
+        # Per credential (the Authorization header), so people behind one proxy or NAT do not share a limit.
+        # Requests without credentials share one budget. Answered with 429 by Traefik.
+        **({"rate-limit": {"rateLimit": {"average": s.rate_limit_average, "burst": max(s.rate_limit_burst, s.rate_limit_average),
+                                        "period": "1s", "sourceCriterion": {"requestHeaderName": "Authorization"}}}}
+           if s.rate_limit_average > 0 else {}),
         "sql-sanitize": {"headers":{"customRequestHeaders":{name:"" for name in (
             "X-User","X-Team","X-Role","X-Role-TE","X-First-name","X-Last-name","X-Full-name",
             "X-FDP-User","X-FDP-Team","X-FDP-Display-Name")}}},
     }
+
+    if s.rate_limit_average > 0:
+        for name in ("api", "sql", "gw"):
+            routers[name]["middlewares"] = ["rate-limit", *routers[name].get("middlewares", [])]
 
     def add(kind: str, item_id: str, upstream: str, strip: bool, rstudio: bool = False) -> None:
         key = f"{kind}-{item_id}"

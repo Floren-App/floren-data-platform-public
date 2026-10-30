@@ -276,7 +276,7 @@ def test_internal_apis_have_their_own_gateway_address_that_asks_for_client_certi
     gw = http["routers"]["gw"]
     # TLS options follow the host name, so the router names the API gateway host on its own entry point.
     assert gw["rule"] == "Host(`localhost`) && PathPrefix(`/gw/`)" and gw["entryPoints"] == [get_settings().api_gateway_entrypoint]
-    assert gw["tls"] == {"options": "api-gateway@file"} and gw["middlewares"] == ["gw-client-cert", "gw-proof"]
+    assert gw["tls"] == {"options": "api-gateway@file"} and gw["middlewares"] == ["rate-limit", "gw-client-cert", "gw-proof"]
     assert http["middlewares"]["gw-proof"]["headers"]["customRequestHeaders"]["X-FDP-Gateway-Proof"] == core.gateway_proof()
     assert http["middlewares"]["gw-client-cert"] == {"passTLSClientCert": {"pem": True}}
 
@@ -443,3 +443,67 @@ def test_a_program_answers_internal_api_calls_with_its_own_status_code(client, r
     answer.update(outcome="failed")
     crashed = client.post("/gw/orders/lookup")
     assert crashed.status_code == 502 and crashed.json()["status_code"] == 502
+
+
+def test_outbound_calls_reach_only_public_addresses(monkeypatch):
+    from fastapi import HTTPException
+    from app import apis as core
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "api_private_networks", "")
+    for url in ("http://127.0.0.1:8000/internal/trino/allow", "http://169.254.169.254/latest/meta-data",
+                "http://[::1]/", "http://10.96.0.1/api", "http://100.100.1.1/", "http://[::ffff:10.0.0.1]/"):
+        with pytest.raises(HTTPException) as refused:
+            core.checked_address(url)
+        assert refused.value.status_code == 403, url
+    # A name is checked by every address it resolves to, then pinned to the checked one (no DNS rebinding).
+    monkeypatch.setattr(core.socket if hasattr(core, "socket") else __import__("socket"), "getaddrinfo",
+                        lambda host, port, **kw: [(2, 1, 6, "", ("93.184.215.14", port))] if host == "api.example.com"
+                        else [(2, 1, 6, "", ("93.184.215.14", port)), (2, 1, 6, "", ("10.0.0.5", port))])
+    assert core.checked_address("https://api.example.com:8443/v1/x?a=1") == (
+        "https://93.184.215.14:8443/v1/x?a=1", {"host": "api.example.com:8443"}, {"sni_hostname": "api.example.com"})
+    with pytest.raises(HTTPException):
+        core.checked_address("https://mixed.example.com/")  # one private answer is enough to refuse
+    monkeypatch.setattr(get_settings(), "api_private_networks", "10.0.0.0/8")
+    assert core.checked_address("https://mixed.example.com/")[0] == "https://93.184.215.14/"
+    assert core.checked_address("http://10.1.2.3/x")[0] == "http://10.1.2.3/x"
+
+
+def test_pinned_connections_still_verify_the_host_name(tmp_path, monkeypatch):
+    """The call connects to the checked address, but TLS still checks the certificate against the host name."""
+    import socket
+    import ssl
+    from datetime import datetime, timedelta, timezone
+    import httpx
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+    from app import apis as core
+    ca, ca_key, ca_pem = make_certificate("Backend CA", ca=True)
+    key = ec.generate_private_key(ec.SECP256R1())
+    now = datetime.now(timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "backend.test")]))
+            .issuer_name(ca.subject).public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=1))
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName("backend.test")]), critical=False).sign(ca_key, hashes.SHA256()))
+    (tmp_path / "server.pem").write_text(cert.public_bytes(serialization.Encoding.PEM).decode())
+    (tmp_path / "server.key").write_text(key_pem(key))
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(tmp_path / "server.pem", tmp_path / "server.key")
+    server = HTTPServer(("127.0.0.1", 0), Backend)
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    real = socket.getaddrinfo
+    monkeypatch.setattr(socket, "getaddrinfo", lambda host, port, *args, **kw: [(2, 1, 6, "", ("127.0.0.1", port))]
+                        if host in ("backend.test", "other.test") else real(host, port, *args, **kw))
+    trust = ssl.create_default_context(cadata=ca_pem)
+    try:
+        url, extra, extensions = core.checked_address(f"https://backend.test:{server.server_port}/ping")
+        assert url == f"https://127.0.0.1:{server.server_port}/ping"
+        with httpx.Client(verify=trust) as http:
+            assert http.get(url, headers=extra, extensions=extensions).status_code == 200
+        url, extra, extensions = core.checked_address(f"https://other.test:{server.server_port}/ping")
+        with pytest.raises(httpx.ConnectError), httpx.Client(verify=trust) as http:
+            http.get(url, headers=extra, extensions=extensions)  # the certificate is for backend.test, not other.test
+    finally:
+        server.shutdown()

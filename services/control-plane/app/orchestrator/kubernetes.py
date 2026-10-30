@@ -160,6 +160,9 @@ class KubernetesOrchestrator:
                 run_as_non_root=spec.run_as_user is not None,
                 run_as_user=spec.run_as_user,
                 run_as_group=spec.run_as_group,
+                # Non-root programs need no capabilities (Pod Security "restricted"). Editors that start as root
+                # (RStudio) keep the runtime's defaults; their namespace enforces "baseline".
+                capabilities=client.V1Capabilities(drop=["ALL"]) if spec.run_as_user is not None else None,
                 seccomp_profile=client.V1SeccompProfile(type="RuntimeDefault"),
             ),
         )

@@ -14,6 +14,7 @@ os.environ.update(
     FDP_PACKAGE_DIR=os.path.join(_tmp, "packages"),
     FDP_APP_START_TIMEOUT_SECONDS="3",   # a deploy that never becomes ready fails fast
     FDP_QUERY_EXECUTOR="native",  # legacy adapter coverage; shared SQL tests opt in explicitly
+    FDP_API_PRIVATE_NETWORKS="127.0.0.0/8,::1/128",  # test backends run locally; tests of the default override it
 )
 
 import pytest  # noqa: E402

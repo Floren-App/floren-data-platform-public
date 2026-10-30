@@ -103,3 +103,15 @@ def test_docker_mounts_same_subfolder_after_a_credential_free_initializer():
     assert mount['Target'] == '/workspace' and mount['VolumeOptions']['Subpath'] == 'workspace'
     assert 'volumes' not in main
     assert main['environment']['TOKEN'] == 'x'
+
+
+def test_non_root_workloads_drop_every_capability():
+    """Pod Security "restricted" for programs; editors that start as root keep the runtime's defaults."""
+    orch = orchestrator()
+    orch.start(ExecutionSpec(name='app', image='runtime:1', cpu=1, memory_gb=1, run_as_user=1000, run_as_group=1000))
+    main = orch.core.objects[('fdp-runtime', 'pod', 'app')].spec.containers[0]
+    assert main.security_context.capabilities.drop == ['ALL']
+    assert main.security_context.run_as_non_root is True and main.security_context.allow_privilege_escalation is False
+    assert main.security_context.seccomp_profile.type == 'RuntimeDefault'
+    orch.start(ExecutionSpec(name='rstudio', image='runtime:1', cpu=1, memory_gb=1, run_as_user=None))
+    assert orch.core.objects[('fdp-runtime', 'pod', 'rstudio')].spec.containers[0].security_context.capabilities is None
