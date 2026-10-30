@@ -6,6 +6,7 @@ import { ObjectBreadcrumbs, ObjectTabs, OpenTab, PermissionsPanel, resourceChain
 import type { TabRef } from "./Tabs";
 import { TokensCard } from "./Identity";
 import { DataListing } from "../components/DataBrowser";
+import { DataPoliciesPanel } from "../components/DataPolicies";
 import { MetadataSql } from "../components/MetadataSql";
 import { ProductIcon } from "../components/ProductIcon";
 import { IconBranch, IconPlus, IconDeployed } from "../components/Icons";
@@ -126,8 +127,10 @@ export function SchemaView({ tab, hub, openTab }: ObjectProps) {
       subtitle={<>{sourceKind === "s3" ? "Storage namespace" : "Schema"} in {source?.name ?? "data source"} · <SetupState resource={resource} /></>} />
     {resource.layer_name && <p className="hint">Layer · <strong>{resource.layer_name}</strong></p>}
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
-    <ObjectTabs active={section} lineage sql={!!resource.config.system_metadata} onChange={(s) => openTab({ ...tab, section: s })} />
-    {section === "permissions" ? <ObjectAccess resource={resource} hub={hub} openTab={openTab} initialServiceId={tab.grantPrincipalId} />
+    <ObjectTabs active={section} lineage sql={!!resource.config.system_metadata} onChange={(s) => openTab({ ...tab, section: s })}
+      policies={(sourceKind === "postgres" || sourceKind === "iceberg") && !resource.config.system_metadata} />
+    {section === "policies" ? <DataPoliciesPanel schema={resource} />
+      : section === "permissions" ? <ObjectAccess resource={resource} hub={hub} openTab={openTab} initialServiceId={tab.grantPrincipalId} />
       : section === "lineage" ? <ObjectLineage resourceId={resource.id} openTab={openTab} />
       : section === "sql" && resource.config.system_metadata ? <MetadataSql schema={resource} hub={hub} /> : <>
       <DataListing schema={resource} storage={sourceKind === "s3"} openTab={openTab} />

@@ -43,6 +43,13 @@ export interface AppGroup {
   id: string; name: string; description: string; owners: string[]; bindings: string[]; can_manage: boolean; can_inspect?: boolean;
   origin?: "app";
 }
+export interface DataPolicy {
+  id: string; schema_id: string; table: string; kind: "column_mask" | "row_filter"; column: string;
+  method: "" | "null" | "redact" | "hash" | "partial" | "expression"; expression: string;
+  exempt_groups: string[]; exempt_principals: string[]; member_groups: string[];
+  description: string; updated_by: string; updated_at: string | null;
+}
+export type DataPolicyChange = Pick<DataPolicy, "method" | "expression" | "exempt_groups" | "exempt_principals" | "description">;
 export interface AccessResource {
   owner_group_id?: string | null; owner_group_name?: string | null;
   layer_id?: string | null; layer_name?: string | null;
@@ -694,6 +701,12 @@ export const api = {
     assignService: (id: string, principal_id: string, role: string) => request<RoleAssignment[]>("PUT", `/v1/rbac/resources/${id}/assignments`, { principal_id, role }),
     revoke: (id: string, gid: string) => request<void>("DELETE", `/v1/rbac/resources/${id}/assignments/${gid}`),
     revokeService: (id: string, pid: string) => request<void>("DELETE", `/v1/rbac/resources/${id}/assignments/services/${pid}`),
+  },
+  dataPolicies: {
+    list: (schemaId: string) => request<DataPolicy[]>("GET", `/v1/data-policies?schema_id=${encodeURIComponent(schemaId)}`),
+    create: (body: DataPolicyChange & Pick<DataPolicy, "schema_id" | "table" | "kind" | "column">) => request<DataPolicy>("POST", "/v1/data-policies", body),
+    update: (id: string, body: DataPolicyChange) => request<DataPolicy>("PUT", `/v1/data-policies/${id}`, body),
+    remove: (id: string) => request<void>("DELETE", `/v1/data-policies/${id}`),
   },
   me: () => request<Me>("GET", "/v1/me"),
 

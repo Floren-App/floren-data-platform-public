@@ -41,6 +41,7 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
   const errors: string[] = [];
   let activeGroup = "analysts";
   let rejectAssignment = false;
+  const policies: Record<string, any>[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.addInitScript((seconds) => {
     localStorage.setItem("fdp.server", "https://iam.test");
@@ -147,6 +148,15 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
       while (current) { chain.add(current.id); current = resources.find((r) => r.id === current!.parent_id); }
       return respond(grants.filter((g) => chain.has(g.resource_id)).map((g) => ({ ...g, inherited: g.resource_id !== id })));
     }
+    if (path === "/v1/data-policies" && method === "GET") return respond(policies.filter((p) => p.schema_id === new URL(req.url()).searchParams.get("schema_id")));
+    if (path === "/v1/data-policies" && method === "POST") {
+      const created = { id: `policy-${policies.length + 1}`, member_groups: [], updated_by: "admin", updated_at: null, ...body, table: body.table.toLowerCase() };
+      policies.push(created);
+      return respond(created, 201);
+    }
+    const policyPath = path.match(/^\/v1\/data-policies\/([^/]+)$/);
+    if (policyPath && method === "PUT") { const p = policies.find((x) => x.id === policyPath[1])!; Object.assign(p, body); return respond(p); }
+    if (policyPath && method === "DELETE") { policies.splice(policies.findIndex((x) => x.id === policyPath[1]), 1); return route.fulfill({ status: 204 }); }
     if (path === "/v1/service-accounts") return respond([{ id: "etl", name: "finance-etl", principal: "sa:finance-etl", can_manage: access === "owner", description: "Finance ETL", groups: [], allowed_groups: [], disabled: false }]);
     if (path === "/v1/secrets") return respond([{ name: "api-key", ref: "me/api-key", scope: "user", owner: "admin", description: "External API", updated_at: "2026-10-17T12:00:00Z", updated_by: "admin" }]);
     if (path === "/v1/repos") return respond([{ id: "analytics", name: "analytics", url: "https://git.test/analytics" }]);
@@ -2119,4 +2129,59 @@ test("explicit refresh supersedes a slower earlier snapshot", async ({ page }) =
     await expect.poll(() => requests).toBe(2);
     await expect(page.locator(".main").getByText("Sales app", { exact: true })).toHaveCount(0);
   } finally { release(); }
+});
+
+test("schema owners mask columns and filter rows; readers see the rules", async ({ page }) => {
+  const state = await setup(page);
+  await openSchema(page);
+  const sections = page.getByRole("navigation", { name: "Object sections" });
+  await sections.getByRole("button", { name: "Masks and filters", exact: true }).click();
+  const panel = page.getByRole("region", { name: /Masks and filters/ });
+  await expect(panel).toContainText("No masks or filters");
+  await panel.getByRole("button", { name: "Add mask or filter" }).click();
+  await page.getByLabel("Table", { exact: true }).fill("Customers");
+  await page.getByLabel("Column", { exact: true }).fill("email");
+  await page.getByLabel("What people see").selectOption("partial");
+  await page.getByRole("checkbox", { name: "Analysts" }).check();
+  await page.getByLabel("Exempt identities").selectOption("etl-identity");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const row = panel.getByRole("row", { name: /customers/ });
+  await expect(row).toContainText("email");
+  await expect(row).toContainText("Show the last 4 characters");
+  await expect(row).toContainText("Analysts, finance-etl");
+  expect(state.mutations.find((m) => m.path === "/v1/data-policies")!.body).toMatchObject({ schema_id: "pg-reporting", table: "Customers",
+    kind: "column_mask", column: "email", method: "partial", expression: "", exempt_groups: ["analysts"], exempt_principals: ["etl-identity"] });
+
+  await panel.getByRole("button", { name: "Add mask or filter" }).click();
+  await page.getByLabel("Table", { exact: true }).fill("customers");
+  await page.getByLabel("Kind").selectOption("row_filter");
+  await expect(page.getByLabel("Column", { exact: true })).toHaveCount(0);
+  await page.getByLabel("Rows people see (condition)").fill("region = 'EU' OR is_member('Analysts')");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(panel.getByRole("row", { name: /Rows/ })).toContainText("region = 'EU' OR is_member('Analysts')");
+
+  await panel.getByRole("row", { name: /email/ }).getByRole("button", { name: "Change" }).click();
+  await page.getByLabel("What people see").selectOption("hash");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(panel.getByRole("row", { name: /email/ })).toContainText("SHA-256");
+  page.once("dialog", (dialog) => dialog.accept());
+  await panel.getByRole("row", { name: /email/ }).getByRole("button", { name: "Remove" }).click();
+  await expect(panel.getByRole("row", { name: /email/ })).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+test("schema readers see masks and filters but cannot change them", async ({ page }) => {
+  await setup(page, "reader");
+  await page.route("https://iam.test/api/v1/data-policies?*", (route) => route.fulfill({ json: [{ id: "p1", schema_id: "pg-reporting", table: "customers",
+    kind: "column_mask", column: "email", method: "redact", expression: "", exempt_groups: [], exempt_principals: [], member_groups: [],
+    description: "Personal data", updated_by: "admin", updated_at: null }] }));
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "finance-dw", exact: true }).click();
+  await page.locator(".main").getByRole("button", { name: "reporting", exact: true }).click();
+  await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Masks and filters", exact: true }).click();
+  const panel = page.getByRole("region", { name: /Masks and filters/ });
+  await expect(panel.getByRole("row", { name: /customers/ })).toContainText("Show ****");
+  await expect(panel).toContainText("Personal data");
+  await expect(panel.getByRole("button", { name: "Add mask or filter" })).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Change" })).toHaveCount(0);
 });

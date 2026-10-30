@@ -4,7 +4,7 @@ import { ProductIcon } from "./ProductIcon";
 import type { TabRef } from "../views/Tabs";
 import { IconRefresh } from "./Icons";
 
-export type ObjectSection = "overview" | "permissions" | "settings" | "preview" | "runs" | "sql" | "lineage";
+export type ObjectSection = "overview" | "permissions" | "settings" | "preview" | "runs" | "sql" | "lineage" | "policies";
 export type OpenTab = (tab: TabRef) => void;
 
 export function resourcePath(resource: AccessResource, resources: AccessResource[]): string {
@@ -57,10 +57,11 @@ export function ObjectBreadcrumbs({ resource, resources, openTab, trailing = [] 
   </nav>;
 }
 
-export function ObjectTabs({ active, onChange, settings = false, overview = "Overview", preview = false, runs = false, sql = false, lineage = false }: {
-  active: ObjectSection; onChange: (section: ObjectSection) => void; settings?: boolean; overview?: string; preview?: boolean; runs?: boolean; sql?: boolean; lineage?: boolean;
+export function ObjectTabs({ active, onChange, settings = false, overview = "Overview", preview = false, runs = false, sql = false, lineage = false, policies = false }: {
+  active: ObjectSection; onChange: (section: ObjectSection) => void; settings?: boolean; overview?: string; preview?: boolean; runs?: boolean; sql?: boolean; lineage?: boolean; policies?: boolean;
 }) {
   const tabs: [ObjectSection, string][] = [["overview", overview], ["permissions", "Permissions"]];
+  if (policies) tabs.push(["policies", "Masks and filters"]);
   if (runs) tabs.splice(1, 0, ["runs", "Recent runs"]);
   if (preview) tabs.splice(1, 0, ["preview", "Data preview"]);
   if (lineage) tabs.splice(1, 0, ["lineage", "Lineage"]);

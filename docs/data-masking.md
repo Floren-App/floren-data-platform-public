@@ -57,6 +57,9 @@ administrator), because it decides who sees what. Everyone who may read the sche
 policies, so people know when a value is masked. Changes apply to queries that start afterwards;
 running queries keep the policies they started with.
 
+In the app, open the schema and its **Masks and filters** tab: owners add, change and remove
+masks and filters there; readers see them.
+
 With OpenTofu ([`fdp_data_policy`](reference/terraform/fdp_data_policy.md)):
 
 ```hcl
@@ -114,4 +117,4 @@ Every change is recorded in the [audit trail](audit-and-siem.md) as `data_policy
   subqueries or refer to other tables. Expressions are stored normalized (comments removed).
 - Conditions on identity attributes from the IdP (for example a person's region) are planned;
   use `is_member` with groups until then.
-- Policies are managed with OpenTofu and the HTTP API; pages in the app follow.
+- Policies are managed in the app (a schema's **Masks and filters** tab), with OpenTofu and through the HTTP API.

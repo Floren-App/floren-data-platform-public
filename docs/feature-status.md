@@ -9,7 +9,7 @@ Confirm the source revision, configuration and integration checks for your deplo
 | Secret stores | Bundled OpenBao (Kubernetes or KMS auto-unseal), your OpenBao/Vault, Kubernetes Secrets, AWS, Azure and Google secret managers; one store per installation |
 | Workspaces | VS Code, RStudio and SQL editors; private subdirectory storage; root/direct-repository config discovery |
 | Layer isolation | Managed layers: own namespace, default-deny network policies and layer-local services; requires a CNI that enforces policy. Unmanaged layers are an authorization boundary only |
-| Data IAM | Schema roles include current/future objects; individual table grants are not the initial permission model. Column masks and row filters per table, through OpenTofu and the HTTP API (app pages to follow) |
+| Data IAM | Schema roles include current/future objects; individual table grants are not the initial permission model. Column masks and row filters per table, in the app, OpenTofu and the HTTP API |
 | Native DDL | Admin may receive native privileges that also permit native grants on some engines; FDP IAM assignment remains protected |
 | Workload IAM | Nested folders, additive inheritance, built-in managed identities and fixed/caller data modes |
 | Catalog | Governed resources, search, lineage, quality and freshness/run SLA evidence; uncertified objects remain available |
