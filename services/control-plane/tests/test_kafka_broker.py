@@ -59,6 +59,9 @@ def test_real_broker_tls_oauth_sdk_and_revocation(client, topic, tmp_path, monke
     lock=threading.Lock()
     class ControlPlane(BaseHTTPRequestHandler):
         def request(self):
+            # Like uvicorn in the platform: an h2c upgrade request is not served (found on the live cluster).
+            if self.headers.get('upgrade'):
+                self.send_response(400);self.send_header('content-length','0');self.end_headers();return
             body=self.rfile.read(int(self.headers.get('content-length','0')))
             with lock:
                 response=client.request(self.command,self.path,content=body,

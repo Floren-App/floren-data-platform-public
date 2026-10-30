@@ -20,7 +20,9 @@ import org.apache.kafka.server.authorizer.*;
 /** OPA-shaped remote decisions with authenticated broker callbacks and no fail-open/cache path. */
 public final class FdpAuthorizer implements Authorizer {
     private final ObjectMapper json = new ObjectMapper();
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+    // HTTP/1.1: over plain http Java otherwise attempts an h2c upgrade, which uvicorn does not serve.
+    private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+        .connectTimeout(Duration.ofSeconds(2)).build();
     private URI endpoint;
     private Path tokenFile;
     private Set<String> superUsers = Set.of();
