@@ -26,9 +26,11 @@ import { QueryLogView } from "./QueryLog";
 import { rEnabled, type PackageKind } from "../api";
 
 import { KafkaClustersView, KafkaView } from "./Kafka";
+import { PrivacyForm, PrivacyForms, PrivacyPolicies, PrivacyRoles } from "./Privacy";
 
 export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
   | "products" | "product" | "access-requests"
+  | "privacy-policies" | "privacy-forms" | "privacy-form" | "privacy-roles" | "privacy-classifications"
   | "admin-app-profiles" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
 
 export interface TabRef {
@@ -90,7 +92,12 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "workload": return <WorkloadView tab={tab} id={tab.ref!} hub={hub} openTab={openTab} runTab={runTab} />;
     case "admin-layers": return <AdminLayers hub={hub} />;
     case "admin-app-profiles": return <AdminAppProfiles />;
-    case "admin-classifications": return <AdminClassifications />;
+    case "admin-classifications": case "privacy-classifications": return <AdminClassifications />;
+    case "privacy-policies": return <PrivacyPolicies hub={hub} />;
+    case "privacy-forms": return <PrivacyForms hub={hub} openTab={openTab} />;
+    case "privacy-roles": return <PrivacyRoles hub={hub} />;
+    case "privacy-form": return <PrivacyForm key={tab.ref} id={tab.ref ?? ""} hub={hub} onRenamed={(title) => openTab({ ...tab, title })}
+      onDeleted={() => openTab({ kind: "privacy-forms", title: "Compliance forms" })} />;
     case "admin-sources": return <AdminSources hub={hub} openTab={openTab} />;
     case "admin-repos": return <AdminRepos />;
     case "admin-runtimes": return <AdminRuntimes withR={rEnabled(hub.me)} />;

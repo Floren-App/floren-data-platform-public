@@ -416,11 +416,12 @@ class LevelsIn(BaseModel):
 
 @router.put("/classifications")
 def put_classifications(body: LevelsIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    """Change the classifications (platform administrators). A level still in use cannot be removed."""
+    """Change the classifications (platform or compliance administrators). A level still in use cannot be removed."""
     from .. import classification as levels
+    from ..compliance import is_compliance_admin
     from ..models import PlatformSetting
-    if not rbac.resolve_user(db, user).is_admin:
-        raise HTTPException(403, "platform administrator required")
+    if not is_compliance_admin(db, user):
+        raise HTTPException(403, "platform or compliance administrator required")
     new = levels.validate_levels(db, [l.model_dump() for l in body.levels])
     setting = db.get(PlatformSetting, levels.SETTING) or PlatformSetting(key=levels.SETTING, value={})
     before = levels.levels(db)

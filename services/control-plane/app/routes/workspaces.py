@@ -44,6 +44,7 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
         features={"r": r_enabled()},
         app_profile="Full access (administrator)" if user.is_admin else profile.name if profile else None,
         app_features=app_features,
+        compliance_roles=compliance_roles(db, user),
         principal_id=user.principal_id, active_group_id=user.active_group_id or None,
         active_layer_id=active_layer(db, user),
         available_groups=[{"id":g.id,"name":g.name,"system":g.id == GLOBAL_ADMIN}
@@ -54,6 +55,17 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
         data_sources=[ds_out(ds) for ds in granted_sources(db, user) if ds.id in visible_sources],
         pools=pools,
     )
+
+
+def compliance_roles(db, user):
+    from ..compliance import ROLES
+    from ..models import ComplianceRole
+    from ..rbac import app_groups
+    if user.is_admin:
+        return list(ROLES)
+    groups = app_groups(db, user)
+    held = set(db.scalars(select(ComplianceRole.role).where(ComplianceRole.app_group_id.in_(groups)))) if groups else set()
+    return [r for r in ROLES if r in held]
 
 
 def selectable_layers(db, user):

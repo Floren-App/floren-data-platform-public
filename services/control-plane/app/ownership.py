@@ -134,7 +134,7 @@ def browsing_scope(db, user):
         result = {r.id:{"Owner"} for r in resources.values() if permits(db,user,r)}
     else:
         grants = {}
-        for g in rbac.group_grants(db, {user.active_group_id}):  # includes what data product roles give
+        for g in rbac.group_grants(db, {user.active_group_id}, user):  # includes what data product roles give
             order = list(rbac.roles_for(resources[g.resource_id])) if g.resource_id in resources else []
             current = grants.get(g.resource_id)
             if current is None or (g.role in order and current in order and order.index(g.role) > order.index(current)):

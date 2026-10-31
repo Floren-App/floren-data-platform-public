@@ -8,6 +8,7 @@ An app group's access to a data product: Consumer on the product with one of its
 |---|---|---|---|
 | `app_group_id` | `basetypes.StringType` | Required |  |
 | `id` | `basetypes.StringType` | Computed |  |
+| `justification_id` | `basetypes.StringType` | Optional | An approved compliance case for this group and option, needed when an access policy applies. |
 | `option` | `basetypes.StringType` | Optional, Computed | Name of the access option; left out: the product's default option. |
 | `product_id` | `basetypes.StringType` | Required |  |
 
