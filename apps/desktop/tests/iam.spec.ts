@@ -167,6 +167,7 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     if (path === "/v1/workspaces" || path === "/v1/runs" || path.endsWith("/tokens")) return respond([]);
     if (path === "/v1/catalog/products") return respond({ items: [], domains: [], kinds: [] });
     if (path === "/v1/catalog/requests") return respond([]);
+    if (path === "/v1/compliance/requirement") return respond({ required: false, layer_id: null, classification: "internal" });
     if (/^\/v1\/catalog\/assets\/[^/]+\/product$/.test(path)) return respond({ publishable: false, can_publish: false, products: [], uses: [], name: "", kind: "", domain: "", classification: "unclassified" });
     return respond({ detail: `Unexpected test request: ${method} ${path}` }, 404);
   });
@@ -2657,4 +2658,155 @@ test("schema readers see masks and filters but cannot change them", async ({ pag
   await expect(panel).toContainText("Personal data");
   await expect(panel.getByRole("button", { name: "Add mask or filter" })).toHaveCount(0);
   await expect(panel.getByRole("button", { name: "Change" })).toHaveCount(0);
+});
+
+const complianceDefinition = { pages: [
+  { id: "purpose", title: "Purpose", intro: "", show_if: null, fields: [
+    { id: "why", label: "Why does the group need it", help: "", type: "long_text", required: true, options: [], show_if: null },
+    { id: "special", label: "Special categories", help: "", type: "choice", required: true, options: ["Yes", "No"], show_if: null }] },
+  { id: "basis_page", title: "Legal basis", intro: "", show_if: { field: "special", equals: "Yes" }, fields: [
+    { id: "basis", label: "Which legal basis", help: "", type: "short_text", required: true, options: [], show_if: null }] },
+  { id: "agree", title: "Agreement", intro: "", show_if: null, fields: [
+    { id: "ok", label: "We use it only for this purpose", help: "", type: "statement", required: true, options: [], show_if: null }] }] };
+const complianceRequirement = { required: true, layer_id: "1a0000000001", classification: "confidential", policy_id: "pol",
+  form: { id: "f1", name: "Personal data access", version_id: "v1", version: 1, definition: complianceDefinition },
+  steps: [{ role: "data_owner", approvals: 1 }, { role: "compliance_reviewer", approvals: 1 }], max_days: 180, review_days: 10 };
+
+test("granting covered data asks for the compliance form, page by page, and sends it for review", async ({ page }) => {
+  const state = await setup(page);
+  const cases: Record<string, unknown>[] = [];
+  await page.route(/\/v1\/rbac\/resources\/pg-reporting\/assignments$/, (route) => route.request().method() === "PUT"
+    ? route.fulfill({ status: 409, json: { detail: { code: "justification_required", message: "This access needs an approved compliance form.", requirement: complianceRequirement } } })
+    : route.fallback());
+  await page.route(/\/v1\/compliance\/cases$/, (route) => { cases.push(route.request().postDataJSON()); return route.fulfill({ status: 201, json: { id: "case1" } }); });
+  await openSchema(page);
+  await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
+  await page.getByRole("button", { name: "Assign role", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Justify access" });
+  await expect(panel.getByRole("heading", { name: "Personal data access" })).toBeVisible();
+  await expect(panel).toContainText("data owners, then compliance reviewers");
+  // The legal basis page only appears when special categories are involved.
+  await expect(panel.getByRole("list", { name: "Pages" }).getByRole("listitem")).toHaveCount(2);
+  await expect(panel.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+  await panel.getByRole("textbox", { name: /Why does the group need it/ }).fill("Monthly revenue reporting");
+  await panel.getByRole("radio", { name: "Yes", exact: true }).check();
+  await expect(panel.getByRole("list", { name: "Pages" }).getByRole("listitem")).toHaveCount(3);
+  await panel.getByRole("radio", { name: "No", exact: true }).check();
+  await expect(panel.getByRole("list", { name: "Pages" }).getByRole("listitem")).toHaveCount(2);
+  await expect(panel.getByRole("button", { name: "Send for review", exact: true })).toBeDisabled();
+  await panel.getByRole("button", { name: "Next", exact: true }).click();
+  await panel.getByRole("checkbox", { name: "We use it only for this purpose" }).check();
+  await panel.getByRole("button", { name: "Send for review", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Sent for review (case case1)" })).toBeVisible();
+  expect(cases[0]).toMatchObject({ kind: "role", resource_id: "pg-reporting", role: "Reader", app_group_id: "analysts", submit: true,
+    answers: { why: "Monthly revenue reporting", special: "No", ok: true } });
+  await expect(panel).toBeHidden();
+  expect(state.errors).toEqual([]);
+});
+
+test("a product request under a policy carries the form's answers", async ({ page }) => {
+  const state = await setup(page);
+  const sent: { url: string; body: Record<string, unknown> }[] = [];
+  const product = { id: "p1", asset_id: "a-sales", title: "Customers", summary: "People.", kind: "table", runtime: null, name: "customers", layer_id: "1a0000000001",
+    layer_name: "Prod", domain: "Sales", classification: "confidential", status: "draft", steward: "", owner_group_name: "Sales", updated_at: null, sla_status: "",
+    published_at: "2026-10-31T09:00:00Z", published_by: "ana", access: "none", can_manage: false,
+    members: [{ asset_id: "a-sales", name: "customers", kind: "table", runtime: null, access: "none", updated_at: null, open: null }],
+    grants: [{ resource_id: "s", kind: "schema", name: "public", role: "Reader", object: "customers" }], open: null,
+    options: [{ id: "o-full", name: "Full", description: "", default: true, classification: "confidential", masked_columns: 0, filtered_tables: 0 }],
+    lineage: [], lineage_edges: [], used_by: [], used_by_others: 0 };
+  await page.route(/\/v1\/catalog\/products/, (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() !== "GET") { sent.push({ url: url.pathname, body: route.request().postDataJSON() }); return route.fulfill({ status: 201, json: { id: "r1", case_id: "case1" } }); }
+    return route.fulfill({ json: url.pathname.endsWith("/products") ? { items: [product], domains: [], kinds: ["table"] } : product });
+  });
+  await page.route(/\/v1\/compliance\/requirement$/, (route) => route.fulfill({ json: complianceRequirement }));
+  const main = page.locator(".main");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await main.getByRole("article", { name: "Customers" }).getByRole("button", { name: "Request access", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "Personal data access" })).toBeVisible();
+  await main.getByRole("textbox", { name: "Why you need it" }).fill("Churn analysis");
+  await expect(main.getByRole("button", { name: "Send request", exact: true })).toBeDisabled();
+  await main.getByRole("textbox", { name: /Why does the group need it/ }).fill("Churn analysis by region");
+  await main.getByRole("radio", { name: "Yes", exact: true }).check();
+  await main.getByRole("button", { name: "Next", exact: true }).click();
+  await main.getByRole("textbox", { name: /Which legal basis/ }).fill("Legitimate interest");
+  await main.getByRole("button", { name: "Next", exact: true }).click();
+  await main.getByRole("checkbox", { name: "We use it only for this purpose" }).check();
+  await main.getByRole("button", { name: "Send request", exact: true }).click();
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent[0]).toMatchObject({ url: "/api/v1/catalog/products/p1/requests", body: { option_id: "o-full", reason: "Churn analysis", submit: true,
+    answers: { why: "Churn analysis by region", special: "Yes", basis: "Legitimate interest", ok: true } } });
+  expect(state.errors).toEqual([]);
+});
+
+test("the privacy area sets policies per layer and classification and builds multi-page forms", async ({ page }) => {
+  const state = await setup(page);
+  const sent: { method: string; url: string; body: any }[] = [];
+  let form = { id: "f1", name: "Personal data access", description: "", published_version: 1, has_draft: false, used_by: 1,
+    versions: [{ id: "v1", version: 1, published: true, published_at: "2026-10-30T09:00:00Z", published_by: "privacy", definition: { pages: [complianceDefinition.pages[0]] } }] };
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "priya", is_admin: false, active_group_id: "analysts", active_layer_id: null,
+    available_groups: [{ id: "analysts", name: "Analysts" }], groups: [], pools: [], data_sources: [], app_features: ["products.browse"],
+    compliance_roles: ["compliance_reviewer", "compliance_admin"] } }));
+  await page.route(/\/v1\/compliance\//, (route) => {
+    const req = route.request(), url = new URL(req.url()).pathname.replace("/api", "");
+    if (req.method() !== "GET") sent.push({ method: req.method(), url, body: req.postDataJSON() });
+    if (url === "/v1/compliance/policies") return route.fulfill({ json: { layers: [{ id: "1a0000000001", name: "Prod" }, { id: "1a0000000002", name: "Non-Prod" }],
+      classifications: [{ name: "public", masked_as: "public", description: "" }, { name: "internal", masked_as: "internal", description: "" }, { name: "confidential", masked_as: "internal", description: "" }],
+      policies: [{ id: "pol", layer_id: "1a0000000001", classification: "confidential", form_id: "f1", form: "Personal data access", steps: [{ role: "compliance_reviewer", approvals: 1 }], max_days: 365, review_days: 10 }] } });
+    if (url === "/v1/compliance/forms") return route.fulfill({ json: [form] });
+    if (url.startsWith("/v1/compliance/policies/")) return route.fulfill({ json: {} });
+    if (url === "/v1/compliance/forms/f1") return route.fulfill({ json: form });
+    if (req.method() === "PUT" && url.startsWith("/v1/compliance/forms/")) {
+      form = { ...form, has_draft: true, versions: [...form.versions.filter((v) => v.published), { id: "v2", version: 2, published: false, published_at: null as unknown as string, published_by: "", definition: req.postDataJSON().definition }] };
+      return route.fulfill({ json: form });
+    }
+    if (url === "/v1/compliance/forms/f1/publish") { form = { ...form, has_draft: false, published_version: 2, versions: form.versions.map((v) => ({ ...v, published: true })) }; return route.fulfill({ json: form }); }
+    return route.fulfill({ status: 404, json: { detail: `Unexpected ${url}` } });
+  });
+  await page.reload();
+  const main = page.locator(".main");
+  // The privacy team gets only its own part of the app.
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Privacy", exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workspaces", exact: true })).toHaveCount(0);
+  const grid = main.getByRole("table", { name: "Access policies" });
+  await expect(grid.getByRole("button", { name: /^Prod, confidential: Personal data access/ })).toBeVisible();
+  await grid.getByRole("button", { name: "Non-Prod, confidential: No form needed" }).click();
+  const editor = main.getByRole("region", { name: "Policy for Non-Prod, confidential" });
+  await editor.getByRole("button", { name: "Add step", exact: true }).click();
+  await editor.getByRole("combobox", { name: "Step 1 reviewers" }).selectOption("data_owner");
+  await editor.getByRole("spinbutton", { name: "Access lasts at most (days)" }).fill("90");
+  await editor.getByRole("button", { name: "Save policy", exact: true }).click();
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent[0]).toMatchObject({ method: "PUT", url: "/v1/compliance/policies/1a0000000002/confidential",
+    body: { form_id: "f1", max_days: 90, review_days: 10, steps: [{ role: "data_owner", approvals: 1 }, { role: "compliance_reviewer", approvals: 1 }] } });
+  // Forms: add a page that only shows for special categories, with a question on it.
+  await page.locator(".sidebar").getByRole("button", { name: "Compliance forms", exact: true }).click();
+  await main.getByRole("button", { name: "Personal data access", exact: true }).click();
+  const builder = main.getByRole("group", { name: "Form builder" });
+  await builder.getByRole("button", { name: "Add page", exact: true }).click();
+  const second = main.getByRole("region", { name: "Page 2" });
+  await second.getByRole("textbox", { name: "Page 2 title" }).fill("Legal basis");
+  await second.getByRole("combobox", { name: "Page 2: shown when" }).selectOption("special");
+  await second.getByRole("combobox", { name: "Page 2: answer" }).selectOption("Yes");
+  await second.getByRole("button", { name: "Add question", exact: true }).click();
+  await second.getByRole("textbox", { name: "Question", exact: true }).fill("Which legal basis");
+  await second.getByRole("combobox", { name: "Answer type" }).selectOption("choice");
+  await second.getByRole("textbox", { name: "Choices, one per line" }).fill("Consent\nContract");
+  await main.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(main.getByRole("status")).toHaveText("Draft saved.");
+  const draft = sent[1].body.definition;
+  expect(draft.pages).toHaveLength(2);
+  expect(draft.pages[1]).toMatchObject({ title: "Legal basis", show_if: { field: "special", equals: "Yes" },
+    fields: [{ id: "q1", label: "Which legal basis", type: "choice", options: ["Consent", "Contract"], required: true }] });
+  // The preview follows the conditions.
+  await main.getByRole("button", { name: "Preview", exact: true }).click();
+  const preview = main.getByRole("group", { name: "Compliance form" });
+  await expect(preview.getByRole("list", { name: "Pages" })).toHaveCount(0);
+  await preview.getByRole("radio", { name: "Yes", exact: true }).check();
+  await expect(preview.getByRole("list", { name: "Pages" }).getByRole("listitem")).toHaveCount(2);
+  await main.getByRole("button", { name: "Edit", exact: true }).click();
+  await main.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(main.getByRole("status")).toContainText("Published version 2");
+  expect(sent.at(-1)).toMatchObject({ method: "POST", url: "/v1/compliance/forms/f1/publish" });
+  expect(state.errors).toEqual([]);
 });

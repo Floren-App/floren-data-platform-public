@@ -20,8 +20,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
-| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 
@@ -134,6 +134,35 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/catalog/resources/{resource_id}/import/dbt` | Import Dbt |
 | `GET` | `/v1/catalog/search` | Search |
 | `GET` | `/v1/catalog/suggest` | Suggest |
+
+## compliance
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/compliance/cases` | Create Case |
+| `GET` | `/v1/compliance/cases` | List Cases |
+| `GET` | `/v1/compliance/cases/{case_id}` | Get Case |
+| `PATCH` | `/v1/compliance/cases/{case_id}` | Update Case |
+| `POST` | `/v1/compliance/cases/{case_id}/comments` | Comment |
+| `POST` | `/v1/compliance/cases/{case_id}/decision` | Decide Case |
+| `POST` | `/v1/compliance/cases/{case_id}/files` | Add File |
+| `GET` | `/v1/compliance/cases/{case_id}/files/{file_id}` | Get File |
+| `POST` | `/v1/compliance/cases/{case_id}/submit` | Submit Case |
+| `POST` | `/v1/compliance/cases/{case_id}/withdraw` | Withdraw Case |
+| `GET` | `/v1/compliance/forms` | List Forms |
+| `GET` | `/v1/compliance/forms/{form_id}` | Get Form |
+| `DELETE` | `/v1/compliance/forms/{form_id}` | Delete Form |
+| `POST` | `/v1/compliance/forms/{form_id}/publish` | Publish Form |
+| `PUT` | `/v1/compliance/forms/{name}` | Put Form |
+| `GET` | `/v1/compliance/memberships` | Pending Memberships |
+| `POST` | `/v1/compliance/memberships/{group_id}/{principal_id}` | Decide Membership |
+| `GET` | `/v1/compliance/policies` | List Policies |
+| `PUT` | `/v1/compliance/policies/{layer_id}/{level}` | Put Policy |
+| `DELETE` | `/v1/compliance/policies/{layer_id}/{level}` | Delete Policy |
+| `POST` | `/v1/compliance/requirement` | Requirement |
+| `GET` | `/v1/compliance/roles` | List Roles |
+| `POST` | `/v1/compliance/roles` | Add Role |
+| `DELETE` | `/v1/compliance/roles/{role_id}` | Remove Role |
 
 ## compute
 
@@ -318,8 +347,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/pages/{token}` | Page |
+| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

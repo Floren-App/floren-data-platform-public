@@ -251,6 +251,8 @@ export interface Me {
   /** The active group's app profile and the features it gives (administrators: everything). */
   app_profile?: string | null;
   app_features?: AppFeature[];
+  /** Compliance roles held in any scope: compliance_reviewer, membership_approver, compliance_admin. */
+  compliance_roles?: string[];
   available_groups?: { id: string; name: string; system?: boolean }[];
   username: string;
   groups: string[];
@@ -562,8 +564,37 @@ export interface AccessRequestItem {
   id: string; product_id: string; product: string; requester: string; app_group_id: string; group: string; reason: string;
   status: "pending" | "approved" | "declined" | "withdrawn"; decided_by: string; decision_note: string;
   created_at: string; decided_at: string | null; grants: ProductGrant[]; option_id?: string | null; option?: string | null;
+  case_id?: string | null; case_status?: string | null; with_owners?: boolean;
 }
 export interface PublishInput { asset_ids: string[]; title: string; summary?: string; domain?: string; classification?: string }
+
+/** Compliance forms: pages with fields; a page or field can be shown only when an earlier answer calls for it. */
+export type FieldType = "short_text" | "long_text" | "choice" | "multi_choice" | "date" | "number" | "statement" | "person" | "file";
+export interface FormCondition { field: string; equals?: unknown; contains?: string }
+export interface FormField { id: string; label: string; help: string; type: FieldType; required: boolean; options: string[]; show_if: FormCondition | null }
+export interface FormPage { id: string; title: string; intro: string; show_if: FormCondition | null; fields: FormField[] }
+export interface FormDefinition { pages: FormPage[] }
+export interface AccessFormItem { id: string; name: string; description: string; published_version: number | null; has_draft: boolean; used_by: number;
+  versions?: { id: string; version: number; published: boolean; published_at: string | null; published_by: string; definition: FormDefinition }[] }
+export interface AccessPolicyItem { id: string; layer_id: string; classification: string; form_id: string; form: string | null;
+  steps: { role: "data_owner" | "compliance_reviewer"; approvals: number }[]; max_days: number; review_days: number }
+export interface Requirement { required: boolean; layer_id: string | null; classification: string; policy_id?: string;
+  form?: { id: string; name: string; version_id: string | null; version: number | null; definition: FormDefinition | null };
+  steps?: AccessPolicyItem["steps"]; max_days?: number; review_days?: number }
+export interface ComplianceRoleItem { id: string; role: string; label: string; app_group_id: string; group: string;
+  scope: { resource_ids?: string[]; layers?: string[]; classifications?: string[]; group_ids?: string[] } }
+export interface AccessCaseItem {
+  id: string; kind: "product" | "role" | "membership"; status: "draft" | "in_review" | "changes_requested" | "approved" | "declined" | "withdrawn" | "expired";
+  requester: string; app_group_id: string; group: string; resource_id: string | null; resource: { kind: string; name: string } | null; role: string;
+  product_id: string | null; product: string | null; option: string | null; principal: string | null; layer_id: string | null; layer: string | null;
+  classification: string; form: string | null; form_version: number | null; steps: AccessPolicyItem["steps"]; step: number;
+  decisions: { step: number; role: string; by: string; decision: string; note: string; at: string }[];
+  until: string | null; approved_until: string | null; due_at: string | null; created_at: string; submitted_at: string | null; decided_at: string | null;
+  can_review: boolean; is_requester: boolean;
+  answers?: Record<string, unknown>; definition?: FormDefinition | null; comments?: { by: string; text: string; at: string }[];
+  files?: { id: string; field_id: string; name: string; content_type: string }[]; members?: string[];
+}
+export type CaseTarget = { kind: "product" | "role"; app_group_id: string; product_id?: string; option_id?: string; resource_id?: string; role?: string };
 
 /** One line of the central log. Run, workload, commit and layer are stamped by the platform. */
 export interface LogEntry {
@@ -661,6 +692,8 @@ export interface DataAccessIssue {
 }
 
 export class ApiError extends Error {
+  /** Set when access needs an approved compliance form first: which form and review. */
+  public requirement?: Requirement;
   constructor(public status: number, message: string, public fieldErrors: Record<string, string> = {}, public accessIssue?: DataAccessIssue,
     public slaIssue?: {message:string;assets:{asset_id:string;name?:string;status:string}[]}) {
     super(message);
@@ -690,6 +723,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     if (detail && typeof detail === "object" && "code" in detail && detail.code === "data_access_denied") {
       const issue = detail as DataAccessIssue;
       throw new ApiError(res.status, issue.message, {}, issue);
+    }
+    if (detail && typeof detail === "object" && "code" in detail && detail.code === "justification_required") {
+      const issue = detail as unknown as { message: string; requirement?: Requirement };
+      const error = new ApiError(res.status, issue.message);
+      error.requirement = issue.requirement;
+      throw error;
     }
     if(detail&&typeof detail==='object'&&'code' in detail&&detail.code==='SLA_INPUT_GATE') {
       const issue=detail as {code:string;message:string;assets:{asset_id:string;name?:string;status:string}[]};
@@ -873,12 +912,43 @@ export const api = {
     publish: (body: PublishInput) => request<Product>("POST", "/v1/catalog/products", body),
     update: (id: string, body: { title?: string; summary?: string; asset_ids?: string[]; options?: OptionInput[] }) => request<Product>("PATCH", `/v1/catalog/products/${id}`, body),
     unpublish: (id: string) => request<void>("DELETE", `/v1/catalog/products/${id}`),
-    requestAccess: (id: string, app_group_id: string, reason: string, option_id?: string) => request<AccessRequestItem>("POST", `/v1/catalog/products/${id}/requests`, { app_group_id, reason, option_id }),
+    requestAccess: (id: string, app_group_id: string, reason: string, option_id?: string, form?: { answers: Record<string, unknown>; until?: string | null; submit: boolean }) =>
+      request<AccessRequestItem>("POST", `/v1/catalog/products/${id}/requests`, { app_group_id, reason, option_id, ...(form ?? {}) }),
     setConsumer: (id: string, group_id: string, option_id?: string) => request<{ group_id: string; option_id: string; option: string }>("PUT", `/v1/catalog/products/${id}/consumers/${group_id}`, { option_id }),
     removeConsumer: (id: string, group_id: string) => request<void>("DELETE", `/v1/catalog/products/${id}/consumers/${group_id}`),
     requests: (box: "approve" | "mine") => request<AccessRequestItem[]>("GET", `/v1/catalog/requests?box=${box}`),
     decide: (id: string, approve: boolean, note: string) => request<AccessRequestItem>("POST", `/v1/catalog/requests/${id}/decision`, { approve, note }),
     withdraw: (id: string) => request<void>("DELETE", `/v1/catalog/requests/${id}`),
+  },
+  compliance: {
+    forms: () => request<AccessFormItem[]>("GET", "/v1/compliance/forms"),
+    form: (id: string) => request<AccessFormItem>("GET", `/v1/compliance/forms/${id}`),
+    saveForm: (current: string, body: { name: string; description: string; definition: FormDefinition }) =>
+      request<AccessFormItem>("PUT", `/v1/compliance/forms/${encodeURIComponent(current)}`, body),
+    publishForm: (id: string) => request<AccessFormItem>("POST", `/v1/compliance/forms/${id}/publish`),
+    deleteForm: (id: string) => request<void>("DELETE", `/v1/compliance/forms/${id}`),
+    policies: () => request<{ layers: { id: string; name: string }[]; classifications: ClassificationLevel[]; policies: AccessPolicyItem[] }>("GET", "/v1/compliance/policies"),
+    putPolicy: (layer: string, level: string, body: { form_id: string; steps: AccessPolicyItem["steps"]; max_days: number; review_days: number }) =>
+      request<AccessPolicyItem>("PUT", `/v1/compliance/policies/${layer}/${encodeURIComponent(level)}`, body),
+    deletePolicy: (layer: string, level: string) => request<void>("DELETE", `/v1/compliance/policies/${layer}/${encodeURIComponent(level)}`),
+    roles: () => request<{ roles: ComplianceRoleItem[]; kinds: { key: string; label: string }[] }>("GET", "/v1/compliance/roles"),
+    addRole: (body: { role: string; app_group_id: string; scope: ComplianceRoleItem["scope"] }) => request<ComplianceRoleItem>("POST", "/v1/compliance/roles", body),
+    removeRole: (id: string) => request<void>("DELETE", `/v1/compliance/roles/${id}`),
+    requirement: (target: CaseTarget) => request<Requirement>("POST", "/v1/compliance/requirement", target),
+    createCase: (body: CaseTarget & { answers: Record<string, unknown>; until?: string | null; submit: boolean }) => request<AccessCaseItem>("POST", "/v1/compliance/cases", body),
+    cases: (box: "mine" | "review" | "all", status = "") => request<AccessCaseItem[]>("GET", `/v1/compliance/cases?${new URLSearchParams({ box, status })}`),
+    case: (id: string) => request<AccessCaseItem>("GET", `/v1/compliance/cases/${id}`),
+    updateCase: (id: string, body: { answers?: Record<string, unknown>; until?: string | null }) => request<AccessCaseItem>("PATCH", `/v1/compliance/cases/${id}`, body),
+    submitCase: (id: string) => request<AccessCaseItem>("POST", `/v1/compliance/cases/${id}/submit`),
+    decide: (id: string, decision: "approve" | "changes" | "decline", note: string, until?: string | null) =>
+      request<AccessCaseItem>("POST", `/v1/compliance/cases/${id}/decision`, { decision, note, until: until || undefined }),
+    comment: (id: string, text: string) => request<AccessCaseItem>("POST", `/v1/compliance/cases/${id}/comments`, { text }),
+    withdraw: (id: string) => request<AccessCaseItem>("POST", `/v1/compliance/cases/${id}/withdraw`),
+    addFile: (id: string, field_id: string, name: string, content_type: string, data: string) =>
+      request<{ id: string }>("POST", `/v1/compliance/cases/${id}/files`, { field_id, name, content_type, data }),
+    memberships: () => request<{ app_group_id: string; principal_id: string; group: string; principal: string }[]>("GET", "/v1/compliance/memberships"),
+    decideMembership: (group: string, principal: string, approve: boolean, note = "") =>
+      request<{ status: string }>("POST", `/v1/compliance/memberships/${group}/${principal}`, { approve, note }),
   },
   logs: (query: LogQuery) => request<LogPage>("GET", `/v1/logs?${new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]))}`),
   deploy: (body: { repo_id: string; branch: string; program: string; slug: string; title: string;

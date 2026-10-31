@@ -1,0 +1,146 @@
+# Access policies and compliance forms
+
+Some data needs a reason before anyone may use it. **Access policies** say which data: for each
+layer and classification, whether access needs a **compliance form** and who reviews it. Data
+in a cell without a policy needs no form, as before.
+
+When data falls under a policy, every way of giving access needs an approved form:
+
+- a request for a data product;
+- an owner giving a group a role on a schema, source or object directly;
+- an owner making a group a consumer of a data product;
+- Terraform and the API (they pass the ID of an approved case as `justification_id`).
+
+Raising an existing role to one that reaches covered data counts as giving access. Lowering a
+role, or keeping one, does not.
+
+## Which data is covered
+
+The **classification** that counts is the one the group would really see:
+
+- a table or object is never below its most sensitive column;
+- an explicit classification on the object can raise that, never lower it;
+- masked columns count as their level's *masked* level (see
+  [Classifications](catalog.md#classification)).
+
+So a product option that hashes email addresses can fall in a cell without a policy, while the
+*Full* option needs a form. For a role on a schema or source, the most sensitive object under it
+counts, after the masks that apply to that group.
+
+The lowest classification never needs a form. The policy grid has one row per classification and
+one column per layer, so *confidential* data can need a form in Prod and not in Non-Prod.
+
+## A policy
+
+Each filled cell of the grid has:
+
+| Setting | Means |
+|---|---|
+| Form | The compliance form people fill in; its published version is used |
+| Review steps | In order: **data owners** (the owners of the product or object), then **compliance reviewers**; each step can need more than one approval |
+| Access lasts at most | Approved access ends after this many days (or earlier, when the reviewer chooses an earlier date) |
+| Reviews are due within | The deadline reviewers see |
+
+Nobody reviews their own case, and one person approves a step only once.
+
+## Forms
+
+A form has **pages** with **questions**. Question types: short text, long text, one choice,
+several choices, date, number, a statement to agree to, a person, and a file (up to 5 MB).
+Questions can be required and can have help text.
+
+A page or question can depend on an earlier answer: *show the Legal basis page when "Special
+categories" is Yes*, or *when "Personal data" includes health*. Hidden questions are not asked
+and not required.
+
+Changes are saved as a **draft** and **published** as a new version. New cases use the newest
+published version; cases already filled in keep theirs, so a review always shows the questions as
+they were asked. A form used by a policy, or one that cases were filled in with, cannot be deleted.
+
+## Filling in a form
+
+When access needs a form, the app shows it at the moment access is asked for or given:
+
+- **Request access** on a data product shows the form below the request when the chosen option
+  needs one. The product's owners decide first, then the compliance reviewers.
+- **Give access** on a product's access options, and **Assign role** on an object's
+  permissions, show the form instead of giving access straight away. The access is given once the
+  review approves it.
+
+The form is filled in page by page; *Next* waits until the page's required questions are
+answered. Optionally, say until when the access is needed.
+
+## Compliance roles
+
+Compliance work is done by app groups with a **compliance role**. A role can be scoped; an empty
+scope means everything.
+
+| Role | Does | Scoped by |
+|---|---|---|
+| Compliance reviewer | Reviews compliance forms | layers, classifications, objects |
+| Membership approver | Approves people joining a group that has access given through a form | groups |
+| Compliance administrator | Sets up forms, policies, classifications and compliance roles | — |
+
+Platform administrators can do everything and are the only ones who make compliance
+administrators. Give a privacy team's group a role together with a small
+[app profile](app-profiles.md) (for example only `products.browse`), so they see their part of
+the app and not the engineering tools.
+
+## New group members
+
+Access given through a form belongs to the group *as it was reviewed*. When someone joins the
+group later, directly or through the identity provider, they do not get that access until a
+membership approver approves them. Everything else the group can do, they get straight away.
+
+## The privacy area
+
+People with a compliance role get **Privacy** in the activity bar:
+
+- **Access policies**: the grid of layers and classifications; open a cell to set its form,
+  review steps and durations. Reviewers see the grid read-only.
+- **Compliance forms**: the forms, their versions, and the builder: add, remove and reorder pages
+  and questions, set conditions, preview, save a draft and publish.
+- **Compliance roles**: which groups have which compliance role, and for what.
+- **Classifications**: the levels and what masked data counts as.
+
+## Terraform
+
+Everything here is configuration, also in Terraform:
+
+```hcl
+resource "fdp_access_form" "personal_data" {
+  name = "Personal data access"
+  definition = jsonencode({ pages = [
+    { id = "purpose", title = "Purpose", fields = [
+      { id = "purpose", label = "What will you use it for", type = "long_text", required = true },
+      { id = "special", label = "Special categories", type = "choice", required = true, options = ["Yes", "No"] },
+    ] },
+    { id = "basis", title = "Legal basis", show_if = { field = "special", equals = "Yes" }, fields = [
+      { id = "basis", label = "Which legal basis", type = "short_text", required = true },
+    ] },
+  ] })
+}
+
+resource "fdp_access_policy" "prod_confidential" {
+  layer_id       = data.fdp_layer.prod.id
+  classification = "confidential"
+  form_id        = fdp_access_form.personal_data.id
+  steps          = [{ role = "data_owner" }, { role = "compliance_reviewer" }]
+  max_days       = 365
+  review_days    = 10
+}
+
+resource "fdp_compliance_role" "privacy_reviews_prod" {
+  role            = "compliance_reviewer"
+  app_group_id    = fdp_app_group.privacy.id
+  layers          = [data.fdp_layer.prod.id]
+  classifications = ["confidential", "restricted"]
+}
+```
+
+Applying a changed form definition publishes it as a new version. Grants made by Terraform under
+a policy need an approved case: set `justification_id` on `fdp_role_assignment` or
+`fdp_data_product_consumer`. Data products, their access options (masks and row filters per
+option) and classifications are Terraform resources too: see `fdp_data_product`,
+`fdp_classifications` and `fdp_column_classification` in the
+[Terraform reference](reference/terraform/index.md).

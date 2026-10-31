@@ -69,6 +69,10 @@ answer under **Access requests** (the sidebar counts what waits) and may add a n
 makes the group a Consumer. Requests, decisions and role changes are in the audit trail.
 Requesters see the outcome under **My requests** and may withdraw a waiting request.
 
+When the data falls under an [access policy](access-policies.md), the request carries the
+policy's compliance form, and giving access directly needs an approved form too. After the
+owners, compliance reviewers decide.
+
 ## Classification
 
 Classifications are configurable under **Administration → Classifications** (or

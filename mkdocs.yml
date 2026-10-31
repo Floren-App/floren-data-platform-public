@@ -101,6 +101,7 @@ nav:
       - Column masks and row filters: data-masking.md
       - Active groups and ownership: active-groups.md
       - App profiles: app-profiles.md
+      - Access policies and compliance forms: access-policies.md
       - Storage integrations: storage-integrations.md
       - Catalog and lineage: catalog.md
       - KPIs, quality and SLAs: metrics-and-slas.md

@@ -9,7 +9,7 @@ product. Access is a role on the product itself: groups with Consumer on it may 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,7 +20,7 @@ from .. import catalog as c, layers, rbac
 from ..auth import User
 from ..db import get_db
 from ..deps import get_actor
-from ..models import (AccessRequest, AppGroup, CatalogAsset, CatalogProduct, CatalogProductMember, LineageEdge, ProductOption,
+from ..models import (AccessCase, AccessRequest, AppGroup, CatalogAsset, CatalogProduct, CatalogProductMember, LineageEdge, ProductOption,
                       Resource, RoleAssignment, Workload, utcnow)
 from .common import audit
 
@@ -94,11 +94,16 @@ class RequestIn(BaseModel):
     app_group_id: str = Field(min_length=1, max_length=12)
     reason: str = Field(min_length=3, max_length=1000)
     option_id: Optional[str] = Field(default=None, max_length=12, description="The access option asked for; default: the default option")
+    answers: Dict[str, Any] = Field(default_factory=dict, description="The compliance form, when an access policy applies")
+    until: Optional[datetime] = Field(default=None, description="Access needed until, when an access policy applies")
+    submit: bool = Field(default=True, description="False: the compliance form stays a draft (to attach files first)")
 
 
 class ConsumerIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     option_id: Optional[str] = Field(default=None, max_length=12, description="Default: the default option")
+    justification_id: Optional[str] = Field(default=None, max_length=12,
+        description="An approved compliance case for this group and option, when an access policy applies")
 
 
 class DecisionIn(BaseModel):
@@ -383,6 +388,25 @@ def _options_for(db, product, parts, given) -> None:
     product_options.save(db, product, product_options.validate(parts, kept))
 
 
+def _hold_new_objects(db, product, before) -> None:
+    """Consumers who would now need a compliance form keep what they had; new objects wait for an approval."""
+    from .. import compliance, product_options
+    from ..models import ProductAccess
+    db.flush()
+    for a in db.scalars(select(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id, RoleAssignment.role == "Consumer")):
+        access = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == a.app_group_id))
+        if access is not None and access.approved_assets is not None:
+            continue  # already limited to what was approved
+        option = product_options.option_for_group(db, product.id, a.app_group_id)
+        if compliance.product_requirement(db, product, option)["policy"] is None:
+            continue
+        if access is None:
+            product_options.set_option(db, product.id, a.app_group_id, option.id)
+            db.flush()
+            access = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == a.app_group_id))
+        access.approved_assets = list(before)
+
+
 def _set_members(db, product, parts):
     db.execute(delete(CatalogProductMember).where(CatalogProductMember.product_id == product.id))
     db.flush()
@@ -459,8 +483,10 @@ def update_product(product_id: str, body: ProductPatch, db: Session = Depends(ge
         other = db.scalar(select(CatalogProduct).where(CatalogProduct.asset_id == parts[0][0].id, CatalogProduct.id != product.id))
         if other:
             raise HTTPException(409, f"{parts[0][0].name} already leads another product")
+        before = [m.asset_id for m in db.scalars(select(CatalogProductMember).where(CatalogProductMember.product_id == product.id))]
         _set_members(db, product, parts)
         _options_for(db, product, parts, body.options)
+        _hold_new_objects(db, product, before)
     elif body.options is not None:
         _options_for(db, product, members(db, product), body.options)
     product.updated_at = utcnow()
@@ -592,6 +618,9 @@ def request_out(db, r: AccessRequest) -> dict:
             "status": r.status, "decided_by": r.decided_by, "decision_note": r.decision_note,
             "created_at": r.created_at, "decided_at": r.decided_at,
             "option_id": r.option_id, "option": (lambda o: o.name if o else None)(db.get(ProductOption, r.option_id) if r.option_id else None),
+            "case_id": r.case_id, "case_status": (lambda c: c.status if c else None)(db.get(AccessCase, r.case_id) if r.case_id else None),
+            "with_owners": (lambda c: c is None or (c.status == "in_review" and c.steps[c.step]["role"] == "data_owner"))(
+                db.get(AccessCase, r.case_id) if r.case_id else None),
             "grants": _grants(members(db, product)) if product else []}
 
 
@@ -617,8 +646,11 @@ def request_access(product_id: str, body: RequestIn, db: Session = Depends(get_d
     if body.app_group_id not in viewer.groups:
         raise HTTPException(422, "choose one of your own groups")
     parts = members(db, product)
-    if _group_has(db, db.get(Resource, product.access_resource_id), body.app_group_id) or (
-            parts and all(_group_has(db, r, body.app_group_id) for _, r in parts)):
+    from ..models import ProductAccess
+    held = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == body.app_group_id))
+    waiting = held is not None and held.approved_assets is not None and any(a.id not in held.approved_assets for a, _ in parts)
+    if not waiting and (_group_has(db, db.get(Resource, product.access_resource_id), body.app_group_id) or (
+            parts and all(_group_has(db, r, body.app_group_id) for _, r in parts))):
         raise HTTPException(409, "that group already has access to everything in this product")
     if db.scalar(select(AccessRequest).where(AccessRequest.product_id == product.id, AccessRequest.app_group_id == body.app_group_id,
                                              AccessRequest.status == "pending")):
@@ -631,6 +663,13 @@ def request_access(product_id: str, body: RequestIn, db: Session = Depends(get_d
                       app_group_id=body.app_group_id, reason=body.reason.strip(), role="Consumer", option_id=option.id)
     db.add(r)
     db.flush()
+    from .. import compliance
+    if compliance.product_requirement(db, product, option)["policy"] is not None:
+        # Under an access policy the request carries the compliance form; owners decide first, then the review steps.
+        from .compliance import TargetIn, new_case
+        case = new_case(db, user, TargetIn(kind="product", app_group_id=body.app_group_id, product_id=product.id, option_id=option.id),
+                        body.answers, body.until, submit=body.submit, request_id=r.id)
+        r.case_id = case.id
     audit(db, viewer.user.username, "catalog.access_request", product.resource_id, product=product.id, group=body.app_group_id, request=r.id)
     db.commit()
     return request_out(db, r)
@@ -668,6 +707,23 @@ def decide(request_id: str, body: DecisionIn, db: Session = Depends(get_db), use
         raise HTTPException(404, "request not found")
     if r.status != "pending":
         raise HTTPException(409, f"this request was already {r.status}")
+    if r.case_id:  # under an access policy: the owners' decision is the case's data owner step
+        from .. import compliance
+        from ..models import AccessCase
+        case = db.get(AccessCase, r.case_id)
+        if case.status in ("draft", "changes_requested"):
+            raise HTTPException(409, "the requester is still filling in the compliance form")
+        if case.status != "in_review" or case.steps[case.step]["role"] != "data_owner":
+            raise HTTPException(409, "this request is with the compliance reviewers")
+        if not body.approve and not body.note.strip():
+            raise HTTPException(422, "say why, so the requester can act on it")
+        compliance.decide(db, case, user, "approve" if body.approve else "decline", body.note.strip())
+        if not body.approve:
+            r.status, r.decided_by, r.decided_at, r.decision_note = "declined", viewer.user.username, utcnow(), body.note.strip()
+        audit(db, viewer.user.username, "catalog.access_owner_" + ("approved" if body.approve else "declined"), product.resource_id,
+              product=product.id, request=r.id, case=case.id, status=case.status)
+        db.commit()
+        return request_out(db, r)
     if body.approve:
         if not db.get(AppGroup, r.app_group_id):
             raise HTTPException(409, "the requested group no longer exists")
@@ -713,6 +769,15 @@ def put_consumer(product_id: str, group_id: str, body: ConsumerIn, db: Session =
     option = db.get(ProductOption, body.option_id) if body.option_id else product_options.default_option(db, product.id)
     if option is None or option.product_id != product.id:
         raise HTTPException(422, "choose one of the product's access options")
+    from .. import compliance
+    req = compliance.product_requirement(db, product, option)
+    if req["policy"] is not None:
+        case = db.get(AccessCase, body.justification_id) if body.justification_id else None
+        if not (case is not None and case.status == "approved" and case.kind == "product" and case.product_id == product.id
+                and case.app_group_id == group_id and case.option_id == option.id
+                and (case.approved_until is None or compliance._aware(case.approved_until) > utcnow())):
+            raise HTTPException(409, {"code": "justification_required", "message": "this option needs an approved compliance form",
+                                      "requirement": compliance.requirement_out(db, req)})
     current = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id,
                                                      RoleAssignment.app_group_id == group_id))
     if current is None:

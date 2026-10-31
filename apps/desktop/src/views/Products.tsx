@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { AccessRequestItem, ago, api, openInWindow, AppGroup, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
+import { AccessRequestItem, ago, api, ApiError, openInWindow, AppGroup, CaseTarget, Requirement, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
 import { PermissionsPanel } from "../components/Permissions";
+import { Answers, FormRenderer, JustifyPanel, uploadFiles } from "../components/ComplianceForm";
 import { IconCatalog, IconPlus } from "../components/Icons";
 import { objectKindLabel } from "../objectKinds";
 import type { TabRef } from "./Tabs";
@@ -206,9 +207,27 @@ function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDon
   const [group, setGroup] = useState(hub.me?.active_group_id && groups.some((g) => g.id === hub.me?.active_group_id) ? hub.me.active_group_id : groups[0]?.id ?? "");
   const [reason, setReason] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [option, setOption] = useState(((p.options ?? []).find((o) => o.default) ?? (p.options ?? [])[0])?.id ?? "");
+  // Data under an access policy: the request carries the policy's compliance form.
+  const [requirement, setRequirement] = useState<Requirement | null>(null);
+  const [answers, setAnswers] = useState<Answers>({}), [files, setFiles] = useState<Record<string, File>>({});
+  const [until, setUntil] = useState(""), [complete, setComplete] = useState(true);
+  useEffect(() => {
+    if (!group) return;
+    let live = true;
+    api.compliance.requirement({ kind: "product", app_group_id: group, product_id: p.id, option_id: option || undefined })
+      .then((r) => { if (live) setRequirement(r.required ? r : null); }).catch(() => { if (live) setRequirement(null); });
+    return () => { live = false; };
+  }, [p.id, group, option]);
+  const definition = requirement?.form?.definition;
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError("");
-    try { await api.products.requestAccess(p.id, group, reason.trim(), option || undefined); onDone(); } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+    try {
+      if (!requirement) { await api.products.requestAccess(p.id, group, reason.trim(), option || undefined); onDone(); return; }
+      const hasFiles = Object.keys(files).length > 0;
+      const r = await api.products.requestAccess(p.id, group, reason.trim(), option || undefined, { answers, until: until || null, submit: !hasFiles });
+      if (hasFiles && r.case_id) { await uploadFiles(r.case_id, files); await api.compliance.submitCase(r.case_id); }
+      onDone();
+    } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
   };
   return <form className="card" aria-label={`Request access to ${p.title}`} onSubmit={(e) => void submit(e)}>
     <h2>Request access</h2>
@@ -224,8 +243,17 @@ function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDon
       <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="request-reason">Why you need it</label>
         <textarea id="request-reason" rows={2} maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What you will use it for" /></div>
     </div>
+    {requirement && <div className="justify-panel">
+      <h3>{requirement.form?.name ?? "Compliance form"}</h3>
+      <p className="muted">With this option the data is <strong>{words(requirement.classification)}</strong>, so the request needs this form. After the owners, the privacy reviewers decide.
+        {requirement.max_days ? ` Access lasts at most ${requirement.max_days} days.` : ""}</p>
+      {definition ? <FormRenderer definition={definition} answers={answers} onChange={setAnswers} files={files} onComplete={setComplete}
+        onFile={(f, file) => setFiles((all) => { const next = { ...all }; if (file) next[f] = file; else delete next[f]; return next; })} />
+        : <p className="error" role="alert">The policy's form has no published version yet. Ask the privacy team.</p>}
+      <div className="field"><label htmlFor="request-until">Access needed until (optional)</label><input id="request-until" type="date" value={until} onChange={(e) => setUntil(e.target.value)} /></div>
+    </div>}
     {error && <p className="error" role="alert">{error}</p>}
-    <div className="form-actions"><button className="btn" disabled={busy || !group || reason.trim().length < 3}>{busy ? "Sending…" : "Send request"}</button>
+    <div className="form-actions"><button className="btn" disabled={busy || !group || reason.trim().length < 3 || (!!requirement && (!definition || !complete))}>{busy ? "Sending…" : "Send request"}</button>
       <button type="button" className="btn secondary" onClick={onCancel}>Cancel</button></div>
   </form>;
 }
@@ -322,7 +350,12 @@ function AccessOptions({ detail, onChanged }: { detail: ProductDetail; onChanged
   const [groups, setGroups] = useState<AppGroup[]>([]), [group, setGroup] = useState(""), [option, setOption] = useState(""), [error, setError] = useState("");
   useEffect(() => { if (detail.can_manage) api.access.groups().then(setGroups).catch(() => setGroups([])); }, [detail.can_manage]);
   const consumers = detail.consumers ?? [];
-  const act = (p: Promise<unknown>) => { setError(""); void p.then(onChanged).catch((e: Error) => setError(e.message)); };
+  const [justify, setJustify] = useState<{ target: CaseTarget; requirement: Requirement } | null>(null), [message, setMessage] = useState("");
+  const act = (p: Promise<unknown>, target?: CaseTarget) => { setError(""); setMessage(""); setJustify(null); void p.then(onChanged).catch((e: Error) => {
+    // Data under an access policy: the group becomes a consumer once a compliance form is approved.
+    if (target && e instanceof ApiError && e.requirement) setJustify({ target, requirement: e.requirement });
+    setError(e.message);
+  }); };
   return <>
     <p className="hint">Each option is a way to use this product: the masks and row filters its consumers get. The level shows what consumers of the option really see; masked columns count lower.</p>
     <div className="table-scroll"><table aria-label="Access options"><thead><tr><th>Option</th><th>Consumers see</th><th>Level</th>{detail.can_manage && <th>Groups</th>}</tr></thead><tbody>
@@ -337,12 +370,16 @@ function AccessOptions({ detail, onChanged }: { detail: ProductDetail; onChanged
           <button className="text-button" onClick={() => act(api.products.removeConsumer(detail.id, c.group_id))}>Remove</button></div>)}
           {!consumers.some((c) => c.option_id === o.id) && <span className="muted">—</span>}</td>}
       </tr>)}</tbody></table></div>
-    {detail.can_manage && <form className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }} onSubmit={(e) => { e.preventDefault(); act(api.products.setConsumer(detail.id, group, option || undefined)); }}>
+    {detail.can_manage && <form className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }} onSubmit={(e) => { e.preventDefault(); act(api.products.setConsumer(detail.id, group, option || undefined),
+      { kind: "product", app_group_id: group, product_id: detail.id, option_id: option || undefined }); }}>
       <select aria-label="Group to give access" value={group} onChange={(e) => setGroup(e.target.value)}><option value="">Give a group access…</option>
         {groups.filter((g) => !consumers.some((c) => c.group_id === g.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
       <select aria-label="With option" value={option} onChange={(e) => setOption(e.target.value)}><option value="">Default option</option>{(detail.options ?? []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>
       <button className="btn secondary" disabled={!group}>Give access</button></form>}
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && !justify && <p className="error" role="alert">{error}</p>}
+    {message && <p className="success-message" role="status">{message}</p>}
+    {justify && <JustifyPanel target={justify.target} requirement={justify.requirement} onCancel={() => { setJustify(null); setError(""); }}
+      onDone={(text) => { setJustify(null); setError(""); setMessage(text); onChanged(); }} />}
   </>;
 }
 

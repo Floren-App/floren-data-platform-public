@@ -20,6 +20,8 @@ Configures Floren Data Platform through its API. Authenticate with a token, or w
 
 ## Resources
 
+- [fdp_access_form](fdp_access_form.md)
+- [fdp_access_policy](fdp_access_policy.md)
 - [fdp_api](fdp_api.md)
 - [fdp_api_operation](fdp_api_operation.md)
 - [fdp_app_group](fdp_app_group.md)
@@ -28,6 +30,7 @@ Configures Floren Data Platform through its API. Authenticate with a token, or w
 - [fdp_catalog_governance](fdp_catalog_governance.md)
 - [fdp_classifications](fdp_classifications.md)
 - [fdp_column_classification](fdp_column_classification.md)
+- [fdp_compliance_role](fdp_compliance_role.md)
 - [fdp_compute_pool](fdp_compute_pool.md)
 - [fdp_data_policy](fdp_data_policy.md)
 - [fdp_data_product](fdp_data_product.md)

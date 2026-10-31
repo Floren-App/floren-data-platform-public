@@ -10,7 +10,7 @@ from ..auth import User
 from ..db import get_db
 from ..deps import get_actor, get_secret_store
 from ..models import (AppGroup, DirectoryPrincipal, DirectoryMembership, IdentityBinding, Resource, RoleAssignment, ServiceRoleAssignment,
-                      DataSource, Workload, ServiceAccount)
+                      DataSource, Workload, ServiceAccount, utcnow)
 from .. import rbac
 from ..ownership import GLOBAL_ADMIN, require_create, owner_info, browsing_scope, browsing_allowed
 from .common import audit
@@ -49,6 +49,8 @@ class AssignmentIn(BaseModel):
     app_group_id: Optional[str] = None
     principal_id: Optional[str] = None
     role: str
+    justification_id: Optional[str] = Field(default=None, max_length=12,
+        description="An approved compliance case for this access, when an access policy applies (API and Terraform)")
 
     @model_validator(mode="after")
     def one_recipient(self):
@@ -526,12 +528,37 @@ def user_principals(resource_id: str, db: Session = Depends(get_db), user: User 
         DirectoryPrincipal.kind == "user", DirectoryPrincipal.active.is_(True)).order_by(DirectoryPrincipal.name))]
 
 
+def require_justification(db, resource, body) -> None:
+    """Under an access policy a role is given only with an approved case for exactly this access."""
+    from .. import compliance
+    from ..models import AccessCase
+    existing = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource.id,
+                                                      RoleAssignment.app_group_id == body.app_group_id)) if body.app_group_id else None
+    roles = list(rbac.roles_for(resource))
+    if existing is not None and existing.role in roles and roles.index(existing.role) >= roles.index(body.role):
+        return  # not giving more than the group has
+    req = compliance.role_requirement(db, resource, body.role, body.app_group_id)
+    if req["policy"] is None:
+        return
+    if body.principal_id:
+        raise HTTPException(409, {"code": "justification_required", "message": "access to this data needs a compliance form: give it to a group"})
+    case = db.get(AccessCase, body.justification_id) if body.justification_id else None
+    valid = (case is not None and case.status == "approved" and case.kind == "role" and case.resource_id == resource.id
+             and case.app_group_id == body.app_group_id and case.role in roles and roles.index(case.role) >= roles.index(body.role)
+             and (case.approved_until is None or compliance._aware(case.approved_until) > utcnow()))
+    if not valid:
+        raise HTTPException(409, {"code": "justification_required",
+                                  "message": "access to this data needs an approved compliance form",
+                                  "requirement": compliance.requirement_out(db, req)})
+
+
 @router.put("/resources/{resource_id}/assignments")
 def assign(resource_id: str, body: AssignmentIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     r = get_resource(db, resource_id)
     rbac.require(db, user, "assign", r)
     if body.role not in rbac.roles_for(r):
         raise HTTPException(422, "choose a valid built-in role for this resource")
+    require_justification(db, r, body)
     if body.principal_id:
         principal = db.get(DirectoryPrincipal, body.principal_id)
         if not principal or not principal.active or principal.kind not in ("service", "user"):
