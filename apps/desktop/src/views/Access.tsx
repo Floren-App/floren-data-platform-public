@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, AccessResource, AppGroup, DirectoryPrincipal } from "../api";
+import { api, AccessResource, AppGroup, AppProfile, DirectoryPrincipal } from "../api";
 import { resourcePath, resourceTab } from "../components/Permissions";
 import type { OpenTab } from "../components/Permissions";
+import type { TabRef } from "./Tabs";
 import type { Hub } from "../hub";
 import { ProductIcon } from "../components/ProductIcon";
 import { OriginBadge } from "./Directory";
@@ -85,6 +86,7 @@ export function AccessTab({ hub, groupId, bindingPrincipalId, onSelect, openTab 
           {group.description && <p className="muted" style={{ marginTop: -4 }}>{group.description}</p>}
           {group.system && <p className="scope-note">Protected system group · Owner access to every current and future object. Object permissions cannot revoke this access. Workload layer boundaries still apply.</p>}
           {group.can_inspect !== false && <p className="muted">Owners: {group.owners.map(userName).join(", ") || "Platform administrators"}</p>}
+          {!group.system && <GroupProfile group={group} hub={hub} act={act} openTab={openTab} />}
           {group.can_inspect !== false && <section><h3>Roles on objects</h3>
             <p className="hint">These roles are inherited by the object's children. Only resource Owners can change the assignments; group owners manage membership.</p>
             <table><thead><tr><th>Object</th><th>Role</th></tr></thead><tbody>{grants.map((grant) => <tr key={grant.resource.id}>
@@ -136,4 +138,18 @@ export function AccessTab({ hub, groupId, bindingPrincipalId, onSelect, openTab 
       </details>)}
     </section>}
   </>;
+}
+
+/** Which parts of the app the group gets when it is someone's active group; administrators change it. */
+function GroupProfile({ group, hub, act, openTab }: { group: AppGroup; hub: Hub; act: (fn: () => Promise<unknown>) => Promise<unknown>; openTab: (t: TabRef) => void }) {
+  const [profiles, setProfiles] = useState<AppProfile[]>([]);
+  useEffect(() => { api.appProfiles.list().then((r) => setProfiles(r.profiles)).catch(() => setProfiles([])); }, []);
+  const fallback = profiles.find((p) => p.default)?.name;
+  const current = group.app_profile ?? "";
+  return <p className="row muted" style={{ gap: 8, flexWrap: "wrap" }}>App profile:
+    {hub.me?.is_admin ? <select aria-label={`App profile of ${group.name}`} value={current}
+        onChange={(e) => void act(() => api.access.updateGroup(group.id, { name: group.name, description: group.description, owners: group.owners, app_profile: e.target.value }))}>
+        <option value="">Default ({fallback ?? "…"})</option>{profiles.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}</select>
+      : <strong>{group.app_profile ?? `${fallback ?? "default"} (default)`}</strong>}
+    {hub.me?.is_admin && <button className="text-button" onClick={() => openTab({ kind: "admin-app-profiles", title: "App profiles" })}>Edit profiles</button>}</p>;
 }

@@ -82,7 +82,7 @@ export function KafkaView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; openTa
   return <>
     <PageHeader icon={<ProductIcon kind={resource.kind} size={22} />} title={resource.name}
       subtitle={`${cluster ? "Kafka cluster" : "Kafka topic"} · ${resource.layer_name ?? ""}${cluster ? "" : ` · ${resource.config.phase}`}`}
-      actions={!cluster && <PublishButton resourceId={resource.id} openTab={openTab} />} />
+      actions={!cluster && <PublishButton resourceId={resource.id} openTab={openTab} hub={hub} />} />
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
     <ObjectTabs active={section} lineage settings={!cluster && resource.actions.includes("ddl")} onChange={(s) => openTab({ ...tab, section: s })} />
     {error && <p className="error" role="alert">{error}</p>}

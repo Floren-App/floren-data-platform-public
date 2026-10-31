@@ -36,8 +36,14 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
     visible_sources = {r.object_id for r in db.scalars(select(Resource))
                        if r.kind in ("source","schema") and browsing.get(r.id,set()) & DATA_ROLES.keys()}
     from ..runtimes import r_enabled
+    from ..app_profiles import features_for, profile_for, FEATURES
+    profile = profile_for(db, user)
+    app_features = [f for f in FEATURES if f in features_for(db, user)]
+    db.commit()
     return Me(
         features={"r": r_enabled()},
+        app_profile="Full access (administrator)" if user.is_admin else profile.name if profile else None,
+        app_features=app_features,
         principal_id=user.principal_id, active_group_id=user.active_group_id or None,
         active_layer_id=active_layer(db, user),
         available_groups=[{"id":g.id,"name":g.name,"system":g.id == GLOBAL_ADMIN}

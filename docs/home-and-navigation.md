@@ -16,6 +16,9 @@ The bottom of the sidebar shows your working context:
 
 Search the catalog from anywhere with **Ctrl/Cmd+K**.
 
+The active group also decides which parts of the app you get: its [app profile](app-profiles.md)
+switches whole sections on or off, so some of the sections below may not be there for you.
+
 ## Activity bar
 
 The activity bar on the left shows icons. Hold the pointer over it for a moment, or move

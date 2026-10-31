@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import logging
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import Depends, FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, select, text
@@ -17,7 +17,8 @@ from .programs import json_schema
 from .deploying import gitops_loop
 from .reaper import reaper_loop
 from .runtimes import sync_installation_runtimes
-from .routes import layers, admin, apis, connect, gateway, identity, deploy, runs, workspaces, rbac, scim, delegation, sql, data_browser, catalog, measurements, compute, workspace_templates, git_credentials, packages, query_log, data_policies, kafka, logs, products
+from .routes import layers, admin, apis, connect, gateway, identity, deploy, runs, workspaces, rbac, scim, delegation, sql, data_browser, catalog, measurements, compute, workspace_templates, git_credentials, packages, query_log, data_policies, kafka, logs, products, app_profiles as app_profile_routes
+from .app_profiles import feature_gate
 from . import workload_logs  # noqa: F401 -- records run and deploy events in the central log
 
 logging.basicConfig(level=logging.INFO)
@@ -79,6 +80,10 @@ async def lifespan(app: FastAPI):
     upgrade()
     upgrade_git_credentials()
     seed()
+    with SessionLocal() as db:
+        from .app_profiles import ensure_defaults
+        ensure_defaults(db)
+        db.commit()
     with SessionLocal() as db:  # create well-known roots up front rather than racing on first use
         from .rbac import api_root, packages_root, root
         root(db)
@@ -138,7 +143,8 @@ async def lifespan(app: FastAPI):
     sql_access._native_engines.clear()
 
 
-app = FastAPI(title="Floren Data Platform control plane", version="0.1.0", lifespan=lifespan)
+# Every route passes the app-profile gate: it refuses actions of features the caller's profile does not include.
+app = FastAPI(title="Floren Data Platform control plane", version="0.1.0", lifespan=lifespan, dependencies=[Depends(feature_gate)])
 from .secrets import SecretBackendError
 
 
@@ -165,7 +171,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-for module in (workspaces, workspace_templates, git_credentials, packages, query_log, runs, compute, admin, connect, deploy, identity, gateway, rbac, scim, delegation, sql, data_browser, catalog, apis, layers, data_policies, kafka, logs, products):
+for module in (workspaces, workspace_templates, git_credentials, packages, query_log, runs, compute, admin, connect, deploy, identity, gateway, rbac, scim, delegation, sql, data_browser, catalog, apis, layers, data_policies, kafka, logs, products, app_profile_routes):
     app.include_router(module.router)
 app.include_router(gateway.docs_router)
 

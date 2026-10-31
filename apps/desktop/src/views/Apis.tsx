@@ -277,7 +277,7 @@ export function ApiView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; openTab:
     </nav>
     <PageHeader icon={<IconApi size={22} />} title={item.name}
       subtitle={<><span className="badge">{item.protocol.toUpperCase()}</span> {item.direction} · <span className="mono">{item.direction === "internal" ? item.endpoint : `fdp.api("${item.slug}")`}</span>{item.description && ` · ${item.description}`}</>}
-      actions={<><PublishButton resourceId={item.resource_id} openTab={openTab} />{item.actions.includes("delete") && <button className="btn ghost danger" onClick={() => confirm(`Delete ${item.name} and its ${item.operation_count} operations?${item.direction === "internal" ? " Callers can no longer reach it and its managed identity is disabled." : ""}`)
+      actions={<><PublishButton resourceId={item.resource_id} openTab={openTab} hub={hub} />{item.actions.includes("delete") && <button className="btn ghost danger" onClick={() => confirm(`Delete ${item.name} and its ${item.operation_count} operations?${item.direction === "internal" ? " Callers can no longer reach it and its managed identity is disabled." : ""}`)
         && api.apis.remove(item.id).then(async () => { await hub.refresh(); openTab({ kind: "apis", ref: item.direction, title: "API management" }); }).catch((e: Error) => setError(e.message))}><IconTrash size={14} />Delete API</button>}</>} />
     {resource?.layer_name && <p className="hint">Layer · <strong>{resource.layer_name}</strong></p>}
     {item.direction === "internal" && item.config.inbound?.anonymous && <AnonymousWarning />}
