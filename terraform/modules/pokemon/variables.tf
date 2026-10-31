@@ -44,3 +44,8 @@ variable "levels" {
   default     = { internal = "internal", personal = "confidential" }
   description = "Names of the platform's classification levels (fdp_classifications) for internal data and for personal data."
 }
+variable "consumer_group_ids" {
+  type        = list(string)
+  default     = []
+  description = "Further app groups that use the Pokemon cards product with its Standard option, such as dashboard viewers."
+}

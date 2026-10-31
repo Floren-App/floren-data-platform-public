@@ -250,10 +250,12 @@ resource "fdp_role_assignment" "engineers_product" {
   app_group_id = var.engineers_group_id
   role         = "Owner"
 }
-# Analysts use the product with the Standard option: masked illustrators, so no form is needed.
-resource "fdp_data_product_consumer" "analysts" {
+# Analysts (and other groups the root names, such as dashboard viewers) use the product with the Standard
+# option: masked illustrators, so no form is needed.
+resource "fdp_data_product_consumer" "standard" {
+  for_each     = toset(concat([var.analysts_group_id], var.consumer_group_ids))
   product_id   = fdp_data_product.cards.id
-  app_group_id = var.analysts_group_id
+  app_group_id = each.value
   option       = "Standard"
 }
 
