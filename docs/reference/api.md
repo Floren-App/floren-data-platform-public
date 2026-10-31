@@ -159,6 +159,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `GET` | `/v1/compliance/policies` | List Policies |
 | `PUT` | `/v1/compliance/policies/{layer_id}/{level}` | Put Policy |
 | `DELETE` | `/v1/compliance/policies/{layer_id}/{level}` | Delete Policy |
+| `GET` | `/v1/compliance/register` | Access Register |
 | `POST` | `/v1/compliance/requirement` | Requirement |
 | `GET` | `/v1/compliance/roles` | List Roles |
 | `POST` | `/v1/compliance/roles` | Add Role |
@@ -347,8 +348,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `GET` | `/v1/sql/pages/{token}` | Page |
 | `DELETE` | `/v1/sql/pages/{token}` | Page |
+| `GET` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

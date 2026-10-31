@@ -235,6 +235,16 @@ secretManagement:
     prefix: fdp-
     locations: []                # replica locations; empty: automatic replication
 
+# Email for compliance reviews (docs/access-policies.md). Emails only say what waits and link to the
+# app; decisions are made in the app. The password comes from existingSecret: FDP_SMTP_PASSWORD.
+email:
+  smtp:
+    host: ""                     # empty: no email
+    port: 587
+    security: starttls           # starttls | tls (implicit, usually port 465) | none
+    username: ""
+    from: ""                     # e.g. "Floren Data Platform <fdp@example.com>"
+
 # Stream the audit trail and data-access events to your SIEM (docs/audit-and-siem.md). Each destination
 # receives the same hash-chained events. Secrets come from existingSecret: FDP_SIEM_HTTP_TOKEN,
 # FDP_SIEM_OTLP_HEADERS and FDP_SIEM_SIGNING_KEY (HMAC signature on every event; recommended).

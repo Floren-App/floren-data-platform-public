@@ -594,6 +594,8 @@ export interface AccessCaseItem {
   answers?: Record<string, unknown>; definition?: FormDefinition | null; comments?: { by: string; text: string; at: string }[];
   files?: { id: string; field_id: string; name: string; content_type: string }[]; members?: string[];
 }
+export interface RegisterRow { group: string; app_group_id: string; access: string; kind: string; classification: string; layer: string; form: string;
+  requester: string; approved_by: string; approved_at: string | null; until: string | null; members: number; case_id: string }
 export type CaseTarget = { kind: "product" | "role"; app_group_id: string; product_id?: string; option_id?: string; resource_id?: string; role?: string };
 
 /** One line of the central log. Run, workload, commit and layer are stamped by the platform. */
@@ -698,6 +700,20 @@ export class ApiError extends Error {
     public slaIssue?: {message:string;assets:{asset_id:string;name?:string;status:string}[]}) {
     super(message);
   }
+}
+
+/** A file from the API (for example a form's attachment), signed in like every other call. */
+async function fetchBlob(path: string): Promise<Blob> {
+  const res = await fetch(`${getServer()}/api${path}`, { headers: { Authorization: `Bearer ${await accessToken(false)}` } });
+  if (!res.ok) throw new ApiError(res.status, res.statusText || "download failed");
+  return res.blob();
+}
+
+/** Offer data to the person as a file. */
+export function saveFile(data: Blob, name: string) {
+  const url = URL.createObjectURL(data), a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -946,6 +962,9 @@ export const api = {
     withdraw: (id: string) => request<AccessCaseItem>("POST", `/v1/compliance/cases/${id}/withdraw`),
     addFile: (id: string, field_id: string, name: string, content_type: string, data: string) =>
       request<{ id: string }>("POST", `/v1/compliance/cases/${id}/files`, { field_id, name, content_type, data }),
+    caseFile: (id: string, fileId: string) => fetchBlob(`/v1/compliance/cases/${id}/files/${fileId}`),
+    register: () => request<RegisterRow[]>("GET", "/v1/compliance/register"),
+    registerCsv: () => request<string>("GET", "/v1/compliance/register?format=csv"),
     memberships: () => request<{ app_group_id: string; principal_id: string; group: string; principal: string }[]>("GET", "/v1/compliance/memberships"),
     decideMembership: (group: string, principal: string, approve: boolean, note = "") =>
       request<{ status: string }>("POST", `/v1/compliance/memberships/${group}/${principal}`, { approve, note }),

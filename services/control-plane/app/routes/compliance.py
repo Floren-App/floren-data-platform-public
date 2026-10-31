@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import classification, compliance as cp, layers, rbac
+from .. import classification, compliance as cp, layers, notify, rbac
 from ..auth import User
 from ..db import get_db
 from ..deps import get_actor
@@ -437,6 +437,7 @@ def submit_case(case_id: str, db: Session = Depends(get_db), user: User = Depend
     case.answers = cp.validate_answers(version.definition, case.answers or {}, files, complete=True)
     if case.status == "changes_requested":
         case.status = "in_review"  # back to the step that asked
+        notify.case_event(db, case, "review")
     else:
         cp.submit(db, case, db.get(AccessPolicy, case.policy_id) if case.policy_id else None)
     audit(db, case.requester, "compliance.case_submitted", case.resource_id or case.product_id, case=case.id)
@@ -471,7 +472,9 @@ class CommentIn(BaseModel):
 @router.post("/cases/{case_id}/comments")
 def comment(case_id: str, body: CommentIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     case = _case(db, case_id, user)
-    case.comments = [*(case.comments or []), {"by": rbac.resolve_user(db, user).username, "text": body.text.strip(), "at": utcnow().isoformat()}]
+    by = rbac.resolve_user(db, user).username
+    case.comments = [*(case.comments or []), {"by": by, "text": body.text.strip(), "at": utcnow().isoformat()}]
+    notify.case_event(db, case, "comment", by=by)
     db.commit()
     return case_out(db, case, user)
 
@@ -573,3 +576,63 @@ def decide_membership(group_id: str, principal_id: str, body: MembershipDecision
     audit(db, resolved.username, "compliance.membership_" + ("approved" if body.approve else "declined"), group_id, principal=principal_id)
     db.commit()
     return {"app_group_id": group_id, "principal_id": principal_id, "status": case.status}
+
+
+# --- the access register ----------------------------------------------------------------------------------
+
+REGISTER_COLUMNS = ["group", "access", "kind", "classification", "layer", "form", "requester", "approved_by", "approved_at",
+                    "until", "members", "case_id"]
+
+
+def register_rows(db, user) -> List[dict]:
+    """Access that was given because a compliance form was approved, with who approved it and until when."""
+    from ..models import JustifiedGrant
+    admin = cp.is_compliance_admin(db, user)
+    rows = []
+    for grant in db.scalars(select(JustifiedGrant).order_by(JustifiedGrant.created_at.desc())):
+        case = db.get(AccessCase, grant.case_id)
+        if case is None:
+            continue
+        target = cp.case_target(db, case) if case.kind == "product" else case.resource_id
+        if not admin and not cp.has_role(db, user, "compliance_reviewer", resource_id=target, layer_id=case.layer_id, level=case.classification):
+            continue
+        out = case_out(db, case, user, full=False)
+        access = (f"{out['product']} ({out['option']})" if out["option"] else out["product"]) if case.kind == "product" \
+            else f"{grant.role} on {out['resource']['name'] if out['resource'] else grant.resource_id}"
+        rows.append({"group": out["group"], "app_group_id": case.app_group_id, "access": access, "kind": case.kind,
+                     "classification": case.classification, "layer": out["layer"] or "",
+                     "form": f"{out['form']} v{out['form_version']}" if out["form"] else "", "requester": case.requester,
+                     "approved_by": ", ".join(sorted({d["by"] for d in case.decisions or [] if d["decision"] == "approve"})),
+                     "approved_at": case.decided_at, "until": grant.until, "members": len(cp.members_of(db, case.app_group_id)),
+                     "case_id": case.id})
+    return rows
+
+
+@router.get("/register")
+def access_register(format: Literal["json", "csv"] = "json", db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """The access register: compliance administrators see all of it, reviewers what is in their scope."""
+    import csv
+    import io
+    held = db.scalar(select(ComplianceRole.id).where(ComplianceRole.role == "compliance_reviewer",
+                                                     ComplianceRole.app_group_id.in_(list(rbac.app_groups(db, rbac.resolve_user(db, user))))))
+    if not (cp.is_compliance_admin(db, user) or held):
+        raise HTTPException(403, "a compliance role is required")
+    rows = register_rows(db, user)
+    audit(db, rbac.resolve_user(db, user).username, "compliance.register_read", "compliance-register", rows=len(rows), format=format)
+    db.commit()
+    if format == "json":
+        return rows
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=REGISTER_COLUMNS, extrasaction="ignore")
+    writer.writeheader()
+    def cell(value):
+        if value is None:
+            return ""
+        if isinstance(value, datetime):
+            return value.isoformat()
+        text = str(value)
+        return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text  # no formulas in spreadsheets
+    for row in rows:
+        writer.writerow({k: cell(v) for k, v in row.items()})
+    return Response(buffer.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="access-register.csv"', "Cache-Control": "no-store"})

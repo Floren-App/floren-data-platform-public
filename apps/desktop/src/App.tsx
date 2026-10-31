@@ -21,7 +21,7 @@ const viewForTab = (tab: TabRef): View => {
   // Workspace runs belong with workspaces; runs of deployed programs with workloads.
   if ((tab.kind === "run" && tab.runScope === "workspace") || (tab.kind === "runs" && tab.ref === "workspace")) return "workspaces";
   if (["run", "runs", "workload", "deploy", "folder", "docs"].includes(tab.kind)) return "workloads";
-  if (tab.kind.startsWith("catalog") || ["products", "product", "access-requests"].includes(tab.kind)) return "catalog";
+  if (tab.kind.startsWith("catalog") || ["products", "product", "access-requests", "case"].includes(tab.kind)) return "catalog";
   if (["apis", "api"].includes(tab.kind)) return "apis";
   if (["kafka", "kafka-clusters"].includes(tab.kind)) return "kafka";
   if (["data", "source", "schema", "data-object"].includes(tab.kind)) return "data";
@@ -130,6 +130,15 @@ function Shell({ user }: { user: User }) {
       return next;
     });
   };
+  // A link from a review email, once signed in.
+  const signedIn = !!hub.me;
+  useEffect(() => {
+    if (!signedIn) return;
+    let link: string | null = null;
+    try { link = sessionStorage.getItem("fdp.link"); sessionStorage.removeItem("fdp.link"); } catch { /* no storage */ }
+    if (link?.startsWith("case=")) openTab({ kind: hub.me?.compliance_roles?.length ? "privacy-case" : "case", ref: link.slice(5), title: "Compliance form" });
+    else if (link === "memberships") openTab({ kind: "privacy-memberships", title: "Memberships" });
+  }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const search = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); }
@@ -181,7 +190,7 @@ function Shell({ user }: { user: User }) {
       kafka: { kind: "kafka-clusters", title: "Kafka" },
       compute: { kind: "pool", title: "Usage" },
       admin: { kind: "admin-sources", title: "Storage integrations" },
-      privacy: { kind: "privacy-policies", title: "Access policies" },
+      privacy: hub.me?.compliance_roles?.some((r) => r !== "membership_approver") ? { kind: "privacy-reviews", title: "Reviews" } : { kind: "privacy-memberships", title: "Memberships" },
     };
     if (defaults[next]) openTab(defaults[next]!);
   };

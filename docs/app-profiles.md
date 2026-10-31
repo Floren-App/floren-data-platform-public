@@ -32,7 +32,7 @@ dashboards they can use; a dashboard opens straight away.
 
 ## Profiles
 
-The platform starts with four profiles. They are configuration like any other: rename them,
+The platform starts with five profiles (on a new installation; add Privacy yourself on an existing one). They are configuration like any other: rename them,
 change their features, add and remove profiles.
 
 | Profile | Features |
@@ -41,6 +41,7 @@ change their features, add and remove profiles.
 | Engineer | Everything except `security` |
 | Analyst | Browse and request products, all objects, workspaces, view workloads, storage |
 | Viewer | Browse products and open the dashboards you can use |
+| Privacy | Browse products; with a compliance role, the privacy area comes on top (see [access policies](access-policies.md)) |
 
 One profile is the **default**: groups without a profile get it. Full access is the default at
 first, so nothing changes for existing groups until you give them a profile.

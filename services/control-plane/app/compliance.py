@@ -218,11 +218,21 @@ def has_role(db, user, role: str, *, resource_id: Optional[str] = None, layer_id
     groups = rbac.app_groups(db, user)
     if not groups:
         return False
+    return bool(role_groups(db, role, resource_id=resource_id, layer_id=layer_id, level=level, group_id=group_id, among=groups))
+
+
+def role_groups(db, role: str, *, resource_id: Optional[str] = None, layer_id: Optional[str] = None,
+                level: Optional[str] = None, group_id: Optional[str] = None, among=None) -> List[str]:
+    """The app groups holding the compliance role for this scope (an empty scope list means all)."""
     ancestors = set()
     if resource_id:
         resource = db.get(Resource, resource_id)
         ancestors = {a.id for a in rbac.ancestors(db, resource)} | {resource_id} if resource else {resource_id}
-    for item in db.scalars(select(ComplianceRole).where(ComplianceRole.role == role, ComplianceRole.app_group_id.in_(groups))):
+    stmt = select(ComplianceRole).where(ComplianceRole.role == role)
+    if among is not None:
+        stmt = stmt.where(ComplianceRole.app_group_id.in_(list(among)))
+    out = []
+    for item in db.scalars(stmt):
         scope = item.scope or {}
         if scope.get("resource_ids") and not (set(scope["resource_ids"]) & ancestors):
             continue
@@ -232,8 +242,8 @@ def has_role(db, user, role: str, *, resource_id: Optional[str] = None, layer_id
             continue
         if scope.get("group_ids") and group_id not in scope["group_ids"]:
             continue
-        return True
-    return False
+        out.append(item.app_group_id)
+    return sorted(set(out))
 
 
 def is_compliance_admin(db, user) -> bool:
@@ -270,9 +280,11 @@ def may_review(db, user, case: AccessCase) -> bool:
 
 
 def submit(db, case: AccessCase, policy: Optional[AccessPolicy]) -> None:
+    from . import notify
     case.status, case.step, case.submitted_at = "in_review", 0, utcnow()
     if policy is not None:
         case.due_at = utcnow() + timedelta(days=policy.review_days)
+    notify.case_event(db, case, "review")
 
 
 def decide(db, case: AccessCase, user, decision: str, note: str = "", until: Optional[datetime] = None) -> None:
@@ -283,11 +295,14 @@ def decide(db, case: AccessCase, user, decision: str, note: str = "", until: Opt
     step = case.steps[case.step]
     case.decisions = [*(case.decisions or []), {"step": case.step, "role": step["role"], "by": user.username, "decision": decision,
                                                 "note": note, "at": utcnow().isoformat()}]
+    from . import notify
     if decision == "decline":
         case.status, case.decided_at = "declined", utcnow()
+        notify.case_event(db, case, "declined", by=user.username, note=note)
         return
     if decision == "changes":
         case.status = "changes_requested"
+        notify.case_event(db, case, "changes", by=user.username, note=note)
         return
     approvals = sum(1 for d in case.decisions if d["step"] == case.step and d["decision"] == "approve")
     if approvals < int(step.get("approvals") or 1):
@@ -297,6 +312,9 @@ def decide(db, case: AccessCase, user, decision: str, note: str = "", until: Opt
     case.step += 1
     if case.step >= len(case.steps):
         approve(db, case, user)
+        notify.case_event(db, case, "approved")
+    else:
+        notify.case_event(db, case, "review")
 
 
 def approve(db, case: AccessCase, user) -> None:

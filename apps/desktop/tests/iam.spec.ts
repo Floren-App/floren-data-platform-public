@@ -2754,6 +2754,7 @@ test("the privacy area sets policies per layer and classification and builds mul
       classifications: [{ name: "public", masked_as: "public", description: "" }, { name: "internal", masked_as: "internal", description: "" }, { name: "confidential", masked_as: "internal", description: "" }],
       policies: [{ id: "pol", layer_id: "1a0000000001", classification: "confidential", form_id: "f1", form: "Personal data access", steps: [{ role: "compliance_reviewer", approvals: 1 }], max_days: 365, review_days: 10 }] } });
     if (url === "/v1/compliance/forms") return route.fulfill({ json: [form] });
+    if (url === "/v1/compliance/cases" || url === "/v1/compliance/memberships") return route.fulfill({ json: [] });
     if (url.startsWith("/v1/compliance/policies/")) return route.fulfill({ json: {} });
     if (url === "/v1/compliance/forms/f1") return route.fulfill({ json: form });
     if (req.method() === "PUT" && url.startsWith("/v1/compliance/forms/")) {
@@ -2768,6 +2769,8 @@ test("the privacy area sets policies per layer and classification and builds mul
   // The privacy team gets only its own part of the app.
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Privacy", exact: true }).click();
   await expect(page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workspaces", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("heading", { name: "Reviews" })).toBeVisible();
+  await page.locator(".sidebar").getByRole("button", { name: "Access policies", exact: true }).click();
   const grid = main.getByRole("table", { name: "Access policies" });
   await expect(grid.getByRole("button", { name: /^Prod, confidential: Personal data access/ })).toBeVisible();
   await grid.getByRole("button", { name: "Non-Prod, confidential: No form needed" }).click();
@@ -2808,5 +2811,120 @@ test("the privacy area sets policies per layer and classification and builds mul
   await main.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(main.getByRole("status")).toContainText("Published version 2");
   expect(sent.at(-1)).toMatchObject({ method: "POST", url: "/v1/compliance/forms/f1/publish" });
+  expect(state.errors).toEqual([]);
+});
+
+const reviewCase = (extra: Record<string, unknown> = {}) => ({ id: "case1", kind: "role", status: "in_review", requester: "ana", app_group_id: "analysts", group: "Analysts",
+  resource_id: "pg-reporting", resource: { kind: "schema", name: "reporting" }, role: "Reader", product_id: null, product: null, option: null, principal: null,
+  layer_id: "1a0000000001", layer: "Prod", classification: "confidential", form: "Personal data access", form_version: 1,
+  steps: [{ role: "compliance_reviewer", approvals: 1 }], step: 0, decisions: [], until: null, approved_until: null, due_at: "2026-10-01T00:00:00Z",
+  created_at: "2026-09-20T09:00:00Z", submitted_at: "2026-09-20T09:00:00Z", decided_at: null, can_review: true, is_requester: false,
+  answers: { why: "Monthly revenue reporting", special: "Yes", basis: "Legitimate interest", ok: true }, definition: complianceDefinition,
+  comments: [], files: [], members: ["ana", "carl"], ...extra });
+
+async function privacyUser(page: Page, roles: string[]) {
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "priya", is_admin: false, active_group_id: "analysts", active_layer_id: null,
+    available_groups: [{ id: "analysts", name: "Analysts" }], groups: [], pools: [], data_sources: [], app_features: ["products.browse"], compliance_roles: roles } }));
+}
+
+test("reviewers work the queue by deadline, read the answers and decide in the app", async ({ page }) => {
+  const state = await setup(page);
+  const sent: { url: string; body: any }[] = [];
+  let current = reviewCase();
+  await privacyUser(page, ["compliance_reviewer"]);
+  await page.route(/\/v1\/compliance\/(cases|memberships)/, (route) => {
+    const req = route.request(), url = new URL(req.url()).pathname.replace("/api", "");
+    if (req.method() !== "GET") {
+      const body = req.postDataJSON(); sent.push({ url, body });
+      current = reviewCase({ status: body.decision === "approve" ? "approved" : "changes_requested", can_review: false, approved_until: body.decision === "approve" ? "2026-12-31T00:00:00Z" : null,
+        decisions: [{ step: 0, role: "compliance_reviewer", by: "priya", decision: body.decision, note: body.note, at: "2026-09-21T09:00:00Z" }] });
+      return route.fulfill({ json: current });
+    }
+    if (url === "/v1/compliance/cases") return route.fulfill({ json: current.can_review ? [{ ...current, id: "case2", due_at: "2099-01-01T00:00:00Z" }, current] : [] });
+    if (url === "/v1/compliance/memberships") return route.fulfill({ json: [] });
+    return route.fulfill({ json: current });
+  });
+  await page.reload();
+  const main = page.locator(".main");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Privacy", exact: true }).click();
+  await expect(page.locator(".sidebar").getByRole("button", { name: /Reviews/ })).toContainText("2");
+  // Oldest deadline first; the late one says so.
+  const queue = main.getByRole("table", { name: "Waiting for me" });
+  await expect(queue.getByRole("row").nth(1)).toContainText("overdue");
+  await expect(main.getByRole("status").filter({ hasText: "1 overdue." })).toBeVisible();
+  await queue.getByRole("row").nth(1).getByRole("button", { name: "Reader on reporting" }).click();
+  // The answers as given: the legal basis page was shown because special categories apply.
+  const answers = main.getByRole("generic", { name: "Answers" }).or(main.locator(".form-answers"));
+  await expect(answers).toContainText("Legitimate interest");
+  await expect(answers).toContainText("Yes, agreed");
+  await expect(main.getByRole("region", { name: "What it gives" })).toContainText("ana, carl");
+  const decide = main.getByRole("region", { name: "Decide" });
+  await expect(decide.getByRole("button", { name: "Ask for changes" })).toBeDisabled();
+  await decide.getByRole("textbox", { name: "Note to the requester" }).fill("Which report exactly?");
+  await decide.getByRole("button", { name: "Ask for changes" }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Sent back to the requester." })).toBeVisible();
+  expect(sent[0]).toMatchObject({ url: "/v1/compliance/cases/case1/decision", body: { decision: "changes", note: "Which report exactly?" } });
+  await expect(main.locator(".case-history")).toContainText("priya asked for changes as compliance reviewers: Which report exactly?");
+  expect(state.errors).toEqual([]);
+});
+
+test("the register exports CSV and approvers let new members in", async ({ page }) => {
+  const state = await setup(page);
+  const decided: unknown[] = [];
+  await privacyUser(page, ["compliance_reviewer", "membership_approver"]);
+  await page.route(/\/v1\/compliance\//, (route) => {
+    const req = route.request(), url = new URL(req.url());
+    if (url.pathname.endsWith("/register") && url.searchParams.get("format") === "csv")
+      return route.fulfill({ body: "group,access\nAnalysts,Reader on reporting\n", headers: { "content-type": "text/csv" } });
+    if (url.pathname.endsWith("/register")) return route.fulfill({ json: [{ group: "Analysts", app_group_id: "analysts", access: "Reader on reporting", kind: "role",
+      classification: "confidential", layer: "Prod", form: "Personal data access v1", requester: "ana", approved_by: "priya", approved_at: "2026-09-21T09:00:00Z",
+      until: "2027-09-21T00:00:00Z", members: 2, case_id: "case1" }] });
+    if (url.pathname.endsWith("/memberships") && req.method() === "GET") return route.fulfill({ json: decided.length ? [] : [{ app_group_id: "analysts", principal_id: "p-carl", group: "Analysts", principal: "carl" }] });
+    if (url.pathname.includes("/memberships/")) { decided.push({ url: url.pathname, body: req.postDataJSON() }); return route.fulfill({ json: { status: "approved" } }); }
+    return route.fulfill({ json: [] });
+  });
+  await page.reload();
+  const main = page.locator(".main");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Privacy", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: /Access register/ }).click();
+  await expect(main.getByRole("table", { name: "Access register" })).toContainText("Personal data access v1");
+  const download = page.waitForEvent("download");
+  await main.getByRole("button", { name: "Export CSV" }).click();
+  expect((await download).suggestedFilename()).toBe("access-register.csv");
+  await page.locator(".sidebar").getByRole("button", { name: /Memberships/ }).click();
+  await main.getByRole("table", { name: "Memberships to approve" }).getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(main.getByRole("status")).toHaveText("Approved carl.");
+  expect(decided[0]).toMatchObject({ url: "/api/v1/compliance/memberships/analysts/p-carl", body: { approve: true } });
+  expect(state.errors).toEqual([]);
+});
+
+test("requesters change answers when asked, and email links open the case", async ({ page }) => {
+  const state = await setup(page);
+  const sent: { url: string; body: any }[] = [];
+  const asked = reviewCase({ status: "changes_requested", can_review: false, is_requester: true, requester: "admin",
+    decisions: [{ step: 0, role: "compliance_reviewer", by: "priya", decision: "changes", note: "Which report?", at: "2026-09-21T09:00:00Z" }] });
+  await page.route(/\/v1\/compliance\/cases/, (route) => {
+    const req = route.request(), url = new URL(req.url()).pathname.replace("/api", "");
+    if (req.method() !== "GET") { sent.push({ url, body: req.postDataJSON() }); return route.fulfill({ json: { ...asked, status: "in_review" } }); }
+    return route.fulfill({ json: url === "/v1/compliance/cases" ? [asked] : asked });
+  });
+  await page.goto("/index.html#case=case1");   // an email link opens the app fresh
+  const main = page.locator(".main");
+  await expect(main.getByRole("heading", { name: "Reader on reporting" })).toBeVisible();
+  expect(new URL(page.url()).hash).toBe("");
+  await expect(main.locator(".case-history")).toContainText("Which report?");
+  await main.getByRole("button", { name: "Change answers" }).click();
+  await main.getByRole("textbox", { name: /Why does the group need it/ }).fill("The monthly finance revenue report");
+  await main.getByRole("button", { name: "Next", exact: true }).click();
+  await main.getByRole("button", { name: "Next", exact: true }).click();
+  await main.getByRole("button", { name: "Send again" }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Sent for review again." })).toBeVisible();
+  expect(sent.map((s) => s.url)).toEqual(["/v1/compliance/cases/case1", "/v1/compliance/cases/case1/submit"]);
+  expect(sent[0].body.answers.why).toBe("The monthly finance revenue report");
+  // My requests lists the forms you sent.
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: /Access requests|My requests/ }).first().click();
+  await main.getByRole("button", { name: "My requests", exact: true }).click();
+  await expect(main.getByRole("table", { name: "Your compliance forms" })).toContainText("Reader on reporting");
   expect(state.errors).toEqual([]);
 });
