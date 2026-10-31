@@ -315,6 +315,7 @@ class OpenOut(BaseModel):
 class Me(BaseModel):
     principal_id: str = ""
     active_group_id: Optional[str] = None
+    active_layer_id: Optional[str] = None
     available_groups: List[Dict[str, Any]] = Field(default_factory=list)
     username: str
     groups: List[str]
@@ -327,6 +328,11 @@ class Me(BaseModel):
 class ActiveGroupIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     group_id: str = Field(min_length=1, max_length=12)
+
+
+class ActiveLayerIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    layer_id: str = Field(min_length=1, max_length=12)
 
 
 class ConnectOut(BaseModel):

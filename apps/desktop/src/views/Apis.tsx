@@ -88,10 +88,10 @@ function ValuesEditor({ label, values, onChange, errors, prefix, namePlaceholder
 const cleanValues = (values: ApiValue[]) => values.filter((v) => v.name.trim()).map((v) => ({ ...v, secret: v.secret.trim() }));
 
 /** The API's own settings: caller authentication (internal) or the backend (external). Used to create and edit. */
-function ApiSettingsForm({ initial, creating, onSave, onCancel, layers }: {
-  initial: ApiInput; creating: boolean; layers: Layer[]; onSave: (body: ApiInput) => Promise<void>; onCancel?: () => void;
+function ApiSettingsForm({ initial, creating, onSave, onCancel, layers, layerId }: {
+  initial: ApiInput; creating: boolean; layers: Layer[]; layerId: string; onSave: (body: ApiInput) => Promise<void>; onCancel?: () => void;
 }) {
-  const [form, setForm] = useState<ApiInput>({ ...initial, layer_id: initial.layer_id || defaultLayerId(layers) });
+  const [form, setForm] = useState<ApiInput>({ ...initial, layer_id: initial.layer_id || layerId || defaultLayerId(layers) });
   const [errors, setErrors] = useState<Errors>({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -228,7 +228,7 @@ export function ApisView({ direction = "internal", hub, openTab }: { direction?:
         onClick={() => openTab({ kind: "apis", ref: d, title: "API management" })}>{DIRECTION_TEXT[d].title} <span className="badge">{count(d)}</span></button>)}
     </nav>
     {error && <p className="error" role="alert">{error}</p>}
-    {creating && <ApiSettingsForm layers={hub.layers} creating onCancel={() => setCreating(false)}
+    {creating && <ApiSettingsForm layers={hub.layers} layerId={hub.layerId} creating onCancel={() => setCreating(false)}
       initial={{ name: "", slug: "", direction, protocol: "rest", description: "", inbound: direction === "internal" ? defaultInbound() : undefined, outbound: direction === "external" ? defaultOutbound() : undefined }}
       onSave={async (body) => { const created = await api.apis.create(body); setCreating(false); await reload(); await hub.refresh(); openTab({ kind: "api", ref: created.id, title: created.name }); }} />}
     <table aria-label={`${DIRECTION_TEXT[direction].title} APIs`}>
@@ -293,7 +293,7 @@ export function ApiView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; openTab:
           (and data roles if they run in caller mode), or use app-group grants.</p>
         <div className="form-actions"><button className="btn secondary" onClick={() => openTab({ kind: "access", title: "App groups" })}>Bind to an app group</button></div>
       </section>}
-      {item.actions.includes("edit") ? <ApiSettingsForm layers={hub.layers} key={item.id} creating={false} initial={toInput(item)} onSave={async (body) => { setItem(await api.apis.update(item.id, body)); await hub.refresh(); }} />
+      {item.actions.includes("edit") ? <ApiSettingsForm layers={hub.layers} layerId={hub.layerId} key={item.id} creating={false} initial={toInput(item)} onSave={async (body) => { setItem(await api.apis.update(item.id, body)); await hub.refresh(); }} />
         : <p className="notice">You can view this API; changing its settings requires the Contributor role.</p>}
     </>}
     {section === "calls" && <CallsPanel item={item} />}

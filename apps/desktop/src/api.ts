@@ -7,8 +7,13 @@ export interface Layer {
   /** Where work without a layer goes (configured, or the only layer). */
   default?: boolean;
 }
-/** The layer a form starts with: the default layer, or nothing so the person chooses. */
+/** The configured default layer, or nothing so the person chooses. */
 export const defaultLayerId = (layers: Layer[]) => layers.find((l) => l.default)?.id ?? "";
+/** The app's layer mode: the person's chosen layer (top bar) while it exists, else the default layer. */
+export const modeLayerId = (me: { active_layer_id?: string | null } | null | undefined, layers: Layer[]) =>
+  me?.active_layer_id && layers.some((l) => l.id === me.active_layer_id) ? me.active_layer_id : defaultLayerId(layers);
+/** Whether an item belongs to the layer mode. Items without a layer belong to every layer. */
+export const inLayer = (mode: string, itemLayer: string | null | undefined) => !mode || !itemLayer || itemLayer === mode;
 
 export interface DataSource {
   id: string;
@@ -220,6 +225,8 @@ export function inLine(position?: number | null): string {
 export interface Me {
   principal_id?: string;
   active_group_id?: string | null;
+  /** The layer mode chosen in the top bar; GET /v1/me falls back to the default layer. */
+  active_layer_id?: string | null;
   available_groups?: { id: string; name: string; system?: boolean }[];
   username: string;
   groups: string[];
@@ -651,6 +658,7 @@ export const api = {
     remove: (id: string) => request<void>("DELETE", `/v1/kafka/topics/${id}`),
   },
   warehouses: () => request<WarehouseOverview[]>("GET", "/v1/compute/warehouses"),
+  selectActiveLayer: (layer_id: string) => request<{active_layer_id: string}>("PUT","/v1/me/active-layer",{layer_id}),
   selectActiveGroup: (group_id: string) => request<{active_group_id: string; name: string}>("PUT","/v1/me/active-group",{group_id}),
   layers: {
     list: () => request<Layer[]>("GET", "/v1/layers"),

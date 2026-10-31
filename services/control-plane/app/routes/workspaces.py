@@ -12,7 +12,7 @@ from ..db import get_db
 from ..deps import get_actor, get_orchestrator, granted_sources
 from ..models import ComputePool, Resource, Workspace, utcnow
 from ..orchestrator import Orchestrator
-from ..schemas import ActiveGroupIn, ConfigOut, Me, OpenOut, PoolOut, WorkspaceIn, WorkspaceOut
+from ..schemas import ActiveGroupIn, ActiveLayerIn, ConfigOut, Me, OpenOut, PoolOut, WorkspaceIn, WorkspaceOut
 from ..executions import workspace_spec
 from ..workspace_files import load_config
 from .. import git_credentials
@@ -39,6 +39,7 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
     return Me(
         features={"r": r_enabled()},
         principal_id=user.principal_id, active_group_id=user.active_group_id or None,
+        active_layer_id=active_layer(db, user),
         available_groups=[{"id":g.id,"name":g.name,"system":g.id == GLOBAL_ADMIN}
                           for g in available_groups(db,user)],
         username=user.username,
@@ -47,6 +48,45 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
         data_sources=[ds_out(ds) for ds in granted_sources(db, user) if ds.id in visible_sources],
         pools=pools,
     )
+
+
+def selectable_layers(db, user):
+    """The layers this caller can see (an execution sees only its own), as in GET /v1/layers."""
+    from .. import layers
+    return [layer.id for layer in layers.all_layers(db)
+            if user.environment_id is None or layers.canonical(db, user.environment_id) == layer.id]
+
+
+def active_layer(db, user):
+    """The app's layer mode: the caller's choice while that layer exists, else the default layer."""
+    from .. import layers
+    from ..models import UserPreference
+    choices = selectable_layers(db, user)
+    preference = db.get(UserPreference, user.principal_id) if user.principal_id else None
+    if preference is not None and preference.active_layer_id in choices:
+        return preference.active_layer_id
+    default = layers.default_layer(db)
+    return default if default in choices else (choices[0] if len(choices) == 1 else None)
+
+
+@router.put("/me/active-layer")
+def select_active_layer(body: ActiveLayerIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    from .. import rbac
+    from ..models import UserPreference
+    user = rbac.resolve_user(db, user)
+    if not user.principal_id:
+        raise HTTPException(401, "A provisioned directory identity is required")
+    if body.layer_id not in selectable_layers(db, user):
+        raise HTTPException(404, "Layer not found")
+    preference = db.get(UserPreference, user.principal_id)
+    if preference is None:
+        preference = UserPreference(principal_id=user.principal_id)
+        db.add(preference)
+    before = preference.active_layer_id
+    preference.active_layer_id = body.layer_id
+    audit(db, user.username, "identity.active_layer", body.layer_id, before=before)
+    db.commit()
+    return {"active_layer_id": body.layer_id}
 
 
 @router.put("/me/active-group")

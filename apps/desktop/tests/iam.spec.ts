@@ -40,6 +40,7 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
   const dataReads: string[] = [];
   const errors: string[] = [];
   let activeGroup = "analysts";
+  let activeLayer: string | null = null;
   let rejectAssignment = false;
   const policies: Record<string, any>[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -55,13 +56,14 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     if (method !== "GET") mutations.push({ method, path, body }); else reads.push(path);
     if (path === "/v1/layers") return respond([{ id: "1a0000000001", name: "Prod", description: "", workspaces: false, production: true }, { id: "1a0000000002", name: "Non-Prod", description: "", workspaces: true, default: true }]);
     if (path === "/v1/client-config") return respond({ oidc_issuer: "https://idp.test", oidc_client_id: "desktop", oidc_scopes: "openid", public_url: "https://iam.test" });
-    if (path === "/v1/me") return respond({ username: "admin", is_admin: access === "owner", active_group_id: activeGroup, available_groups: groups.map((g) => ({ id: g.id, name: g.name })), groups: [], pools: [{ id: "small", name: "small", cpu: 2, memory_gb: 4, max_concurrent: 10, auto_suspend_seconds: 600, usage_available: true, active_runs: 1, active_services: 3, active_products: 2, active_executions: 4, in_use: 4, queued: 2 }], data_sources: [] });
+    if (path === "/v1/me") return respond({ username: "admin", is_admin: access === "owner", active_group_id: activeGroup, active_layer_id: activeLayer, available_groups: groups.map((g) => ({ id: g.id, name: g.name })), groups: [], pools: [{ id: "small", name: "small", cpu: 2, memory_gb: 4, max_concurrent: 10, auto_suspend_seconds: 600, usage_available: true, active_runs: 1, active_services: 3, active_products: 2, active_executions: 4, in_use: 4, queued: 2 }], data_sources: [] });
     if (path === "/v1/compute/warehouses") return respond([{ name: "small", cpu: 2, memory_gb: 4, gpu: 0, max_concurrent: 10, in_use: 4, queued: 2,
       layers: [{ layer_id: "1a0000000002", layer_name: "Non-Prod", in_use: 3, queued: 2 }, { layer_id: "1a0000000001", layer_name: "Prod", in_use: 1, queued: 0 }],
       occupants: [{ category: "trino", kind: "workers", state: "running", slots: 1, name: "Trino workers", owner: "platform", layer_id: "1a0000000001", layer_name: "Prod", queue_position: null, run_id: null, workload_id: null, workspace_id: null },
         { category: "app", kind: "app", state: "running", slots: 1, name: "Sales app", owner: "admin", layer_id: "1a0000000001", layer_name: "Prod", queue_position: null, run_id: null, workload_id: "sales", workspace_id: null },
         { category: "job", kind: "script", state: "queued", slots: 1, name: "etl.py", owner: "admin", layer_id: "1a0000000002", layer_name: "Non-Prod", queue_position: 2, run_id: "run-9", workload_id: null, workspace_id: null }],
       others_in_use: 3, others_queued: 1, workspaces: { running: 2, queued: 0, max_running: 5 } }]);
+    if (path === "/v1/me/active-layer" && method === "PUT") { activeLayer = body.layer_id; return respond({ active_layer_id: activeLayer }); }
     if (path === "/v1/me/active-group" && method === "PUT") { activeGroup = body.group_id; return respond({ active_group_id: activeGroup }); }
     if (path === "/v1/rbac/resources") return respond(resources);
     if (path === "/v1/catalog/suggest") return respond({ items: catalogItems.filter((a) => a.name.toLowerCase().includes(new URL(req.url()).searchParams.get("q")!.toLowerCase())) });
@@ -621,7 +623,9 @@ test("IAM has separate group user and service pages with explicit identity origi
   const state = await setup(page);
   const main = page.locator('.main');
   await page.getByRole('button', { name: 'Security', exact: true }).click();
-  const navigation = page.getByRole('navigation', { name: 'Security pages' });
+  // The sidebar is the only Security navigation; pages no longer repeat it.
+  await expect(page.getByRole('navigation', { name: 'Security pages' })).toHaveCount(0);
+  const navigation = page.getByRole('list', { name: 'Security pages' });
   await expect(navigation.getByRole('button')).toHaveCount(4);
   await expect(main.getByRole('heading', { name: 'IdP groups & roles', exact: true })).toBeVisible();
   await navigation.getByRole('button', { name: 'Users', exact: true }).click();
@@ -657,7 +661,7 @@ test("preview queries only when opened and displays at most 25 rows", async ({ p
 
 test("compute counts active products and scripts are ready on demand", async ({ page }) => {
   const state = await setup(page);
-  await page.getByRole('button', { name: 'Compute pools', exact: true }).click();
+  await page.getByRole('button', { name: 'Usage', exact: true }).click();
   await expect(page.locator('.sidebar').getByText('4/10 +2', { exact: true })).toBeVisible();
   await page.locator('.sidebar').getByRole('button', { name: /small/ }).click();
   const main = page.locator('.main');
@@ -671,7 +675,7 @@ test("compute counts active products and scripts are ready on demand", async ({ 
   await expect(main.getByText(/2 running of 5 \(separate limit\)/)).toBeVisible();
   await using.getByRole('button', { name: 'Sales app', exact: true }).click();
   await expect(main.getByRole('heading', { name: 'Sales app' })).toBeVisible();
-  await page.getByRole('button', { name: 'Compute pools', exact: true }).click();
+  await page.getByRole('button', { name: 'Usage', exact: true }).click();
   await page.locator('.sidebar').getByRole('button', { name: /small/ }).click();
   await page.getByRole('button', { name: 'Workloads', exact: true }).click();
   await page.locator('.main').getByRole('button', { name: /Finance$/ }).click();
@@ -1097,7 +1101,7 @@ test("administrators limit a warehouse to layers and kinds of work", async ({ pa
   });
   await page.route("https://iam.test/api/v1/admin/settings/workspaces", (route) => route.fulfill({ json: { warehouse: null, max_running: null, max_running_per_user: 3 } }));
   const main = page.locator(".main");
-  await page.getByRole("button", { name: "Compute pools", exact: true }).click();
+  await page.getByRole("button", { name: "Usage", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: /small/ }).click();
   await main.getByRole("button", { name: "Configure pools", exact: true }).click();
   await expect(main.getByRole("cell", { name: "every layer · every kind", exact: true })).toBeVisible();
@@ -1703,8 +1707,11 @@ test("Home starts with scoped activity and submits global search into the catalo
   await page.reload();
   const main = page.locator(".main"), nav = page.getByRole("navigation", { name: "Views" });
   await expect(main.getByRole("tab", { name: "Home", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(nav.locator(":scope > button").first()).toHaveAttribute("aria-label", /Home/); // The first section is Home.
-  expect(await nav.locator(":scope > button").evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label")))).toEqual(["Home", "Workspaces", "Workloads", "Storage", "Kafka", "APIs", "Packages", "Catalog", "Security", "Compute pools", "Documentation", "Administration"]);
+  // Overview, Build and Integration groups; Security, Administration and Documentation at the bottom.
+  const groupsOf = async () => nav.getByRole("group").evaluateAll((groups) => groups.map((g) =>
+    [g.getAttribute("aria-label"), [...g.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))]));
+  expect(await groupsOf()).toEqual([["Overview", ["Home", "Catalog", "Usage"]], ["Build", ["Workspaces", "Workloads", "Storage", "Packages"]], ["Integration", ["Kafka", "APIs"]]]);
+  expect(await nav.locator(":scope > button").evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label")))).toEqual(["Security", "Administration", "Documentation"]);
   await expect(page.getByRole("button", { name: "Runs & apps", exact: true })).toHaveCount(0);
   await expect(main.getByRole("region", { name: "Your workspaces", exact: true })).toContainText("Pokemon Test workspace");
   await expect(main.getByRole("region", { name: "Recent runs", exact: true }).locator("li").first()).toContainText("Daily report");
@@ -1868,7 +1875,28 @@ test("schema Owners grant a person access directly and see User as the recipient
   expect(state.errors).toEqual([]);
 });
 
-test("active group stays at the sidebar bottom across tabs and reloads", async ({ page }) => {
+test("the layer mode filters lists, is remembered, and marks production", async ({ page }) => {
+  const state = await setup(page);
+  (state.resources.find((r) => r.id === "source-lake") as any).layer_id = "1a0000000001";
+  await page.reload();
+  const layer = page.getByRole("combobox", { name: "Layer mode", exact: true }), sidebar = page.locator(".sidebar");
+  await expect(layer).toHaveValue("1a0000000002"); // The default layer until the person chooses.
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Storage", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: "finance-dw", exact: true })).toBeVisible(); // No layer: shown in every layer.
+  await expect(sidebar.getByRole("button", { name: "lake", exact: true })).toHaveCount(0);
+  await expect(sidebar).toContainText("1 more in other layers");
+  await expect(page.locator(".shell")).not.toHaveClass(/prod/);
+  await layer.selectOption("1a0000000001");
+  await expect(sidebar.getByRole("button", { name: "lake", exact: true })).toBeVisible();
+  await expect(page.locator(".shell")).toHaveClass(/prod/);
+  await expect(page.getByRole("banner", { name: "Working context" })).toContainText("Changes here affect production");
+  expect(state.mutations.some((m) => m.method === "PUT" && m.path === "/v1/me/active-layer" && m.body.layer_id === "1a0000000001")).toBeTruthy();
+  await page.reload();
+  await expect(layer).toHaveValue("1a0000000001");
+  expect(state.errors).toEqual([]);
+});
+
+test("active group stays in the top bar across tabs and reloads", async ({ page }) => {
   const state = await setup(page), picker=page.getByRole("combobox",{name:"Active group",exact:true});
   await expect(picker).toHaveValue("analysts");
   await picker.selectOption("operators");
@@ -1999,7 +2027,7 @@ test("queued work shows its place in line and admins set workspace limits", asyn
   await expect(main.getByRole("button", { name: "Leave the line", exact: true })).toBeEnabled();
   await expect(main.getByRole("table", { name: "Runs" })).toContainText("queued · 1st in line");
 
-  await page.getByRole("button", { name: "Compute pools", exact: true }).click();
+  await page.getByRole("button", { name: "Usage", exact: true }).click();
   await sidebar.getByRole("button", { name: /small/ }).click();
   await main.getByRole("button", { name: "Configure pools", exact: true }).click();
   await expect(main.getByRole("cell", { name: "6 / 6 · 1 waiting", exact: true })).toBeVisible();

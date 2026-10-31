@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, AccessResource } from "../api";
+import { api, AccessResource, inLayer } from "../api";
 import type { Hub } from "../hub";
 import type { TabRef } from "./Tabs";
 import { ObjectTabs, PermissionsPanel, resourceTab } from "../components/Permissions";
@@ -10,7 +10,9 @@ import { ObjectLineage } from "../components/ObjectLineage";
 export function KafkaClustersView({ hub, openTab }: { hub: Hub; openTab: (t: TabRef) => void }) {
   const clusters = hub.resources.filter((r) => r.kind === "kafka");
   const [registering, setRegistering] = useState(false);
-  const [layer, setLayer] = useState("");
+  const [chosen, setLayer] = useState("");
+  const free = hub.layers.filter((l) => !clusters.some((r) => r.layer_id === l.id));
+  const layer = chosen || (free.some((l) => l.id === hub.layerId) ? hub.layerId : "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   return <><PageHeader icon={<ProductIcon kind="kafka" size={22} />} title="Kafka" subtitle="Managed Kafka per layer. Open a cluster to browse its topics; grants on a cluster apply to all of its topics."
@@ -20,9 +22,9 @@ export function KafkaClustersView({ hub, openTab }: { hub: Hub; openTab: (t: Tab
       try { const result = await api.kafka.register(layer); await hub.refresh(); setRegistering(false); openTab(resourceTab(result)); }
       catch (e) { setError((e as Error).message); } finally { setBusy(false); }
     }}><h2>Register managed Kafka</h2><p className="muted">Enable Kafka in this layer’s infrastructure with OpenTofu first. Registration makes its topics available for IAM and browsing.</p>
-      <label>Layer<select required value={layer} onChange={(e) => setLayer(e.target.value)}><option value="">Choose a layer</option>{hub.layers.filter((l) => !clusters.some((r) => r.layer_id === l.id)).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+      <label>Layer<select required value={layer} onChange={(e) => setLayer(e.target.value)}><option value="">Choose a layer</option>{free.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
       {error && <p className="error" role="alert">{error}</p>}<button className="btn" disabled={busy || !layer}>{busy ? "Registering…" : "Register"}</button></form>}
-    <table><thead><tr><th>Kafka cluster</th><th>Layer</th></tr></thead><tbody>{clusters.map((r) => <tr key={r.id}>
+    <table><thead><tr><th>Kafka cluster</th><th>Layer</th></tr></thead><tbody>{clusters.filter((r) => inLayer(hub.layerId, r.layer_id)).map((r) => <tr key={r.id}>
       <td><button className="text-button object-name" onClick={() => openTab(resourceTab(r))}><ProductIcon kind="kafka" size={16} />{r.name}</button></td><td>{r.layer_name || "—"}</td>
     </tr>)}{!clusters.length && <tr><td colSpan={2} className="muted">No Kafka clusters you can access. Ask a cluster owner for access.</td></tr>}</tbody></table>
   </>;

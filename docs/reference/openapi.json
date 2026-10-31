@@ -17,6 +17,22 @@
         "title": "ActiveGroupIn",
         "type": "object"
       },
+      "ActiveLayerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "layer_id": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "Layer Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_id"
+        ],
+        "title": "ActiveLayerIn",
+        "type": "object"
+      },
       "AirflowImport": {
         "additionalProperties": false,
         "properties": {
@@ -1827,6 +1843,17 @@
               }
             ],
             "title": "Active Group Id"
+          },
+          "active_layer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Layer Id"
           },
           "available_groups": {
             "items": {
@@ -14513,6 +14540,63 @@
           }
         },
         "summary": "Select Active Group",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/v1/me/active-layer": {
+      "put": {
+        "operationId": "put_v1_me_active-layer",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActiveLayerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select Active Layer",
         "tags": [
           "workspaces"
         ]

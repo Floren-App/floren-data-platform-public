@@ -103,7 +103,7 @@ export function AdminSources({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
     if (!t) return;
     setKind(t.kind); setEditing(true); setOpen(true); setFieldErrors({});
     setDraft({ name: ds.name, description: ds.description, egress: ds.egress.join(", "), secrets: {},
-      config: { ...Object.fromEntries(t.config.map((f) => [f.name, ds.config[f.name] != null ? String(ds.config[f.name]) : ""])), layer_id: String(ds.config.layer_id || defaultLayerId(hub.layers)) } });
+      config: { ...Object.fromEntries(t.config.map((f) => [f.name, ds.config[f.name] != null ? String(ds.config[f.name]) : ""])), layer_id: String(ds.config.layer_id || hub.layerId) } });
     requestAnimationFrame(() => document.getElementById("si-description")?.focus());
   };
 
@@ -112,7 +112,7 @@ export function AdminSources({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
     if (!spec) return;
     setBusy(true); setFieldErrors({}); setError(null);
     const config: Record<string, unknown> = {};
-    config.layer_id = draft.config.layer_id || defaultLayerId(hub.layers);
+    config.layer_id = draft.config.layer_id || hub.layerId;
     for (const f of spec.config) {
       const v = draft.config[f.name]?.trim();
       if (v) config[f.name] = f.kind === "port" ? Number(v) : v;
@@ -159,7 +159,7 @@ export function AdminSources({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
           <div className="field"><label htmlFor="si-description">Description</label>
             <input id="si-description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
         </div>
-        <div className="field"><label htmlFor="si-layer">Layer</label><select id="si-layer" required disabled={editing} value={draft.config.layer_id || defaultLayerId(hub.layers)} onChange={(e) => setDraft({ ...draft, config: { ...draft.config, layer_id: e.target.value } })}>{!(draft.config.layer_id || defaultLayerId(hub.layers)) && <option value="">Choose a layer</option>}{hub.layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.name}</option>)}</select><span className="hint">All schemas and data objects in this integration inherit its layer.</span></div>
+        <div className="field"><label htmlFor="si-layer">Layer</label><select id="si-layer" required disabled={editing} value={draft.config.layer_id || hub.layerId} onChange={(e) => setDraft({ ...draft, config: { ...draft.config, layer_id: e.target.value } })}>{!(draft.config.layer_id || hub.layerId) && <option value="">Choose a layer</option>}{hub.layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.name}</option>)}</select><span className="hint">All schemas and data objects in this integration inherit its layer.</span></div>
         <h3>Location</h3>
         <div className="arg-grid">{spec.config.map((f) => <SettingField key={f.name} id={`si-${f.name}`} f={f} value={draft.config[f.name] ?? ""} error={fieldErrors[f.name]}
           onChange={(v) => setDraft({ ...draft, config: { ...draft.config, [f.name]: v } })} />)}</div>
@@ -382,7 +382,7 @@ export function AdminWorkspaceTemplates({ hub }: { hub: Hub }) {
   const { data: repos } = useLoad(api.admin.repos, [] as Repo[]);
   const layers = hub.layers.filter((l) => l.workspaces);
   const blank = (): WorkspaceTemplateInput => ({ name: "", group_id: groups[0]?.id ?? "", editor: "vscode",
-    layer_id: defaultLayerId(layers) || layers[0]?.id || "", description: "", repositories: [] });
+    layer_id: (layers.some((l) => l.id === hub.layerId) ? hub.layerId : defaultLayerId(layers)) || layers[0]?.id || "", description: "", repositories: [] });
   const [draft, setDraft] = useState<(WorkspaceTemplateInput & { id?: string }) | null>(null);
   const [busy, setBusy] = useState(false);
   const save = async (e: React.FormEvent) => {

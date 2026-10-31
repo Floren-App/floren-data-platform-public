@@ -27,15 +27,6 @@ export function SecurityIcon({ icon, size = 16 }: { icon: typeof SECURITY_PAGES[
   return icon === "key" ? <span className="product-icon" style={{ color: "#d6b344" }}><IconKey size={size} /></span> : <ProductIcon kind={icon} size={size} />;
 }
 
-export function IAMNavigation({ active, openTab }: { active: SecurityPage; openTab: OpenTab }) {
-  return <nav className="iam-navigation" aria-label="Security pages">
-    {SECURITY_PAGES.map((item) =>
-      <button key={item.kind} aria-current={active === item.kind ? "page" : undefined} className={active === item.kind ? "active" : ""} onClick={() => openTab({ kind: item.kind, title: item.title })}>
-        <SecurityIcon icon={item.icon} />{item.title}
-      </button>)}
-  </nav>;
-}
-
 export function UsersTab({ hub, selectedId, openTab }: { hub: Hub; selectedId?: string; openTab: OpenTab }) {
   const groups = useCached("catalog:groups", api.access.groups);
   const allowed = !!hub.me?.is_admin || !!groups.data?.some((g) => g.can_manage);

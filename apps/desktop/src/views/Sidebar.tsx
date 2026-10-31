@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { accessibleSchemas, accessibleSources, api, AccessResource, rEnabled, EDITOR_LABEL, EDITOR_NAME, Editor, openInWindow, Run, RunKind, RunScope, startingPool, usablePools, workloadDot, workloadStatus } from "../api";
+import { accessibleSchemas, accessibleSources, api, AccessResource, inLayer, rEnabled, EDITOR_LABEL, EDITOR_NAME, Editor, openInWindow, Run, RunKind, RunScope, startingPool, usablePools, workloadDot, workloadStatus } from "../api";
 import { ProductIcon } from "../components/ProductIcon";
 import { resourceTab } from "../components/Permissions";
 import { SchemaTreeNode } from "../components/DataBrowser";
@@ -25,7 +25,7 @@ interface Props {
 export function Sidebar(props: Props) {
   const { view, hub } = props;
   const cache = useObjectCache();
-  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Security", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Compute pools", packages: "Packages", admin: "Administration" }[view];
+  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Security", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Usage", packages: "Packages", admin: "Administration" }[view];
   return (
     <>
       <h2>
@@ -64,6 +64,11 @@ export function Sidebar(props: Props) {
 }
 
 
+/** "3 more in other layers": items the layer mode hides from this list. */
+function OtherLayers({ count }: { count: number }) {
+  return count ? <p className="sidebar-note muted">{count} more in other layers. Switch the layer in the top bar to see {count === 1 ? "it" : "them"}.</p> : null;
+}
+
 export async function openEditor(hub: Hub, id: string, name: string) {
   await hub.act(() => openInWindow(api.openWorkspace(id).then((r) => r.url), `${name} — Floren Data Platform`, `ws-${id}`));
 }
@@ -75,7 +80,8 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
   const [editor, setEditor] = useState<Editor>("vscode");
   const environments = hub.layers.filter((layer) => layer.workspaces);
   const [environment, setEnvironment] = useState("");
-  const selectedEnvironment = environment || environments[0]?.id || "";
+  const selectedEnvironment = environment || environments.find((l) => l.id === hub.layerId)?.id || environments[0]?.id || "";
+  const shown = hub.workspaces.filter((w) => inLayer(hub.layerId, w.layer_id ?? w.environment_id));
 
   const [busy, setBusy] = useState(false);
 
@@ -124,7 +130,7 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
         </form>
       )}
       <ul className="list">
-        {hub.workspaces.map((w) => (
+        {shown.map((w) => (
           <li key={w.id} className={activeKey === `workspace:${w.id}` ? "selected" : ""}>
             <button className="nav-item" title={`${w.name} · ${w.owner} · ${w.status}${w.status === "running" ? " · double-click to open the editor" : ""}`}
                     onClick={() => openTab({ kind: "workspace", ref: w.id, title: w.name })}
@@ -144,8 +150,9 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
             </span>
           </li>
         ))}
-        {!hub.workspaces.length && !adding && <li className="empty"><button className="text-button" onClick={() => setAdding(true)}>Create your first workspace…</button></li>}
+        {!shown.length && !adding && <li className="empty"><button className="text-button" onClick={() => setAdding(true)}>{hub.workspaces.length ? "Create a workspace in this layer…" : "Create your first workspace…"}</button></li>}
       </ul>
+      <OtherLayers count={hub.workspaces.length - shown.length} />
       <div className="sidebar-section-divider" /><RunsPanel scope="workspace" hub={hub} openTab={openTab} activeKey={activeKey} />
     </>
   );
@@ -256,7 +263,7 @@ function DeployedPanel({ hub, openTab, activeKey }: Props) {
         </span>
       </summary>{folder(r.id)}</details>
     </li>)}
-    {hub.workloads.filter((p) => p.folder_id === parent).map((p) => <li key={p.id}>
+    {hub.workloads.filter((p) => p.folder_id === parent && inLayer(hub.layerId, p.layer_id)).map((p) => <li key={p.id}>
       <button className={`tree-leaf ${activeKey === `workload:${p.id}` ? "selected" : ""}`} title={`${p.title} · ${workloadStatus(p)}`}
         onClick={() => openTab({ kind: "workload", ref: p.id, title: p.title })}>
         <span className={`dot ${workloadDot(p)}`} /><ProductIcon kind={p.kind} runtime={p.runtime} size={16} />
@@ -279,13 +286,15 @@ function DeployedPanel({ hub, openTab, activeKey }: Props) {
     </div>}
     {folder("workloads")}
     {!resources.some((r) => r.parent_id === "workloads") && <p className="sidebar-note muted">No workloads available.</p>}
+    <OtherLayers count={hub.workloads.filter((p) => !inLayer(hub.layerId, p.layer_id)).length} />
     <div className="sidebar-section-divider" /><RunsPanel scope="deployed" hub={hub} openTab={openTab} activeKey={activeKey} />
   </>;
 }
 
 function DataPanel({ hub, openTab, activeKey }: Props) {
   const [search, setSearch] = useState("");
-  const sources = accessibleSources(hub.resources);
+  const all = accessibleSources(hub.resources);
+  const sources = all.filter((s) => inLayer(hub.layerId, s.layer_id));
   const match = (name: string) => name.toLowerCase().includes(search.toLowerCase());
   return <>
     <div className="sidebar-search"><input type="search" aria-label="Search data sources and schemas" placeholder="Find a source or schema…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
@@ -293,16 +302,20 @@ function DataPanel({ hub, openTab, activeKey }: Props) {
       {sources.filter((s) => match(s.name) || accessibleSchemas(hub.resources, s.id).some((r) => match(r.name))).map((s) =>
         <SourceTreeNode key={s.id} source={s} hub={hub} search={search} activeKey={activeKey} openTab={openTab} />)}
     </ul>
-    {!sources.length && <p className="sidebar-note muted">No data sources you can access. Ask a data source owner for access.</p>}
+    {!all.length && <p className="sidebar-note muted">No data sources you can access. Ask a data source owner for access.</p>}
+    <OtherLayers count={all.length - sources.length} />
   </>;
 }
 
 function KafkaPanel({ hub, openTab, activeKey }: Props) {
-  const clusters = hub.resources.filter((r) => r.kind === "kafka");
+  const all = hub.resources.filter((r) => r.kind === "kafka");
+  const clusters = all.filter((c) => inLayer(hub.layerId, c.layer_id ?? String(c.config.layer_id ?? "")));
   return <>
     <div className="section-title"><button className="section-link" onClick={() => openTab({ kind: "kafka-clusters", title: "Kafka" })}>All clusters</button></div>
     <ul className="object-tree">{clusters.map((c) => <KafkaTreeNode key={c.id} cluster={c} activeKey={activeKey} openTab={openTab} />)}</ul>
-    {!clusters.length && <p className="sidebar-note muted">No Kafka clusters you can access. Ask a cluster owner for access.</p>}
+    {!all.length && <p className="sidebar-note muted">No Kafka clusters you can access. Ask a cluster owner for access.</p>}
+    {!!all.length && !clusters.length && <p className="sidebar-note muted">No Kafka in this layer.</p>}
+    <OtherLayers count={all.length - clusters.length} />
   </>;
 }
 
@@ -339,20 +352,23 @@ function SourceTreeNode({ source, hub, search, activeKey, openTab }: { source: A
 }
 
 /** APIs by direction; each heading opens that tab of API management. */
-function ApisPanel({ openTab, activeKey }: Props) {
+function ApisPanel({ hub, openTab, activeKey }: Props) {
   const apis = useCached("catalog:apis", api.apis.list);
+  const all = apis.data?.apis ?? [];
+  const shown = all.filter((a) => inLayer(hub.layerId, a.config.layer_id ?? a.config.environment_id));
   return <>{(["internal", "external"] as const).map((direction) => <section key={direction}>
     <div className="section-title">
       <button className="section-link" onClick={() => openTab({ kind: "apis", ref: direction, title: "API management" })}>{direction === "internal" ? "Internal" : "External"}</button>
     </div>
     <ul className="list">
-      {(apis.data?.apis ?? []).filter((a) => a.direction === direction).map((a) => <li key={a.id} className={activeKey === `api:${a.id}` ? "selected" : ""}>
+      {shown.filter((a) => a.direction === direction).map((a) => <li key={a.id} className={activeKey === `api:${a.id}` ? "selected" : ""}>
         <button className="nav-item" onClick={() => openTab({ kind: "api", ref: a.id, title: a.name })}><IconApi size={16} /><span className="grow">{a.name} <span className="sub">{a.protocol.toUpperCase()}</span></span></button>
       </li>)}
-      {apis.status === "ready" && !(apis.data?.apis ?? []).some((a) => a.direction === direction) && <li className="empty muted">None yet</li>}
+      {apis.status === "ready" && !shown.some((a) => a.direction === direction) && <li className="empty muted">None in this layer</li>}
     </ul>
   </section>)}
     {apis.error && <p className="sidebar-note error">{apis.error}</p>}
+    <OtherLayers count={all.length - shown.length} />
   </>;
 }
 
@@ -370,16 +386,22 @@ function SecurityPanel({ openTab, activeKey }: Props) {
 }
 
 function ComputePanel({ hub, openTab, activeRef }: Props) {
-  return (
+  const [everywhere, setEverywhere] = useState(false);
+  const pools = (hub.me?.pools ?? []).filter((p) => everywhere || !p.layer_ids?.length || p.layer_ids.includes(hub.layerId));
+  return (<>
+    <div className="segmented sidebar-toggle" role="group" aria-label="Layers shown">
+      <button aria-pressed={!everywhere} className={everywhere ? "" : "active"} onClick={() => setEverywhere(false)}>This layer</button>
+      <button aria-pressed={everywhere} className={everywhere ? "active" : ""} onClick={() => setEverywhere(true)}>All layers</button>
+    </div>
     <ul className="list">
-      {hub.me?.pools.map((p) => (
+      {pools.map((p) => (
         <li key={p.id} className={activeRef === p.name ? "selected" : ""}>
           <button className="nav-item" onClick={() => openTab({ kind: "pool", ref: p.name, title: p.name })}><span className={`dot ${p.active_executions ? "running" : ""}`} /><span className="grow">{p.name} <span className="sub">{p.cpu} vCPU · {p.memory_gb} GB{p.gpu ? ` · ${p.gpu} GPU` : ""}</span></span></button>
           <span className="badge" title={`${p.in_use ?? "—"} of ${p.max_concurrent} slots in use${p.queued ? ` · ${p.queued} waiting` : ""} · ${p.active_runs ?? "—"} jobs · ${p.active_services ?? "—"} service components`}>{p.dedicated ? `${p.in_use ?? "—"} · team` : `${p.in_use ?? "—"}/${p.max_concurrent}${p.queued ? ` +${p.queued}` : ""}`}</span>
         </li>
       ))}
     </ul>
-  );
+  </>);
 }
 
 function PackagesPanel({ hub, openTab, activeKey, activeRef }: Props) {
