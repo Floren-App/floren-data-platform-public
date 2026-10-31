@@ -84,9 +84,9 @@ scope means everything.
 | Compliance administrator | Sets up forms, policies, classifications and compliance roles | — |
 
 Platform administrators can do everything and are the only ones who make compliance
-administrators. Give a privacy team's group a role together with the **Privacy**
-[app profile](app-profiles.md) (only `products.browse`), so they see their part of the app and not
-the engineering tools.
+administrators. Give a privacy team's group a role together with a small
+[app profile](app-profiles.md), for example one with only `products.browse`, so they see their part
+of the app and not the engineering tools.
 
 ## New group members
 
@@ -162,39 +162,27 @@ data.
 Reviews that come due remind their reviewers; overdue reviews go to the compliance administrators
 too.
 
-## Email
+## Notifications
 
-With email set up, the platform tells people what waits for them:
+The platform tells people what waits for them through [notification webhooks](notifications.md):
+it posts each event to the webhooks you configure, for example a Teams or Slack channel, or your
+own automation that sends the email. Without webhooks, the app alone shows what waits (the counts
+in the Privacy and Catalog sidebars).
 
-| When | Who |
-|---|---|
-| A case waits for a step | The reviewers of that step (data owners, or compliance reviewers in scope; compliance administrators when nobody is in scope) |
-| Approved, declined or changes asked | The requester |
-| A comment | The requester, or the reviewers of the current step when the requester comments |
-| Someone joins a group with justified access | The membership approvers for that group (once) |
-| A renewal is ready; reminders 14 and 3 days before the end | The requester, the object's owners and the group's owners |
-| Access ended, or was removed at its deadline | The same |
-| Existing access needs a form (with its deadline) | The object's owners and the group's owners |
-| A review is due tomorrow, or overdue | The reviewers; when overdue also the compliance administrators |
+| Event | When | Recipients |
+|---|---|---|
+| `review.waiting` | A case waits for a step | The reviewers of that step (data owners, or compliance reviewers in scope; compliance administrators when nobody is in scope) |
+| `case.approved`, `case.declined`, `case.changes_requested` | A decision | The requester |
+| `case.comment` | A comment | The requester, or the reviewers of the current step when the requester comments |
+| `membership.waiting` | Someone joins a group with justified access | The membership approvers for that group (once) |
+| `access.renewal_ready`, `access.ending` | A renewal is ready; reminders 14 and 3 days before the end | The requester, the object's owners and the group's owners |
+| `access.ended`, `access.removed` | Access ended, or was removed at its deadline | The same |
+| `access.deadline` | Existing access needs a form (with its deadline) | The object's owners and the group's owners |
+| `review.due`, `review.overdue` | A review is due tomorrow, or overdue | The reviewers; when overdue also the compliance administrators |
 
-Emails say what waits and link to it in the app; nothing is decided by email, and the answers never
-leave the platform in an email. Addresses come from SCIM, or from the `email` claim of the sign-in
-token.
-
-Set the SMTP server in the Helm values; the password goes in the control plane's secret as
-`FDP_SMTP_PASSWORD`:
-
-```yaml
-email:
-  smtp:
-    host: smtp.example.com
-    port: 587
-    security: starttls          # starttls | tls | none
-    username: fdp@example.com
-    from: "Floren Data Platform <fdp@example.com>"
-```
-
-Sending failures are retried a few times and kept with their error.
+A message names its recipients with their email address (from SCIM, or the `email` claim of the
+sign-in token) and links into the app; nothing is decided outside the app, and form answers are
+never sent.
 
 ## Terraform
 
@@ -223,6 +211,18 @@ resource "fdp_access_policy" "prod_confidential" {
   review_days    = 10
   renew_days     = 30
   grace_days     = 30
+}
+
+resource "fdp_app_profile" "privacy" {
+  name     = "Privacy"
+  features = ["products.browse"]
+}
+
+resource "fdp_notification_webhook" "privacy_mail" {
+  name      = "Privacy mail"
+  url       = "https://automation.example.com/hooks/fdp"
+  events    = ["review.waiting", "review.overdue", "membership.waiting"]
+  secret_wo = var.fdp_webhook_secret
 }
 
 resource "fdp_compliance_role" "privacy_reviews_prod" {

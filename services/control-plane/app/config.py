@@ -46,14 +46,7 @@ class Settings(BaseSettings):
     # The app in the browser (Helm web.enabled): where its static files are served inside the cluster. The
     # gateway routes everything on the public address that is not the API, an editor or an app there.
     web_url: str = ""
-    # Email notifications (SMTP). Emails only notify and link to the app; decisions are made in the app.
-    # Empty host: no email. The password comes from the secret (FDP_SMTP_PASSWORD).
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_security: Literal["starttls", "tls", "none"] = "starttls"
-    smtp_username: str = ""
-    smtp_password: str = ""
-    smtp_from: str = ""
+    # How often notifications are posted to the configured webhooks (see notify).
     notification_interval_seconds: int = 30
     # Ends justified access, opens renewals, sends reminders, and sets deadlines for access that needs a form.
     compliance_interval_seconds: int = 900

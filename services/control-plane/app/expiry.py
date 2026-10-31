@@ -1,6 +1,6 @@
 """Justified access ends: at its end date, unless renewed; and access that needs a form but has none (it existed
 before the policy, or its data was classified higher since) is kept until a deadline, then removed. Renewals open
-before the end, prefilled; reminders and escalations go by email (see notify)."""
+before the end, prefilled; reminders and escalations go to the notification webhooks (see notify)."""
 import asyncio
 import logging
 import math
@@ -53,16 +53,15 @@ def remove_access(db, resource_id: str, group_id: str, previous_role: Optional[s
         db.delete(current)
 
 
-def _tell_owners(db, resource_id: str, group_id: str, subject: str, lead: str, key: Optional[str] = None,
+def _tell_owners(db, event: str, resource_id: str, group_id: str, subject: str, text: str, key: Optional[str] = None,
                  case: Optional[AccessCase] = None) -> None:
     """The object's owners and the group's owners (and the requester of the case)."""
     group = db.get(AppGroup, group_id)
     people = notify.people(db, notify.owner_groups(db, resource_id)) | set((group.owners or []) if group else [])
     if case is not None:
         people |= notify.requester(db, case)
-    link = notify.link(case.id) if case is not None else notify.get_settings().public_url.rstrip("/")
-    notify.queue(db, people, subject, f"{lead}\n\nOpen: {link}\n\nThis email only lets you know. Act in the app.",
-                 case.id if case else None, key=key)
+    notify.queue(db, event, people, subject, text, case, key=key,
+                 link_to=None if case is not None else notify.get_settings().public_url.rstrip("/"))
 
 
 def _what(db, resource_id: str, group_id: str, role: str) -> str:
@@ -86,7 +85,7 @@ def expire(db, now: datetime) -> int:
         if case is not None and case.status == "approved":
             case.status = "expired"
         _audit(db, "compliance.expired", grant.resource_id, group=grant.app_group_id, role=grant.role, case=grant.case_id)
-        _tell_owners(db, grant.resource_id, grant.app_group_id, f"Access ended: {what}",
+        _tell_owners(db, "access.ended", grant.resource_id, grant.app_group_id, f"Access ended: {what}",
                      f"The approved access to {what} ended on {grant.until:%Y-%m-%d}. A new request needs a new compliance form.",
                      key=f"ended:{grant.case_id}", case=case)
         db.delete(grant)
@@ -138,14 +137,13 @@ def renewals(db, now: datetime) -> None:
         if renewal is None:
             continue
         what = notify.describe(db, case)
-        notify.queue(db, notify.requester(db, renewal), f"Renew access: {what}",
+        notify.queue(db, "access.renewal_ready", notify.requester(db, renewal), f"Renew access: {what}",
                      f"Access to {what} ends on {grant.until:%Y-%m-%d}. A renewal is ready, filled in with your earlier answers: "
-                     f"check them and send it for review.\n\nOpen: {notify.link(renewal.id)}\n\nThis email only lets you know. Act in the app.",
-                     renewal.id, key=f"renew:{case.id}")
+                     "check them and send it for review.", renewal, key=f"renew:{case.id}")
         due = [d for d in REMINDERS if left <= timedelta(days=d)]
         if renewal.status in ("draft", "changes_requested") and due:
             days = min(due)   # the tightest reminder that applies; each is sent once
-            _tell_owners(db, grant.resource_id, grant.app_group_id, f"Access ends in {max(math.ceil(left.total_seconds() / 86400), 0)} days: {what}",
+            _tell_owners(db, "access.ending", grant.resource_id, grant.app_group_id, f"Access ends in {max(math.ceil(left.total_seconds() / 86400), 0)} days: {what}",
                          f"Access to {what} ends on {grant.until:%Y-%m-%d} and the renewal was not sent for review yet.",
                          key=f"remind:{case.id}:{days}", case=renewal)
 
@@ -155,14 +153,13 @@ def escalate(db, now: datetime) -> None:
     from . import compliance as cp
     for case in db.scalars(select(AccessCase).where(AccessCase.status == "in_review", AccessCase.due_at.is_not(None))):
         due, what = _aware(case.due_at), notify.describe(db, case)
-        body = lambda lead: f"{lead}\n\nOpen: {notify.link(case.id)}\n\nThis email only lets you know. Decide in the app."  # noqa: E731
         if now >= due - timedelta(days=1):
-            notify.queue(db, notify.reviewers(db, case), f"Review due {due:%Y-%m-%d}: {what}",
-                         body(f"The review of {what} is due on {due:%Y-%m-%d}."), case.id, key=f"due:{case.id}:{case.step}")
+            notify.queue(db, "review.due", notify.reviewers(db, case), f"Review due {due:%Y-%m-%d}: {what}",
+                         f"The review of {what} is due on {due:%Y-%m-%d}.", case, key=f"due:{case.id}:{case.step}")
         if now >= due:
-            notify.queue(db, notify.people(db, cp.role_groups(db, "compliance_admin")), f"Review overdue: {what}",
-                         body(f"The review of {what} was due on {due:%Y-%m-%d} and waits for {case.steps[case.step]['role'].replace('_', ' ')}s."),
-                         case.id, key=f"overdue:{case.id}:{case.step}")
+            notify.queue(db, "review.overdue", notify.people(db, cp.role_groups(db, "compliance_admin")), f"Review overdue: {what}",
+                         f"The review of {what} was due on {due:%Y-%m-%d} and waits for {case.steps[case.step]['role'].replace('_', ' ')}s.",
+                         case, key=f"overdue:{case.id}:{case.step}")
 
 
 # --- access that needs a form but has none ------------------------------------------------------------
@@ -219,7 +216,7 @@ def deadlines(db, now: datetime) -> None:
             remove_access(db, item.resource_id, item.app_group_id)
             _audit(db, "compliance.unjustified_removed", item.resource_id, group=item.app_group_id, role=item.role,
                    due_at=item.due_at.isoformat())
-            _tell_owners(db, item.resource_id, item.app_group_id, f"Access removed: {what}",
+            _tell_owners(db, "access.removed", item.resource_id, item.app_group_id, f"Access removed: {what}",
                          f"Access to {what} needed an approved compliance form by {item.due_at:%Y-%m-%d} and had none, so it was removed.",
                          key=f"removed:{item.resource_id}:{item.app_group_id}:{item.due_at:%Y%m%d}")
             db.delete(item)
@@ -229,7 +226,7 @@ def deadlines(db, now: datetime) -> None:
         db.add(JustificationDeadline(resource_id=resource_id, app_group_id=group_id, role=role, policy_id=policy.id,
                                      classification=level, due_at=due))
         what = _what(db, resource_id, group_id, role)
-        _tell_owners(db, resource_id, group_id, f"Justify access by {due:%Y-%m-%d}: {what}",
+        _tell_owners(db, "access.deadline", resource_id, group_id, f"Justify access by {due:%Y-%m-%d}: {what}",
                      f"Access to {what} now needs an approved compliance form ({level} data). It stays until {due:%Y-%m-%d}; "
                      "without an approved form by then it is removed. Open the object's permissions and choose Justify.",
                      key=f"deadline:{resource_id}:{group_id}:{policy.id}")

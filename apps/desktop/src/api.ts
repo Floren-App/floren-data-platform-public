@@ -597,6 +597,9 @@ export interface AccessCaseItem {
 /** Access that needs a compliance form and has none yet: kept until due_at, then removed. */
 export interface JustifyDeadline { resource_id: string; resource: string; kind: string; product_id: string | null; app_group_id: string; group: string;
   role: string; classification: string; due_at: string }
+export interface Webhook { id: string; name: string; url: string; events: string[]; enabled: boolean; has_secret: boolean; created_at: string;
+  last: { event: string; at: string; sent_at: string | null; error: string } | null; failing: boolean }
+export interface WebhookDelivery { id: number; event: string; subject: string; created_at: string; sent_at: string | null; attempts: number; error: string }
 export interface RegisterRow { group: string; app_group_id: string; access: string; kind: string; classification: string; layer: string; form: string;
   requester: string; approved_by: string; approved_at: string | null; until: string | null; members: number; case_id: string }
 export type CaseTarget = { kind: "product" | "role"; app_group_id: string; product_id?: string; option_id?: string; resource_id?: string; role?: string };
@@ -819,6 +822,14 @@ export const api = {
     put: (current: string, body: { name: string; description: string; features: AppFeature[]; default: boolean }) =>
       request<AppProfile>("PUT", `/v1/admin/app-profiles/${encodeURIComponent(current)}`, body),
     remove: (name: string) => request<void>("DELETE", `/v1/admin/app-profiles/${encodeURIComponent(name)}`),
+  },
+  webhooks: {
+    list: () => request<{ webhooks: Webhook[]; events: { key: string; label: string }[] }>("GET", "/v1/admin/webhooks"),
+    put: (current: string, body: { name: string; url: string; events: string[]; enabled: boolean; secret?: string; remove_secret?: boolean }) =>
+      request<Webhook>("PUT", `/v1/admin/webhooks/${encodeURIComponent(current)}`, body),
+    remove: (name: string) => request<void>("DELETE", `/v1/admin/webhooks/${encodeURIComponent(name)}`),
+    test: (name: string) => request<{ sent: boolean; error: string }>("POST", `/v1/admin/webhooks/${encodeURIComponent(name)}/test`),
+    deliveries: (name: string) => request<WebhookDelivery[]>("GET", `/v1/admin/webhooks/${encodeURIComponent(name)}/deliveries`),
   },
   selectActiveGroup: (group_id: string) => request<{active_group_id: string; name: string}>("PUT","/v1/me/active-group",{group_id}),
   layers: {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, AppFeature, AppGroup, AppProfile, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput, WORKLOAD_KINDS, WorkloadKind, usablePools } from "../api";
+import { api, ApiError, AppFeature, Webhook, WebhookDelivery, AppGroup, AppProfile, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput, WORKLOAD_KINDS, WorkloadKind, usablePools } from "../api";
 import type { Hub } from "../hub";
 import { OpenTab, resourceTab } from "../components/Permissions";
 import { PageHeader } from "../components/Page";
@@ -478,16 +478,17 @@ export function AdminAppProfiles() {
     <div className="table-scroll"><table className="profile-grid" aria-label="App profiles">
       <thead><tr><th>Feature</th>{profiles.map((p) => <th key={p.id}>
         <input aria-label={`Name of ${p.name}`} value={drafts[p.id]?.name ?? p.name} onChange={(e) => setDrafts({ ...drafts, [p.id]: { ...drafts[p.id], name: e.target.value } })} />
-        <label className="row muted"><input type="radio" name="default-profile" checked={drafts[p.id]?.default ?? p.default}
-          onChange={() => setDrafts(Object.fromEntries(Object.entries(drafts).map(([id, d]) => [id, { ...d, default: id === p.id }])))} />Default</label></th>)}</tr></thead>
+        <label className="row muted"><input type="checkbox" checked={drafts[p.id]?.default ?? p.default}
+          onChange={(e) => setDrafts(Object.fromEntries(Object.entries(drafts).map(([id, d]) => [id, { ...d, default: id === p.id ? e.target.checked : e.target.checked ? false : d.default }])))} />Default</label></th>)}</tr></thead>
       <tbody>{data.features.map((f) => <tr key={f.key}><td>{f.label}</td>{profiles.map((p) => <td key={p.id}>
         <input type="checkbox" aria-label={`${f.label} in ${p.name}`} checked={drafts[p.id]?.features.includes(f.key) ?? false} onChange={() => toggle(p, f.key)} /></td>)}</tr>)}
         <tr><td className="muted">Groups</td>{profiles.map((p) => <td key={p.id} className="muted small">{p.groups.join(", ") || "—"}</td>)}</tr>
         <tr><td /> {profiles.map((p) => <td key={p.id}><div className="row" style={{ gap: 4 }}>
           <button className="btn sm" disabled={!changed(p)} onClick={() => save(p)}>Save</button>
-          {!p.default && !p.groups.length && <button className="btn sm ghost danger" onClick={() => void api.appProfiles.remove(p.name).then(load).catch((e: Error) => setError(e.message))}>Remove</button>}</div></td>)}</tr>
+          {!p.groups.length && <button className="btn sm ghost danger" onClick={() => void api.appProfiles.remove(p.name).then(load).catch((e: Error) => setError(e.message))}>Remove</button>}</div></td>)}</tr>
       </tbody></table></div>
-    <p className="hint">A feature brings what it needs: requesting access brings browsing products, deploying workloads brings viewing them. Changing the default changes every group without a profile. Give groups a profile on their page under Security → App groups.</p>
+    {!profiles.length && <p className="muted">No app profiles yet: every group gets the whole app, and object permissions decide what people may open.</p>}
+    <p className="hint">A feature brings what it needs: requesting access brings browsing products, deploying workloads brings viewing them. Groups without a profile get the default profile, or the whole app when there is none. Give groups a profile on their page under Security → App groups. Also configurable with Terraform (fdp_app_profile).</p>
     <form className="row" style={{ gap: 8, marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); setError("");
       api.appProfiles.put(newName.trim(), { name: newName.trim(), description: "", features: ["products.browse"], default: false }).then(() => { setNewName(""); return load(); }).catch((err: Error) => setError(err.message)); }}>
       <input aria-label="New profile name" placeholder="New profile name" value={newName} onChange={(e) => setNewName(e.target.value)} />
@@ -520,10 +521,78 @@ export function AdminClassifications() {
         <td><select aria-label={`Masked ${r.name} counts as`} value={r.masked_as || r.name} onChange={(e) => set(i, { masked_as: e.target.value })}>
           {rows.slice(0, i + 1).map((l) => <option key={l.name} value={l.name}>{l.name === r.name ? `${l.name} (itself)` : l.name}</option>)}</select></td>
         <td><input aria-label={`Description of ${r.name}`} value={r.description} onChange={(e) => set(i, { description: e.target.value })} /></td>
-        <td><button className="icon-btn" aria-label={`Remove ${r.name}`} disabled={rows.length === 1} onClick={() => setRows(rows.filter((_, j) => j !== i))}><IconTrash size={14} /></button></td>
-      </tr>)}</tbody></table>
+        <td><button className="icon-btn" aria-label={`Remove ${r.name}`} onClick={() => setRows(rows.filter((_, j) => j !== i))}><IconTrash size={14} /></button></td>
+      </tr>)}
+      {!rows.length && <tr><td colSpan={5} className="muted">No classifications yet: everything is unclassified, and no access policy applies.</td></tr>}</tbody></table>
     <div className="form-actions"><button className="btn secondary" onClick={() => setRows([...rows, { name: "", masked_as: "", description: "" }])}><IconPlus size={14} />Add level</button>
       <button className="btn" onClick={save}>Save classifications</button></div>
     <p className="hint">A level still used by a column or object cannot be removed. Also configurable with Terraform (fdp_classifications).</p>
+  </>;
+}
+
+/** Notifications: webhooks the platform posts its events to, for example a chat channel or automation that sends email. */
+export function AdminNotifications() {
+  const [data, setData] = useState<{ webhooks: Webhook[]; events: { key: string; label: string }[] } | null>(null);
+  const [error, setError] = useState(""), [message, setMessage] = useState("");
+  const [editing, setEditing] = useState<{ current: string; name: string; url: string; events: string[]; enabled: boolean; secret: string; remove: boolean; has: boolean } | null>(null);
+  const [deliveries, setDeliveries] = useState<{ name: string; items: WebhookDelivery[] } | null>(null);
+  const load = useCallback(() => api.webhooks.list().then(setData).catch((e: Error) => setError(e.message)), []);
+  useEffect(() => { void load(); }, [load]);
+  if (!data) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  const label = (key: string) => data.events.find((e) => e.key === key)?.label ?? key;
+  const done = (text: string) => { setMessage(text); setEditing(null); void load(); };
+  const save = (e: React.FormEvent) => { e.preventDefault(); if (!editing) return; setError(""); setMessage("");
+    api.webhooks.put(editing.current || editing.name.trim(), { name: editing.name.trim(), url: editing.url.trim(), events: editing.events, enabled: editing.enabled,
+      ...(editing.secret ? { secret: editing.secret } : {}), ...(editing.remove ? { remove_secret: true } : {}) })
+      .then(() => done(`Saved ${editing.name.trim()}.`)).catch((err: Error) => setError(err.message)); };
+  const test = (h: Webhook) => { setError(""); setMessage("");
+    api.webhooks.test(h.name).then((r) => { if (r.sent) setMessage(`Test sent to ${h.name}.`); else setError(`The test to ${h.name} failed: ${r.error}`); void load(); })
+      .catch((e: Error) => setError(e.message)); };
+  const show = (h: Webhook) => api.webhooks.deliveries(h.name).then((items) => setDeliveries({ name: h.name, items })).catch((e: Error) => setError(e.message));
+  return <>
+    <PageHeader icon={<ProductIcon kind="api" size={22} />} title="Notifications"
+      subtitle="Webhooks the platform posts its events to as JSON: a chat channel, or automation that sends the email. Each message says what happened, who should act (with their email) and links into the app; form answers are never included."
+      actions={<button className="btn" onClick={() => setEditing({ current: "", name: "", url: "", events: [], enabled: true, secret: "", remove: false, has: false })}><IconPlus size={14} />Add webhook</button>} />
+    {error && <p className="error" role="alert">{error}</p>}
+    {message && <p className="scope-note" role="status">{message}</p>}
+    <div className="table-scroll"><table aria-label="Webhooks"><thead><tr><th>Name</th><th>URL</th><th>Events</th><th>Last message</th><th /></tr></thead><tbody>
+      {data.webhooks.map((h) => <tr key={h.id}>
+        <td><strong>{h.name}</strong>{!h.enabled && <span className="badge"> Off</span>}{h.has_secret && <div className="muted small">Signed</div>}</td>
+        <td className="mono small">{h.url}</td>
+        <td className="small">{h.events.length ? h.events.map(label).join(", ") : <span className="muted">All events</span>}</td>
+        <td className="small">{h.last ? <>{h.last.event} · {h.last.sent_at ? "delivered" : h.last.error ? <span className="error-text">{h.last.error}</span> : "waiting"}</> : <span className="muted">None yet</span>}
+          {h.failing && <div className="error-text">Some messages could not be delivered</div>}</td>
+        <td className="table-actions"><div className="row" style={{ gap: 4 }}>
+          <button className="btn sm secondary" onClick={() => test(h)}>Send test</button>
+          <button className="btn sm secondary" onClick={() => void show(h)}>Messages</button>
+          <button className="btn sm secondary" onClick={() => setEditing({ current: h.name, name: h.name, url: h.url, events: h.events, enabled: h.enabled, secret: "", remove: false, has: h.has_secret })}>Edit</button>
+          <button className="icon-btn" aria-label={`Remove ${h.name}`} onClick={() => void api.webhooks.remove(h.name).then(() => done(`Removed ${h.name}.`)).catch((e: Error) => setError(e.message))}><IconTrash size={14} /></button></div></td>
+      </tr>)}
+      {!data.webhooks.length && <tr><td colSpan={5} className="muted">No webhooks: the app alone shows what waits for people.</td></tr>}</tbody></table></div>
+    {editing && <form className="card" aria-label={editing.current ? `Edit ${editing.current}` : "New webhook"} onSubmit={save}>
+      <h2>{editing.current ? `Edit ${editing.current}` : "New webhook"}</h2>
+      <div className="arg-grid">
+        <div className="field"><label htmlFor="hook-name">Name</label><input id="hook-name" value={editing.name} maxLength={120} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></div>
+        <div className="field"><label htmlFor="hook-url">URL</label><input id="hook-url" value={editing.url} placeholder="https://" onChange={(e) => setEditing({ ...editing, url: e.target.value })} /></div>
+        <div className="field"><label htmlFor="hook-secret">Signing secret{editing.has && " (set; type to replace)"}</label>
+          <input id="hook-secret" type="password" autoComplete="new-password" value={editing.secret} onChange={(e) => setEditing({ ...editing, secret: e.target.value, remove: false })} />
+          <span className="hint">Optional, at least 16 characters. Messages then carry X-FDP-Signature: sha256=HMAC of the body. Kept in the secret store.</span>
+          {editing.has && <label className="row"><input type="checkbox" checked={editing.remove} onChange={(e) => setEditing({ ...editing, remove: e.target.checked, secret: "" })} />Remove the secret</label>}</div>
+        <label className="row"><input type="checkbox" checked={editing.enabled} onChange={(e) => setEditing({ ...editing, enabled: e.target.checked })} />Enabled</label>
+      </div>
+      <fieldset className="field form-choices"><legend>Events</legend><span className="hint">None chosen: all events.</span>
+        {data.events.map((ev) => <label key={ev.key} className="row"><input type="checkbox" checked={editing.events.includes(ev.key)}
+          onChange={(e) => setEditing({ ...editing, events: e.target.checked ? [...editing.events, ev.key] : editing.events.filter((x) => x !== ev.key) })} />
+          {ev.label} <span className="muted mono small">{ev.key}</span></label>)}</fieldset>
+      <div className="form-actions"><button className="btn" disabled={!editing.name.trim() || !editing.url.trim()}>Save webhook</button>
+        <button type="button" className="btn secondary" onClick={() => setEditing(null)}>Cancel</button></div>
+    </form>}
+    {deliveries && <section className="card" aria-label={`Messages to ${deliveries.name}`}><h2>Messages to {deliveries.name}</h2>
+      <div className="table-scroll"><table><thead><tr><th>Event</th><th>Subject</th><th>Created</th><th>Result</th></tr></thead><tbody>
+        {deliveries.items.map((d) => <tr key={d.id}><td className="mono small">{d.event}</td><td>{d.subject}</td><td>{new Date(d.created_at).toLocaleString()}</td>
+          <td>{d.sent_at ? "Delivered" : d.error ? <span className="error-text">{d.error} ({d.attempts} attempts)</span> : "Waiting"}</td></tr>)}
+        {!deliveries.items.length && <tr><td colSpan={4} className="muted">No messages yet.</td></tr>}</tbody></table></div>
+      <button className="btn secondary" onClick={() => setDeliveries(null)}>Close</button></section>}
+    <p className="hint">Also configurable with Terraform (fdp_notification_webhook).</p>
   </>;
 }

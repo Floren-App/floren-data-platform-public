@@ -169,6 +169,9 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     if (path === "/v1/catalog/requests") return respond([]);
     if (path === "/v1/compliance/requirement") return respond({ required: false, layer_id: null, classification: "internal" });
     if (path === "/v1/compliance/deadlines") return respond([]);
+    // The platform has no classifications of its own; these are what Terraform would configure.
+    if (path === "/v1/catalog/classifications") return respond({ levels: ["public", "internal", "confidential", "restricted"].map((name) =>
+      ({ name, masked_as: name === "confidential" || name === "restricted" ? "internal" : name, description: "" })) });
     if (/^\/v1\/catalog\/assets\/[^/]+\/product$/.test(path)) return respond({ publishable: false, can_publish: false, products: [], uses: [], name: "", kind: "", domain: "", classification: "unclassified" });
     return respond({ detail: `Unexpected test request: ${method} ${path}` }, 404);
   });
@@ -2977,5 +2980,38 @@ test("approved access is renewed from the case, prefilled with the earlier answe
   await main.getByRole("button", { name: "Send for review" }).click();
   await expect(main.getByRole("status").filter({ hasText: "Sent for review." })).toBeVisible();
   expect(sent.map((s) => `${s.method} ${s.url}`)).toEqual(["POST /v1/compliance/cases/case1/renew", "PATCH /v1/compliance/cases/case2", "POST /v1/compliance/cases/case2/submit"]);
+  expect(state.errors).toEqual([]);
+});
+
+test("administrators add a notification webhook, choose events and send a test", async ({ page }) => {
+  const state = await setup(page);
+  const sent: { method: string; url: string; body: any }[] = [];
+  let hooks: Record<string, unknown>[] = [];
+  await page.route(/\/v1\/admin\/webhooks/, (route) => {
+    const req = route.request(), url = new URL(req.url()).pathname.replace("/api", "");
+    if (req.method() === "PUT") { const body = req.postDataJSON(); sent.push({ method: "PUT", url, body });
+      hooks = [{ id: "w1", name: body.name, url: body.url, events: body.events, enabled: body.enabled, has_secret: !!body.secret, created_at: "", last: null, failing: false }];
+      return route.fulfill({ json: hooks[0] }); }
+    if (url.endsWith("/test")) { sent.push({ method: "POST", url, body: null }); return route.fulfill({ json: { sent: true, error: "" } }); }
+    return route.fulfill({ json: { webhooks: hooks, events: [{ key: "review.waiting", label: "A compliance form waits for a review step" },
+      { key: "access.ending", label: "Access ends soon and the renewal was not sent" }] } });
+  });
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Administration", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Notifications", exact: true }).click();
+  const main = page.locator(".main");
+  await expect(main.getByRole("table", { name: "Webhooks" })).toContainText("No webhooks");
+  await main.getByRole("button", { name: "Add webhook" }).click();
+  const form = main.getByRole("form", { name: "New webhook" });
+  await form.getByRole("textbox", { name: "Name" }).fill("Privacy mail");
+  await form.getByRole("textbox", { name: "URL" }).fill("https://automation.example.test/fdp");
+  await form.getByLabel(/Signing secret/).fill("a-long-signing-secret-123");
+  await form.getByRole("checkbox", { name: /A compliance form waits/ }).check();
+  await form.getByRole("button", { name: "Save webhook" }).click();
+  await expect(main.getByRole("status")).toHaveText("Saved Privacy mail.");
+  expect(sent[0]).toMatchObject({ url: "/v1/admin/webhooks/Privacy%20mail", body: { name: "Privacy mail", url: "https://automation.example.test/fdp",
+    events: ["review.waiting"], enabled: true, secret: "a-long-signing-secret-123" } });
+  await expect(main.getByRole("table", { name: "Webhooks" })).toContainText("Signed");
+  await main.getByRole("button", { name: "Send test" }).click();
+  await expect(main.getByRole("status")).toHaveText("Test sent to Privacy mail.");
   expect(state.errors).toEqual([]);
 });

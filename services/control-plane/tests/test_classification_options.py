@@ -118,3 +118,21 @@ def test_option_masks_must_name_product_tables(client, repo):  # noqa: F811
     assert twice.status_code == 422
     standard = client.post("/v1/catalog/products", headers=as_("ana"), json={"title": "x", "asset_ids": [ids["sales"]]}).json()
     assert [o["name"] for o in standard["options"]] == ["Standard"] and standard["options"][0]["default"]
+
+
+def test_no_classifications_until_configured_and_values_in_use_must_stay(client, repo):  # noqa: F811
+    from app import classification
+    from app.models import CatalogAsset, PlatformSetting
+    ids = setup_products(client, repo)
+    with SessionLocal() as db:
+        db.delete(db.get(PlatformSetting, classification.SETTING))
+        # A value from before the levels were configurable.
+        asset = db.get(CatalogAsset, ids["sales"])
+        asset.governance = {**(asset.governance or {}), "classification": "confidential"}
+        db.commit()
+    assert client.get("/v1/catalog/classifications", headers=as_("ana")).json()["levels"] == []
+    assert classify(client, ids["sales"], {"email": {"classification": "restricted"}}).status_code == 422
+    missing = client.put("/v1/catalog/classifications", headers=as_("admin"), json={"levels": [{"name": "public"}, {"name": "internal"}]})
+    assert missing.status_code == 409 and "confidential is still used" in missing.text
+    assert client.put("/v1/catalog/classifications", headers=as_("admin"),
+                      json={"levels": [{"name": "public"}, {"name": "confidential"}]}).status_code == 200

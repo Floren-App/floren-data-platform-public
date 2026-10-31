@@ -1143,15 +1143,29 @@ class ApiCall(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class NotificationWebhook(Base):
+    """Where the platform posts its notifications: a URL, the events it wants (empty: all), and an optional signing
+    secret (kept in the secret store, never here)."""
+    __tablename__ = "notification_webhooks"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    url: Mapped[str] = mapped_column(String(2000))
+    events: Mapped[list] = mapped_column(JSON, default=list)
+    enabled: Mapped[bool] = mapped_column(default=True)
+    has_secret: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Notification(Base):
-    """An email in the outbox. A key sends a notice once (per recipient); emails only link to the app."""
+    """A message in the outbox of one webhook. A key sends a notice once per webhook."""
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     key: Mapped[Optional[str]] = mapped_column(String(300), nullable=True, unique=True)
-    recipient: Mapped[str] = mapped_column(String(254))
-    subject: Mapped[str] = mapped_column(String(300))
-    body: Mapped[str] = mapped_column(Text, default="")
+    webhook_id: Mapped[str] = mapped_column(String(12), index=True)
+    event: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
     case_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)

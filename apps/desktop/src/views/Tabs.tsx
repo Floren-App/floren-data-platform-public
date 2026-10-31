@@ -5,7 +5,7 @@ import type { Hub } from "../hub";
 import { IconRuns, IconCompute, IconOpen, IconPlay, IconStop, IconTrash, IconWorkspaces } from "../components/Icons";
 import { PageHeader } from "../components/Page";
 import { LoadMoreRuns, NewRunForm, openEditor, RUN_SCOPE_TITLE, runsIn } from "./Sidebar";
-import { AdminAppProfiles, AdminClassifications, AdminLayers, AdminAudit, AdminNetwork, AdminPools, AdminSources, AdminWorkspaceTemplates } from "./Admin";
+import { AdminAppProfiles, AdminNotifications, AdminClassifications, AdminLayers, AdminAudit, AdminNetwork, AdminPools, AdminSources, AdminWorkspaceTemplates } from "./Admin";
 import { ProgramRunner } from "./Programs";
 import { AdminRepos, WorkloadView, DeployWizard } from "./Deploy";
 import { AccessTab } from "./Access";
@@ -33,7 +33,7 @@ export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | 
   | "products" | "product" | "access-requests"
   | "privacy-reviews" | "privacy-case" | "case" | "privacy-memberships" | "privacy-register"
   | "privacy-policies" | "privacy-forms" | "privacy-form" | "privacy-roles" | "privacy-classifications"
-  | "admin-app-profiles" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
+  | "admin-app-profiles" | "admin-notifications" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
 
 export interface TabRef {
   kind: TabKind;
@@ -94,6 +94,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "workload": return <WorkloadView tab={tab} id={tab.ref!} hub={hub} openTab={openTab} runTab={runTab} />;
     case "admin-layers": return <AdminLayers hub={hub} />;
     case "admin-app-profiles": return <AdminAppProfiles />;
+    case "admin-notifications": return <AdminNotifications />;
     case "admin-classifications": case "privacy-classifications": return <AdminClassifications />;
     case "privacy-policies": return <PrivacyPolicies hub={hub} />;
     case "privacy-reviews": return <PrivacyReviews openTab={openTab} />;

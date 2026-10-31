@@ -149,7 +149,7 @@ function GroupProfile({ group, hub, act, openTab }: { group: AppGroup; hub: Hub;
   return <p className="row muted" style={{ gap: 8, flexWrap: "wrap" }}>App profile:
     {hub.me?.is_admin ? <select aria-label={`App profile of ${group.name}`} value={current}
         onChange={(e) => void act(() => api.access.updateGroup(group.id, { name: group.name, description: group.description, owners: group.owners, app_profile: e.target.value }))}>
-        <option value="">Default ({fallback ?? "…"})</option>{profiles.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}</select>
-      : <strong>{group.app_profile ?? `${fallback ?? "default"} (default)`}</strong>}
+        <option value="">Default ({fallback ?? "the whole app"})</option>{profiles.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}</select>
+      : <strong>{group.app_profile ?? (fallback ? `${fallback} (default)` : "The whole app (no profile)")}</strong>}
     {hub.me?.is_admin && <button className="text-button" onClick={() => openTab({ kind: "admin-app-profiles", title: "App profiles" })}>Edit profiles</button>}</p>;
 }

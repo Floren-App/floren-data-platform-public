@@ -31,16 +31,6 @@ FEATURES: Dict[str, str] = {
 # A feature that needs another to be useful brings it along.
 IMPLIES = {"products.request": {"products.browse"}, "products.publish": {"products.browse"},
            "workloads.manage": {"workloads.view"}}
-DEFAULT_PROFILES = [
-    ("Full access", "Everything the platform offers; object permissions still decide what can be opened.", list(FEATURES), True),
-    ("Engineer", "Build, deploy and share: everything except managing groups and services.",
-     [f for f in FEATURES if f != "security"], False),
-    ("Analyst", "Find and request data, work in workspaces and SQL, run workloads.",
-     ["products.browse", "products.request", "catalog.objects", "workspaces", "workloads.view", "storage"], False),
-    ("Viewer", "Find data products and open the dashboards you can use.", ["products.browse"], False),
-    # With a compliance role, the privacy area comes on top: reviews, memberships, the register.
-    ("Privacy", "Review compliance forms: the privacy area and the data products under review.", ["products.browse"], False),
-]
 
 
 def normalize(features: Iterable[str]) -> List[str]:
@@ -54,18 +44,10 @@ def normalize(features: Iterable[str]) -> List[str]:
     return [f for f in FEATURES if f in chosen]
 
 
-def ensure_defaults(db) -> None:
-    """The built-in profiles, created once; afterwards they are configuration like any other."""
-    if db.scalar(select(AppProfile.id).limit(1)):
-        return
-    for name, description, features, default in DEFAULT_PROFILES:
-        db.add(AppProfile(name=name, description=description, features=normalize(features), default=default))
-    db.flush()
-
-
 def default_profile(db) -> Optional[AppProfile]:
-    ensure_defaults(db)
-    return db.scalar(select(AppProfile).where(AppProfile.default.is_(True))) or db.scalar(select(AppProfile).order_by(AppProfile.name))
+    """The profile of groups without one. The platform has no profiles until they are configured (Terraform:
+    fdp_app_profile); without a default, groups without a profile get every feature."""
+    return db.scalar(select(AppProfile).where(AppProfile.default.is_(True)))
 
 
 def profile_for(db, user) -> Optional[AppProfile]:

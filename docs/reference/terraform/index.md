@@ -44,6 +44,7 @@ Configures Floren Data Platform through its API. Authenticate with a token, or w
 - [fdp_kafka_topic](fdp_kafka_topic.md)
 - [fdp_layer](fdp_layer.md)
 - [fdp_metric](fdp_metric.md)
+- [fdp_notification_webhook](fdp_notification_webhook.md)
 - [fdp_package](fdp_package.md)
 - [fdp_package_allowlist](fdp_package_allowlist.md)
 - [fdp_query_log_settings](fdp_query_log_settings.md)
