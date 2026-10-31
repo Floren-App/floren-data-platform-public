@@ -40,6 +40,8 @@ Each filled cell of the grid has:
 | Review steps | In order: **data owners** (the owners of the product or object), then **compliance reviewers**; each step can need more than one approval |
 | Access lasts at most | Approved access ends after this many days (or earlier, when the reviewer chooses an earlier date) |
 | Reviews are due within | The deadline reviewers see |
+| Renewal opens | How long before the end a renewal is prepared (30 days by default) |
+| Existing access must be justified within | Time given to access that needs a form and has none (30 days by default) |
 
 Nobody reviews their own case, and one person approves a step only once.
 
@@ -82,9 +84,9 @@ scope means everything.
 | Compliance administrator | Sets up forms, policies, classifications and compliance roles | — |
 
 Platform administrators can do everything and are the only ones who make compliance
-administrators. Give a privacy team's group a role together with the **Privacy**
-[app profile](app-profiles.md) (only `products.browse`), so they see their part of the app and not
-the engineering tools.
+administrators. Give a privacy team's group a role together with a small
+[app profile](app-profiles.md), for example one with only `products.browse`, so they see their part
+of the app and not the engineering tools.
 
 ## New group members
 
@@ -129,35 +131,61 @@ Anyone who can see the case can comment, for example to ask a question. Requeste
 under **Catalog → My requests**; owners find role grants waiting for another owner under **Access
 requests**.
 
-## Email
+## End dates and renewal
 
-With email set up, the platform tells people what waits for them:
+Approved access ends at its end date: a product's consumer stops being one, and a role goes back to
+what the group had before (or goes away). The case shows as *Expired*, and the owners and the
+requester are told.
 
-| When | Who |
-|---|---|
-| A case waits for a step | The reviewers of that step (data owners, or compliance reviewers in scope; compliance administrators when nobody is in scope) |
-| Approved, declined or changes asked | The requester |
-| A comment | The requester, or the reviewers of the current step when the requester comments |
-| Someone joins a group with justified access | The membership approvers for that group (once) |
+Before the end (30 days by default), the platform prepares a **renewal**: a draft on the form's
+current version, filled in with the earlier answers that still apply. The requester checks the
+answers and sends it; it is reviewed like a new case, and its approval moves the end date. While
+nothing is sent, reminders go out 14 and 3 days before the end. Anyone who may give the access can
+also choose **Renew** on an approved or expired case.
 
-Emails say what waits and link to it in the app; nothing is decided by email, and the answers never
-leave the platform in an email. Addresses come from SCIM, or from the `email` claim of the sign-in
-token.
+## Access without a form
 
-Set the SMTP server in the Helm values; the password goes in the control plane's secret as
-`FDP_SMTP_PASSWORD`:
+Access that needs a form but has none gets a **deadline** instead of being removed at once:
 
-```yaml
-email:
-  smtp:
-    host: smtp.example.com
-    port: 587
-    security: starttls          # starttls | tls | none
-    username: fdp@example.com
-    from: "Floren Data Platform <fdp@example.com>"
-```
+- access that existed before its policy (when the platform first gets access policies, or a policy
+  is added to a cell);
+- access whose data was classified higher since its form was approved (or moved to a cell with a
+  stricter policy).
 
-Sending failures are retried a few times and kept with their error.
+The object's owners and the group's owners are told. The group's row on the object's
+**Permissions** (or on the product's **Access options**) says *Needs a form by …* with **Justify**,
+which opens the form for exactly that access. An approved case clears the deadline; at the
+deadline, the access is removed. The privacy area's **Access register** lists everything waiting
+for a form.
+
+The data's owners need no form for their own use of it: a group with a role that may give access
+(such as Owner) on the object, or on anything above it, also gets roles below that without a form,
+and never gets a deadline. Making a group an owner of covered data does need a form.
+
+Reviews that come due remind their reviewers; overdue reviews go to the compliance administrators
+too.
+
+## Notifications
+
+The platform tells people what waits for them through [notification webhooks](notifications.md):
+it posts each event to the webhooks you configure, for example a Teams or Slack channel, or your
+own automation that sends the email. Without webhooks, the app alone shows what waits (the counts
+in the Privacy and Catalog sidebars).
+
+| Event | When | Recipients |
+|---|---|---|
+| `review.waiting` | A case waits for a step | The reviewers of that step (data owners, or compliance reviewers in scope; compliance administrators when nobody is in scope) |
+| `case.approved`, `case.declined`, `case.changes_requested` | A decision | The requester |
+| `case.comment` | A comment | The requester, or the reviewers of the current step when the requester comments |
+| `membership.waiting` | Someone joins a group with justified access | The membership approvers for that group (once) |
+| `access.renewal_ready`, `access.ending` | A renewal is ready; reminders 14 and 3 days before the end | The requester, the object's owners and the group's owners |
+| `access.ended`, `access.removed` | Access ended, or was removed at its deadline | The same |
+| `access.deadline` | Existing access needs a form (with its deadline) | The object's owners and the group's owners |
+| `review.due`, `review.overdue` | A review is due tomorrow, or overdue | The reviewers; when overdue also the compliance administrators |
+
+A message names its recipients with their email address (from SCIM, or the `email` claim of the
+sign-in token) and links into the app; nothing is decided outside the app, and form answers are
+never sent.
 
 ## Terraform
 
@@ -184,6 +212,20 @@ resource "fdp_access_policy" "prod_confidential" {
   steps          = [{ role = "data_owner" }, { role = "compliance_reviewer" }]
   max_days       = 365
   review_days    = 10
+  renew_days     = 30
+  grace_days     = 30
+}
+
+resource "fdp_app_profile" "privacy" {
+  name     = "Privacy"
+  features = ["products.browse"]
+}
+
+resource "fdp_notification_webhook" "privacy_mail" {
+  name      = "Privacy mail"
+  url       = "https://automation.example.com/hooks/fdp"
+  events    = ["review.waiting", "review.overdue", "membership.waiting"]
+  secret_wo = var.fdp_webhook_secret
 }
 
 resource "fdp_compliance_role" "privacy_reviews_prod" {

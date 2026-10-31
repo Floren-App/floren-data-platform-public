@@ -169,17 +169,28 @@ def test_compliance_admins_manage_forms_and_classifications_but_not_their_own_ro
     assert client.post("/v1/compliance/roles", headers=as_("bob"), json={"role": "compliance_admin", "app_group_id": privacy}).status_code == 403
 
 
-class FakeSMTP:
+class Hook:
+    """What the platform posted to the test webhook: per recipient with an email address, like a mail automation sees it."""
     sent: list = []
+    raw: list = []
 
-    def __enter__(self):
-        return self
 
-    def __exit__(self, *exc):
-        return False
+def capture(monkeypatch, client, events=None, secret=None, status=200):
+    import json
+    from app import notify
+    Hook.sent, Hook.raw = [], []
 
-    def send_message(self, message):
-        FakeSMTP.sent.append({"to": message["To"], "subject": message["Subject"], "body": message.get_content()})
+    def post(url, body, headers):
+        payload = json.loads(body)
+        Hook.raw.append((url, payload, headers, body))
+        for r in payload["recipients"]:
+            if r["email"]:
+                Hook.sent.append({"to": r["email"], "subject": payload["subject"], "body": payload["text"] + "\n" + (payload["link"] or ""),
+                                  "event": payload["event"]})
+        return status
+    monkeypatch.setattr(notify, "_post", post)
+    client.put("/v1/admin/webhooks/privacy", headers=as_("admin"), json={
+        "name": "privacy", "url": "https://hooks.example.test/fdp", "events": events or [], **({"secret": secret} if secret else {})}).raise_for_status()
 
 
 def set_email(username, address):
@@ -192,10 +203,7 @@ def set_email(username, address):
 
 def test_reviews_notify_by_email_and_land_in_the_register(client, repo, monkeypatch):  # noqa: F811
     from app import notify
-    from app.config import get_settings
-    monkeypatch.setattr(get_settings(), "smtp_host", "smtp.test")
-    monkeypatch.setattr(notify, "_connect", lambda s: FakeSMTP())
-    FakeSMTP.sent = []
+    capture(monkeypatch, client)
     ids = setup_products(client, repo)
     classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
     layer, _ = set_up_policy(client, ids["public"])
@@ -209,17 +217,17 @@ def test_reviews_notify_by_email_and_land_in_the_register(client, repo, monkeypa
     case = client.post("/v1/compliance/cases", headers=as_("ana"), json={**target, "answers": ANSWERS}).json()
     notify.tick(SessionLocal)
     # Reviewers are told what waits and where; the answers never go out by email.
-    assert [(m["to"], m["subject"]) for m in FakeSMTP.sent] == [("bob@example.test", "Review needed: Reader on public for =Marketing")]
-    assert f"/#case={case['id']}" in FakeSMTP.sent[0]["body"] and "Monthly report" not in FakeSMTP.sent[0]["body"]
+    assert [(m["to"], m["subject"]) for m in Hook.sent] == [("bob@example.test", "Review needed: Reader on public for =Marketing")]
+    assert f"/#case={case['id']}" in Hook.sent[0]["body"] and "Monthly report" not in Hook.sent[0]["body"]
     client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "changes", "note": "Which report?"})
     client.post(f"/v1/compliance/cases/{case['id']}/submit", headers=as_("ana")).raise_for_status()
     client.post(f"/v1/compliance/cases/{case['id']}/comments", headers=as_("ana"), json={"text": "It is the finance one"}).raise_for_status()
     client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "approve"}).raise_for_status()
     notify.tick(SessionLocal)
-    assert [(m["to"], m["subject"].split(":")[0]) for m in FakeSMTP.sent[1:]] == [
+    assert [(m["to"], m["subject"].split(":")[0]) for m in Hook.sent[1:]] == [
         ("ana@example.test", "Changes asked"), ("bob@example.test", "Review needed"), ("bob@example.test", "New comment"),
         ("ana@example.test", "Approved")]
-    assert "Which report?" in FakeSMTP.sent[1]["body"]
+    assert "Which report?" in Hook.sent[1]["body"]
     # Membership approvers hear once about someone joining.
     grant_group(client, "workloads", "=Marketing", "Executor", users=["bob"])
     client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "membership_approver", "app_group_id": privacy}).raise_for_status()
@@ -229,7 +237,7 @@ def test_reviews_notify_by_email_and_land_in_the_register(client, repo, monkeypa
     client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "membership_approver", "app_group_id": approvers}).raise_for_status()
     notify.tick(SessionLocal)
     notify.tick(SessionLocal)
-    assert [(m["to"], m["subject"]) for m in FakeSMTP.sent[5:]] == [("ana@example.test", "Membership to approve: =Marketing")]
+    assert [(m["to"], m["subject"]) for m in Hook.sent[5:]] == [("ana@example.test", "Membership to approve: =Marketing")]
     # The register: what was given through a form, by whom and until when; CSV for the auditors.
     assert client.get("/v1/compliance/register", headers=as_("ana")).status_code == 403
     rows = client.get("/v1/compliance/register", headers=as_("bob")).json()
@@ -240,22 +248,157 @@ def test_reviews_notify_by_email_and_land_in_the_register(client, repo, monkeypa
     assert lines[0].startswith("group,access,kind") and lines[1].startswith("'=Marketing,Reader on public,role,restricted")
 
 
-def test_email_failures_are_retried_and_kept(client, monkeypatch):
+def test_webhooks_are_admin_configured_signed_filtered_and_retried(client, monkeypatch):
+    import hashlib
+    import hmac
+    import httpx
     from app import notify
-    from app.config import get_settings
     from app.models import Notification
-    monkeypatch.setattr(get_settings(), "smtp_host", "smtp.test")
-
-    def refuse(s):
-        raise OSError("connection refused")
-    monkeypatch.setattr(notify, "_connect", refuse)
+    body = {"name": "chat", "url": "https://hooks.example.test/chat", "events": ["review.waiting"]}
+    assert client.put("/v1/admin/webhooks/chat", headers=as_("ana"), json=body).status_code == 403
+    assert client.put("/v1/admin/webhooks/chat", headers=as_("admin"), json={**body, "url": "ftp://x"}).status_code == 422
+    assert client.put("/v1/admin/webhooks/chat", headers=as_("admin"), json={**body, "events": ["teleport"]}).status_code == 422
+    capture(monkeypatch, client, events=["membership.waiting"], secret="s3cret-signing-key-0123")
+    listed = client.get("/v1/admin/webhooks", headers=as_("admin")).json()
+    assert listed["webhooks"][0]["has_secret"] and "secret" not in listed["webhooks"][0]
+    assert "review.overdue" in {e["key"] for e in listed["events"]}
     set_email("bob", "bob@example.test")
     with SessionLocal() as db:
         bob = rbac.resolve_user(db, USERS["bob"]).principal_id
-        assert notify.queue(db, [bob], "Hello", "Body", key="hello") == 1
-        assert notify.queue(db, [bob], "Hello", "Body", key="hello") == 0   # once per key
+        assert notify.queue(db, "review.waiting", [bob], "Hello", "Body") == 0          # not an event this webhook wants
+        assert notify.queue(db, "membership.waiting", [bob], "Hello", "Body", key="hello") == 1
+        assert notify.queue(db, "membership.waiting", [bob], "Hello", "Body", key="hello") == 0   # once per key
         db.commit()
     notify.tick(SessionLocal)
+    url, payload, headers, raw = Hook.raw[0]
+    assert url == "https://hooks.example.test/fdp" and headers["X-FDP-Event"] == "membership.waiting"
+    assert payload["recipients"] == [{"username": "bob", "email": "bob@example.test"}] and payload["subject"] == "Hello"
+    assert headers["X-FDP-Signature"] == "sha256=" + hmac.new(b"s3cret-signing-key-0123", raw, hashlib.sha256).hexdigest()
+    # Failures are retried, then kept with their error.
+
+    def refuse(url, body, headers):
+        raise httpx.ConnectError("connection refused")
+    monkeypatch.setattr(notify, "_post", refuse)
     with SessionLocal() as db:
-        item = db.scalar(select(Notification))
-        assert item.sent_at is None and item.attempts == 1 and "refused" in item.error
+        notify.queue(db, "membership.waiting", [bob], "Again", "Body")
+        db.commit()
+    for _ in range(notify.MAX_ATTEMPTS + 1):
+        notify.tick(SessionLocal)
+    with SessionLocal() as db:
+        item = db.scalar(select(Notification).where(Notification.sent_at.is_(None)))
+        assert item.attempts == notify.MAX_ATTEMPTS and "refused" in item.error
+    hooks = client.get("/v1/admin/webhooks", headers=as_("admin")).json()["webhooks"]
+    assert hooks[0]["failing"]
+    assert [d["event"] for d in client.get("/v1/admin/webhooks/privacy/deliveries", headers=as_("admin")).json()] == ["membership.waiting"] * 2
+    tested = client.post("/v1/admin/webhooks/privacy/test", headers=as_("admin")).json()
+    assert not tested["sent"] and "refused" in tested["error"]
+    assert client.delete("/v1/admin/webhooks/privacy", headers=as_("admin")).status_code == 204
+    assert client.get("/v1/admin/webhooks", headers=as_("admin")).json()["webhooks"] == []
+
+
+def test_access_ends_renews_and_existing_access_gets_a_deadline(client, repo, monkeypatch):  # noqa: F811
+    from datetime import timedelta
+    from app import expiry, notify
+    from app.models import AccessCase, JustificationDeadline, utcnow
+    capture(monkeypatch, client)
+    ids = setup_products(client, repo)
+    classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
+    # Access that existed before the policy: kept, with a deadline.
+    legacy = grant_group(client, "workloads", "Legacy readers", "Executor")
+    client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": legacy, "role": "Reader"}).raise_for_status()
+    layer, _ = set_up_policy(client, ids["public"])
+    marketing = grant_group(client, "workloads", "Marketing readers", "Executor")
+    privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_reviewer", "app_group_id": privacy}).raise_for_status()
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": privacy}).raise_for_status()
+    set_email("ana", "ana@example.test")
+    set_email("bob", "bob@example.test")
+    now = utcnow()
+    expiry.tick(SessionLocal, now)
+    deadlines = client.get("/v1/compliance/deadlines", headers=as_("ana"), params={"resource_id": ids["public"]}).json()
+    assert [(d["group"], d["role"], d["classification"]) for d in deadlines] == [("Legacy readers", "Reader", "restricted")]
+    # The group's access is approved for 25 days; a renewal opens 30 days before the end, prefilled.
+    target = {"kind": "role", "resource_id": ids["public"], "role": "Reader", "app_group_id": marketing}
+    case = client.post("/v1/compliance/cases", headers=as_("ana"), json={**target, "answers": ANSWERS,
+                                                                         "until": (now + timedelta(days=25)).isoformat()}).json()
+    approved = client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "approve"}).json()
+    assert approved["status"] == "approved"
+    expiry.tick(SessionLocal, now + timedelta(days=4))
+    with SessionLocal() as db:
+        renewal = db.scalar(select(AccessCase).where(AccessCase.renewal_of == case["id"]))
+        assert renewal.status == "draft" and renewal.answers == ANSWERS and renewal.requester == "ana"
+    assert client.get(f"/v1/compliance/cases/{case['id']}", headers=as_("ana")).json()["renewal"] == renewal.id
+    expiry.tick(SessionLocal, now + timedelta(days=12))   # 13 days left, nothing sent: a reminder
+    expiry.tick(SessionLocal, now + timedelta(days=12))   # once
+    notify.tick(SessionLocal)
+    subjects = [(m["to"], m["subject"]) for m in Hook.sent]
+    assert ("ana@example.test", "Renew access: Reader on public for Marketing readers") in subjects
+    assert sum(s.startswith("Access ends in 13 days") for _, s in subjects) == 1, subjects
+    assert any(s.startswith("Justify access by") for _, s in subjects)
+    # Without a renewal the access ends; the role goes away and the case is expired.
+    expiry.tick(SessionLocal, now + timedelta(days=31))
+    with SessionLocal() as db:
+        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == marketing)) is None
+        assert db.get(AccessCase, case["id"]).status == "expired"
+        assert db.scalar(select(JustifiedGrant).where(JustifiedGrant.app_group_id == marketing)) is None
+    # Past the deadline, the legacy access without a form is removed too.
+    with SessionLocal() as db:
+        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == legacy)) is None
+        assert db.scalar(select(JustificationDeadline)) is None
+    # An ended case can be renewed by hand.
+    again = client.post(f"/v1/compliance/cases/{case['id']}/renew", headers=as_("ana"))
+    assert again.status_code == 201 and again.json()["renewal_of"] == case["id"]
+
+
+def test_justifying_existing_access_clears_its_deadline_and_overdue_reviews_escalate(client, repo, monkeypatch):  # noqa: F811
+    from datetime import timedelta
+    from app import expiry, notify
+    from app.models import JustificationDeadline, utcnow
+    capture(monkeypatch, client)
+    ids = setup_products(client, repo)
+    classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
+    legacy = grant_group(client, "workloads", "Legacy readers", "Executor")
+    client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": legacy, "role": "Reader"}).raise_for_status()
+    set_up_policy(client, ids["public"])
+    privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": privacy}).raise_for_status()
+    set_email("bob", "bob@example.test")
+    now = utcnow()
+    expiry.tick(SessionLocal, now)
+    # The owners justify the access the group already has.
+    case = client.post("/v1/compliance/cases", headers=as_("ana"), json={"kind": "role", "resource_id": ids["public"], "role": "Reader",
+                                                                         "app_group_id": legacy, "answers": ANSWERS}).json()
+    expiry.tick(SessionLocal, now + timedelta(days=11))   # review due after 10 days: overdue
+    notify.tick(SessionLocal)
+    assert ("bob@example.test", "Review overdue: Reader on public for Legacy readers") in [(m["to"], m["subject"]) for m in Hook.sent]
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_reviewer", "app_group_id": privacy}).raise_for_status()
+    client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "approve"}).raise_for_status()
+    with SessionLocal() as db:
+        assert db.scalar(select(JustificationDeadline)) is None
+        assert db.scalar(select(JustifiedGrant).where(JustifiedGrant.app_group_id == legacy)).previous_role is None
+    expiry.tick(SessionLocal, now + timedelta(days=20))   # justified now: no new deadline, the access stays
+    with SessionLocal() as db:
+        assert db.scalar(select(JustificationDeadline)) is None
+        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == legacy)).role == "Reader"
+
+
+def test_the_datas_owners_need_no_form_below_what_they_own(client, repo):  # noqa: F811
+    from app import expiry
+    from app.models import JustificationDeadline, utcnow
+    ids = setup_products(client, repo)
+    classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
+    with SessionLocal() as db:
+        source = db.get(Resource, ids["public"]).parent_id
+    owners = grant_group(client, "workloads", "Lake owners", "Executor")
+    client.put(f"/v1/rbac/resources/{source}/assignments", headers=as_("admin"), json={"app_group_id": owners, "role": "Owner"}).raise_for_status()
+    set_up_policy(client, ids["public"])
+    # A role below what they own needs no form, and gets no deadline.
+    assert client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("admin"),
+                      json={"app_group_id": owners, "role": "Admin"}).status_code == 200
+    expiry.tick(SessionLocal, utcnow())
+    with SessionLocal() as db:
+        assert db.scalar(select(JustificationDeadline).where(JustificationDeadline.app_group_id == owners)) is None
+    # Becoming an owner of covered data does need one.
+    others = grant_group(client, "workloads", "Others", "Executor")
+    refused = client.put(f"/v1/rbac/resources/{source}/assignments", headers=as_("admin"), json={"app_group_id": others, "role": "Owner"})
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "justification_required"

@@ -120,15 +120,6 @@
           "locations":{"type":"array","items":{"type":"string","minLength":1}}}}
       }
     },
-    "email": {
-      "type":"object", "additionalProperties":false,
-      "properties":{
-        "smtp":{"type":"object","additionalProperties":false,"properties":{
-          "host":{"type":"string","pattern":"^$|^[A-Za-z0-9.-]+$"},
-          "port":{"type":"integer","minimum":1,"maximum":65535},
-          "security":{"type":"string","enum":["starttls","tls","none"]},
-          "username":{"type":"string"},
-          "from":{"type":"string"}}}}},
     "siem": {
       "type":"object", "additionalProperties":false,
       "properties":{

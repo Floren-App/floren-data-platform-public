@@ -52,8 +52,8 @@ func (r *appProfileResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"features": schema.SetAttribute{ElementType: types.StringType, Required: true,
 				Description: "Feature keys; the server adds what they need, so declare those too to avoid drift."},
 			"default": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "The profile of groups without one. Exactly one profile is the default; making this one the default " +
-					"takes it from the other."},
+				Description: "The profile of groups without one. At most one profile is the default; making this one the default " +
+					"takes it from the other. Without a default, groups without a profile get the whole app."},
 		},
 	}
 }

@@ -187,8 +187,21 @@ def product_requirement(db, product: CatalogProduct, option: Optional[ProductOpt
     return {"layer_id": product.layer_id, "classification": level, "policy": policy_for(db, product.layer_id, level)}
 
 
+def owns(db, resource: Resource, group_id: Optional[str]) -> bool:
+    """Whether the group may give access to the object: a role with "assign" on it or above it (the data's owners)."""
+    from .models import RoleAssignment
+    if not group_id:
+        return False
+    for item in rbac.ancestors(db, resource):
+        assignment = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == item.id, RoleAssignment.app_group_id == group_id))
+        if assignment is not None and "assign" in rbac.roles_for(item).get(assignment.role, set()):
+            return True
+    return False
+
+
 def role_requirement(db, resource: Resource, role: str, group_id: Optional[str]) -> dict:
-    if "read" not in rbac.roles_for(resource).get(role, set()):
+    # The data's owners do not justify their own use of it; becoming an owner does need a form.
+    if "read" not in rbac.roles_for(resource).get(role, set()) or owns(db, resource, group_id):
         return {"layer_id": None, "classification": classification.UNCLASSIFIED, "policy": None}
     layer_id = layers.info(db, resource)["layer_id"]
     level = role_level(db, resource, group_id)
@@ -334,7 +347,7 @@ def approve(db, case: AccessCase, user) -> None:
         product = db.get(CatalogProduct, case.product_id)
         if product is None:
             raise HTTPException(409, "the product was unpublished")
-        resource_id, role = product.access_resource_id, "Consumer"
+        resource_id, role, previous = product.access_resource_id, "Consumer", None
         if db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == case.app_group_id)) is None:
             db.add(RoleAssignment(resource_id=resource_id, app_group_id=case.app_group_id, role=role))
         option = db.get(ProductOption, case.option_id) if case.option_id else product_options.default_option(db, product.id)
@@ -349,12 +362,16 @@ def approve(db, case: AccessCase, user) -> None:
                 request.status, request.decided_by, request.decided_at = "approved", user.username, utcnow()
     else:
         resource_id, role = case.resource_id, case.role
-        apply_role(db, resource_id, case.app_group_id, role)
+        previous = apply_role(db, resource_id, case.app_group_id, role)
     grant = db.scalar(select(JustifiedGrant).where(JustifiedGrant.resource_id == resource_id, JustifiedGrant.app_group_id == case.app_group_id))
     if grant is None:
-        grant = JustifiedGrant(resource_id=resource_id, app_group_id=case.app_group_id, role=role, case_id=case.id)
+        # A grant that is renewed keeps what the group had before the first approval.
+        grant = JustifiedGrant(resource_id=resource_id, app_group_id=case.app_group_id, role=role, case_id=case.id, previous_role=previous)
         db.add(grant)
     grant.role, grant.case_id, grant.until = role, case.id, until
+    from .models import JustificationDeadline
+    db.query(JustificationDeadline).filter(JustificationDeadline.resource_id == resource_id,
+                                           JustificationDeadline.app_group_id == case.app_group_id).delete()
     # The group's members when it was approved were part of what the reviewers saw.
     for principal_id in members_of(db, case.app_group_id):
         _approve_member(db, case.app_group_id, principal_id, "approval of " + case.id, case.id)
@@ -362,15 +379,19 @@ def approve(db, case: AccessCase, user) -> None:
           until=until.isoformat() if until else None)
 
 
-def apply_role(db, resource_id: str, group_id: str, role: str) -> None:
+def apply_role(db, resource_id: str, group_id: str, role: str) -> Optional[str]:
+    """Give the role (never lowering one the group has); returns the lower role it replaced, if any."""
     from .models import RoleAssignment
     resource = db.get(Resource, resource_id)
     roles = list(rbac.roles_for(resource))
     current = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == group_id))
     if current is None:
         db.add(RoleAssignment(resource_id=resource_id, app_group_id=group_id, role=role))
-    elif current.role in roles and role in roles and roles.index(current.role) < roles.index(role):
-        current.role = role
+        return None
+    if current.role in roles and role in roles and roles.index(current.role) < roles.index(role):
+        previous, current.role = current.role, role
+        return previous  # the lower role the group goes back to when this ends
+    return None
 
 
 def _approve_member(db, group_id: str, principal_id: Optional[str], by: str, case_id: Optional[str]) -> None:

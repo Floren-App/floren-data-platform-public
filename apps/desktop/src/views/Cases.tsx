@@ -71,7 +71,10 @@ export function CaseView({ id, hub, openTab }: { id: string; hub: Hub; openTab: 
   const decide = (decision: "approve" | "changes" | "decline") => act(api.compliance.decide(c.id, decision, note.trim(), until || null),
     decision === "approve" ? "Approved." : decision === "changes" ? "Sent back to the requester." : "Declined.");
   const resubmit = () => act((async () => { await api.compliance.updateCase(c.id, { answers });
-    if (Object.keys(files).length) await uploadFiles(c.id, files); await api.compliance.submitCase(c.id); })(), "Sent for review again.");
+    if (Object.keys(files).length) await uploadFiles(c.id, files); await api.compliance.submitCase(c.id); })(), c.status === "draft" ? "Sent for review." : "Sent for review again.");
+  const caseTab = (ref: string, title: string) => openTab({ kind: "privacy-case", ref, title });
+  const renew = () => { setBusy(true); setError("");
+    api.compliance.renew(c.id).then((r) => caseTab(r.id, caseWhat(r))).catch((e: Error) => setError(e.message)).finally(() => setBusy(false)); };
   const download = (fileId: string, name: string) => void api.compliance.caseFile(c.id, fileId).then((b) => saveFile(b, name)).catch((e: Error) => setError(e.message));
   const history = [...(c.submitted_at ? [{ at: c.submitted_at, by: c.requester, text: "sent the form" }] : []),
     ...c.decisions.map((d) => ({ at: d.at, by: d.by, text: `${d.decision === "approve" ? "approved" : d.decision === "changes" ? "asked for changes" : "declined"} as ${STEP[d.role] ?? d.role}${d.note ? `: ${d.note}` : ""}` })),
@@ -95,7 +98,7 @@ export function CaseView({ id, hub, openTab }: { id: string; hub: Hub; openTab: 
     </section>
     {c.definition && (editing ? <section className="card"><FormRenderer definition={c.definition} answers={answers} onChange={setAnswers} files={files} onComplete={setComplete}
         onFile={(f, file) => setFiles((all) => { const next = { ...all }; if (file) next[f] = file; else delete next[f]; return next; })} />
-        <div className="form-actions"><button className="btn" disabled={busy || !complete} onClick={() => void resubmit()}>Send again</button>
+        <div className="form-actions"><button className="btn" disabled={busy || !complete} onClick={() => void resubmit()}>{c.status === "draft" ? "Send for review" : "Send again"}</button>
           <button className="btn secondary" onClick={() => { setEditing(false); setAnswers(c.answers ?? {}); }}>Cancel</button></div></section>
       : <FormAnswers definition={c.definition} answers={c.answers ?? {}} files={c.files ?? []} onFile={download} />)}
     {c.can_review && <section className="card decision-panel" aria-label="Decide">
@@ -110,8 +113,14 @@ export function CaseView({ id, hub, openTab }: { id: string; hub: Hub; openTab: 
         <button className="btn secondary" disabled={busy || !note.trim()} onClick={() => void decide("changes")}>Ask for changes</button>
         <button className="btn danger" disabled={busy || !note.trim()} onClick={() => void decide("decline")}>Decline</button></div>
     </section>}
+    {c.renewal_of && <p className="hint">Renews <button className="text-button" onClick={() => caseTab(c.renewal_of!, "Earlier case")}>the earlier case</button>; the answers were filled in from it.</p>}
+    {(c.status === "approved" || c.status === "expired") && c.kind !== "membership" && <div className="form-actions">
+      {c.renewal ? <button className="btn secondary" onClick={() => caseTab(c.renewal!, "Renewal")}>Open the renewal</button>
+        : <button className="btn secondary" disabled={busy} onClick={renew}>Renew</button>}
+      {c.status === "approved" && c.approved_until && <span className="muted">Access ends {day(c.approved_until)}.</span>}</div>}
     {c.is_requester && open && !editing && <div className="form-actions">
       {c.status === "changes_requested" && <button className="btn" onClick={() => setEditing(true)}>Change answers</button>}
+      {c.status === "draft" && <button className="btn" onClick={() => setEditing(true)}>Check answers and send</button>}
       <button className="btn secondary" disabled={busy} onClick={() => void act(api.compliance.withdraw(c.id), "Withdrawn.")}>Withdraw</button></div>}
     <h2>History</h2>
     <ol className="case-history">{history.map((h, i) => <li key={i}><span className="muted" title={new Date(h.at).toLocaleString()}>{new Date(h.at).toLocaleString()}</span> <strong>{h.by}</strong> {h.text}</li>)}

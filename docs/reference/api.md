@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
-| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
-| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `POST` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
+| `GET` | `/v1/egress/{slug}/{path}` | Egress |
+| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -147,8 +147,10 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/compliance/cases/{case_id}/decision` | Decide Case |
 | `POST` | `/v1/compliance/cases/{case_id}/files` | Add File |
 | `GET` | `/v1/compliance/cases/{case_id}/files/{file_id}` | Get File |
+| `POST` | `/v1/compliance/cases/{case_id}/renew` | Renew Case |
 | `POST` | `/v1/compliance/cases/{case_id}/submit` | Submit Case |
 | `POST` | `/v1/compliance/cases/{case_id}/withdraw` | Withdraw Case |
+| `GET` | `/v1/compliance/deadlines` | List Deadlines |
 | `GET` | `/v1/compliance/forms` | List Forms |
 | `GET` | `/v1/compliance/forms/{form_id}` | Get Form |
 | `DELETE` | `/v1/compliance/forms/{form_id}` | Delete Form |
@@ -303,6 +305,16 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/catalog/assets/{ident}/observations` | Dataset Report |
 | `GET` | `/v1/catalog/assets/{ident}/sla-history` | Sla History |
 
+## notifications
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/v1/admin/webhooks` | List Webhooks |
+| `PUT` | `/v1/admin/webhooks/{name}` | Put Webhook |
+| `DELETE` | `/v1/admin/webhooks/{name}` | Delete Webhook |
+| `GET` | `/v1/admin/webhooks/{name}/deliveries` | Deliveries |
+| `POST` | `/v1/admin/webhooks/{name}/test` | Test Webhook |
+
 ## observability
 
 | Method | Path | Purpose |
@@ -348,8 +360,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/pages/{token}` | Page |
+| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

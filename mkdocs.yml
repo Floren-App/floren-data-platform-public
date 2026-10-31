@@ -102,6 +102,7 @@ nav:
       - Active groups and ownership: active-groups.md
       - App profiles: app-profiles.md
       - Access policies and compliance forms: access-policies.md
+      - Notifications (webhooks): notifications.md
       - Storage integrations: storage-integrations.md
       - Catalog and lineage: catalog.md
       - KPIs, quality and SLAs: metrics-and-slas.md

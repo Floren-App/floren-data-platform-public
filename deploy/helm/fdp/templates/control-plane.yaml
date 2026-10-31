@@ -226,15 +226,6 @@ spec:
             - { name: FDP_GCP_SECRETS_LOCATIONS, value: {{ join "," . | quote }} }
             {{- end }}
             {{- end }}
-            {{- with .Values.email.smtp }}
-            {{- if .host }}
-            - { name: FDP_SMTP_HOST, value: {{ .host | quote }} }
-            - { name: FDP_SMTP_PORT, value: {{ .port | quote }} }
-            - { name: FDP_SMTP_SECURITY, value: {{ .security | quote }} }
-            - { name: FDP_SMTP_USERNAME, value: {{ .username | quote }} }
-            - { name: FDP_SMTP_FROM, value: {{ .from | quote }} }
-            {{- end }}
-            {{- end }}
             {{- with .Values.siem }}
             {{- if .stdout }}
             - { name: FDP_SIEM_STDOUT, value: "true" }

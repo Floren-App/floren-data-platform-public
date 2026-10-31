@@ -6,7 +6,7 @@ An app profile: the features (pages, navigation and the API actions behind them)
 
 | Attribute | Type | Behavior | Description |
 |---|---|---|---|
-| `default` | `basetypes.BoolType` | Optional, Computed | The profile of groups without one. Exactly one profile is the default; making this one the default takes it from the other. |
+| `default` | `basetypes.BoolType` | Optional, Computed | The profile of groups without one. At most one profile is the default; making this one the default takes it from the other. Without a default, groups without a profile get the whole app. |
 | `description` | `basetypes.StringType` | Optional, Computed |  |
 | `features` | `types.SetType[basetypes.StringType]` | Required | Feature keys; the server adds what they need, so declare those too to avoid drift. |
 | `id` | `basetypes.StringType` | Computed |  |

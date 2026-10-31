@@ -13,6 +13,7 @@ def me(client, user):
 
 def make_viewer(client):
     """bob in a group "Viewers" on the Viewer profile, as his active group."""
+    client.put("/v1/admin/app-profiles/Viewer", headers=as_("admin"), json={"name": "Viewer", "features": ["products.browse"]}).raise_for_status()
     gid = grant_group(client, "workloads", "Viewers", "Executor", users=["bob"])
     group = client.get(f"/v1/rbac/groups", headers=as_("admin")).json()
     body = next(g for g in group if g["id"] == gid)
@@ -24,13 +25,12 @@ def make_viewer(client):
     return gid
 
 
-def test_defaults_keep_todays_access_and_profiles_follow_the_active_group(client):
+def test_no_profiles_until_configured_and_profiles_follow_the_active_group(client):
     listed = client.get("/v1/app-profiles", headers=as_("ana")).json()
-    names = {p["name"]: p for p in listed["profiles"]}
-    assert {"Full access", "Engineer", "Analyst", "Viewer"} <= set(names) and names["Full access"]["default"]
+    assert listed["profiles"] == []   # the platform comes with none: Terraform or an administrator adds them
     assert {f["key"] for f in listed["features"]} >= {"workspaces", "products.browse", "security"}
-    # Groups without a profile get the default: everything, as before.
-    assert "workspaces" in me(client, "ana")["app_features"]
+    # Without profiles, nothing is limited: object permissions decide, as before.
+    assert "workspaces" in me(client, "ana")["app_features"] and me(client, "ana")["app_profile"] is None
     gid = make_viewer(client)
     bob = me(client, "bob")
     assert bob["app_profile"] == "Viewer" and bob["app_features"] == ["products.browse"]
@@ -57,18 +57,20 @@ def test_only_administrators_configure_profiles_and_features_bring_what_they_nee
     created = client.put("/v1/admin/app-profiles/Requesters", headers=as_("admin"), json=body)
     assert created.status_code == 200 and created.json()["features"] == ["products.browse", "products.request"]
     assert client.put("/v1/admin/app-profiles/Bad", headers=as_("admin"), json={"name": "Bad", "features": ["teleport"]}).status_code == 422
-    # Exactly one default.
-    assert client.put("/v1/admin/app-profiles/Full access", headers=as_("admin"),
-                      json={"name": "Full access", "features": ["products.browse"], "default": False}).status_code == 409
+    # At most one default: groups without a profile follow it.
+    client.put("/v1/admin/app-profiles/Analyst", headers=as_("admin"), json={"name": "Analyst", "features": ["storage"], "default": True}).raise_for_status()
     switched = client.put("/v1/admin/app-profiles/Requesters", headers=as_("admin"), json={**body, "default": True})
     assert switched.json()["default"]
     defaults = [p["name"] for p in client.get("/v1/app-profiles", headers=as_("ana")).json()["profiles"] if p["default"]]
     assert defaults == ["Requesters"]
-    assert me(client, "ana")["app_features"] == ["products.browse", "products.request"]  # groups without a profile follow the default
-    # A profile in use or the default cannot be removed.
+    assert me(client, "ana")["app_features"] == ["products.browse", "products.request"]
+    # Without a default again, groups without a profile get everything.
+    client.put("/v1/admin/app-profiles/Requesters", headers=as_("admin"), json={**body, "default": False}).raise_for_status()
+    assert "workspaces" in me(client, "ana")["app_features"]
+    # A profile in use cannot be removed; others can.
     make_viewer(client)
     assert client.delete("/v1/admin/app-profiles/Viewer", headers=as_("admin")).status_code == 409
-    assert client.delete("/v1/admin/app-profiles/Requesters", headers=as_("admin")).status_code == 409
+    assert client.delete("/v1/admin/app-profiles/Requesters", headers=as_("admin")).status_code == 204
     assert client.delete("/v1/admin/app-profiles/Analyst", headers=as_("admin")).status_code == 204
     with SessionLocal() as db:
         assert db.scalar(select(AppGroup).where(AppGroup.name == "Viewers")).profile_id
