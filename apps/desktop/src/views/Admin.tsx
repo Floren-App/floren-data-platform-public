@@ -517,7 +517,7 @@ export function AdminNotifications() {
       .catch((e: Error) => setError(e.message)); };
   const show = (h: Webhook) => api.webhooks.deliveries(h.name).then((items) => setDeliveries({ name: h.name, items })).catch((e: Error) => setError(e.message));
   return <>
-    <PageHeader icon={<ProductIcon kind="api" size={22} />} title="Notifications"
+    <PageHeader icon={<ProductIcon kind="api" size={22} />} title="Alerts"
       subtitle="Webhooks the platform posts its events to as JSON: a chat channel, or automation that sends the email. Each message says what happened, who should act (with their email) and links into the app; form answers are never included."
       actions={<button className="btn" onClick={() => setEditing({ current: "", name: "", url: "", events: [], enabled: true, secret: "", remove: false, has: false })}><IconPlus size={14} />Add webhook</button>} />
     {error && <p className="error" role="alert">{error}</p>}

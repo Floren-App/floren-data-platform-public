@@ -274,16 +274,16 @@ export function PrivacyRoles({ hub }: { hub: Hub }) {
     {items.map((i) => <label key={i.id} className="row"><input type="checkbox" checked={scope[key].includes(i.id)} onChange={() => toggle(key, i.id)} />{i.name}</label>)}
     <span className="hint">None chosen: all.</span></fieldset>;
   return <>
-    <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="Compliance roles"
-      subtitle="Give app groups a compliance job: reviewing forms, approving people who join groups with justified access, or setting this up. Scope a role to layers, classifications, objects or groups." />
+    <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="Review duties"
+      subtitle="Give groups a duty: reviewing compliance forms, or approving new members of groups whose access came through a form. Scope a duty to layers, classifications, objects or groups." />
     {error && <p className="error" role="alert">{error}</p>}
-    <div className="table-scroll"><table aria-label="Compliance roles"><thead><tr><th>Role</th><th>Group</th><th>Scope</th>{admin && <th />}</tr></thead><tbody>
+    <div className="table-scroll"><table aria-label="Review duties"><thead><tr><th>Role</th><th>Group</th><th>Scope</th>{admin && <th />}</tr></thead><tbody>
       {data.roles.map((r) => <tr key={r.id}><td>{r.label}</td><td>{r.group}</td><td>{scopeText(r.scope, layers, groups)}</td>
         {admin && <td><button className="icon-btn" aria-label={`Remove ${r.label} from ${r.group}`} onClick={() => { setError("");
           api.compliance.removeRole(r.id).then(() => void load()).catch((err: Error) => setError(err.message)); }}><IconTrash size={14} /></button></td>}</tr>)}
-      {!data.roles.length && <tr><td colSpan={admin ? 4 : 3} className="muted">No compliance roles yet. Platform administrators can do everything.</td></tr>}</tbody></table></div>
+      {!data.roles.length && <tr><td colSpan={admin ? 4 : 3} className="muted">No review duties yet. Platform administrators can do everything.</td></tr>}</tbody></table></div>
     {admin && <form className="card" aria-label="Give a compliance role" onSubmit={add}>
-      <h2>Give a role</h2>
+      <h2>Give a duty</h2>
       <div className="arg-grid">
         <div className="field"><label htmlFor="role-kind">Role</label><select id="role-kind" value={role} onChange={(e) => setRole(e.target.value)}>
           {data.kinds.filter((k) => hub.me?.is_admin || k.key !== "compliance_admin").map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}</select></div>
@@ -293,7 +293,7 @@ export function PrivacyRoles({ hub }: { hub: Hub }) {
       {role === "compliance_reviewer" && <div className="arg-grid">
         {checks("layers", layers, "Layers")}{checks("classifications", levels.map((l) => ({ id: l.name, name: l.name })), "Classifications")}</div>}
       {role === "membership_approver" && checks("group_ids", groups.map((g) => ({ id: g.id, name: g.name })), "Groups")}
-      <div className="form-actions"><button className="btn" disabled={!group}>Give role</button></div>
+      <div className="form-actions"><button className="btn" disabled={!group}>Give duty</button></div>
       <p className="hint">Scoping a reviewer to specific objects is possible with Terraform or the API (resource_ids). Also configurable with Terraform (fdp_compliance_role).</p>
     </form>}
   </>;
@@ -332,11 +332,11 @@ export function PrivacyMemberships({ hub }: { hub: Hub }) {
     api.compliance.decideMembership(g, p, approve, notes[g + p] ?? "").then(() => { setMessage(`${approve ? "Approved" : "Declined"} ${name}.`); void load(); void hub.refresh(); })
       .catch((e: Error) => setError(e.message)); };
   return <>
-    <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="Memberships"
+    <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="New members"
       subtitle="People who joined a group that has access given through a compliance form. They have the group's other access already; this access waits for your approval." />
     {error && <p className="error" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
-    {!items ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Memberships to approve"><thead><tr><th>Person</th><th>Group</th><th /></tr></thead><tbody>
+    {!items ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="New members to approve"><thead><tr><th>Person</th><th>Group</th><th /></tr></thead><tbody>
       {items.map((m) => <tr key={m.app_group_id + m.principal_id}><td>{m.principal}</td><td>{m.group}</td>
         <td className="table-actions"><div className="row">
           <input aria-label={`Note for ${m.principal}`} placeholder="Note (optional)" value={notes[m.app_group_id + m.principal_id] ?? ""}

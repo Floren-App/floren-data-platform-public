@@ -31,15 +31,15 @@ export function HasAccessTo({ rows, hub, openTab, showGroup = false, label = "Ha
   </>;
 }
 
-/** Compliance roles held, with their scope. */
+/** Review duties held (compliance roles), with their scope. */
 export function ComplianceRolesHeld({ roles, openTab, showGroup = false }: { roles: ComplianceRoleHeld[]; openTab: OpenTab; showGroup?: boolean }) {
   if (!roles.length) return null;
   const scope = (r: ComplianceRoleHeld) => [r.scope.layers?.length ? `${r.scope.layers.length} layer${r.scope.layers.length === 1 ? "" : "s"}` : "",
     r.scope.classifications?.length ? r.scope.classifications.join(", ") : "", r.scope.resource_ids?.length ? `${r.scope.resource_ids.length} objects` : "",
     r.scope.group_ids?.length ? `${r.scope.group_ids.length} groups` : ""].filter(Boolean).join(" · ") || "everything";
-  return <section><h3>Compliance roles</h3>
+  return <section><h3>Review duties</h3>
     <ul className="object-links">{roles.map((r, i) => <li key={i}><ProductIcon kind="identity" size={16} />{r.label} <span className="muted">· {scope(r)}</span>
       {showGroup && <> <span className="muted">via</span> <button className="text-button" onClick={() => openTab({ kind: "access", ref: r.group.id, title: r.group.name })}>{r.group.name}</button></>}</li>)}</ul>
-    <p className="hint">Given in the privacy area (Privacy → Compliance roles).</p>
+    <p className="hint">Given under Administration → Review duties.</p>
   </section>;
 }
