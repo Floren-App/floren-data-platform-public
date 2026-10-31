@@ -60,8 +60,15 @@ def interactive(user) -> bool:
     return not user.execution_context and not user.username.startswith(("service:", "sa:"))
 
 
+def acting_as_admin(user) -> bool:
+    """Administrators with Global Admin (or no group) active get the whole app. With another group active they see
+    the app as that group's profile, to work as or check it; the API still lets them do everything (feature_gate)."""
+    from .ownership import GLOBAL_ADMIN
+    return user.is_admin and not user.execution_context and getattr(user, "active_group_id", None) in (None, GLOBAL_ADMIN)
+
+
 def features_for(db, user) -> Set[str]:
-    if user.is_admin and not user.execution_context:
+    if acting_as_admin(user):
         return set(FEATURES)
     if not interactive(user):
         return set(FEATURES)  # programs are limited by object permissions, not by app profiles
