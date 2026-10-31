@@ -553,6 +553,8 @@ test("workload identity settings preserve the caller and fixed-service choices",
 test("data children are fetched only when opened and shared between tree and detail pages", async ({ page }) => {
   const state = await setup(page);
   const sidebar = page.locator(".sidebar"), main = page.locator(".main");
+  // Live reads from the engine; the app also asks once for the last listing (cached=true) to show at once.
+  const live = () => state.dataReads.filter((url) => new URL(url).searchParams.get("cached") !== "true");
   await page.getByRole("button", { name: "Storage", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Storage", exact: true })).toBeVisible();
   expect(state.dataReads).toEqual([]);
@@ -561,24 +563,48 @@ test("data children are fetched only when opened and shared between tree and det
   expect(state.dataReads).toEqual([]);
   await sidebar.getByRole("button", { name: "Expand schema reporting", exact: true }).click();
   await expect(sidebar.getByRole("button", { name: "sales", exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(1);
+  expect(live().length).toBe(1);
+  expect(state.dataReads.filter((url) => url.includes("cached=true")).length).toBe(1);
   await main.getByRole("button", { name: "reporting", exact: true }).click();
   await expect(main.getByRole("button", { name: "sales", exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(1);
+  expect(live().length).toBe(1);
   await sidebar.getByRole("button", { name: "Expand table sales", exact: true }).click();
   await expect(sidebar.getByText("amount", { exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(2);
-  expect(new URL(state.dataReads[1]).searchParams.get("table")).toBe("sales");
+  expect(live().length).toBe(2);
+  expect(new URL(live()[1]).searchParams.get("table")).toBe("sales");
   await main.getByRole("button", { name: "sales", exact: true }).click();
   await expect(main.getByRole("cell", { name: "decimal(12,2)", exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(2);
+  expect(live().length).toBe(2);
   await sidebar.getByRole("button", { name: "Collapse table sales", exact: true }).click();
   await sidebar.getByRole("button", { name: "Expand table sales", exact: true }).click();
   await expect(sidebar.getByText("amount", { exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(2);
+  expect(live().length).toBe(2);
   await page.screenshot({ path: test.info().outputPath("data-hierarchy.png") });
   await main.getByRole("button", { name: "Refresh columns", exact: true }).click();
-  await expect.poll(() => state.dataReads.length).toBe(3);
+  await expect.poll(() => live().length).toBe(3);
+  expect(state.errors).toEqual([]);
+});
+
+test("a schema shows its last listing at once while the live listing loads", async ({ page }) => {
+  const state = await setup(page);
+  let release!: () => void;
+  const slow = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(/\/v1\/data\/schemas\/[^/]+\/children/, async (route) => {
+    if (new URL(route.request().url()).searchParams.get("cached") === "true")
+      return route.fulfill({ json: { children: [{ name: "sales", kind: "table" }], next_cursor: null, cached: true } });
+    await slow; // the engine is slow
+    return route.fulfill({ json: { children: [{ name: "sales", kind: "table" }, { name: "new_table", kind: "table" }], next_cursor: null } });
+  });
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "finance-dw", exact: true }).click();
+  const main = page.locator(".main");
+  await main.getByRole("button", { name: "reporting", exact: true }).click();
+  await expect(main.getByRole("button", { name: "sales", exact: true })).toBeVisible();
+  await expect(main.getByText("Showing the last listing · refreshing…", { exact: true })).toBeVisible();
+  await expect(main.getByRole("button", { name: "new_table", exact: true })).toHaveCount(0);
+  release();
+  await expect(main.getByRole("button", { name: "new_table", exact: true })).toBeVisible();
+  await expect(main.getByText("Metadata cached for this session", { exact: true })).toBeVisible();
   expect(state.errors).toEqual([]);
 });
 

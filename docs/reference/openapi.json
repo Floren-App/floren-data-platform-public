@@ -12699,6 +12699,18 @@
             }
           },
           {
+            "description": "Return the last listing the platform saw, without querying the engine",
+            "in": "query",
+            "name": "cached",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Return the last listing the platform saw, without querying the engine",
+              "title": "Cached",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,

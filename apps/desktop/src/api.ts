@@ -140,7 +140,8 @@ export interface DataChild {
   name: string; kind: "table" | "view" | "materialized_view" | "column" | "folder" | "file";
   data_type?: string; nullable?: boolean; ordinal_position?: number; path?: string; size?: number; modified_at?: string;
 }
-export interface DataChildren { children: DataChild[]; next_cursor: string | null }
+/** cached: the last listing the platform saw, returned without querying the engine. */
+export interface DataChildren { children: DataChild[]; next_cursor: string | null; cached?: boolean }
 export interface DataLocation { schemaId: string; table?: string; path?: string; item?: DataChild }
 
 export type WorkloadKind = "script" | "notebook" | "app" | "dbt" | "airflow" | "stream" | "kafka";
@@ -705,8 +706,9 @@ export const api = {
     "GET", `/v1/data/schemas/${encodeURIComponent(schemaId)}/preview?${new URLSearchParams({ table })}`),
   metadataQuery: (sql: string) => request<{ columns: string[]; rows: unknown[][]; rowcount: number; truncated: boolean; query_id: string }>(
     "POST", "/v1/sql/query", { source: "fdp-metadata", sql, max_rows: 1000 }),
-  dataChildren: (schemaId: string, options: { table?: string; path?: string; after?: string } = {}) => {
-    const params = new URLSearchParams(options);
+  dataChildren: (schemaId: string, options: { table?: string; path?: string; after?: string; cached?: boolean } = {}) => {
+    const { cached, ...rest } = options;
+    const params = new URLSearchParams({ ...rest, ...(cached ? { cached: "true" } : {}) });
     return request<DataChildren>("GET", `/v1/data/schemas/${encodeURIComponent(schemaId)}/children?${params}`);
   },
   access: {

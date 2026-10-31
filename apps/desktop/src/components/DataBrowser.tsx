@@ -16,10 +16,18 @@ export function dataTab(schema: AccessResource, child: DataChild): TabRef {
   return { kind: "data-object", ref: JSON.stringify([schema.id, child.kind, child.path ?? child.name]), title: child.name, data };
 }
 
+/** Live metadata from the engine. For SQL schemas the first page also comes from the platform's last listing,
+ *  shown at once (refreshing) until the live one arrives: Trino can take seconds per Iceberg schema. */
 function useChildren(schema: AccessResource, location: DataLocation, active: boolean, after = "") {
   const key = "data:" + JSON.stringify([schema.id, schema.config, schema.actions.slice().sort(), location.table ?? null, location.path ?? "", after]);
-  return useCached(key, () => api.dataChildren(schema.id, { ...(location.table !== undefined ? { table: location.table } : {}),
-    ...(location.path ? { path: location.path } : {}), ...(after ? { after } : {}) }), active && schema.config.state === "ready");
+  const options = { ...(location.table !== undefined ? { table: location.table } : {}), ...(location.path ? { path: location.path } : {}), ...(after ? { after } : {}) };
+  const enabled = active && schema.config.state === "ready";
+  const live = useCached(key, () => api.dataChildren(schema.id, options), enabled);
+  const sql = schema.config.source_kind !== "s3" && location.path === undefined && !after;
+  const quick = useCached(key + ":cached", () => api.dataChildren(schema.id, { ...options, cached: true }), enabled && sql);
+  if (live.status === "ready" || !quick.data?.children.length) return { ...live, refreshing: false };
+  // Live still loading (or failed): the last listing, marked as refreshing.
+  return { ...live, status: "ready" as const, data: quick.data, error: live.status === "error" ? live.error : undefined, refreshing: live.status !== "error" };
 }
 
 const kindLabel = (child: DataChild) => objectKindLabel(child.kind);
@@ -35,6 +43,7 @@ export function DataTreeChildren({ schema, location = { schemaId: schema.id }, o
     {state.status === "idle" || state.status === "loading" ? <li className="tree-message muted" role="status">Loading…</li>
       : state.status === "error" ? <li className="tree-message"><span className="error">{state.error}</span> <button className="text-button" onClick={state.refresh}>Retry</button></li>
       : <>
+        {state.refreshing && <li className="tree-message muted" role="status">Refreshing…</li>}
         {state.data?.children.map((child) => <DataTreeItem key={`${child.kind}:${child.path ?? child.name}`} schema={schema} child={child} openTab={openTab} />)}
         {!state.data?.children.length && <li className="tree-message muted">No {location.table ? "columns" : "objects"}.</li>}
         {state.data?.next_cursor && (more ? <li><DataTreeChildren key={state.data.next_cursor} schema={schema} location={location} openTab={openTab} after={state.data.next_cursor} /></li>
@@ -81,8 +90,8 @@ export function DataListing({ schema, location = { schemaId: schema.id }, openTa
     <div className="section-heading" style={{ justifyContent: "flex-start", gap: 8 }}><h2>{columns ? "Columns" : sourceStorage ? "Folders & files" : "Tables & views"}</h2>
       {state.data && <span className="badge" title="Objects on this page">{state.data.children.length}{state.data.next_cursor ? "+" : ""}</span>}</div>
     <div className="object-toolbar"><input type="search" aria-label={columns ? "Find column" : "Find data object"} placeholder="Filter this page…" value={search} onChange={(e) => setSearch(e.target.value)} />
-      <div className="toolbar-group"><span className="hint">{state.status === "ready" ? "Metadata cached for this session" : "Loads when opened"}</span>
-        <button className="btn secondary" disabled={state.status === "loading"} onClick={state.refresh}><IconRefresh size={14} />Refresh {columns ? "columns" : "objects"}</button></div></div>
+      <div className="toolbar-group"><span className="hint" role="status">{state.refreshing ? "Showing the last listing · refreshing…" : state.error ? `Showing the last listing · ${state.error}` : state.status === "ready" ? "Metadata cached for this session" : "Loads when opened"}</span>
+        <button className="btn secondary" disabled={state.status === "loading" || state.refreshing} onClick={state.refresh}><IconRefresh size={14} />Refresh {columns ? "columns" : "objects"}</button></div></div>
     {state.status === "idle" || state.status === "loading" ? <p className="muted" role="status">Loading {columns ? "columns" : "objects"}…</p>
       : state.status === "error" ? <p className="error" role="alert">{state.error}</p>
       : <div className="table-scroll"><table><thead><tr><th>Name</th><th>{columns ? "Data type" : "Type"}</th>{columns && <th>Nullable</th>}</tr></thead><tbody>
