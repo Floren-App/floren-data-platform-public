@@ -52,6 +52,13 @@ commits. Valid updates are deployed; a failed update keeps the last serving vers
 and reports an error. **Check for updates** requests an immediate check. With sync
 disabled, the publication stays on its deployed commit until deliberately updated.
 
+Git is the source of truth for versions. A workload's **Versions** tab lists the newest
+commits on its branch with their hash, author and commit time, and marks which one runs
+now, which ran before (and when they were deployed), and which are newer but not deployed
+yet. Below it, the deploy history shows each deploy, wait for capacity and failure. To roll
+back, revert the commit in Git. Folder lists show each workload's commit and when it was
+last updated, and every run records the commit it ran.
+
 Scripts run when invoked; a registered script does not need a continuously running
 process. Apps keep a serving process. dbt supports execution and its generated docs;
 Airflow serves an orchestrator. Inspect run outcomes separately from publication status.

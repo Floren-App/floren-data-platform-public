@@ -401,8 +401,9 @@ test("folder IAM flows to apps and nested folders while keeping branches visible
   await expect(page.getByRole("status")).toHaveText("Assigned Executor to Analysts.");
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Contents", exact: true }).click();
   await main.getByRole("button", { name: "Reports", exact: true }).click();
-  await expect(main.getByRole("columnheader", { name: "Git branch", exact: true })).toBeVisible();
-  await expect(main.getByRole("row").filter({ hasText: "Sales app" }).getByText("main", { exact: true })).toBeVisible();
+  await expect(main.getByRole("columnheader", { name: "Git", exact: true })).toBeVisible();
+  await expect(main.getByRole("columnheader", { name: "Updated", exact: true })).toBeVisible();
+  await expect(main.getByRole("row").filter({ hasText: "Sales app" })).toContainText("main · abc1234");
   await main.getByRole("button", { name: "Sales app", exact: true }).click();
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Permissions", exact: true }).click();
   const inherited = main.getByRole("row").filter({ hasText: "Analysts" });
@@ -553,6 +554,8 @@ test("workload identity settings preserve the caller and fixed-service choices",
 test("data children are fetched only when opened and shared between tree and detail pages", async ({ page }) => {
   const state = await setup(page);
   const sidebar = page.locator(".sidebar"), main = page.locator(".main");
+  // Live reads from the engine; the app also asks once for the last listing (cached=true) to show at once.
+  const live = () => state.dataReads.filter((url) => new URL(url).searchParams.get("cached") !== "true");
   await page.getByRole("button", { name: "Storage", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Storage", exact: true })).toBeVisible();
   expect(state.dataReads).toEqual([]);
@@ -561,24 +564,117 @@ test("data children are fetched only when opened and shared between tree and det
   expect(state.dataReads).toEqual([]);
   await sidebar.getByRole("button", { name: "Expand schema reporting", exact: true }).click();
   await expect(sidebar.getByRole("button", { name: "sales", exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(1);
+  expect(live().length).toBe(1);
+  expect(state.dataReads.filter((url) => url.includes("cached=true")).length).toBe(1);
   await main.getByRole("button", { name: "reporting", exact: true }).click();
   await expect(main.getByRole("button", { name: "sales", exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(1);
+  expect(live().length).toBe(1);
   await sidebar.getByRole("button", { name: "Expand table sales", exact: true }).click();
   await expect(sidebar.getByText("amount", { exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(2);
-  expect(new URL(state.dataReads[1]).searchParams.get("table")).toBe("sales");
+  expect(live().length).toBe(2);
+  expect(new URL(live()[1]).searchParams.get("table")).toBe("sales");
   await main.getByRole("button", { name: "sales", exact: true }).click();
   await expect(main.getByRole("cell", { name: "decimal(12,2)", exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(2);
+  expect(live().length).toBe(2);
   await sidebar.getByRole("button", { name: "Collapse table sales", exact: true }).click();
   await sidebar.getByRole("button", { name: "Expand table sales", exact: true }).click();
   await expect(sidebar.getByText("amount", { exact: true })).toBeVisible();
-  expect(state.dataReads.length).toBe(2);
+  expect(live().length).toBe(2);
   await page.screenshot({ path: test.info().outputPath("data-hierarchy.png") });
   await main.getByRole("button", { name: "Refresh columns", exact: true }).click();
-  await expect.poll(() => state.dataReads.length).toBe(3);
+  await expect.poll(() => live().length).toBe(3);
+  expect(state.errors).toEqual([]);
+});
+
+test("a workload's Versions tab follows Git and shows what ran when", async ({ page }) => {
+  const state = await setup(page);
+  const hour = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
+  await page.route("https://iam.test/api/v1/workloads/sales/versions", (route) => route.fulfill({ json: {
+    repo: "analytics", branch: "main", head_sha: "f".repeat(40), deployed_sha: "abc1234" + "0".repeat(33), last_checked_at: hour(0), auto_update: false, behind: 1,
+    commits: [{ sha: "f".repeat(40), subject: "Add filters", author: "Jesse", date: hour(1), state: "pending", deployed_at: null },
+      { sha: "abc1234" + "0".repeat(33), subject: "First version", author: "Jesse", date: hour(30), state: "running", deployed_at: hour(26) },
+      { sha: "e".repeat(40), subject: "Draft", author: "Jesse", date: hour(50), state: "deployed", deployed_at: hour(48) }] } }));
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
+  await page.locator(".main").getByRole("button", { name: "Finance", exact: true }).click();
+  await page.locator(".main").getByRole("button", { name: "Reports", exact: true }).click();
+  const main = page.locator(".main");
+  await expect(main.getByRole("table")).toContainText("main · abc1234");
+  await main.getByRole("button", { name: "Sales app", exact: true }).click();
+  await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Versions", exact: true }).click();
+  const versions = main.getByRole("table", { name: "Versions" });
+  await expect(versions.getByRole("row", { name: /Add filters/ })).toContainText("Not deployed yet");
+  await expect(versions.getByRole("row", { name: /First version/ })).toContainText("Running now");
+  await expect(versions.getByRole("row", { name: /First version/ })).toContainText("deployed 1 day ago");
+  await expect(versions.getByRole("row", { name: /Draft/ })).toContainText("Ran before");
+  await expect(main.getByText("1 newer commit", { exact: true })).toBeVisible();
+  await expect(main.getByText(/Git is the source of truth/)).toBeVisible();
+  expect(state.errors).toEqual([]);
+});
+
+test("logs: a workload's Logs tab, the joint Workloads log and a run's log", async ({ page }) => {
+  const state = await setup(page);
+  const asked: URLSearchParams[] = [];
+  const line = (id: number, level: string, message: string, extra: Record<string, unknown> = {}) => ({ id, at: new Date(Date.now() - id * 60_000).toISOString(), level, source: "program",
+    event: "", message, fields: {}, workload_id: "sales", workload: "Sales app", run_id: null, workspace_id: null, commit_sha: "abc1234" + "0".repeat(33), layer_id: "1a0000000002", actor: "admin", ...extra });
+  await page.route("https://iam.test/api/v1/runs?*", (route) => route.fulfill({ json: [{ id: "run-1", initiated_by: "admin", owner: "admin", workspace_id: null, workload_id: "script",
+    commit_sha: "abc1234" + "0".repeat(33), kind: "script", entrypoint: "daily.py", program: "daily-report", args: {}, runtime: "python", runtime_version: "3.12",
+    status: "succeeded", pool_name: "small", created_at: "2026-10-19T10:00:00Z", finished_at: "2026-10-19T11:00:00Z" }] }));
+  await page.reload();
+  await page.route(/\/v1\/logs\?/, (route) => {
+    const params = new URL(route.request().url()).searchParams; asked.push(params);
+    const all = [line(1, "error", "upload failed", { fields: { attempt: 2 } }), line(2, "warning", "3 rows without a region"),
+      line(3, "info", "DAG pokemon started", { source: "airflow", event: "dag.started" }), line(4, "info", "daily.py started", { source: "platform", event: "run.started", run_id: "run-1" })];
+    const min = ["debug", "info", "warning", "error"].indexOf(params.get("level") || "debug");
+    return route.fulfill({ json: { entries: all.filter((e) => ["debug", "info", "warning", "error"].indexOf(e.level) >= min && e.message.includes(params.get("q") || "")), next_before: null } });
+  });
+  const main = page.locator(".main");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Logs", exact: true }).click();
+  const lines = main.getByRole("table", { name: "Log lines" });
+  await expect(lines.getByRole("row")).toHaveCount(5);
+  await expect(lines.getByRole("row", { name: /upload failed/ })).toContainText("abc1234");
+  await expect(lines.getByRole("row", { name: /DAG pokemon started/ })).toContainText("Airflow ·");
+  expect(asked.at(-1)!.get("folder_id")).toBe("workloads");
+  expect(asked.at(-1)!.get("layer_id")).toBe("1a0000000002"); // the joint log follows the layer mode
+  await main.getByRole("combobox", { name: "Log level", exact: true }).selectOption("warning");
+  await expect(lines.getByRole("row")).toHaveCount(3);
+  await lines.getByRole("row", { name: /upload failed/ }).getByRole("button", { name: "details", exact: true }).click();
+  await expect(lines).toContainText('"attempt": 2');
+  await main.getByRole("combobox", { name: "Log level", exact: true }).selectOption("debug");
+  await lines.getByRole("row", { name: /daily.py started/ }).getByRole("button", { name: "Run", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "Log", exact: true })).toBeVisible();
+  expect(asked.at(-1)!.get("run_id")).toBe("run-1");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
+  await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Contents", exact: true }).click();
+  await main.getByRole("button", { name: "Finance", exact: true }).click();
+  await main.getByRole("button", { name: "Reports", exact: true }).click();
+  await main.getByRole("button", { name: "Sales app", exact: true }).click();
+  await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Logs", exact: true }).click();
+  await expect(main.getByRole("table", { name: "Log lines" })).toBeVisible();
+  expect(asked.at(-1)!.get("workload_id")).toBe("sales");
+  expect(state.errors).toEqual([]);
+});
+
+test("a schema shows its last listing at once while the live listing loads", async ({ page }) => {
+  const state = await setup(page);
+  let release!: () => void;
+  const slow = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(/\/v1\/data\/schemas\/[^/]+\/children/, async (route) => {
+    if (new URL(route.request().url()).searchParams.get("cached") === "true")
+      return route.fulfill({ json: { children: [{ name: "sales", kind: "table" }], next_cursor: null, cached: true } });
+    await slow; // the engine is slow
+    return route.fulfill({ json: { children: [{ name: "sales", kind: "table" }, { name: "new_table", kind: "table" }], next_cursor: null } });
+  });
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "finance-dw", exact: true }).click();
+  const main = page.locator(".main");
+  await main.getByRole("button", { name: "reporting", exact: true }).click();
+  await expect(main.getByRole("button", { name: "sales", exact: true })).toBeVisible();
+  await expect(main.getByText("Showing the last listing · refreshing…", { exact: true })).toBeVisible();
+  await expect(main.getByRole("button", { name: "new_table", exact: true })).toHaveCount(0);
+  release();
+  await expect(main.getByRole("button", { name: "new_table", exact: true })).toBeVisible();
+  await expect(main.getByText("Metadata cached for this session", { exact: true })).toBeVisible();
   expect(state.errors).toEqual([]);
 });
 
@@ -668,6 +764,11 @@ test("compute counts active products and scripts are ready on demand", async ({ 
   await expect(main.getByRole('meter', { name: 'Slots in use' })).toHaveAttribute('aria-valuenow', '4');
   await expect(main.getByRole('table', { name: 'Use by layer' })).toContainText('Non-Prod32');
   const using = main.getByRole('table', { name: 'Using this warehouse' });
+  // The layer mode (Non-Prod) hides Prod's work until All layers is chosen; the sidebar shares the choice.
+  await expect(using.getByRole('row', { name: /Sales app/ })).toHaveCount(0);
+  await expect(main.getByRole('table', { name: 'Use by layer' })).not.toContainText('Prod1');
+  await main.getByRole('group', { name: 'Layers shown' }).getByRole('button', { name: 'All layers', exact: true }).click();
+  await expect(page.locator('.sidebar').getByRole('button', { name: 'All layers', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(using.getByRole('row', { name: /Sales app/ })).toContainText('App');
   await expect(using.getByRole('row', { name: /Trino workers/ })).toContainText('SQL engine');
   await expect(using.getByRole('row', { name: /etl\.py/ })).toContainText('queued · 2nd in line');
@@ -765,7 +866,9 @@ for (const inspectChild of [false, true]) test(`Airflow hierarchy ${inspectChild
   await expect(graph.locator(`[data-id="${dag.id}"]`)).toHaveClass(/react-flow__node/);
   await expect(graph.locator(`[data-id="${load.id}"]`)).toBeVisible();
   await expect(graph.locator('[data-id="task-dependency"] .react-flow__edge-path')).toHaveCSS("stroke-dasharray", "5px, 4px");
-  await graph.locator(`[data-id="${program.id}"] .lineage-entity-title`).first().hover();
+  // The expanded program contains its DAG and tasks and can be taller than the canvas, so its title may sit
+  // outside the visible area: point at the node itself rather than at a screen position.
+  await graph.locator(`[data-id="${program.id}"] .lineage-entity-title`).first().dispatchEvent("mouseover");
   await expect(graph.locator(`[data-id="${load.id}"]`)).not.toHaveClass(/dimmed/);
   await page.screenshot({path:test.info().outputPath("nested-airflow.png")});
   if (!inspectChild) {
@@ -1014,18 +1117,19 @@ test("recent runs load 20 at a time with an option to load more", async ({ page 
   });
   await page.reload();
   await page.getByRole("button", { name: "Workloads", exact: true }).click();
-  const sidebar = page.locator(".sidebar");
-  await expect(sidebar.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(20);
+  await page.locator(".sidebar").getByRole("button", { name: "Recent runs", exact: true }).click();
+  const runsTable = page.locator(".main").getByRole("table", { name: "Runs", exact: true }), more = page.locator(".main").getByRole("button", { name: "Load more runs", exact: true });
+  await expect(runsTable.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(20);
   expect(limits.at(-1)).toBe(21);
-  await sidebar.getByRole("button", { name: "Load more runs", exact: true }).click();
-  await expect(sidebar.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(40);
-  await sidebar.getByRole("button", { name: "Load more runs", exact: true }).click();
-  await expect(sidebar.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(45);
-  await expect(sidebar.getByRole("button", { name: "Load more runs", exact: true })).toHaveCount(0);
+  await more.click();
+  await expect(runsTable.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(40);
+  await more.click();
+  await expect(runsTable.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(45);
+  await expect(more).toHaveCount(0);
   expect(state.errors).toEqual([]);
 });
 
-test("workspace runs are listed under Workspaces, apart from runs of deployed programs", async ({ page }) => {
+test("workspace runs are a tab of Workspaces, apart from runs of deployed programs", async ({ page }) => {
   const state = await setup(page);
   const base = { initiated_by: "admin", owner: "admin", commit_sha: null, kind: "script", program: null, args: {}, runtime: "python", runtime_version: "3.12",
     status: "pending", waiting_reason: "waiting for cluster capacity: no node has enough memory free", pool_name: "small", created_at: "2026-10-18T09:00:00Z", finished_at: null };
@@ -1035,20 +1139,19 @@ test("workspace runs are listed under Workspaces, apart from runs of deployed pr
   await page.reload();
   const sidebar = page.locator(".sidebar"), main = page.locator(".main");
   await page.getByRole("button", { name: "Workloads", exact: true }).click();
-  await expect(sidebar.getByRole("list", { name: "Recent runs" })).toContainText("jobs/daily.py");
-  await expect(sidebar.getByRole("list", { name: "Recent runs" })).not.toContainText("explore.py");
+  await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Recent runs", exact: true }).click();
+  await expect(main.getByRole("table", { name: "Runs", exact: true })).toContainText("jobs/daily.py");
+  await expect(main.getByRole("table", { name: "Runs", exact: true })).not.toContainText("explore.py");
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workspaces", exact: true }).click();
-  const workspaceRuns = sidebar.getByRole("list", { name: "Workspace runs" });
-  await expect(workspaceRuns).toContainText("explore.py");
-  await expect(workspaceRuns).not.toContainText("jobs/daily.py");
+  await main.getByRole("navigation", { name: "Workspace sections" }).getByRole("button", { name: "Runs", exact: true }).click();
+  await expect(main.getByRole("table", { name: "Runs", exact: true })).toContainText("explore.py");
+  await expect(main.getByRole("table", { name: "Runs", exact: true })).not.toContainText("jobs/daily.py");
   await sidebar.getByRole("button", { name: "Workspace runs", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Workspace runs" })).toBeVisible();
   await expect(main.getByRole("table", { name: "Runs" })).toContainText("no node has enough memory free");
   const views = page.getByRole("navigation", { name: "Views" });
   await main.getByRole("table", { name: "Runs" }).getByRole("button", { name: "explore.py", exact: true }).click();
   await expect(views.getByRole("button", { name: "Workspaces", exact: true })).toHaveAttribute("aria-current", "page");  // stays in Workspaces
-  await workspaceRuns.getByRole("button", { name: /explore\.py/ }).click();
-  await expect(views.getByRole("button", { name: "Workspaces", exact: true })).toHaveAttribute("aria-current", "page");
   expect(state.errors).toEqual([]);
 });
 
@@ -1724,7 +1827,7 @@ test("Home starts with scoped activity and submits global search into the catalo
   expect(state.errors).toEqual([]);
 });
 
-test("Workloads contains the run sidebar and a searchable history tab", async ({ page }) => {
+test("Workloads keeps runs in a searchable tab, not in the sidebar", async ({ page }) => {
   const state = await setup(page);
   const run = { id: "run-1", initiated_by: "admin", owner: "admin", workspace_id: null, workload_id: "script", commit_sha: null,
     kind: "script", entrypoint: "daily.py", program: "daily-report", args: {}, runtime: "python", runtime_version: "3.12", status: "failed", pool_name: "small", created_at: "2026-10-19T10:00:00Z", finished_at: "2026-10-19T11:00:00Z" };
@@ -1732,8 +1835,7 @@ test("Workloads contains the run sidebar and a searchable history tab", async ({
   await page.reload();
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
   const sidebar = page.locator(".sidebar"), main = page.locator(".main");
-  await expect(sidebar.getByRole("button", { name: /daily-report/ })).toBeVisible();
-  expect(await sidebar.locator(".object-tree").first().evaluate((tree) => !!(tree.compareDocumentPosition(document.querySelector(".sidebar-section-divider")!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+  await expect(sidebar.getByRole("button", { name: /daily-report/ })).toHaveCount(0);
   await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Recent runs", exact: true }).click();
   await expect(main.getByRole("table", { name: "Runs", exact: true })).toContainText("daily-report");
   await main.getByRole("combobox", { name: "Run status", exact: true }).selectOption("succeeded");
@@ -1875,7 +1977,7 @@ test("schema Owners grant a person access directly and see User as the recipient
   expect(state.errors).toEqual([]);
 });
 
-test("the layer mode filters lists, is remembered, and marks production", async ({ page }) => {
+test("the layer mode filters lists, is remembered, and names production in the picker", async ({ page }) => {
   const state = await setup(page);
   (state.resources.find((r) => r.id === "source-lake") as any).layer_id = "1a0000000001";
   await page.reload();
@@ -1885,18 +1987,65 @@ test("the layer mode filters lists, is remembered, and marks production", async 
   await expect(sidebar.getByRole("button", { name: "finance-dw", exact: true })).toBeVisible(); // No layer: shown in every layer.
   await expect(sidebar.getByRole("button", { name: "lake", exact: true })).toHaveCount(0);
   await expect(sidebar).toContainText("1 more in other layers");
-  await expect(page.locator(".shell")).not.toHaveClass(/prod/);
+  await expect(layer.locator("option:checked")).toHaveText("Non-Prod");
   await layer.selectOption("1a0000000001");
   await expect(sidebar.getByRole("button", { name: "lake", exact: true })).toBeVisible();
-  await expect(page.locator(".shell")).toHaveClass(/prod/);
-  await expect(page.getByRole("banner", { name: "Working context" })).toContainText("Changes here affect production");
+  await expect(layer.locator("option:checked")).toHaveText("Prod · production");
+  await expect(page.locator(".shell")).toHaveAttribute("class", "shell"); // Same styling in every layer.
   expect(state.mutations.some((m) => m.method === "PUT" && m.path === "/v1/me/active-layer" && m.body.layer_id === "1a0000000001")).toBeTruthy();
   await page.reload();
   await expect(layer).toHaveValue("1a0000000001");
   expect(state.errors).toEqual([]);
 });
 
-test("active group stays in the top bar across tabs and reloads", async ({ page }) => {
+test("activity bar shows its labels on hover without taking room", async ({ page }) => {
+  const state = await setup(page);
+  const bar = page.getByRole("navigation", { name: "Views" }), sidebar = page.locator(".sidebar");
+  const sidebarLeft = (await sidebar.boundingBox())!.x;
+  expect((await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
+  await bar.getByRole("button", { name: "Workspaces", exact: true }).hover();
+  await expect.poll(async () => (await bar.boundingBox())!.width).toBeGreaterThan(150);
+  expect((await sidebar.boundingBox())!.x).toBe(sidebarLeft); // Overlays the sidebar; nothing shifts.
+  await expect(bar.getByRole("button", { name: "Workspaces", exact: true })).toContainText("Workspaces");
+  await page.mouse.move(700, 300);
+  await expect.poll(async () => (await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
+  expect(state.errors).toEqual([]);
+});
+
+test("folders follow the layer, workspaces follow the group, and Git credentials sit with Workspaces", async ({ page }) => {
+  const state = await setup(page);
+  state.resources.push({ ...resource("test-env", "folder", "Pokemon Test", "workloads", { environment: true }), layer_id: "1a0000000002" } as any,
+    { ...resource("prod-env", "folder", "Pokemon Prod", "workloads", { environment: true }), layer_id: "1a0000000001" } as any);
+  const ws = (id: string, name: string, group: string) => ({ id, owner: "admin", name, editor: "vscode", status: "stopped", owner_group_id: group,
+    layer_id: "1a0000000002", last_activity_at: "2026-10-20T10:00:00Z", created_at: "2026-10-20T10:00:00Z" });
+  await page.route("https://iam.test/api/v1/workspaces", (route) => route.fulfill({ json: [ws("ws-a", "Analysis", "analysts"), ws("ws-e", "Engineering", "operators")] }));
+  await page.reload();
+  const sidebar = page.locator(".sidebar"), main = page.locator(".main"), views = page.getByRole("navigation", { name: "Views" });
+  await views.getByRole("button", { name: "Workloads", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: "Pokemon Test", exact: true })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "Pokemon Prod", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Pokemon Prod", exact: true })).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Layer mode", exact: true }).selectOption("1a0000000001");
+  await expect(sidebar.getByRole("button", { name: "Pokemon Prod", exact: true })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "Pokemon Test", exact: true })).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Layer mode", exact: true }).selectOption("1a0000000002");
+  await views.getByRole("button", { name: "Workspaces", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: /^Analysis/ })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: /^Engineering/ })).toHaveCount(0);
+  await expect(sidebar).toContainText("1 more in other groups or layers");
+  await expect(main.getByRole("table", { name: "Your workspaces" })).not.toContainText("Engineering");
+  await page.getByRole("combobox", { name: "Active group", exact: true }).selectOption("operators");
+  await expect(sidebar.getByRole("button", { name: /^Engineering/ })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: /^Analysis/ })).toHaveCount(0);
+  await sidebar.getByRole("button", { name: "Git credentials", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "Git credentials" })).toBeVisible();
+  await expect(main.getByRole("navigation", { name: "Workspace sections" }).getByRole("button", { name: "Git credentials", exact: true })).toHaveAttribute("aria-current", "page");
+  await views.getByRole("button", { name: "Usage", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: /small/ }).locator(".dot")).toHaveClass(/queued/); // in use with work waiting
+  expect(state.errors).toEqual([]);
+});
+
+test("active group stays in the sidebar across tabs and reloads", async ({ page }) => {
   const state = await setup(page), picker=page.getByRole("combobox",{name:"Active group",exact:true});
   await expect(picker).toHaveValue("analysts");
   await picker.selectOption("operators");

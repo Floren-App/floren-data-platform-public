@@ -93,11 +93,34 @@ def storage_children(db, source, schema, path, after, limit, store, reserved=fro
     return {"children": children, "next_cursor": result.get("NextContinuationToken")}
 
 
+RELATION_KINDS = ("table", "view", "materialized_view")
+
+
+def indexed_children(db, schema, table=None):
+    """The last listing the platform saw (catalog index), returned without asking the engine.
+    The app shows it at once and replaces it with the live listing; empty when nothing was seen yet."""
+    from sqlalchemy import select
+    from ..catalog import asset_id
+    from ..models import CatalogAsset
+    if table is not None:
+        asset = db.get(CatalogAsset, asset_id(schema.id, "object:" + table))
+        columns = sorted((asset.attributes or {}).get("columns", []) if asset else [], key=lambda c: c.get("ordinal_position") or 0)
+        items = [{"name": c["name"], "kind": "column", "data_type": c.get("data_type"), "nullable": c.get("nullable"),
+                  "ordinal_position": c.get("ordinal_position")} for c in columns if c.get("name")]
+    else:
+        assets = db.scalars(select(CatalogAsset).where(CatalogAsset.resource_id == schema.id, CatalogAsset.kind.in_(RELATION_KINDS)))
+        items = sorted(({"name": a.name, "kind": a.kind} for a in assets
+                        if (a.attributes or {}).get("object_path") == a.name), key=lambda item: item["name"])
+    return {"children": items, "next_cursor": None, "cached": True}
+
+
 @router.get("/schemas/{resource_id}/children")
 async def children(resource_id: str, request: Request, response: Response,
                    table: Optional[str] = Query(default=None, max_length=1024),
                    path: str = Query(default="", max_length=4096), after: str = Query(default="", max_length=4096),
-                   limit: int = Query(default=200, ge=1, le=500), db=Depends(get_db),
+                   limit: int = Query(default=200, ge=1, le=500),
+                   cached: bool = Query(default=False, description="Return the last listing the platform saw, without querying the engine"),
+                   db=Depends(get_db),
                    user: User = Depends(get_current_user), authorization: str = Header(default=""),
                    store=Depends(get_secret_store)):
     response.headers["Cache-Control"] = "no-store"
@@ -115,11 +138,20 @@ async def children(resource_id: str, request: Request, response: Response,
         raise HTTPException(409, "metadata browsing supports PostgreSQL, Iceberg, and S3 sources")
     if path:
         raise HTTPException(422, "SQL schemas do not have storage paths")
+    if cached:
+        return await run_in_threadpool(transaction_call, db, indexed_children, schema, table)
     catalog = '"' + sql_access.catalog_name(source).replace('"', '""') + '"'
     if table is None:
-        statement = (f"SELECT table_name, table_type FROM {catalog}.information_schema.tables "
+        # Names only: asking information_schema.tables for table_type makes Trino load every Iceberg table's
+        # metadata (seconds per table). Views come from information_schema.views, which lists only views.
+        # Two single-table queries: metadata tables are read on the coordinator, a join would need a worker.
+        statement = (f"SELECT table_name FROM {catalog}.information_schema.tables "
                      f"WHERE table_schema = ? AND table_name > ? ORDER BY table_name LIMIT {limit + 1}")
         parameters = [schema.name, after]
+        views = await query_request(QueryIn(source=source.name, sql=f"SELECT table_name FROM {catalog}.information_schema.views "
+                                            f"WHERE table_schema = ?", parameters=[schema.name], max_rows=10000),
+                                    request, db=db, authorization=authorization, x_fdp_viewer="")
+        view_names = {row[0] for row in views["rows"]}
     else:
         try:
             position = int(after or "0")
@@ -135,8 +167,7 @@ async def children(resource_id: str, request: Request, response: Response,
                                  request, db=db, authorization=authorization, x_fdp_viewer="")
     rows = result["rows"][:limit]
     if table is None:
-        items = [{"name": row[0], "kind": "view" if row[1] == "VIEW" else
-                  "materialized_view" if row[1] == "MATERIALIZED VIEW" else "table"} for row in rows]
+        items = [{"name": row[0], "kind": "view" if row[0] in view_names else "table"} for row in rows]
         cursor = rows[-1][0] if rows and len(result["rows"]) > limit else None
     else:
         items = [{"name": row[0], "kind": "column", "data_type": row[1], "nullable": row[2] == "YES",

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { accessibleSchemas, accessibleSources, api, AccessResource, inLayer, rEnabled, EDITOR_LABEL, EDITOR_NAME, Editor, openInWindow, Run, RunKind, RunScope, startingPool, usablePools, workloadDot, workloadStatus } from "../api";
+import { accessibleSchemas, accessibleSources, ago, api, AccessResource, inGroup, shortSha, inLayer, poolDot, poolInLayer, rEnabled, EDITOR_LABEL, EDITOR_NAME, Editor, openInWindow, Run, RunKind, RunScope, startingPool, usablePools, workloadDot, workloadStatus } from "../api";
 import { ProductIcon } from "../components/ProductIcon";
 import { resourceTab } from "../components/Permissions";
 import { SchemaTreeNode } from "../components/DataBrowser";
 import { useCached, useObjectCache } from "../cache";
 import type { Hub } from "../hub";
-import { IconHome, IconWorkspaces, IconDeployed, IconCatalog, IconRuns, IconApi, IconBranch, IconChevron, IconClose, IconOpen, IconPlay, IconPlus, IconRefresh, IconStop, IconPackage, IconImport } from "../components/Icons";
+import { IconHome, IconWorkspaces, IconDeployed, IconCatalog, IconRuns, IconApi, IconBranch, IconChevron, IconClose, IconOpen, IconPlay, IconPlus, IconRefresh, IconStop, IconPackage, IconImport, IconKey, IconLog } from "../components/Icons";
 import { MenuButton } from "../components/Menu";
 import { SECURITY_PAGES, SecurityIcon } from "./Directory";
 import type { TabRef } from "./Tabs";
@@ -64,9 +64,9 @@ export function Sidebar(props: Props) {
 }
 
 
-/** "3 more in other layers": items the layer mode hides from this list. */
-function OtherLayers({ count }: { count: number }) {
-  return count ? <p className="sidebar-note muted">{count} more in other layers. Switch the layer in the top bar to see {count === 1 ? "it" : "them"}.</p> : null;
+/** "3 more in other layers": items the layer (and group) mode hides from this list. */
+function OtherLayers({ count, groups = false }: { count: number; groups?: boolean }) {
+  return count ? <p className="sidebar-note muted">{count} more in other {groups ? "groups or layers" : "layers"}. Switch at the bottom of the sidebar to see {count === 1 ? "it" : "them"}.</p> : null;
 }
 
 export async function openEditor(hub: Hub, id: string, name: string) {
@@ -81,7 +81,7 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
   const environments = hub.layers.filter((layer) => layer.workspaces);
   const [environment, setEnvironment] = useState("");
   const selectedEnvironment = environment || environments.find((l) => l.id === hub.layerId)?.id || environments[0]?.id || "";
-  const shown = hub.workspaces.filter((w) => inLayer(hub.layerId, w.layer_id ?? w.environment_id));
+  const shown = hub.workspaces.filter((w) => inLayer(hub.layerId, w.layer_id ?? w.environment_id) && inGroup(hub.me?.active_group_id, w.owner_group_id));
 
   const [busy, setBusy] = useState(false);
 
@@ -152,8 +152,12 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
         ))}
         {!shown.length && !adding && <li className="empty"><button className="text-button" onClick={() => setAdding(true)}>{hub.workspaces.length ? "Create a workspace in this layer…" : "Create your first workspace…"}</button></li>}
       </ul>
-      <OtherLayers count={hub.workspaces.length - shown.length} />
-      <div className="sidebar-section-divider" /><RunsPanel scope="workspace" hub={hub} openTab={openTab} activeKey={activeKey} />
+      <OtherLayers count={hub.workspaces.length - shown.length} groups />
+      <div className="sidebar-section-divider" />
+      <ul className="list">
+        <li className={activeKey === "runs:workspace" ? "selected" : ""}><button className="nav-item" onClick={() => openTab({ kind: "runs", ref: "workspace", title: "Workspace runs" })}><IconRuns size={16} />Workspace runs</button></li>
+        <li className={activeKey === "git-credentials:" ? "selected" : ""}><button className="nav-item" onClick={() => openTab({ kind: "git-credentials", title: "Git credentials" })}><IconKey size={16} />Git credentials</button></li>
+      </ul>
     </>
   );
 }
@@ -214,35 +218,6 @@ export function NewRunForm({ hub, workspaceId, onDone }: { hub: Hub; workspaceId
 export const runsIn = (runs: Run[], scope: RunScope) => runs.filter((r) => scope === "deployed" ? !!r.workload_id : !r.workload_id);
 export const RUN_SCOPE_TITLE: Record<RunScope, string> = { deployed: "Recent runs", workspace: "Workspace runs" };
 
-function RunsPanel({ hub, openTab, activeKey, scope }: Pick<Props, "hub" | "openTab" | "activeKey"> & { scope: RunScope }) {
-  const runs = runsIn(hub.runs, scope);
-  return (
-    <>
-      <div className="section-title">
-        <button className="section-link" onClick={() => openTab({ kind: "runs", ref: scope, title: RUN_SCOPE_TITLE[scope] })}>{RUN_SCOPE_TITLE[scope]}</button>
-      </div>
-      <ul className="list" aria-label={RUN_SCOPE_TITLE[scope]}>
-        {runs.map((r) => (
-          <li key={r.id} className={activeKey === `run:${r.id}` ? "selected" : ""}>
-            <button className="nav-item" title={`${r.program ?? r.entrypoint} · ${r.status}`}
-                    onClick={() => openTab({ kind: "run", ref: r.id, title: r.program ?? r.entrypoint.split("/").pop() ?? r.id, runScope: scope })}>
-              <span className={`dot ${r.status}`} /><ProductIcon kind={r.kind} runtime={r.runtime ?? undefined} size={16} />
-              <span className="grow">{r.program ?? r.entrypoint} <span className="sub">{r.kind} · {r.pool_name}</span></span>
-            </button>
-            {(r.status === "running" || r.status === "pending") && (
-              <span className="actions">
-                <button className="icon-btn" title="Stop" aria-label="Stop" onClick={() => hub.act(() => api.stopRun(r.id))}><IconStop /></button>
-              </span>
-            )}
-          </li>
-        ))}
-        {!runs.length && <li className="empty muted">{scope === "workspace" ? "No workspace runs yet." : "No runs of deployed programs yet."}</li>}
-        {hub.hasMoreRuns && <li className="empty"><LoadMoreRuns hub={hub} /></li>}
-      </ul>
-    </>
-  );
-}
-
 /** Loads the next page of older runs; shared by the sidebar and run tables. */
 export function LoadMoreRuns({ hub, className = "text-button" }: { hub: Hub; className?: string }) {
   const [busy, setBusy] = useState(false);
@@ -253,7 +228,7 @@ export function LoadMoreRuns({ hub, className = "text-button" }: { hub: Hub; cla
 function DeployedPanel({ hub, openTab, activeKey }: Props) {
   const resources = hub.resources;
   const folder = (parent: string): JSX.Element => <ul className="object-tree">
-    {resources.filter((r) => r.parent_id === parent && r.kind === "folder").sort((a, b) => a.name.localeCompare(b.name)).map((r) => <li key={r.id}>
+    {resources.filter((r) => r.parent_id === parent && r.kind === "folder" && inLayer(hub.layerId, r.layer_id)).sort((a, b) => a.name.localeCompare(b.name)).map((r) => <li key={r.id}>
       <details><summary className={activeKey === `folder:${r.id}` ? "selected" : ""}>
         <span className="deployed-folder-heading"><button className="tree-label tree-name" onClick={(e) => { e.preventDefault(); e.currentTarget.closest("details")!.open = true; openTab(resourceTab(r)); }}><ProductIcon kind="folder" size={16} />{r.name}</button>
           <span className="row">
@@ -264,7 +239,7 @@ function DeployedPanel({ hub, openTab, activeKey }: Props) {
       </summary>{folder(r.id)}</details>
     </li>)}
     {hub.workloads.filter((p) => p.folder_id === parent && inLayer(hub.layerId, p.layer_id)).map((p) => <li key={p.id}>
-      <button className={`tree-leaf ${activeKey === `workload:${p.id}` ? "selected" : ""}`} title={`${p.title} · ${workloadStatus(p)}`}
+      <button className={`tree-leaf ${activeKey === `workload:${p.id}` ? "selected" : ""}`} title={`${p.title} · ${workloadStatus(p)}${p.deployed_sha ? ` · version ${shortSha(p.deployed_sha)}, updated ${ago(p.deployed_at)}` : ""}`}
         onClick={() => openTab({ kind: "workload", ref: p.id, title: p.title })}>
         <span className={`dot ${workloadDot(p)}`} /><ProductIcon kind={p.kind} runtime={p.runtime} size={16} />
         <span className="tree-name">{p.title}</span><span className="muted">{p.kind === "script" || p.kind === "notebook" ? "on demand" : p.kind}</span>
@@ -287,7 +262,10 @@ function DeployedPanel({ hub, openTab, activeKey }: Props) {
     {folder("workloads")}
     {!resources.some((r) => r.parent_id === "workloads") && <p className="sidebar-note muted">No workloads available.</p>}
     <OtherLayers count={hub.workloads.filter((p) => !inLayer(hub.layerId, p.layer_id)).length} />
-    <div className="sidebar-section-divider" /><RunsPanel scope="deployed" hub={hub} openTab={openTab} activeKey={activeKey} />
+    <div className="sidebar-section-divider" />
+    <ul className="list"><li className={activeKey === "runs:" || activeKey === "runs:deployed" ? "selected" : ""}>
+      <button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "runs" })}><IconRuns size={16} />Recent runs</button></li>
+      <li><button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "logs" })}><IconLog size={16} />Logs</button></li></ul>
   </>;
 }
 
@@ -386,8 +364,9 @@ function SecurityPanel({ openTab, activeKey }: Props) {
 }
 
 function ComputePanel({ hub, openTab, activeRef }: Props) {
-  const [everywhere, setEverywhere] = useState(false);
-  const pools = (hub.me?.pools ?? []).filter((p) => everywhere || !p.layer_ids?.length || p.layer_ids.includes(hub.layerId));
+  const everywhere = hub.usageAllLayers, setEverywhere = hub.setUsageAllLayers;
+  const all = hub.me?.pools ?? [];
+  const pools = all.filter((p) => everywhere || poolInLayer(p, hub.layerId));
   return (<>
     <div className="segmented sidebar-toggle" role="group" aria-label="Layers shown">
       <button aria-pressed={!everywhere} className={everywhere ? "" : "active"} onClick={() => setEverywhere(false)}>This layer</button>
@@ -396,11 +375,12 @@ function ComputePanel({ hub, openTab, activeRef }: Props) {
     <ul className="list">
       {pools.map((p) => (
         <li key={p.id} className={activeRef === p.name ? "selected" : ""}>
-          <button className="nav-item" onClick={() => openTab({ kind: "pool", ref: p.name, title: p.name })}><span className={`dot ${p.active_executions ? "running" : ""}`} /><span className="grow">{p.name} <span className="sub">{p.cpu} vCPU · {p.memory_gb} GB{p.gpu ? ` · ${p.gpu} GPU` : ""}</span></span></button>
+          <button className="nav-item" onClick={() => openTab({ kind: "pool", ref: p.name, title: p.name })}><span className={`dot ${poolDot(p)}`} /><span className="grow">{p.name} <span className="sub">{p.cpu} vCPU · {p.memory_gb} GB{p.gpu ? ` · ${p.gpu} GPU` : ""}</span></span></button>
           <span className="badge" title={`${p.in_use ?? "—"} of ${p.max_concurrent} slots in use${p.queued ? ` · ${p.queued} waiting` : ""} · ${p.active_runs ?? "—"} jobs · ${p.active_services ?? "—"} service components`}>{p.dedicated ? `${p.in_use ?? "—"} · team` : `${p.in_use ?? "—"}/${p.max_concurrent}${p.queued ? ` +${p.queued}` : ""}`}</span>
         </li>
       ))}
     </ul>
+    {!everywhere && <OtherLayers count={all.length - pools.length} />}
   </>);
 }
 

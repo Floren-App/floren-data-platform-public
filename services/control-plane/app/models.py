@@ -323,6 +323,13 @@ class Run(Base):
 
     pool: Mapped[ComputePool] = relationship()
 
+    @property
+    def layer_id(self):
+        """The layer the run's work belongs to (its workload or workspace layer)."""
+        from sqlalchemy.orm import object_session
+        from .layers import layer_of
+        return layer_of(object_session(self), self.environment_id)
+
 
 class ServiceAccount(Base):
     """A non-human identity for a data product (pipelines, deployed apps, external tools).
@@ -501,6 +508,28 @@ class WorkloadEvent(Base):
     message: Mapped[str] = mapped_column(Text, default="")
 
     workload: Mapped[Workload] = relationship(back_populates="events")
+
+
+class WorkloadLog(Base):
+    """One line of the central log: what happened in a workload or run, and what its code reported.
+
+    Platform entries (run started/finished, deploys, Airflow DAG runs) and program entries (fdp.log) share
+    one shape. Run, workload, workspace and commit come from the platform (the run's token), never the program."""
+    __tablename__ = "workload_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    level: Mapped[str] = mapped_column(String(8), default="info")       # debug | info | warning | error
+    source: Mapped[str] = mapped_column(String(16), default="platform") # platform | program | airflow
+    event: Mapped[str] = mapped_column(String(48), default="")          # run.started, dag.failed, ... ("" for program lines)
+    message: Mapped[str] = mapped_column(Text, default="")
+    fields: Mapped[dict] = mapped_column(JSON, default=dict)
+    workload_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    run_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    workspace_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    commit_sha: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    layer_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    actor: Mapped[str] = mapped_column(String(256), default="")
 
 
 class AuditEvent(Base):

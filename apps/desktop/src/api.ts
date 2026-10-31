@@ -9,11 +9,16 @@ export interface Layer {
 }
 /** The configured default layer, or nothing so the person chooses. */
 export const defaultLayerId = (layers: Layer[]) => layers.find((l) => l.default)?.id ?? "";
-/** The app's layer mode: the person's chosen layer (top bar) while it exists, else the default layer. */
+/** The app's layer mode: the person's chosen layer (sidebar) while it exists, else the default layer. */
 export const modeLayerId = (me: { active_layer_id?: string | null } | null | undefined, layers: Layer[]) =>
   me?.active_layer_id && layers.some((l) => l.id === me.active_layer_id) ? me.active_layer_id : defaultLayerId(layers);
 /** Whether an item belongs to the layer mode. Items without a layer belong to every layer. */
 export const inLayer = (mode: string, itemLayer: string | null | undefined) => !mode || !itemLayer || itemLayer === mode;
+/** The Global Admin group: in that group mode, every group's objects are shown. */
+export const GLOBAL_ADMIN_GROUP = "000000000001";
+/** Whether an item belongs to the group mode. Items without an owner group belong to every group. */
+export const inGroup = (mode: string | null | undefined, itemGroup: string | null | undefined) =>
+  !mode || mode === GLOBAL_ADMIN_GROUP || !itemGroup || itemGroup === mode;
 
 export interface DataSource {
   id: string;
@@ -135,7 +140,8 @@ export interface DataChild {
   name: string; kind: "table" | "view" | "materialized_view" | "column" | "folder" | "file";
   data_type?: string; nullable?: boolean; ordinal_position?: number; path?: string; size?: number; modified_at?: string;
 }
-export interface DataChildren { children: DataChild[]; next_cursor: string | null }
+/** cached: the last listing the platform saw, returned without querying the engine. */
+export interface DataChildren { children: DataChild[]; next_cursor: string | null; cached?: boolean }
 export interface DataLocation { schemaId: string; table?: string; path?: string; item?: DataChild }
 
 export type WorkloadKind = "script" | "notebook" | "app" | "dbt" | "airflow" | "stream" | "kafka";
@@ -156,6 +162,8 @@ export interface Pool {
   default?: boolean;
   /** Layers whose Trino workers run here: only Trino uses this warehouse. */
   trino_layers?: string[];
+  /** Layers whose infrastructure (Trino workers, Kafka brokers) runs here: the warehouse belongs to them. */
+  infrastructure_layer_ids?: string[];
   /** Scope: the layers (ids) and kinds of work this warehouse is for; empty = every layer / kind. */
   layer_ids?: string[]; layer_names?: string[];
   workload_kinds?: WorkloadKind[];
@@ -198,7 +206,12 @@ export interface WarehouseOverview {
   workspaces: { running: number; queued: number; max_running: number | null } | null;
 }
 
-/** Warehouses work can be placed on: all but those that run Trino workers. */
+/** A warehouse belongs to a layer when it is limited to it or runs that layer's infrastructure; others serve every layer. */
+export const poolInLayer = (p: Pick<Pool, "layer_ids" | "infrastructure_layer_ids">, mode: string) =>
+  !mode || (p.layer_ids?.length ? p.layer_ids.includes(mode) : p.infrastructure_layer_ids?.length ? p.infrastructure_layer_ids.includes(mode) : true);
+/** One status dot for a warehouse everywhere: work waiting (yellow ring), in use (green), idle (gray). */
+export const poolDot = (p: { in_use?: number | null; queued?: number | null; active_executions?: number | null }) =>
+  p.queued ? "queued" : p.in_use || p.active_executions ? "running" : "idle";
 /** Warehouses work may choose: not Trino's, and meant for its layer and kind when those are known. */
 export const usablePools = (pools?: Pool[], layerId?: string | null, kind?: string | null) => (pools ?? []).filter((p) =>
   !p.trino_layers?.length
@@ -290,6 +303,8 @@ export interface Run {
   pool_name: string;
   created_at: string;
   finished_at: string | null;
+  /** The layer the run's work belongs to. */
+  layer_id?: string | null;
 }
 
 /** Runs of deployed programs, or runs started in workspaces (private to the workspace's owner and admins). */
@@ -482,6 +497,39 @@ export function programRuntime(p: ProgramDef): { kind: RuntimeKind; version: str
   if (p.kind === "airflow") return { kind: "airflow", version: p.airflow ?? null };
   return p.runtime === "r" ? { kind: "r", version: p.r ?? null } : { kind: "python", version: p.python ?? null };
 }
+
+/** Git is the source of truth: a branch commit and whether (and when) it ran here. */
+export interface WorkloadCommit {
+  sha: string; subject: string; author: string; date: string;
+  state: "running" | "queued" | "failed" | "deployed" | "pending" | "skipped";
+  deployed_at: string | null;
+}
+export interface WorkloadVersions {
+  repo: string; branch: string; head_sha: string | null; deployed_sha: string | null;
+  last_checked_at: string | null; auto_update: boolean; behind: number; commits: WorkloadCommit[];
+}
+/** A short commit hash, as Git shows it. */
+export const shortSha = (sha?: string | null) => (sha ? sha.slice(0, 7) : "—");
+/** "5 min ago", "3 days ago": for when something was updated. */
+export function ago(iso?: string | null): string {
+  if (!iso) return "—";
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  const [n, unit] = seconds < 60 ? [0, ""] : seconds < 3600 ? [Math.floor(seconds / 60), "min"] : seconds < 86400 ? [Math.floor(seconds / 3600), "hour"]
+    : seconds < 86400 * 30 ? [Math.floor(seconds / 86400), "day"] : [0, "date"];
+  if (unit === "") return "just now";
+  if (unit === "date") return new Date(iso).toLocaleDateString();
+  return `${n} ${unit}${n === 1 || unit === "min" ? "" : "s"} ago`;
+}
+
+/** One line of the central log. Run, workload, commit and layer are stamped by the platform. */
+export interface LogEntry {
+  id: number; at: string; level: "debug" | "info" | "warning" | "error"; source: "platform" | "program" | "airflow";
+  event: string; message: string; fields: Record<string, unknown>;
+  workload_id: string | null; workload: string | null; run_id: string | null; workspace_id: string | null;
+  commit_sha: string | null; layer_id: string | null; actor: string;
+}
+export interface LogPage { entries: LogEntry[]; next_before: number | null }
+export interface LogQuery { workload_id?: string; folder_id?: string; run_id?: string; layer_id?: string; level?: string; q?: string; before?: number; limit?: number }
 
 export interface WorkloadEvent {
   at: string;
@@ -691,8 +739,9 @@ export const api = {
     "GET", `/v1/data/schemas/${encodeURIComponent(schemaId)}/preview?${new URLSearchParams({ table })}`),
   metadataQuery: (sql: string) => request<{ columns: string[]; rows: unknown[][]; rowcount: number; truncated: boolean; query_id: string }>(
     "POST", "/v1/sql/query", { source: "fdp-metadata", sql, max_rows: 1000 }),
-  dataChildren: (schemaId: string, options: { table?: string; path?: string; after?: string } = {}) => {
-    const params = new URLSearchParams(options);
+  dataChildren: (schemaId: string, options: { table?: string; path?: string; after?: string; cached?: boolean } = {}) => {
+    const { cached, ...rest } = options;
+    const params = new URLSearchParams({ ...rest, ...(cached ? { cached: "true" } : {}) });
     return request<DataChildren>("GET", `/v1/data/schemas/${encodeURIComponent(schemaId)}/children?${params}`);
   },
   access: {
@@ -756,6 +805,8 @@ export const api = {
     request<PullResult>("POST", `/v1/repos/${repoId}/pull?branch=${encodeURIComponent(branch)}`),
   workloads: () => request<Workload[]>("GET", "/v1/workloads"),
   workload: (id: string) => request<Workload>("GET", `/v1/workloads/${id}`),
+  workloadVersions: (id: string) => request<WorkloadVersions>("GET", `/v1/workloads/${id}/versions`),
+  logs: (query: LogQuery) => request<LogPage>("GET", `/v1/logs?${new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]))}`),
   deploy: (body: { repo_id: string; branch: string; program: string; slug: string; title: string;
                     layer_id?: string; warehouse?: string; allowed_groups: string[]; auto_update: boolean; run_as?: string;
                     env: Record<string, string>; secrets: Record<string, string>; folder_id: string; execution_mode: "caller" | "fixed" }) =>

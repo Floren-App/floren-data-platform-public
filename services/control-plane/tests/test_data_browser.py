@@ -27,8 +27,9 @@ def test_sql_children_are_lazy_scoped_and_paginated(sql_mode, monkeypatch):
 
     async def engine(method, path, **kwargs):
         sent.append(kwargs["content"].decode())
-        return httpx.Response(200, json={"id": "metadata_test", "columns": [{"name": "table_name"}, {"name": "table_type"}],
-                                        "data": [["orders", "BASE TABLE"], ["totals", "VIEW"]]})
+        views = "information_schema.views" in sent[-1]
+        return httpx.Response(200, json={"id": "metadata_test", "columns": [{"name": "table_name"}],
+                                        "data": [["totals"]] if views else [["orders"], ["totals"]]})
 
     monkeypatch.setattr(sql_access, "engine_request", engine)
     # Listing registered resources must never query the data engine.
@@ -39,10 +40,21 @@ def test_sql_children_are_lazy_scoped_and_paginated(sql_mode, monkeypatch):
     assert response.status_code == 200, response.text
     assert response.headers["cache-control"] == "no-store"
     assert response.json() == {"children": [{"name": "orders", "kind": "table"}], "next_cursor": "orders"}
-    assert len(sent) == 1 and '"finance".information_schema.tables' in sent[0] and "reporting" in sent[0]
+    assert len(sent) == 2 and '"finance".information_schema.views' in sent[0] and '"finance".information_schema.tables' in sent[1]
+    assert "reporting" in sent[1]
+    # Names only: table_type would make Trino load every Iceberg table's metadata.
+    assert not any("table_type" in s for s in sent)
     response = client.get(url, headers=as_("ana"), params={"after": "orders", "limit": 5})
     assert response.json()["children"][1]["kind"] == "view"
     assert "orders" in sent[-1] and "LIMIT 6" in sent[-1]
+    # The last listing comes back at once from the catalog index, without the engine.
+    count = len(sent)
+    quick = client.get(url, headers=as_("ana"), params={"cached": "true"})
+    assert quick.status_code == 200, quick.text
+    assert quick.json() == {"children": [{"name": "orders", "kind": "table"}, {"name": "totals", "kind": "view"}], "next_cursor": None, "cached": True}
+    assert len(sent) == count
+    # The same data grants apply to the cached listing.
+    assert client.get(url, headers=as_("bob"), params={"cached": "true"}).status_code == 404
 
 
 def test_columns_are_parameterized_and_do_not_read_table_rows(sql_mode, monkeypatch):

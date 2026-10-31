@@ -1,7 +1,7 @@
 import { ObjectLineage } from "../components/ObjectLineage";
 import { objectKindLabel } from "../objectKinds";
 import { useCallback, useEffect, useState } from "react";
-import { openInWindow, api, AccessResource, ApiError, startingPool, usablePools, programRuntime, Workload, PullResult, Repo, Run, runtimeLabel, ServiceAccount, workloadStatus, workloadDot } from "../api";
+import { ago, openInWindow, api, AccessResource, ApiError, startingPool, usablePools, programRuntime, Workload, WorkloadCommit, WorkloadVersions, PullResult, Repo, Run, runtimeLabel, ServiceAccount, workloadStatus, workloadDot } from "../api";
 import { AccessError } from "../components/AccessError";
 import { ProductIcon } from "../components/ProductIcon";
 import type { Hub } from "../hub";
@@ -11,6 +11,7 @@ import { ArgField } from "./Programs";
 import type { TabRef } from "./Tabs";
 import { ObjectBreadcrumbs, ObjectTabs, PermissionsPanel, resourcePath } from "../components/Permissions";
 import { OrganizationSettings } from "./Objects";
+import { LogView } from "../components/LogView";
 import { LoadMoreRuns } from "./Sidebar";
 
 const short = (sha?: string | null) => (sha ? sha.slice(0, 7) : "—");
@@ -260,6 +261,44 @@ export function DeployWizard({ hub, openTab, initialFolder }: { hub: Hub; openTa
 }
 
 /** One workload: open/run it, GitOps status and history, settings for its deployer. */
+const COMMIT_STATE: Record<WorkloadCommit["state"], [string, string]> = {
+  running: ["running", "Running now"], queued: ["queued", "Waiting for capacity"], failed: ["failed", "Deploy failed"],
+  deployed: ["stopped", "Ran before"], pending: ["ready", "Not deployed yet"], skipped: ["idle", "Never deployed"],
+};
+
+/** Git leads: the branch's commits, newest first, and which of them ran here and when. */
+function VersionsPanel({ pub }: { pub: Workload }) {
+  const [versions, setVersions] = useState<WorkloadVersions | null>(null), [error, setError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    api.workloadVersions(pub.id).then((v) => { if (alive) { setVersions(v); setError(""); } }).catch((e: Error) => alive && setError(e.message));
+    return () => { alive = false; };
+  }, [pub.id, pub.deployed_sha, pub.latest_sha, pub.queued_sha, pub.last_checked_at]);
+  const history = (pub.events ?? []).filter((e) => ["deployed", "deploy_failed", "queued", "update_found", "sync_failed", "restarting"].includes(e.kind));
+  return <>
+    <section className="card"><dl className="kv">
+      <dt>Source</dt><dd><span className="mono">{pub.repo}</span> · branch <b className="mono">{pub.branch}</b> · {pub.program}</dd>
+      <dt>Running</dt><dd>{pub.deployed_sha ? <><span className="mono" title={pub.deployed_sha}>{short(pub.deployed_sha)}</span> · deployed {ago(pub.deployed_at)}{pub.deployed_commit.date && <span className="muted"> · committed {ago(pub.deployed_commit.date)}</span>}</> : "nothing yet"}</dd>
+      <dt>Branch head</dt><dd>{pub.latest_sha ? <span className="mono" title={pub.latest_sha}>{short(pub.latest_sha)}</span> : "—"} · checked {ago(pub.last_checked_at)}
+        {versions && versions.behind > 0 && <> · <span className="badge warn">{versions.behind} newer commit{versions.behind === 1 ? "" : "s"}</span></>}</dd>
+      <dt>Updates</dt><dd>{pub.auto_update ? <>New commits on <b className="mono">{pub.branch}</b> deploy automatically.</> : "Automatic updates are off: Check for updates deploys nothing until they are turned on."}</dd>
+    </dl><p className="hint">Git is the source of truth. To change what runs, push to <span className="mono">{pub.branch}</span>; to roll back, revert the commit in Git.</p></section>
+    <div className="section-heading"><h2>Commits on {pub.branch}</h2></div>
+    {error ? <p className="error" role="alert">{error}</p> : !versions ? <p className="muted" role="status">Reading the branch…</p>
+      : <div className="table-scroll"><table aria-label="Versions"><thead><tr><th>Version</th><th>Commit</th><th>Author</th><th>Committed</th><th>Here</th></tr></thead><tbody>
+        {versions.commits.map((c) => <tr key={c.sha} className={c.state === "running" ? "current" : ""}>
+          <td><span className="mono" title={c.sha}>{short(c.sha)}</span> <button className="icon-btn" aria-label={`Copy commit ${short(c.sha)}`} title="Copy the full commit hash" onClick={() => void navigator.clipboard?.writeText(c.sha)}>⧉</button></td>
+          <td>{c.subject}</td><td>{c.author}</td><td title={new Date(c.date).toLocaleString()}>{ago(c.date)}</td>
+          <td><span className="status"><span className={`dot ${COMMIT_STATE[c.state][0]}`} />{COMMIT_STATE[c.state][1]}{c.deployed_at && c.state !== "pending" && <span className="muted"> · deployed {ago(c.deployed_at)}</span>}</span></td>
+        </tr>)}
+      </tbody></table></div>}
+    {history.length > 0 && <><div className="section-heading"><h2>Deploy history</h2></div>
+      <div className="table-scroll"><table aria-label="Deploy history"><thead><tr><th>When</th><th>What</th><th>Version</th><th>Details</th></tr></thead><tbody>
+        {history.map((e, i) => <tr key={i}><td title={new Date(e.at).toLocaleString()}>{ago(e.at)}</td><td>{e.kind.replace("_", " ")}</td><td className="mono">{short(e.sha)}</td><td className="muted">{e.message}</td></tr>)}
+      </tbody></table></div></>}
+  </>;
+}
+
 export function WorkloadView({ id, tab, hub, openTab, runTab }: {
   id: string; tab: TabRef; hub: Hub; openTab: (t: TabRef) => void; runTab: (r: Run) => TabRef;
 }) {
@@ -322,6 +361,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
         subtitle={<>
           <span className={`dot ${workloadDot(pub)}`} />
           {workloadStatus(pub)} · {objectKindLabel(pub.kind)} · {runtimeLabel(programRuntime(pub.program_def).kind, pub.runtime_version)} · deployed by {pub.owner}
+          {pub.deployed_sha && <> · version <button className="text-button mono" title={`${pub.deployed_sha} · deployed ${when(pub.deployed_at)}`} onClick={() => openTab({ ...tab, section: "versions" })}>{short(pub.deployed_sha)}</button> · updated {ago(pub.deployed_at)}</>}
           {pub.run_as && ` · runs as sa:${pub.run_as}`}
         </>}
         actions={<>
@@ -337,13 +377,15 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
           )}
         </>} />
 
-      <ObjectTabs active={section} lineage={!!resource} settings={pub.actions.includes("identity") || !!parent?.actions.includes("delete")}
+      <ObjectTabs active={section} lineage={!!resource} versions logs settings={pub.actions.includes("identity") || !!parent?.actions.includes("delete")}
         onChange={(s) => openTab({ ...tab, section: s })} />
       {error && <AccessError error={error} openTab={openTab} />}
       {!error && loadError && <AccessError error={loadError} openTab={openTab} />}
       {section === "permissions" && (resource ? <PermissionsPanel resource={resource} resources={hub.resources} openTab={openTab} onChanged={hub.refresh} />
         : <p className="muted">Permission details are unavailable.</p>)}
       {section === "lineage" && resource && <ObjectLineage resourceId={resource.id} openTab={openTab} />}
+      {section === "versions" && <VersionsPanel pub={pub} />}
+      {section === "logs" && <LogView scope={{ workload_id: pub.id }} openTab={openTab} showWorkload={false} label={`Log of ${pub.title}`} />}
       {section === "settings" && <>
         {pub.actions.includes("identity") && <ProductionSettings pub={pub} onSave={(patch) => act(() => api.updateWorkload(pub.id, patch))} />}
         {resource && parent?.actions.includes("delete") && <OrganizationSettings resource={resource} hub={hub} openTab={openTab} />}
@@ -362,9 +404,11 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
         <dl className="kv">
           <dt>Source</dt><dd className="mono">{pub.repo} · {pub.branch} · {pub.program}</dd>
           <dt>{pub.kind === "app" || pub.kind === "airflow" ? "Running version" : "Deployed version"}</dt>
-          <dd><span className="mono">{short(pub.deployed_sha)}</span> {pub.deployed_commit.subject && `· ${pub.deployed_commit.subject}`}
-            {pub.deployed_commit.author && <span className="muted"> · {pub.deployed_commit.author}</span>}</dd>
-          <dt>Deployed</dt><dd>{when(pub.deployed_at)}</dd>
+          <dd><span className="mono" title={pub.deployed_sha ?? undefined}>{short(pub.deployed_sha)}</span> {pub.deployed_commit.subject && `· ${pub.deployed_commit.subject}`}
+            {pub.deployed_commit.author && <span className="muted"> · {pub.deployed_commit.author}</span>}
+            {pub.deployed_commit.date && <span className="muted"> · committed {ago(pub.deployed_commit.date)}</span>}
+            {" "}<button className="text-button" onClick={() => openTab({ ...tab, section: "versions" })}>All versions</button></dd>
+          <dt>Deployed</dt><dd>{when(pub.deployed_at)} <span className="muted">({ago(pub.deployed_at)})</span></dd>
           <dt>GitOps</dt>
           <dd>
             {pub.auto_update ? <>follows <b className="mono">{pub.branch}</b> · last checked {when(pub.last_checked_at)}</> : <>auto-update off · latest <span className="mono">{short(pub.latest_sha)}</span></>}

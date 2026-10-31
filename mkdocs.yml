@@ -87,6 +87,7 @@ nav:
       - Workspaces: workspaces.md
       - Program configuration: fdp-json.md
       - Publishing and promotion: deploying.md
+      - Workload logs: logging.md
       - Python SDK: python-sdk.md
       - R SDK: r-sdk.md
       - dbt and Airflow: dbt-and-airflow.md

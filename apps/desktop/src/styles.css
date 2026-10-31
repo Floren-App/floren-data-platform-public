@@ -37,10 +37,10 @@
   --focus: #7cc63c;
   --status-bg: #5a9e2a;
   --status-fg: #0b1404;
-  /* Production layer mode: the top bar and status bar turn amber. */
-  --prod-bg: #d29922;
-  --prod-fg: #1c1404;
+  /* Status colors, the same on every page: ok = running or succeeded, info = ready / on demand,
+     warn = starting or waiting, err = failed; gray = stopped or idle. The lime accent is for controls only. */
   --ok: #2ea043;
+  --info: #3794ff;
   --warn: #cca700;
   --err: #f85149;
   --shadow: 0 4px 16px #0000005c;
@@ -76,6 +76,7 @@
     --status-bg: #6cb52e;
     --bg-selected: #e3ecdb;
     --ok: #1a7f37;
+    --info: #0969da;
     --warn: #9a6700;
     --err: #cf222e;
     --shadow: 0 4px 16px #00000024;
@@ -109,35 +110,31 @@ button:focus-visible, summary:focus-visible, [role="tab"]:focus-visible { outlin
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 
 /* ---------- Shell ---------- */
-.shell { display: grid; grid-template-columns: 48px 300px minmax(0, 1fr); grid-template-rows: 34px minmax(0, 1fr) 22px; height: 100%; }
-/* Top bar: the working context (group and layer mode) and catalog search, always visible. */
-.topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 0 12px 0 14px; background: var(--bg-activity); border-bottom: 1px solid var(--border); min-width: 0; }
-.topbar-field { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.topbar-field label { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
-.topbar-field select { height: 24px; max-width: 220px; }
-.topbar-note { font-size: 12px; font-weight: 600; }
-.topbar-search { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; height: 24px; min-width: 220px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg-input); color: var(--fg-muted); cursor: pointer; font: inherit; }
-.topbar-search .kbd { margin-left: auto; }
-.topbar-search:hover { color: var(--fg); border-color: var(--fg-muted); }
-.shell.prod .topbar { background: var(--prod-bg); color: var(--prod-fg); border-bottom-color: var(--prod-bg); }
-.shell.prod .topbar-field label { color: var(--prod-fg); }
-.shell.prod .topbar-field select { background: color-mix(in srgb, var(--prod-bg) 70%, #fff); border-color: color-mix(in srgb, var(--prod-bg) 60%, #000); color: var(--prod-fg); color-scheme: light; }
-.shell.prod .topbar-search { background: color-mix(in srgb, var(--prod-bg) 70%, #fff); border-color: color-mix(in srgb, var(--prod-bg) 60%, #000); color: var(--prod-fg); }
-.shell.prod .statusbar { background: var(--prod-bg); color: var(--prod-fg); }
-.activity-group { display: flex; flex-direction: column; align-items: center; }
-.activity-group hr { width: 24px; border: 0; border-top: 1px solid var(--border-strong); margin: 4px 0; }
-.activity-group > button { width: 48px; height: 44px; background: none; border: none; color: var(--fg-muted); cursor: pointer; border-left: 2px solid transparent; border-right: 2px solid transparent; display: grid; place-items: center; }
+.shell { display: grid; grid-template-columns: 48px 300px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 22px; height: 100%; }
+/* Activity bar: icons only; hovering a moment (or keyboard focus) slides the labels out over the sidebar,
+   so the bar never takes more room. */
+.activity { grid-row: 1; position: relative; z-index: 30; width: 48px; background: var(--bg-activity); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: stretch; padding: 4px 0; transition: width .12s ease, box-shadow .12s ease; }
+@media (hover: hover) { .activity:hover { width: 176px; box-shadow: var(--shadow); transition-delay: .35s; } }
+.activity:focus-within:has(:focus-visible) { width: 176px; box-shadow: var(--shadow); }
+.activity-label { justify-self: start; padding-right: 12px; font-size: 13px; white-space: nowrap; }
+.activity-group { display: flex; flex-direction: column; align-items: stretch; }
+.activity-group hr { width: 24px; border: 0; border-top: 1px solid var(--border-strong); margin: 4px 0 4px 12px; }
+.activity-group > button { width: 100%; height: 44px; background: none; border: none; color: var(--fg-muted); cursor: pointer; border-left: 2px solid transparent; border-right: 2px solid transparent; display: grid; grid-template-columns: 44px max-content; align-items: center; justify-items: center; overflow: hidden; padding: 0; }
 .activity-group > button:hover { color: var(--fg-strong); }
 .activity-group > button.active { color: var(--fg-strong); border-left-color: var(--accent); }
-.activity { grid-row: 2; background: var(--bg-activity); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 4px 0; }
-.activity > button, .activity > .menu-anchor > button { width: 48px; height: 48px; background: none; border: none; color: var(--fg-muted); cursor: pointer; border-left: 2px solid transparent; border-right: 2px solid transparent; display: grid; place-items: center; }
+.activity > button, .activity > .menu-anchor > button { width: 100%; height: 48px; background: none; border: none; color: var(--fg-muted); cursor: pointer; border-left: 2px solid transparent; border-right: 2px solid transparent; display: grid; grid-template-columns: 44px max-content; align-items: center; justify-items: center; overflow: hidden; padding: 0; }
 .activity > button:hover, .activity > .menu-anchor > button:hover, .activity > .menu-anchor > button[aria-expanded="true"] { color: var(--fg-strong); }
 .activity > button.active { color: var(--fg-strong); border-left-color: var(--accent); }
 .activity .spacer { flex: 1; }
 .activity .account-menu-anchor .menu { left: calc(100% + 4px); right: auto; top: auto; bottom: 4px; }
 
-.sidebar { grid-row: 2; background: var(--bg-side); border-right: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
+.sidebar { grid-row: 1; background: var(--bg-side); border-right: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
 .sidebar-toggle { margin: 4px 12px 8px 20px; }
+/* Group and layer at the bottom of the sidebar: the working context for every list. */
+.context-picker { flex-shrink: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 10px; padding: 10px 12px 10px 20px; border-top: 1px solid var(--border); }
+.context-picker label { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
+.context-picker select { width: 100%; height: 24px; }
+.context-picker small { grid-column: 1 / -1; color: var(--fg-muted); font-size: 11px; }
 .sidebar-content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 12px; }
 .sidebar h2 { position: sticky; top: 0; z-index: 2; background: var(--bg-side); margin: 0; padding: 0 12px 0 20px; height: 35px; font-size: 11px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-muted); display: flex; align-items: center; justify-content: space-between; }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; padding: 6px 12px 2px 20px; font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--fg); }
@@ -179,11 +176,12 @@ button:focus-visible, summary:focus-visible, [role="tab"]:focus-visible { outlin
 .workspace-starting { border-color: var(--warn); }
 .dot.failed { background: var(--err); }
 .dot.stopped { background: var(--fg-muted); }
-.dot.ready { background: var(--accent); }
+.dot.ready { background: var(--info); }
+.dot.idle { background: var(--fg-muted); opacity: .6; }
 .status { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 
 /* Editor tabs */
-.main { grid-row: 2; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.main { grid-row: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .tabs { display: flex; background: var(--bg-side); border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; flex: none; scrollbar-width: thin; }
 .tabs::-webkit-scrollbar { height: 3px; }
 .tab { display: flex; align-items: center; gap: 4px; padding: 0 6px 0 14px; height: 35px; border-right: 1px solid var(--border); cursor: pointer; color: var(--fg-muted); white-space: nowrap; flex: none; max-width: 240px; }
@@ -385,6 +383,7 @@ th { color: var(--fg-muted); font-weight: 500; font-size: 12px; white-space: now
 td .muted { font-size: 12px; }
 tbody tr:hover > td { background: color-mix(in srgb, var(--bg-hover) 55%, transparent); }
 tr.clickable { cursor: pointer; }
+tr.current td { background: color-mix(in srgb, var(--ok) 8%, transparent); }
 td.empty, tbody td[colspan] { color: var(--fg-muted); padding: 14px 10px; }
 .table-actions { text-align: right; white-space: nowrap; width: 1%; }
 .table-actions .row { justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }
@@ -614,3 +613,14 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 
 .lineage-container-toggle { margin-top: 7px; border: 1px solid var(--border); background: var(--bg-side); color: var(--fg); border-radius: var(--radius); padding: 3px 7px; font-size: 11px; cursor: pointer; }
 .lineage-container-toggle:hover { background: var(--bg-hover); border-color: var(--accent); }
+
+/* Central log: levels use the shared status colors (info blue, warning yellow, error red, debug gray). */
+.log-table td { vertical-align: top; }
+.log-level { display: inline-block; min-width: 56px; padding: 0 6px; border-radius: var(--radius); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; text-align: center; border: 1px solid currentColor; }
+.log-level.debug { color: var(--fg-muted); }
+.log-level.info { color: var(--info); }
+.log-level.warning { color: var(--warn); }
+.log-level.error { color: var(--err); }
+tr.log-error td { background: color-mix(in srgb, var(--err) 6%, transparent); }
+.log-message { white-space: pre-wrap; word-break: break-word; }
+.log-fields { margin: 6px 0 0; max-height: 240px; overflow: auto; }

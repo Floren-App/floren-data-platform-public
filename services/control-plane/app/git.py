@@ -126,6 +126,14 @@ class GitClient:
         full, subject, author, date = out.rstrip("\n").split("\x00")
         return Commit(full, subject, author, date)
 
+    def log(self, repo_id: str, ref: str, limit: int = 30) -> List[Commit]:
+        """The newest commits reachable from a fetched commit or branch, newest first (from the cache, no network)."""
+        if not _SHA.match(ref) and not (ref.startswith("refs/heads/") and valid_branch(ref[len("refs/heads/"):])):
+            raise GitError("invalid commit")
+        out = self._git(["log", f"-{max(1, min(limit, 200))}", "--first-parent", "--format=%H%x00%s%x00%an%x00%cI", ref, "--"],
+                        cwd=self._cache(repo_id))
+        return [Commit(*line.split("\x00")) for line in out.splitlines() if line.count("\x00") == 3]
+
     def read_file(self, repo_id: str, sha: str, path: str) -> Optional[str]:
         try:
             return self._git(["show", f"{self._sha(sha)}:{path}"], cwd=self._cache(repo_id))

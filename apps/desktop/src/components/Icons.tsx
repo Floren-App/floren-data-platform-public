@@ -15,7 +15,7 @@ export const IconRuns = ({ size = 24 }: P) =>
 export const IconData = ({ size = 24 }: P) =>
   svg(size, <><ellipse cx="12" cy="5.5" rx="7" ry="2.5" /><path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5" /></>);
 export const IconStream = ({ size = 24 }: P) =>
-  svg(size, <><path d="M3 7h12M3 12h16M3 17h12" /><path d="M16 4l3 3-3 3M17 14l3 3-3 3" /></>);
+  svg(size, <><circle cx="8" cy="12" r="2.5" /><circle cx="8" cy="4.5" r="2" /><circle cx="8" cy="19.5" r="2" /><circle cx="17" cy="8" r="2" /><circle cx="17" cy="16" r="2" /><path d="M8 6.5v3M8 14.5v3m2.3-6.6 4.9-2.1m-4.9 4.4 4.9 2.1" /></>);
 export const IconCompute = ({ size = 24 }: P) =>
   svg(size, <><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" /></>);
 export const IconAdmin = ({ size = 24 }: P) =>
@@ -58,3 +58,5 @@ export const IconMore = ({ size = 16 }: P) =>
   svg(size, <><circle cx="5" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="19" cy="12" r="1" fill="currentColor" /></>);
 export const IconApi = ({ size = 24 }: P) =>
   svg(size, <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z" /></>);
+export const IconLog = ({ size = 24 }: P) =>
+  svg(size, <><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></>);

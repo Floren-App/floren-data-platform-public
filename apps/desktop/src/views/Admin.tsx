@@ -4,7 +4,7 @@ import type { Hub } from "../hub";
 import { OpenTab, resourceTab } from "../components/Permissions";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
-import { IconCompute, IconPlus, IconTrash } from "../components/Icons";
+import { IconCompute, IconPlus, IconTrash, IconWorkspaces } from "../components/Icons";
 
 function useLoad<T>(fn: () => Promise<T>, initial: T) {
   const [data, setData] = useState<T>(initial);
@@ -14,7 +14,7 @@ function useLoad<T>(fn: () => Promise<T>, initial: T) {
   return { data, error, reload, setError };
 }
 
-const TYPE_ICON: Record<StorageType["kind"], string> = { postgres: "postgres", iceberg: "iceberg", s3: "folder" };
+const TYPE_ICON: Record<StorageType["kind"], string> = { postgres: "postgres", iceberg: "iceberg", s3: "bucket" };
 const SSL_MODES = ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"];
 
 export function AdminLayers({ hub }: { hub: Hub }) {
@@ -29,7 +29,7 @@ export function AdminLayers({ hub }: { hub: Hub }) {
     setError("");
     try { await api.layers.setDefault(layer.id); await hub.refresh(); } catch (e) { setError((e as Error).message); }
   };
-  return <><PageHeader icon={<ProductIcon kind="folder" size={22} />} title="Layers" subtitle="Global boundaries for workspaces, storage, workloads, and APIs. A matching layer is required in addition to the user's object permissions. There are no built-in layers: create them here or with OpenTofu (fdp_layer)."
+  return <><PageHeader icon={<ProductIcon kind="layer" size={22} />} title="Layers" subtitle="Global boundaries for workspaces, storage, workloads, and APIs. A matching layer is required in addition to the user's object permissions. There are no built-in layers: create them here or with OpenTofu (fdp_layer)."
     actions={<button className="btn" onClick={() => setDraft({ id: "", name: "", description: "", workspaces: true, production: false })}><IconPlus size={14} />Add layer</button>} />
     {error && <p role="alert" className="error">{error}</p>}
     {draft && <form className="card" onSubmit={save}><h2>{draft.id ? `Edit ${draft.name}` : "New layer"}</h2><div className="arg-grid">
@@ -392,7 +392,7 @@ export function AdminWorkspaceTemplates({ hub }: { hub: Hub }) {
     catch (err) { setError((err as Error).message); } finally { setBusy(false); }
   };
   return <>
-    <PageHeader icon={<ProductIcon kind="folder" size={22} />} title="Workspace templates"
+    <PageHeader icon={<IconWorkspaces size={22} />} title="Workspace templates"
       subtitle="Defaults per group: every member gets their own private workspace from each template of their group, created stopped (no cost until first start), also people who join later. Leaving the group removes theirs; files stay in its volume. Also configurable with OpenTofu (fdp_workspace_template)."
       actions={<button className="btn" onClick={() => setDraft(blank())}><IconPlus size={14} />Add template</button>} />
     {error && <p className="error" role="alert">{error}</p>}

@@ -314,3 +314,29 @@ def test_settings_redeploy_refetches_a_cold_cache_without_promoting_a_new_branch
     current=client.get('/v1/workloads/'+pub['id'],headers=as_('ana')).json()
     assert current['status']=='live' and current['deployed_sha']==pinned
     assert current['events'][0]['kind']=='deployed',current['events'][0]
+
+
+def test_versions_follow_git_and_show_what_ran_when(client, repo):
+    pub = deploy(client, repo, program="sales-report", slug="report", auto_update=False).json()
+    first = pub["deployed_sha"]
+    push(repo["work"], "Second version", lambda w: open(w / "analysis" / "sales_report.py", "a").write("\n# v2\n"))
+    reconcile()
+    versions = client.get(f"/v1/workloads/{pub['id']}/versions", headers=as_("ana"))
+    assert versions.status_code == 200, versions.text
+    body = versions.json()
+    assert body["branch"] == "main" and body["deployed_sha"] == first and body["behind"] == 1 and not body["auto_update"]
+    newest, running = body["commits"][:2]
+    assert newest["subject"] == "Second version" and newest["state"] == "pending" and newest["deployed_at"] is None
+    assert newest["sha"] == body["head_sha"] != first
+    assert running["sha"] == first and running["state"] == "running" and running["deployed_at"]
+    assert running["subject"] == "First version" and running["author"] and running["date"]
+    # Turning auto-update on deploys the branch head; the earlier version is kept in the history.
+    client.patch(f"/v1/workloads/{pub['id']}", headers=as_("ana"), json={"auto_update": True}).raise_for_status()
+    reconcile()
+    body = client.get(f"/v1/workloads/{pub['id']}/versions", headers=as_("ana")).json()
+    assert [c["state"] for c in body["commits"][:2]] == ["running", "deployed"] and body["behind"] == 0
+    # Versions are visible exactly to those who may read the workload.
+    for user in ("bob", "admin"):
+        assert (client.get(f"/v1/workloads/{pub['id']}/versions", headers=as_(user)).status_code
+                == client.get(f"/v1/workloads/{pub['id']}", headers=as_(user)).status_code)
+    assert client.get("/v1/workloads/missing/versions", headers=as_("ana")).status_code == 404

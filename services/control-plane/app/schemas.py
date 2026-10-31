@@ -75,6 +75,8 @@ class PoolOut(ORM, PoolIn):
     queued: Optional[int] = Field(default=None, description="Jobs and deploys waiting for this warehouse")
     default: bool = Field(default=False, description="Work without a warehouse runs here")
     trino_layers: List[str] = Field(default_factory=list, description="Layers whose Trino workers run here; only Trino uses it")
+    infrastructure_layer_ids: List[str] = Field(default_factory=list,
+        description="Layers whose infrastructure (Trino workers, Kafka brokers) runs here; it belongs to those layers")
     layer_names: List[str] = Field(default_factory=list, description="Names of layer_ids, in the same order")
     default_for: List[Dict[str, Optional[str]]] = Field(default_factory=list,
         description="Scoped defaults that point here: {layer_id, layer_name, workload_kind}")
@@ -145,6 +147,7 @@ class RunOut(ORM):
     finished_at: Optional[datetime]
     queue_position: Optional[int] = Field(default=None, description="Place in the warehouse's queue while queued")
     waiting_reason: Optional[str] = Field(default=None, description="Why a pending run has not started yet")
+    layer_id: Optional[str] = Field(default=None, description="The layer the run's work belongs to")
 
 
 class ConfigOut(BaseModel):
@@ -186,6 +189,25 @@ class CommitOut(BaseModel):
     subject: str
     author: str
     date: str
+
+
+class WorkloadCommitOut(CommitOut):
+    # running: what serves / runs now; queued: waiting for capacity; failed: its deploy failed;
+    # deployed: ran before; pending: newer than the running version, not deployed yet; skipped: never deployed.
+    state: Literal["running", "queued", "failed", "deployed", "pending", "skipped"]
+    deployed_at: Optional[datetime] = Field(default=None, description="When this commit was last deployed")
+
+
+class WorkloadVersionsOut(BaseModel):
+    """Git is the source of truth: the branch's commits, and which of them ran here and when."""
+    repo: str
+    branch: str
+    head_sha: Optional[str] = Field(default=None, description="The branch head at the last check")
+    deployed_sha: Optional[str] = None
+    last_checked_at: Optional[datetime] = None
+    auto_update: bool
+    behind: int = Field(default=0, description="Commits on the branch newer than the running version")
+    commits: List[WorkloadCommitOut]
 
 
 class PullOut(BaseModel):

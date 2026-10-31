@@ -20,10 +20,10 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
-| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
 | `POST` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -161,6 +161,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `GET` | `/v1/workloads/{pub_id}/orchestrator-runs` | Orchestrator Runs |
 | `POST` | `/v1/workloads/{pub_id}/runs` | Run Deployed |
 | `POST` | `/v1/workloads/{pub_id}/sync` | Sync Now |
+| `GET` | `/v1/workloads/{pub_id}/versions` | Workload Versions |
 
 ## identity
 
@@ -215,6 +216,13 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/admin/settings/default-layer` | Set Default Layer |
 | `DELETE` | `/v1/admin/settings/default-layer` | Clear Default Layer |
 | `GET` | `/v1/layers` | Listing |
+
+## logs
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/logs` | Write Logs |
+| `GET` | `/v1/logs` | Read Logs |
 
 ## meta
 

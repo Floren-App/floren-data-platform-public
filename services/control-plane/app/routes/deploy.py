@@ -22,7 +22,7 @@ from ..orchestrator import Orchestrator
 from ..ownership import owner_info, browsing_allowed
 from ..secrets import SecretStore, repo_path
 from .. import deploying, rbac
-from ..schemas import (BranchOut, CommitOut, OpenOut, OrchestrateIn, WorkloadEventOut, WorkloadOut,
+from ..schemas import (BranchOut, CommitOut, OpenOut, OrchestrateIn, WorkloadCommitOut, WorkloadEventOut, WorkloadOut, WorkloadVersionsOut,
                        WorkloadPatch, DeployedRunIn, DeployIn, PullOut, RepoIn, RepoOut, RunOut)
 from .common import audit, run_out
 from .runs import checked_plan, start_run
@@ -286,6 +286,53 @@ def create_workload(body: DeployIn, db: Session = Depends(get_db), orch: Orchest
 @router.get("/workloads/{pub_id}", response_model=WorkloadOut)
 def get_workload(pub_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     return pub_out(_visible(db, pub_id, user), user, with_events=True)
+
+
+@router.get("/workloads/{pub_id}/versions", response_model=WorkloadVersionsOut)
+def workload_versions(pub_id: str, limit: int = Query(30, ge=1, le=100), db: Session = Depends(get_db),
+                      user: User = Depends(get_actor), secrets: SecretStore = Depends(get_secret_store)):
+    """The branch's newest commits, newest first, with which one runs here and when each was deployed."""
+    from ..models import WorkloadEvent
+    pub = _visible(db, pub_id, user)
+    git = deploying.get_git()
+    ref = pub.latest_sha or pub.deployed_sha or f"refs/heads/{pub.branch}"
+    try:
+        commits = git.log(pub.repo.id, ref, limit)
+    except GitError:
+        try:  # another replica fetched it: read the branch into this one's cache
+            git.fetch(pub.repo.id, pub.repo.url, pub.branch, deploying.repo_secret(secrets, pub.repo))
+            commits = git.log(pub.repo.id, ref, limit)
+        except GitError as exc:
+            raise HTTPException(502, f"cannot read {pub.repo.name}@{pub.branch}: {exc}") from None
+    deployed_at = {}
+    for e in db.scalars(select(WorkloadEvent).where(WorkloadEvent.workload_id == pub.id, WorkloadEvent.kind == "deployed")
+                        .order_by(WorkloadEvent.at.desc())):
+        deployed_at.setdefault(e.sha, e.at)
+    if pub.deployed_sha and pub.deployed_at:
+        deployed_at.setdefault(pub.deployed_sha, pub.deployed_at)
+    shas = [c.sha for c in commits]
+    running = shas.index(pub.deployed_sha) if pub.deployed_sha in shas else len(shas)
+    if pub.deployed_sha and pub.deployed_sha not in shas:
+        try:  # older than the window, or no longer on the branch (history rewritten): still show what runs
+            commits.append(git.commit(pub.repo.id, pub.deployed_sha))
+        except GitError:
+            pass
+
+    def state(i, sha):
+        if sha == pub.deployed_sha:
+            return "running"
+        if sha == pub.queued_sha:
+            return "queued"
+        if sha == pub.failed_sha:
+            return "failed"
+        if sha in deployed_at:
+            return "deployed"
+        return "pending" if i < running else "skipped"
+    return WorkloadVersionsOut(
+        repo=pub.repo.name, branch=pub.branch, head_sha=pub.latest_sha, deployed_sha=pub.deployed_sha,
+        last_checked_at=pub.last_checked_at, auto_update=pub.auto_update, behind=running if pub.deployed_sha in shas else 0,
+        commits=[WorkloadCommitOut(sha=c.sha, subject=c.subject, author=c.author, date=c.date, state=state(i, c.sha),
+                                   deployed_at=deployed_at.get(c.sha)) for i, c in enumerate(commits)])
 
 
 @router.patch("/workloads/{pub_id}", response_model=WorkloadOut)

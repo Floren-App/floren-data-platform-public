@@ -19,6 +19,9 @@ export interface Hub {
   /** The layer mode: lists show this layer and new work lands in it. */
   layerId: string;
   selectActiveLayer: (id: string) => Promise<void>;
+  /** Usage shows every layer instead of the layer mode (sidebar and page share it; not remembered). */
+  usageAllLayers: boolean;
+  setUsageAllLayers: (all: boolean) => void;
   /** Runs an action, surfaces its error, and refreshes state afterwards. Resolves true on success. */
   act: (fn: () => Promise<unknown>) => Promise<boolean>;
   dismissError: () => void;
@@ -154,6 +157,7 @@ export function useHub(enabled: boolean): Hub {
     catch (e) { setMe(before); if (!(e instanceof SessionExpiredError)) setError((e as Error).message); }
   }, [me]);
   const layerId = modeLayerId(me, layers);
+  const [usageAllLayers, setUsageAllLayers] = useState(false);
 
   const loadMoreRuns = useCallback(async () => {
     runLimit.current = Math.min(runLimit.current + RUN_PAGE, MAX_RUNS);
@@ -179,5 +183,5 @@ export function useHub(enabled: boolean): Hub {
     };
   }, [enabled, refresh, update]);
 
-  return { me, workspaces, runs, hasMoreRuns, loadMoreRuns, workloads, resources, layers, error, refresh, selectActiveGroup, layerId, selectActiveLayer, act, dismissError };
+  return { me, workspaces, runs, hasMoreRuns, loadMoreRuns, workloads, resources, layers, error, refresh, selectActiveGroup, layerId, selectActiveLayer, usageAllLayers, setUsageAllLayers, act, dismissError };
 }

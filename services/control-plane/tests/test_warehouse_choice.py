@@ -70,6 +70,20 @@ def test_only_trino_uses_a_trino_warehouse(client, repo):  # noqa: F811
                       json={"warehouse": "large", "max_running_per_user": 2}).status_code == 422
     pools = {p["name"]: p for p in client.get("/v1/admin/pools", headers=ADMIN).json()}
     assert pools["large"]["trino_layers"] == ["Non-Prod"]
+    # The warehouse belongs to Non-Prod: the app's layer mode shows it there only.
+    assert pools["large"]["infrastructure_layer_ids"] == [layers.NON_PROD]
+    assert pools["small"]["infrastructure_layer_ids"] == []
+
+
+def test_runs_report_their_layer(client):
+    ws = start_workspace(client)
+    run = adhoc(client, ws, pool="small")
+    assert run.status_code in (200, 201), run.text
+    listed = {r["id"]: r for r in client.get("/v1/runs", headers=as_("ana")).json()}
+    from app.db import SessionLocal
+    with SessionLocal() as db:
+        expected = layers.default_layer(db)
+    assert listed[run.json()["id"]]["layer_id"] == expected
 
 
 def test_trino_needs_a_warehouse_nothing_else_uses(client, repo):  # noqa: F811
