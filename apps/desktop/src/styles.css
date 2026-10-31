@@ -28,6 +28,8 @@
   --border-strong: #3c3c3c;
   --fg: #cccccc;
   --fg-muted: #9d9d9d;
+  /* Dropdown chevron in --fg-muted (a data URI cannot use currentColor). */
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239d9d9d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --fg-strong: #ffffff;
   --accent: #7cc63c;
   --accent-hover: #8fd451;
@@ -68,6 +70,7 @@
     --border-strong: #cecece;
     --fg: #3b3b3b;
     --fg-muted: #6e6e6e;
+    --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236e6e6e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     --fg-strong: #1f1f1f;
     --link: #3b7a12;
     --accent: #6cb52e;
@@ -111,11 +114,13 @@ button:focus-visible, summary:focus-visible, [role="tab"]:focus-visible { outlin
 
 /* ---------- Shell ---------- */
 .shell { display: grid; grid-template-columns: 48px 300px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 22px; height: 100%; }
-/* Activity bar: icons only; hovering a moment (or keyboard focus) slides the labels out over the sidebar,
+/* Activity bar: icons only; hovering (a 0.1 s pause, so passing over it does not open it) or keyboard focus
+   slides the labels out over the sidebar; leaving closes it at once,
    so the bar never takes more room. */
-.activity { grid-row: 1; position: relative; z-index: 30; width: 48px; background: var(--bg-activity); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: stretch; padding: 4px 0; transition: width .12s ease, box-shadow .12s ease; }
-@media (hover: hover) { .activity:hover { width: 176px; box-shadow: var(--shadow); transition-delay: .35s; } }
+.activity { grid-row: 1; position: relative; z-index: 30; width: 48px; background: var(--bg-activity); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: stretch; padding: 4px 0; transition: width .08s ease-out, box-shadow .08s ease-out; }
+@media (hover: hover) { .activity:hover { width: 176px; box-shadow: var(--shadow); transition-delay: .1s; } }
 .activity:focus-within:has(:focus-visible) { width: 176px; box-shadow: var(--shadow); }
+.activity.picked, .activity.picked:hover { width: 48px; box-shadow: none; transition-delay: 0s; }
 .activity-label { justify-self: start; padding-right: 12px; font-size: 13px; white-space: nowrap; }
 .activity-group { display: flex; flex-direction: column; align-items: stretch; }
 .activity-group hr { width: 24px; border: 0; border-top: 1px solid var(--border-strong); margin: 4px 0 4px 12px; }
@@ -321,6 +326,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--focus); outline:
 input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-allowed; }
 input::placeholder, textarea::placeholder { color: var(--fg-muted); opacity: .75; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width: 14px; height: 14px; margin: 0; }
+/* Our own chevron, inset like the text: the native arrow ignores padding and sits against the border. */
+select:not([multiple]) { appearance: none; -webkit-appearance: none; padding-right: 26px; background-image: var(--select-arrow); background-repeat: no-repeat; background-position: right 9px center; background-size: 10px 6px; }
 select[multiple] { height: auto; padding: 4px; }
 textarea { font-family: var(--mono); font-size: 12px; min-height: 80px; padding: 6px 8px; resize: vertical; line-height: 1.5; }
 textarea.short { min-height: 60px; }

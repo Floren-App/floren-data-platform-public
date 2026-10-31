@@ -17,7 +17,7 @@ const HOME: TabRef = { kind: "home", title: "Home" };
 type EditorTab = TabRef & { pinned: boolean };
 const viewForTab = (tab: TabRef): View => {
   if (tab.kind === "home") return "home";
-  if (["workspace", "workspaces"].includes(tab.kind)) return "workspaces";
+  if (["workspace", "workspaces", "git-credentials"].includes(tab.kind)) return "workspaces";
   // Workspace runs belong with workspaces; runs of deployed programs with workloads.
   if ((tab.kind === "run" && tab.runScope === "workspace") || (tab.kind === "runs" && tab.ref === "workspace")) return "workspaces";
   if (["run", "runs", "workload", "deploy", "folder", "docs"].includes(tab.kind)) return "workloads";
@@ -92,6 +92,8 @@ function Shell({ user }: { user: User }) {
   const [tabs, setTabs] = useState<EditorTab[]>([{ ...HOME, pinned: false }]);
   const [active, setActive] = useState(key(HOME));
   const [switchingGroup, setSwitchingGroup] = useState(false);
+  // After choosing a section the labels close, so the sidebar is free at once; they reopen on the next hover.
+  const [picked, setPicked] = useState(false);
   const switchGroup = async (id: string) => {
     setSwitchingGroup(true);
     try { await hub.selectActiveGroup(id); }
@@ -182,7 +184,8 @@ function Shell({ user }: { user: User }) {
 
   return (
     <div className="shell">
-      <nav className="activity" aria-label="Views">
+      <nav className={`activity ${picked ? "picked" : ""}`} aria-label="Views" onMouseLeave={() => setPicked(false)} onKeyDown={() => setPicked(false)}
+        onClick={(e) => { if ((e.target as HTMLElement).closest(".activity-group > button, .activity > button")) setPicked(true); }}>
         {groups.filter((g) => g.items.length).map((g, i) => <div key={g.label} className="activity-group" role="group" aria-label={g.label}>
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />
