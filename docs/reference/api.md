@@ -19,10 +19,10 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
-| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
 | `PUT` | `/v1/egress/{slug}/{path}` | Egress |
-| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `POST` | `/v1/egress/{slug}/{path}` | Egress |
+| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
+| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
@@ -147,8 +147,10 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/compliance/cases/{case_id}/decision` | Decide Case |
 | `POST` | `/v1/compliance/cases/{case_id}/files` | Add File |
 | `GET` | `/v1/compliance/cases/{case_id}/files/{file_id}` | Get File |
+| `POST` | `/v1/compliance/cases/{case_id}/renew` | Renew Case |
 | `POST` | `/v1/compliance/cases/{case_id}/submit` | Submit Case |
 | `POST` | `/v1/compliance/cases/{case_id}/withdraw` | Withdraw Case |
+| `GET` | `/v1/compliance/deadlines` | List Deadlines |
 | `GET` | `/v1/compliance/forms` | List Forms |
 | `GET` | `/v1/compliance/forms/{form_id}` | Get Form |
 | `DELETE` | `/v1/compliance/forms/{form_id}` | Delete Form |

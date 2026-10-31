@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = ""
     notification_interval_seconds: int = 30
+    # Ends justified access, opens renewals, sends reminders, and sets deadlines for access that needs a form.
+    compliance_interval_seconds: int = 900
     # URL execution containers use to reach the control plane.
     internal_url: str = "http://control-plane:8000"
 

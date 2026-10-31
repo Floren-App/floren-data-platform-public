@@ -797,6 +797,8 @@ class AccessPolicy(Base):
     steps: Mapped[list] = mapped_column(JSON, default=list)        # [{"role": "data_owner" | "compliance_reviewer", "approvals": 1}]
     max_days: Mapped[int] = mapped_column(Integer, default=365)    # longest approved access
     review_days: Mapped[int] = mapped_column(Integer, default=10)  # reviews are due within this many days
+    renew_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=30)  # renewal opens this long before the end
+    grace_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=30)  # existing access: time to justify it
 
 
 class ComplianceRole(Base):
@@ -828,6 +830,7 @@ class AccessCase(Base):
     option_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
     principal_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)  # membership: who joins
     request_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)     # the product access request
+    renewal_of: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)  # the case this one renews
     layer_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
     classification: Mapped[str] = mapped_column(String(32), default="")
     policy_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
@@ -872,6 +875,7 @@ class JustifiedGrant(Base):
     case_id: Mapped[str] = mapped_column(String(12))
     until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    previous_role: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # what the group had before; back to it at the end
 
 
 class MembershipApproval(Base):
@@ -1153,3 +1157,19 @@ class Notification(Base):
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str] = mapped_column(String(500), default="")
+
+
+class JustificationDeadline(Base):
+    """Access that needs a compliance form but has none (it existed before the policy, or the data was classified
+    higher since): it is kept until the deadline, then removed unless a case was approved."""
+    __tablename__ = "compliance_deadlines"
+    __table_args__ = (UniqueConstraint("resource_id", "app_group_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    resource_id: Mapped[str] = mapped_column(String(12), index=True)   # the object, or the product's access resource
+    app_group_id: Mapped[str] = mapped_column(String(12), index=True)
+    role: Mapped[str] = mapped_column(String(32))
+    policy_id: Mapped[str] = mapped_column(String(12))
+    classification: Mapped[str] = mapped_column(String(32), default="")
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

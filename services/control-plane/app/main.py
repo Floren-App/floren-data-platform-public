@@ -122,6 +122,8 @@ async def lifespan(app: FastAPI):
         if hasattr(orch, 'write_layer_secret'):
             from .source_catalogs import catalog_loop
             loops.append(lambda: catalog_loop(SessionLocal, orch, secrets))
+        from .expiry import compliance_loop
+        loops.append(lambda: compliance_loop(SessionLocal, s.compliance_interval_seconds))
         if s.smtp_host:  # compliance review emails
             from .notify import notification_loop
             loops.append(lambda: notification_loop(SessionLocal, s.notification_interval_seconds))

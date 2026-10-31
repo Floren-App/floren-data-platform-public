@@ -6982,12 +6982,28 @@
             "title": "Form Id",
             "type": "string"
           },
+          "grace_days": {
+            "default": 30,
+            "description": "Access that existed before (or was classified higher since) is kept this many days for a form to be approved",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Grace Days",
+            "type": "integer"
+          },
           "max_days": {
             "default": 365,
             "description": "Longest time approved access lasts",
             "maximum": 3650.0,
             "minimum": 1.0,
             "title": "Max Days",
+            "type": "integer"
+          },
+          "renew_days": {
+            "default": 30,
+            "description": "A renewal opens this many days before access ends",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Renew Days",
             "type": "integer"
           },
           "review_days": {
@@ -16510,6 +16526,79 @@
         ]
       }
     },
+    "/v1/compliance/cases/{case_id}/renew": {
+      "post": {
+        "description": "Start the renewal of approved access now: a draft on the current form, prefilled with the answers.",
+        "operationId": "post_v1_compliance_cases_case_id_renew",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Renew Case",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
     "/v1/compliance/cases/{case_id}/submit": {
       "post": {
         "operationId": "post_v1_compliance_cases_case_id_submit",
@@ -16649,6 +16738,86 @@
           }
         },
         "summary": "Withdraw Case",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/deadlines": {
+      "get": {
+        "description": "Access that needs a compliance form and has none yet: kept until its deadline, then removed.",
+        "operationId": "get_v1_compliance_deadlines",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "resource_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Deadlines",
         "tags": [
           "compliance"
         ]

@@ -577,7 +577,7 @@ export interface FormDefinition { pages: FormPage[] }
 export interface AccessFormItem { id: string; name: string; description: string; published_version: number | null; has_draft: boolean; used_by: number;
   versions?: { id: string; version: number; published: boolean; published_at: string | null; published_by: string; definition: FormDefinition }[] }
 export interface AccessPolicyItem { id: string; layer_id: string; classification: string; form_id: string; form: string | null;
-  steps: { role: "data_owner" | "compliance_reviewer"; approvals: number }[]; max_days: number; review_days: number }
+  steps: { role: "data_owner" | "compliance_reviewer"; approvals: number }[]; max_days: number; review_days: number; renew_days: number; grace_days: number }
 export interface Requirement { required: boolean; layer_id: string | null; classification: string; policy_id?: string;
   form?: { id: string; name: string; version_id: string | null; version: number | null; definition: FormDefinition | null };
   steps?: AccessPolicyItem["steps"]; max_days?: number; review_days?: number }
@@ -590,10 +590,13 @@ export interface AccessCaseItem {
   classification: string; form: string | null; form_version: number | null; steps: AccessPolicyItem["steps"]; step: number;
   decisions: { step: number; role: string; by: string; decision: string; note: string; at: string }[];
   until: string | null; approved_until: string | null; due_at: string | null; created_at: string; submitted_at: string | null; decided_at: string | null;
-  can_review: boolean; is_requester: boolean;
+  can_review: boolean; is_requester: boolean; renewal_of?: string | null; renewal?: string | null;
   answers?: Record<string, unknown>; definition?: FormDefinition | null; comments?: { by: string; text: string; at: string }[];
   files?: { id: string; field_id: string; name: string; content_type: string }[]; members?: string[];
 }
+/** Access that needs a compliance form and has none yet: kept until due_at, then removed. */
+export interface JustifyDeadline { resource_id: string; resource: string; kind: string; product_id: string | null; app_group_id: string; group: string;
+  role: string; classification: string; due_at: string }
 export interface RegisterRow { group: string; app_group_id: string; access: string; kind: string; classification: string; layer: string; form: string;
   requester: string; approved_by: string; approved_at: string | null; until: string | null; members: number; case_id: string }
 export type CaseTarget = { kind: "product" | "role"; app_group_id: string; product_id?: string; option_id?: string; resource_id?: string; role?: string };
@@ -944,7 +947,7 @@ export const api = {
     publishForm: (id: string) => request<AccessFormItem>("POST", `/v1/compliance/forms/${id}/publish`),
     deleteForm: (id: string) => request<void>("DELETE", `/v1/compliance/forms/${id}`),
     policies: () => request<{ layers: { id: string; name: string }[]; classifications: ClassificationLevel[]; policies: AccessPolicyItem[] }>("GET", "/v1/compliance/policies"),
-    putPolicy: (layer: string, level: string, body: { form_id: string; steps: AccessPolicyItem["steps"]; max_days: number; review_days: number }) =>
+    putPolicy: (layer: string, level: string, body: { form_id: string; steps: AccessPolicyItem["steps"]; max_days: number; review_days: number; renew_days: number; grace_days: number }) =>
       request<AccessPolicyItem>("PUT", `/v1/compliance/policies/${layer}/${encodeURIComponent(level)}`, body),
     deletePolicy: (layer: string, level: string) => request<void>("DELETE", `/v1/compliance/policies/${layer}/${encodeURIComponent(level)}`),
     roles: () => request<{ roles: ComplianceRoleItem[]; kinds: { key: string; label: string }[] }>("GET", "/v1/compliance/roles"),
@@ -962,6 +965,8 @@ export const api = {
     withdraw: (id: string) => request<AccessCaseItem>("POST", `/v1/compliance/cases/${id}/withdraw`),
     addFile: (id: string, field_id: string, name: string, content_type: string, data: string) =>
       request<{ id: string }>("POST", `/v1/compliance/cases/${id}/files`, { field_id, name, content_type, data }),
+    renew: (id: string) => request<AccessCaseItem>("POST", `/v1/compliance/cases/${id}/renew`),
+    deadlines: (resource_id?: string) => request<JustifyDeadline[]>("GET", `/v1/compliance/deadlines${resource_id ? `?resource_id=${resource_id}` : ""}`),
     caseFile: (id: string, fileId: string) => fetchBlob(`/v1/compliance/cases/${id}/files/${fileId}`),
     register: () => request<RegisterRow[]>("GET", "/v1/compliance/register"),
     registerCsv: () => request<string>("GET", "/v1/compliance/register?format=csv"),

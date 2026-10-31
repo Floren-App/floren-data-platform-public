@@ -129,12 +129,16 @@ class PolicyIn(BaseModel):
     steps: List[StepIn] = Field(min_length=1, max_length=5)
     max_days: int = Field(default=365, ge=1, le=3650, description="Longest time approved access lasts")
     review_days: int = Field(default=10, ge=1, le=365, description="Reviews are due within this many days")
+    renew_days: int = Field(default=30, ge=1, le=365, description="A renewal opens this many days before access ends")
+    grace_days: int = Field(default=30, ge=1, le=365, description="Access that existed before (or was classified higher since) "
+                                                                    "is kept this many days for a form to be approved")
 
 
 def policy_out(db, p: AccessPolicy) -> dict:
     form = db.get(AccessForm, p.form_id)
     return {"id": p.id, "layer_id": p.layer_id, "classification": p.classification, "form_id": p.form_id,
-            "form": form.name if form else None, "steps": p.steps, "max_days": p.max_days, "review_days": p.review_days}
+            "form": form.name if form else None, "steps": p.steps, "max_days": p.max_days, "review_days": p.review_days,
+            "renew_days": p.renew_days or 30, "grace_days": p.grace_days or 30}
 
 
 @router.get("/policies")
@@ -163,6 +167,7 @@ def put_policy(layer_id: str, level: str, body: PolicyIn, db: Session = Depends(
         db.add(policy)
     policy.form_id, policy.steps = body.form_id, [s.model_dump() for s in body.steps]
     policy.max_days, policy.review_days = body.max_days, body.review_days
+    policy.renew_days, policy.grace_days = body.renew_days, body.grace_days
     db.flush()
     audit(db, user.username, "compliance.policy", layer_id, classification=level, before=before, after=policy_out(db, policy))
     db.commit()
@@ -329,6 +334,9 @@ def case_out(db, case: AccessCase, user, full: bool = True) -> dict:
            "steps": case.steps, "step": case.step, "decisions": case.decisions or [], "until": case.until,
            "approved_until": case.approved_until, "due_at": case.due_at, "created_at": case.created_at,
            "submitted_at": case.submitted_at, "decided_at": case.decided_at, "can_review": cp.may_review(db, user, case),
+           "renewal_of": case.renewal_of,
+           "renewal": db.scalar(select(AccessCase.id).where(AccessCase.renewal_of == case.id,
+                                                            AccessCase.status.in_(("draft", "in_review", "changes_requested", "approved")))),
            "is_requester": rbac.resolve_user(db, user).username == case.requester}
     if full:
         out.update({"answers": case.answers or {}, "definition": version.definition if version else None, "comments": case.comments or [],
@@ -636,3 +644,58 @@ def access_register(format: Literal["json", "csv"] = "json", db: Session = Depen
         writer.writerow({k: cell(v) for k, v in row.items()})
     return Response(buffer.getvalue(), media_type="text/csv",
                     headers={"Content-Disposition": 'attachment; filename="access-register.csv"', "Cache-Control": "no-store"})
+
+
+
+# --- renewal and deadlines ---------------------------------------------------------------------------------
+
+def may_act_for(db, user, case: AccessCase) -> bool:
+    """The requester, or someone who can give the access: the object's or product's owners."""
+    resolved = rbac.resolve_user(db, user)
+    if resolved.username == case.requester or resolved.is_admin:
+        return True
+    target = cp.case_target(db, case)
+    resource = db.get(Resource, target) if target else None
+    return resource is not None and rbac.allowed(db, user, "assign", resource)
+
+
+@router.post("/cases/{case_id}/renew", status_code=201)
+def renew_case(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Start the renewal of approved access now: a draft on the current form, prefilled with the answers."""
+    from .. import expiry
+    case = _case(db, case_id, user)
+    if case.status not in ("approved", "expired") or case.kind == "membership":
+        raise HTTPException(409, "only approved or ended access can be renewed")
+    if not may_act_for(db, user, case):
+        raise HTTPException(403, "the requester or the data's owners renew access")
+    renewal = expiry.renew(db, case, by=rbac.resolve_user(db, user).username)
+    if renewal is None:
+        raise HTTPException(409, "this access needs no compliance form any more")
+    audit(db, rbac.resolve_user(db, user).username, "compliance.renewal", case.resource_id or case.product_id, case=renewal.id, renews=case.id)
+    db.commit()
+    return case_out(db, renewal, user)
+
+
+@router.get("/deadlines")
+def list_deadlines(resource_id: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Access that needs a compliance form and has none yet: kept until its deadline, then removed."""
+    from ..models import JustificationDeadline
+    admin = cp.is_compliance_admin(db, user)
+    stmt = select(JustificationDeadline).order_by(JustificationDeadline.due_at)
+    if resource_id:
+        stmt = stmt.where(JustificationDeadline.resource_id == resource_id)
+    out = []
+    for item in db.scalars(stmt):
+        resource = db.get(Resource, item.resource_id)
+        if resource is None:
+            continue
+        policy = db.get(AccessPolicy, item.policy_id)
+        if not (admin or rbac.allowed(db, user, "assign", resource) or cp.has_role(
+                db, user, "compliance_reviewer", resource_id=resource.id, layer_id=policy.layer_id if policy else None, level=item.classification)):
+            continue
+        group = db.get(AppGroup, item.app_group_id)
+        product = db.scalar(select(CatalogProduct).where(CatalogProduct.access_resource_id == resource.id))
+        out.append({"resource_id": resource.id, "resource": product.title if product else resource.name, "kind": "product" if product else resource.kind,
+                    "product_id": product.id if product else None, "app_group_id": item.app_group_id, "group": group.name if group else item.app_group_id,
+                    "role": item.role, "classification": item.classification, "due_at": item.due_at})
+    return out

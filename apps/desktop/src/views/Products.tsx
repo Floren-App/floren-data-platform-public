@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AccessCaseItem, AccessRequestItem, ago, api, ApiError, openInWindow, AppGroup, CaseTarget, Requirement, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
+import { AccessCaseItem, AccessRequestItem, ago, api, ApiError, openInWindow, AppGroup, CaseTarget, JustifyDeadline, Requirement, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
@@ -352,6 +352,12 @@ function AccessOptions({ detail, onChanged }: { detail: ProductDetail; onChanged
   useEffect(() => { if (detail.can_manage) api.access.groups().then(setGroups).catch(() => setGroups([])); }, [detail.can_manage]);
   const consumers = detail.consumers ?? [];
   const [justify, setJustify] = useState<{ target: CaseTarget; requirement: Requirement } | null>(null), [message, setMessage] = useState("");
+  // Consumers from before the product's data needed a form: they stay until their deadline.
+  const [deadlines, setDeadlines] = useState<JustifyDeadline[]>([]);
+  useEffect(() => { if (detail.can_manage) api.compliance.deadlines().then((all) => setDeadlines(all.filter((d) => d.product_id === detail.id))).catch(() => setDeadlines([])); }, [detail.id, detail.can_manage]);
+  const justifyExisting = (groupId: string, optionId: string) => { setError(""); setMessage("");
+    const target: CaseTarget = { kind: "product", app_group_id: groupId, product_id: detail.id, option_id: optionId };
+    api.compliance.requirement(target).then((requirement) => setJustify({ target, requirement })).catch((e: Error) => setError(e.message)); };
   const act = (p: Promise<unknown>, target?: CaseTarget) => { setError(""); setMessage(""); setJustify(null); void p.then(onChanged).catch((e: Error) => {
     // Data under an access policy: the group becomes a consumer once a compliance form is approved.
     if (target && e instanceof ApiError && e.requirement) setJustify({ target, requirement: e.requirement });
@@ -368,7 +374,10 @@ function AccessOptions({ detail, onChanged }: { detail: ProductDetail; onChanged
         {detail.can_manage && <td>{consumers.filter((c) => c.option_id === o.id).map((c) => <div key={c.group_id} className="row" style={{ gap: 6 }}>{c.group}
           <select aria-label={`Option of ${c.group}`} value={o.id} onChange={(e) => act(api.products.setConsumer(detail.id, c.group_id, e.target.value))}>
             {(detail.options ?? []).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-          <button className="text-button" onClick={() => act(api.products.removeConsumer(detail.id, c.group_id))}>Remove</button></div>)}
+          <button className="text-button" onClick={() => act(api.products.removeConsumer(detail.id, c.group_id))}>Remove</button>
+          {(() => { const d = deadlines.find((x) => x.app_group_id === c.group_id); return d && <span className="small">
+            <span className="error-text">Needs a form by {new Date(d.due_at).toLocaleDateString()}</span>{" "}
+            <button className="text-button" onClick={() => justifyExisting(c.group_id, o.id)}>Justify</button></span>; })()}</div>)}
           {!consumers.some((c) => c.option_id === o.id) && <span className="muted">—</span>}</td>}
       </tr>)}</tbody></table></div>
     {detail.can_manage && <form className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }} onSubmit={(e) => { e.preventDefault(); act(api.products.setConsumer(detail.id, group, option || undefined),

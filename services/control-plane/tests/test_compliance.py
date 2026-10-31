@@ -259,3 +259,95 @@ def test_email_failures_are_retried_and_kept(client, monkeypatch):
     with SessionLocal() as db:
         item = db.scalar(select(Notification))
         assert item.sent_at is None and item.attempts == 1 and "refused" in item.error
+
+
+def test_access_ends_renews_and_existing_access_gets_a_deadline(client, repo, monkeypatch):  # noqa: F811
+    from datetime import timedelta
+    from app import expiry, notify
+    from app.config import get_settings
+    from app.models import AccessCase, JustificationDeadline, utcnow
+    monkeypatch.setattr(get_settings(), "smtp_host", "smtp.test")
+    monkeypatch.setattr(notify, "_connect", lambda s: FakeSMTP())
+    FakeSMTP.sent = []
+    ids = setup_products(client, repo)
+    classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
+    # Access that existed before the policy: kept, with a deadline.
+    legacy = grant_group(client, "workloads", "Legacy readers", "Executor")
+    client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": legacy, "role": "Reader"}).raise_for_status()
+    layer, _ = set_up_policy(client, ids["public"])
+    marketing = grant_group(client, "workloads", "Marketing readers", "Executor")
+    privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_reviewer", "app_group_id": privacy}).raise_for_status()
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": privacy}).raise_for_status()
+    set_email("ana", "ana@example.test")
+    set_email("bob", "bob@example.test")
+    now = utcnow()
+    expiry.tick(SessionLocal, now)
+    deadlines = client.get("/v1/compliance/deadlines", headers=as_("ana"), params={"resource_id": ids["public"]}).json()
+    assert [(d["group"], d["role"], d["classification"]) for d in deadlines] == [("Legacy readers", "Reader", "restricted")]
+    # The group's access is approved for 25 days; a renewal opens 30 days before the end, prefilled.
+    target = {"kind": "role", "resource_id": ids["public"], "role": "Reader", "app_group_id": marketing}
+    case = client.post("/v1/compliance/cases", headers=as_("ana"), json={**target, "answers": ANSWERS,
+                                                                         "until": (now + timedelta(days=25)).isoformat()}).json()
+    approved = client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "approve"}).json()
+    assert approved["status"] == "approved"
+    expiry.tick(SessionLocal, now + timedelta(days=4))
+    with SessionLocal() as db:
+        renewal = db.scalar(select(AccessCase).where(AccessCase.renewal_of == case["id"]))
+        assert renewal.status == "draft" and renewal.answers == ANSWERS and renewal.requester == "ana"
+    assert client.get(f"/v1/compliance/cases/{case['id']}", headers=as_("ana")).json()["renewal"] == renewal.id
+    expiry.tick(SessionLocal, now + timedelta(days=12))   # 13 days left, nothing sent: a reminder
+    expiry.tick(SessionLocal, now + timedelta(days=12))   # once
+    notify.tick(SessionLocal)
+    subjects = [(m["to"], m["subject"]) for m in FakeSMTP.sent]
+    assert ("ana@example.test", "Renew access: Reader on public for Marketing readers") in subjects
+    assert sum(s.startswith("Access ends in 13 days") for _, s in subjects) == 1, subjects
+    assert any(s.startswith("Justify access by") for _, s in subjects)
+    # Without a renewal the access ends; the role goes away and the case is expired.
+    expiry.tick(SessionLocal, now + timedelta(days=31))
+    with SessionLocal() as db:
+        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == marketing)) is None
+        assert db.get(AccessCase, case["id"]).status == "expired"
+        assert db.scalar(select(JustifiedGrant).where(JustifiedGrant.app_group_id == marketing)) is None
+    # Past the deadline, the legacy access without a form is removed too.
+    with SessionLocal() as db:
+        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == legacy)) is None
+        assert db.scalar(select(JustificationDeadline)) is None
+    # An ended case can be renewed by hand.
+    again = client.post(f"/v1/compliance/cases/{case['id']}/renew", headers=as_("ana"))
+    assert again.status_code == 201 and again.json()["renewal_of"] == case["id"]
+
+
+def test_justifying_existing_access_clears_its_deadline_and_overdue_reviews_escalate(client, repo, monkeypatch):  # noqa: F811
+    from datetime import timedelta
+    from app import expiry, notify
+    from app.config import get_settings
+    from app.models import JustificationDeadline, utcnow
+    monkeypatch.setattr(get_settings(), "smtp_host", "smtp.test")
+    monkeypatch.setattr(notify, "_connect", lambda s: FakeSMTP())
+    FakeSMTP.sent = []
+    ids = setup_products(client, repo)
+    classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
+    legacy = grant_group(client, "workloads", "Legacy readers", "Executor")
+    client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": legacy, "role": "Reader"}).raise_for_status()
+    set_up_policy(client, ids["public"])
+    privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": privacy}).raise_for_status()
+    set_email("bob", "bob@example.test")
+    now = utcnow()
+    expiry.tick(SessionLocal, now)
+    # The owners justify the access the group already has.
+    case = client.post("/v1/compliance/cases", headers=as_("ana"), json={"kind": "role", "resource_id": ids["public"], "role": "Reader",
+                                                                         "app_group_id": legacy, "answers": ANSWERS}).json()
+    expiry.tick(SessionLocal, now + timedelta(days=11))   # review due after 10 days: overdue
+    notify.tick(SessionLocal)
+    assert ("bob@example.test", "Review overdue: Reader on public for Legacy readers") in [(m["to"], m["subject"]) for m in FakeSMTP.sent]
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_reviewer", "app_group_id": privacy}).raise_for_status()
+    client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "approve"}).raise_for_status()
+    with SessionLocal() as db:
+        assert db.scalar(select(JustificationDeadline)) is None
+        assert db.scalar(select(JustifiedGrant).where(JustifiedGrant.app_group_id == legacy)).previous_role is None
+    expiry.tick(SessionLocal, now + timedelta(days=20))   # justified now: no new deadline, the access stays
+    with SessionLocal() as db:
+        assert db.scalar(select(JustificationDeadline)) is None
+        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == legacy)).role == "Reader"

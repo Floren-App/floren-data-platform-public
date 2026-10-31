@@ -40,6 +40,8 @@ Each filled cell of the grid has:
 | Review steps | In order: **data owners** (the owners of the product or object), then **compliance reviewers**; each step can need more than one approval |
 | Access lasts at most | Approved access ends after this many days (or earlier, when the reviewer chooses an earlier date) |
 | Reviews are due within | The deadline reviewers see |
+| Renewal opens | How long before the end a renewal is prepared (30 days by default) |
+| Existing access must be justified within | Time given to access that needs a form and has none (30 days by default) |
 
 Nobody reviews their own case, and one person approves a step only once.
 
@@ -129,6 +131,37 @@ Anyone who can see the case can comment, for example to ask a question. Requeste
 under **Catalog → My requests**; owners find role grants waiting for another owner under **Access
 requests**.
 
+## End dates and renewal
+
+Approved access ends at its end date: a product's consumer stops being one, and a role goes back to
+what the group had before (or goes away). The case shows as *Expired*, and the owners and the
+requester are told.
+
+Before the end (30 days by default), the platform prepares a **renewal**: a draft on the form's
+current version, filled in with the earlier answers that still apply. The requester checks the
+answers and sends it; it is reviewed like a new case, and its approval moves the end date. While
+nothing is sent, reminders go out 14 and 3 days before the end. Anyone who may give the access can
+also choose **Renew** on an approved or expired case.
+
+## Access without a form
+
+Access that needs a form but has none gets a **deadline** instead of being removed at once:
+
+- access that existed before its policy (when the platform first gets access policies, or a policy
+  is added to a cell);
+- access whose data was classified higher since its form was approved (or moved to a cell with a
+  stricter policy).
+
+The object's owners and the group's owners are told. The group's row on the object's
+**Permissions** (or on the product's **Access options**) says *Needs a form by …* with **Justify**,
+which opens the form for exactly that access. An approved case clears the deadline; at the
+deadline, the access is removed. The privacy area's **Access register** lists everything waiting
+for a form. Groups whose role lets them give access (the data's owners) do not justify their own
+data.
+
+Reviews that come due remind their reviewers; overdue reviews go to the compliance administrators
+too.
+
 ## Email
 
 With email set up, the platform tells people what waits for them:
@@ -139,6 +172,10 @@ With email set up, the platform tells people what waits for them:
 | Approved, declined or changes asked | The requester |
 | A comment | The requester, or the reviewers of the current step when the requester comments |
 | Someone joins a group with justified access | The membership approvers for that group (once) |
+| A renewal is ready; reminders 14 and 3 days before the end | The requester, the object's owners and the group's owners |
+| Access ended, or was removed at its deadline | The same |
+| Existing access needs a form (with its deadline) | The object's owners and the group's owners |
+| A review is due tomorrow, or overdue | The reviewers; when overdue also the compliance administrators |
 
 Emails say what waits and link to it in the app; nothing is decided by email, and the answers never
 leave the platform in an email. Addresses come from SCIM, or from the `email` claim of the sign-in
@@ -184,6 +221,8 @@ resource "fdp_access_policy" "prod_confidential" {
   steps          = [{ role = "data_owner" }, { role = "compliance_reviewer" }]
   max_days       = 365
   review_days    = 10
+  renew_days     = 30
+  grace_days     = 30
 }
 
 resource "fdp_compliance_role" "privacy_reviews_prod" {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, AccessResource, ApiError, AppGroup, CaseTarget, Requirement, RoleAssignment, ServicePrincipal } from "../api";
+import { api, AccessResource, ApiError, AppGroup, CaseTarget, JustifyDeadline, Requirement, RoleAssignment, ServicePrincipal } from "../api";
 import { JustifyPanel } from "./ComplianceForm";
 import { ProductIcon } from "./ProductIcon";
 import type { TabRef } from "../views/Tabs";
@@ -162,6 +162,12 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
   }, [initialServiceId]);
 
   const [justify, setJustify] = useState<{ target: CaseTarget; requirement: Requirement } | null>(null);
+  // Access that needs a form and has none yet: it stays until its deadline.
+  const [deadlines, setDeadlines] = useState<JustifyDeadline[]>([]);
+  useEffect(() => { if (canAssign) api.compliance.deadlines(resource.id).then(setDeadlines).catch(() => setDeadlines([])); }, [resource.id, canAssign]);
+  const justifyExisting = (d: JustifyDeadline) => { setError(""); setMessage("");
+    const target: CaseTarget = { kind: "role", resource_id: resource.id, role: d.role, app_group_id: d.app_group_id };
+    api.compliance.requirement(target).then((requirement) => setJustify({ target, requirement })).catch((e: Error) => setError(e.message)); };
   const change = async (fn: () => Promise<unknown>, success: string) => {
     setBusy(true); setError(""); setMessage(""); setJustify(null);
     try {
@@ -191,7 +197,10 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
       <td>{a.principal_id ? <span className="row"><ProductIcon kind={a.principal_kind === "user" ? "user" : "identity"} size={16} />{name} <span className="badge">{a.principal_kind === "user" ? "User" : "Service"} · direct</span>
         {a.principal_active === false && <span className="badge">Inactive</span>}</span>
         : <button className="text-button" onClick={() => openTab({ kind: "access", ref: a.app_group_id!, title: name })}>{name}</button>}</td>
-      <td><span className="badge role-badge">{a.role}</span></td>
+      <td><span className="badge role-badge">{a.role}</span>
+        {!inherited && (() => { const d = deadlines.find((x) => x.app_group_id === a.app_group_id); return d && <div className="small">
+          <span className="error-text">Needs a form by {new Date(d.due_at).toLocaleDateString()}</span>{" "}
+          <button className="text-button" disabled={busy} onClick={() => justifyExisting(d)}>Justify</button></div>; })()}</td>
       <td>{a.system ? "All objects" : inherited ? origin ? <button className="text-button" title={resourcePath(origin, resources)}
         onClick={() => openTab(resourceTab(origin, "permissions"))}>{resourcePath(origin, resources)}</button> : "Parent object"
         : resource.name}</td>
