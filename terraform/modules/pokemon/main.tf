@@ -236,7 +236,7 @@ resource "fdp_data_product" "cards" {
     { resource_id = fdp_workload.job["explorer"].resource_id },
   ]
   options = jsonencode([
-    { name = "Standard", description = "Illustrator names partly hidden.", default = true,
+    { name  = "Standard", description = "Illustrator names partly hidden.", default = true,
       masks = [{ resource_id = var.product_schema_id, table = "cards_current", column = "illustrator", method = "partial", expression = "" }],
     filters = [] },
     { name = "With illustrators", description = "Everything, including the illustrators' names (personal data).", default = false,
