@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { AccessRequestItem, ago, api, ApiError, openInWindow, AppGroup, CaseTarget, Requirement, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
+import { AccessCaseItem, AccessRequestItem, ago, api, ApiError, openInWindow, AppGroup, CaseTarget, Requirement, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
 import { PermissionsPanel } from "../components/Permissions";
 import { Answers, FormRenderer, JustifyPanel, uploadFiles } from "../components/ComplianceForm";
+import { CaseTable } from "./Cases";
 import { IconCatalog, IconPlus } from "../components/Icons";
 import { objectKindLabel } from "../objectKinds";
 import type { TabRef } from "./Tabs";
@@ -422,6 +423,10 @@ export function AccessRequestsView({ hub, openTab, tab }: { hub: Hub; openTab: O
   const [rows, setRows] = useState<AccessRequestItem[] | null>(null), [error, setError] = useState(""), [notes, setNotes] = useState<Record<string, string>>({});
   const load = useCallback(() => api.products.requests(box).then((r) => { setRows(r); setError(""); }).catch((e: Error) => setError(e.message)), [box]);
   useEffect(() => { void load(); }, [load]);
+  // Compliance forms: role grants waiting for another owner, or everything you sent.
+  const [cases, setCases] = useState<AccessCaseItem[]>([]);
+  useEffect(() => { api.compliance.cases(box === "mine" ? "mine" : "review").then((list) => setCases(box === "mine" ? list : list.filter((c) => c.kind === "role")))
+    .catch(() => setCases([])); }, [box]);
   const decide = (r: AccessRequestItem, approve: boolean) => api.products.decide(r.id, approve, notes[r.id] ?? "").then(() => { void load(); void hub.refresh(); }).catch((e: Error) => setError(e.message));
   return <>
     <PageHeader icon={<IconCatalog size={22} />} title="Access requests" subtitle={box === "approve" ? "Requests for the data products your groups own. Approving makes the requested group a Consumer of the product." : "Your requests and their decisions."} />
@@ -438,12 +443,16 @@ export function AccessRequestsView({ hub, openTab, tab }: { hub: Hub; openTab: O
           <td>{box === "approve" ? r.requester : ""} <span className="muted" title={new Date(r.created_at).toLocaleString()}>{ago(r.created_at)}</span></td>
           <td>{r.group}{r.option && <span className="muted"> · {r.option}</span>}<div className="muted">{r.reason}</div></td>
           <td><span className="status"><span className={`dot ${r.status === "approved" ? "succeeded" : r.status === "pending" ? "queued" : r.status === "declined" ? "failed" : "stopped"}`} />{r.status}</span>
-            {r.decided_by && <div className="muted small">{r.decided_by}{r.decision_note && `: ${r.decision_note}`}</div>}</td>
+            {r.decided_by && <div className="muted small">{r.decided_by}{r.decision_note && `: ${r.decision_note}`}</div>}
+            {r.case_id && <div className="small"><button className="text-button" onClick={() => openTab({ kind: "case", ref: r.case_id!, title: r.product })}>
+              Compliance form{r.case_status ? ` · ${r.case_status.replace("_", " ")}` : ""}</button></div>}</td>
           <td className="table-actions">{r.status === "pending" && (box === "approve" ? <div className="row">
             <input aria-label={`Note for ${r.requester}`} placeholder="Note (optional)" value={notes[r.id] ?? ""} onChange={(e) => setNotes({ ...notes, [r.id]: e.target.value })} />
             <button className="btn sm" onClick={() => void decide(r, true)}>Approve</button><button className="btn sm secondary" onClick={() => void decide(r, false)}>Decline</button></div>
             : <button className="btn sm secondary" onClick={() => void api.products.withdraw(r.id).then(load)}>Withdraw</button>)}</td>
         </tr>)}</tbody></table></div>}
+    {!!cases.length && <><h2>{box === "mine" ? "Your compliance forms" : "Compliance forms for your data"}</h2>
+      <CaseTable cases={cases} openTab={openTab} tabKind="case" requester={box !== "mine"} label={box === "mine" ? "Your compliance forms" : "Compliance forms to review"} /></>}
   </>;
 }
 

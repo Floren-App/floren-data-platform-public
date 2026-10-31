@@ -38,6 +38,8 @@ DEFAULT_PROFILES = [
     ("Analyst", "Find and request data, work in workspaces and SQL, run workloads.",
      ["products.browse", "products.request", "catalog.objects", "workspaces", "workloads.view", "storage"], False),
     ("Viewer", "Find data products and open the dashboards you can use.", ["products.browse"], False),
+    # With a compliance role, the privacy area comes on top: reviews, memberships, the register.
+    ("Privacy", "Review compliance forms: the privacy area and the data products under review.", ["products.browse"], False),
 ]
 
 

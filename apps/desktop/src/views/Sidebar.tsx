@@ -423,8 +423,15 @@ function PackagesPanel({ hub, openTab, activeKey, activeRef }: Props) {
 
 /** The privacy team's part of the app: only what their job needs. */
 function PrivacyPanel({ hub, openTab, activeKey }: Props) {
-  const admin = !!hub.me?.compliance_roles?.includes("compliance_admin");
+  const roles = hub.me?.compliance_roles ?? [];
+  const admin = roles.includes("compliance_admin"), reviewer = admin || roles.includes("compliance_reviewer");
+  const reviews = useCached("privacy:reviews", () => api.compliance.cases("review"), reviewer);
+  const members = useCached("privacy:memberships", () => api.compliance.memberships(), admin || roles.includes("membership_approver"));
+  const badge: Record<string, number> = { "privacy-reviews": reviews.data?.length ?? 0, "privacy-memberships": members.data?.length ?? 0 };
   const items: TabRef[] = [
+    ...(reviewer ? [{ kind: "privacy-reviews", title: "Reviews" }] as TabRef[] : []),
+    ...(admin || roles.includes("membership_approver") ? [{ kind: "privacy-memberships", title: "Memberships" }] as TabRef[] : []),
+    ...(reviewer ? [{ kind: "privacy-register", title: "Access register" }] as TabRef[] : []),
     { kind: "privacy-policies", title: "Access policies" },
     ...(admin ? [{ kind: "privacy-forms", title: "Compliance forms" }, { kind: "privacy-roles", title: "Compliance roles" },
       { kind: "privacy-classifications", title: "Classifications" }] as TabRef[] : []),
@@ -432,9 +439,10 @@ function PrivacyPanel({ hub, openTab, activeKey }: Props) {
   return <>
     <ul className="list">
       {items.map((t) => <li key={t.kind} className={activeKey === `${t.kind}:` ? "selected" : ""}>
-        <button className="nav-item" onClick={() => openTab(t)}>{t.title}</button></li>)}
+        <button className="nav-item" onClick={() => openTab(t)}><span className="grow">{t.title}</span>
+          {!!badge[t.kind] && <span className="badge" aria-label={`${badge[t.kind]} waiting`}>{badge[t.kind]}</span>}</button></li>)}
     </ul>
-    <p className="sidebar-note muted">Which data needs a compliance form, the forms people fill in, and who reviews them.</p>
+    <p className="sidebar-note muted">Reviews of compliance forms, people waiting to use a group's justified access, which data needs a form, the forms people fill in, and who reviews them.</p>
   </>;
 }
 

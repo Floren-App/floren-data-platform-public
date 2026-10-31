@@ -3,7 +3,7 @@ import { api, CaseTarget, FormCondition, FormDefinition, FormField, Requirement 
 
 export type Answers = Record<string, unknown>;
 
-function shown(condition: FormCondition | null, answers: Answers): boolean {
+export function shown(condition: FormCondition | null, answers: Answers): boolean {
   if (!condition) return true;
   const value = answers[condition.field];
   if ("equals" in condition) return value === condition.equals;

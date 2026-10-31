@@ -23,6 +23,7 @@ class User:
     principal_id: str = ""
     subject: str = ""
     issuer: str = ""
+    email: str = ""  # from the token, for notifications; SCIM-managed identities keep their own
     # None = interactive human; empty = legacy unscoped execution. Never client supplied.
     environment_id: Optional[str] = None
     execution_context: str = ""
@@ -87,6 +88,7 @@ class OIDCVerifier:
             roles=list(claim(claims, s.oidc_roles_claim) or []),
             groups=normalize_groups(claim(claims, s.oidc_groups_claim)),
             admin_role=s.admin_role, subject=claims["sub"], issuer=claims["iss"],
+            email=claims["email"] if isinstance(claims.get("email"), str) else "",
         )
 
 

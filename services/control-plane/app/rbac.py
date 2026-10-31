@@ -137,6 +137,8 @@ def _resolve_user(db: Session, user: User, refresh: bool = False) -> User:
             raise HTTPException(401, "OIDC subject does not match the provisioned identity")
         if not p.subject:
             p.subject = user.subject
+    if refresh and not p.managed and user.email and (p.attributes or {}).get("email") != user.email:
+        p.attributes = {**(p.attributes or {}), "email": user.email}  # where notifications go
     if refresh and not p.managed:
         # OIDC-only users can operate before a production SCIM provider is chosen.
         # Never replace SCIM-managed group memberships with stale JWT claims.

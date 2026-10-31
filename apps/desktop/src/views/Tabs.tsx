@@ -26,10 +26,12 @@ import { QueryLogView } from "./QueryLog";
 import { rEnabled, type PackageKind } from "../api";
 
 import { KafkaClustersView, KafkaView } from "./Kafka";
-import { PrivacyForm, PrivacyForms, PrivacyPolicies, PrivacyRoles } from "./Privacy";
+import { PrivacyForm, PrivacyForms, PrivacyMemberships, PrivacyPolicies, PrivacyRegister, PrivacyReviews, PrivacyRoles } from "./Privacy";
+import { CaseView } from "./Cases";
 
 export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
   | "products" | "product" | "access-requests"
+  | "privacy-reviews" | "privacy-case" | "case" | "privacy-memberships" | "privacy-register"
   | "privacy-policies" | "privacy-forms" | "privacy-form" | "privacy-roles" | "privacy-classifications"
   | "admin-app-profiles" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
 
@@ -94,6 +96,10 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "admin-app-profiles": return <AdminAppProfiles />;
     case "admin-classifications": case "privacy-classifications": return <AdminClassifications />;
     case "privacy-policies": return <PrivacyPolicies hub={hub} />;
+    case "privacy-reviews": return <PrivacyReviews openTab={openTab} />;
+    case "privacy-memberships": return <PrivacyMemberships hub={hub} />;
+    case "privacy-register": return <PrivacyRegister openTab={openTab} />;
+    case "privacy-case": case "case": return <CaseView key={tab.ref} id={tab.ref ?? ""} hub={hub} openTab={(t) => openTab(t.kind === "privacy-case" && tab.kind === "case" ? { ...t, kind: "case" } : t)} />;
     case "privacy-forms": return <PrivacyForms hub={hub} openTab={openTab} />;
     case "privacy-roles": return <PrivacyRoles hub={hub} />;
     case "privacy-form": return <PrivacyForm key={tab.ref} id={tab.ref ?? ""} hub={hub} onRenamed={(title) => openTab({ ...tab, title })}

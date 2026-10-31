@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { AccessFormItem, AccessPolicyItem, api, AppGroup, ClassificationLevel, ComplianceRoleItem, FieldType, FormCondition, FormDefinition, FormField, FormPage } from "../api";
+import { AccessCaseItem, AccessFormItem, AccessPolicyItem, api, RegisterRow, saveFile, AppGroup, ClassificationLevel, ComplianceRoleItem, FieldType, FormCondition, FormDefinition, FormField, FormPage } from "../api";
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
 import { IconPlus, IconTrash } from "../components/Icons";
 import { Answers, FormRenderer } from "../components/ComplianceForm";
 import type { TabRef } from "./Tabs";
+import { CaseTable, overdue } from "./Cases";
 
 const STEP_LABEL = { data_owner: "Data owners", compliance_reviewer: "Compliance reviewers" } as const;
 export const isComplianceAdmin = (hub: Hub) => !!hub.me?.compliance_roles?.includes("compliance_admin");
@@ -289,5 +290,76 @@ export function PrivacyRoles({ hub }: { hub: Hub }) {
       <div className="form-actions"><button className="btn" disabled={!group}>Give role</button></div>
       <p className="hint">Scoping a reviewer to specific objects is possible with Terraform or the API (resource_ids). Also configurable with Terraform (fdp_compliance_role).</p>
     </form>}
+  </>;
+}
+
+/** The review queue: what waits for you, oldest deadline first; or every case you may see. */
+export function PrivacyReviews({ openTab }: { openTab: (t: TabRef) => void }) {
+  const [box, setBox] = useState<"review" | "all">("review"), [status, setStatus] = useState("");
+  const [cases, setCases] = useState<AccessCaseItem[] | null>(null), [error, setError] = useState("");
+  useEffect(() => { setCases(null); api.compliance.cases(box, box === "all" ? status : "").then((list) => setCases(box === "review"
+    ? [...list].sort((a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9")) : list)).catch((e: Error) => setError(e.message)); }, [box, status]);
+  const late = (cases ?? []).filter(overdue).length;
+  return <>
+    <PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Reviews"
+      subtitle="Compliance forms waiting for your decision, with their deadlines. Open one to read the answers, ask questions and decide." />
+    <nav className="object-tabs" aria-label="Review boxes">
+      <button className={box === "review" ? "active" : ""} aria-current={box === "review" ? "page" : undefined} onClick={() => setBox("review")}>Waiting for me</button>
+      <button className={box === "all" ? "active" : ""} aria-current={box === "all" ? "page" : undefined} onClick={() => setBox("all")}>All cases</button>
+    </nav>
+    {box === "all" && <div className="row" style={{ gap: 8, marginBottom: 8 }}><label htmlFor="case-status">Status</label>
+      <select id="case-status" value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Any</option>
+        {["in_review", "changes_requested", "approved", "declined", "withdrawn", "expired"].map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}</select></div>}
+    {error && <p className="error" role="alert">{error}</p>}
+    {box === "review" && late > 0 && <p className="notice" role="status">{late} overdue.</p>}
+    {!cases ? <p className="muted" role="status">Loading…</p> : <CaseTable cases={cases} openTab={openTab} label={box === "review" ? "Waiting for me" : "All cases"} />}
+  </>;
+}
+
+/** People who joined a group with access given through a form: they get that access once approved. */
+export function PrivacyMemberships({ hub }: { hub: Hub }) {
+  const [items, setItems] = useState<{ app_group_id: string; principal_id: string; group: string; principal: string }[] | null>(null);
+  const [error, setError] = useState(""), [message, setMessage] = useState(""), [notes, setNotes] = useState<Record<string, string>>({});
+  const load = useCallback(() => api.compliance.memberships().then(setItems).catch((e: Error) => setError(e.message)), []);
+  useEffect(() => { void load(); }, [load]);
+  const decide = (g: string, p: string, name: string, approve: boolean) => { setError(""); setMessage("");
+    api.compliance.decideMembership(g, p, approve, notes[g + p] ?? "").then(() => { setMessage(`${approve ? "Approved" : "Declined"} ${name}.`); void load(); void hub.refresh(); })
+      .catch((e: Error) => setError(e.message)); };
+  return <>
+    <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="Memberships"
+      subtitle="People who joined a group that has access given through a compliance form. They have the group's other access already; this access waits for your approval." />
+    {error && <p className="error" role="alert">{error}</p>}
+    {message && <p className="success-message" role="status">{message}</p>}
+    {!items ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Memberships to approve"><thead><tr><th>Person</th><th>Group</th><th /></tr></thead><tbody>
+      {items.map((m) => <tr key={m.app_group_id + m.principal_id}><td>{m.principal}</td><td>{m.group}</td>
+        <td className="table-actions"><div className="row">
+          <input aria-label={`Note for ${m.principal}`} placeholder="Note (optional)" value={notes[m.app_group_id + m.principal_id] ?? ""}
+            onChange={(e) => setNotes({ ...notes, [m.app_group_id + m.principal_id]: e.target.value })} />
+          <button className="btn sm" onClick={() => decide(m.app_group_id, m.principal_id, m.principal, true)}>Approve</button>
+          <button className="btn sm secondary" onClick={() => decide(m.app_group_id, m.principal_id, m.principal, false)}>Decline</button></div></td></tr>)}
+      {!items.length && <tr><td colSpan={3} className="muted">Nobody waits.</td></tr>}</tbody></table></div>}
+  </>;
+}
+
+/** Access given through compliance forms: who has what, why, approved by whom and until when. */
+export function PrivacyRegister({ openTab }: { openTab: (t: TabRef) => void }) {
+  const [rows, setRows] = useState<RegisterRow[] | null>(null), [error, setError] = useState(""), [query, setQuery] = useState("");
+  useEffect(() => { api.compliance.register().then(setRows).catch((e: Error) => setError(e.message)); }, []);
+  const shown = (rows ?? []).filter((r) => !query || JSON.stringify(r).toLowerCase().includes(query.toLowerCase()));
+  const exportCsv = () => api.compliance.registerCsv().then((text) => saveFile(new Blob([text], { type: "text/csv" }), "access-register.csv")).catch((e: Error) => setError(e.message));
+  const day = (v: string | null) => v ? new Date(v).toLocaleDateString() : "—";
+  return <>
+    <PageHeader icon={<ProductIcon kind="file" size={22} />} title="Access register"
+      subtitle="Access given because a compliance form was approved. Reviewers see what is in their scope."
+      actions={<button className="btn secondary" onClick={() => void exportCsv()}>Export CSV</button>} />
+    {error && <p className="error" role="alert">{error}</p>}
+    <input aria-label="Filter the register" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter by group, data, person…" style={{ marginBottom: 8, minWidth: 280 }} />
+    {!rows ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Access register"><thead><tr>
+      <th>Group</th><th>Access</th><th>Data</th><th>Form</th><th>Approved by</th><th>Approved</th><th>Until</th><th>People</th></tr></thead><tbody>
+      {shown.map((r) => <tr key={r.case_id}><td>{r.group}</td>
+        <td><button className="text-button" onClick={() => openTab({ kind: "privacy-case", ref: r.case_id, title: r.access })}>{r.access}</button></td>
+        <td><span className="product-chip">{r.classification}</span>{r.layer && <span className="muted"> · {r.layer}</span>}</td>
+        <td>{r.form}<div className="muted small">asked by {r.requester}</div></td><td>{r.approved_by}</td><td>{day(r.approved_at)}</td><td>{day(r.until)}</td><td>{r.members}</td></tr>)}
+      {!shown.length && <tr><td colSpan={8} className="muted">No access given through forms{query && " matches"}.</td></tr>}</tbody></table></div>}
   </>;
 }

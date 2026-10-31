@@ -695,3 +695,12 @@ tr.log-error td { background: color-mix(in srgb, var(--err) 6%, transparent); }
 .policy-editor, .builder-page { display: grid; gap: 10px; margin: 12px 0; }
 .form-builder { display: grid; gap: 4px; }
 .builder-field { display: grid; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; }
+/* Compliance reviews: the case page, the queue's deadlines. */
+tr.overdue td:first-child { box-shadow: inset 3px 0 0 var(--err); }
+.error-text { color: var(--err); }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 20px; margin: 0; }
+.facts dt, .form-answers dt { color: var(--fg-muted); font-size: 12px; } .facts dd, .form-answers dd { margin: 2px 0 0; }
+.form-answers { display: grid; gap: 12px; margin: 12px 0; } .form-answers h3 { margin: 0 0 6px; }
+.form-answers dl { display: grid; gap: 8px; margin: 0; } .form-answers dd { white-space: pre-wrap; }
+.decision-panel { display: grid; gap: 10px; border-left: 3px solid var(--accent); }
+.case-history { list-style: none; padding: 0; display: grid; gap: 6px; }
