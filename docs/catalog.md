@@ -75,7 +75,7 @@ owners, compliance reviewers decide.
 
 ## Classification
 
-Classifications are configurable under **Administration → Classifications** (or
+Classifications are configurable under **Privacy → Classifications** (or
 `fdp_classifications` in Terraform): an ordered list from least to most sensitive, for example
 public, internal, confidential and restricted. The platform comes with none: until they are
 configured, everything is unclassified. Each level says what **masked** data of that level counts as

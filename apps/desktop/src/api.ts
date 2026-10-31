@@ -600,6 +600,10 @@ export interface JustifyDeadline { resource_id: string; resource: string; kind: 
 export interface Webhook { id: string; name: string; url: string; events: string[]; enabled: boolean; has_secret: boolean; created_at: string;
   last: { event: string; at: string; sent_at: string | null; error: string } | null; failing: boolean }
 export interface WebhookDelivery { id: number; event: string; subject: string; created_at: string; sent_at: string | null; attempts: number; error: string }
+/** A role someone holds, and where it comes from (Access → Has access to). */
+export interface AccessGrantRow { resource: AccessResource; role: string; group: { id: string; name: string } | null; via: "direct" | "product";
+  product: { id: string; title: string } | null; until: string | null; deadline: string | null; pending_membership: boolean }
+export interface ComplianceRoleHeld { role: string; label: string; scope: ComplianceRoleItem["scope"]; group: { id: string; name: string } }
 export interface RegisterRow { group: string; app_group_id: string; access: string; kind: string; classification: string; layer: string; form: string;
   requester: string; approved_by: string; approved_at: string | null; until: string | null; members: number; case_id: string }
 export type CaseTarget = { kind: "product" | "role"; app_group_id: string; product_id?: string; option_id?: string; resource_id?: string; role?: string };
@@ -873,6 +877,9 @@ export const api = {
   },
   access: {
     groupAssignments: (id: string) => request<{ resource: AccessResource; role: string }[]>("GET", `/v1/rbac/groups/${id}/assignments`),
+    groupAccess: (id: string) => request<{ system: boolean; grants: AccessGrantRow[]; compliance_roles: ComplianceRoleHeld[]; app_profile: string | null }>("GET", `/v1/rbac/groups/${id}/access`),
+    principalAccess: (id: string) => request<{ principal: { id: string; name: string; kind: string; active: boolean };
+      groups: { id: string; name: string; system: boolean; via: string | null }[]; grants: AccessGrantRow[]; compliance_roles: ComplianceRoleHeld[] }>("GET", `/v1/rbac/principals/${id}/access`),
     roles: () => request<Record<string, Record<string, string[]>>>("GET", "/v1/rbac/roles"),
     directory: () => request<DirectoryPrincipal[]>("GET", "/v1/rbac/directory"),
     groups: () => request<AppGroup[]>("GET", "/v1/rbac/groups"),

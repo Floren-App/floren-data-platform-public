@@ -25,7 +25,7 @@ interface Props {
 export function Sidebar(props: Props) {
   const { view, hub } = props;
   const cache = useObjectCache();
-  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Security", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Usage", packages: "Packages", privacy: "Privacy", admin: "Administration" }[view];
+  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Access", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Usage", packages: "Packages", privacy: "Privacy", admin: "Administration" }[view];
   return (
     <>
       <h2>
@@ -38,7 +38,7 @@ export function Sidebar(props: Props) {
           <button className="icon-btn" aria-label="Dismiss error" title="Dismiss" onClick={hub.dismissError}><IconClose /></button>
         </div>
       )}
-      {view === "access" && <SecurityPanel {...props} />}
+      {view === "access" && <AccessPanel {...props} />}
       {view === "workspaces" && <WorkspacesPanel {...props} />}
       {view === "home" && <><div className="section-title">Your platform</div><ul className="list">
         {([{ kind: "home", title: "Overview", icon: <IconHome size={16} /> }, { kind: "workspaces", title: "My workspaces", icon: <IconWorkspaces size={16} /> },
@@ -286,7 +286,8 @@ function DeployedPanel({ hub, openTab, activeKey }: Props) {
     <div className="sidebar-section-divider" />
     <ul className="list"><li className={activeKey === "runs:" || activeKey === "runs:deployed" ? "selected" : ""}>
       <button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "runs" })}><IconRuns size={16} />Recent runs</button></li>
-      <li><button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "logs" })}><IconLog size={16} />Logs</button></li></ul>
+      <li><button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "logs" })}><IconLog size={16} />Logs</button></li>
+      {hub.me?.is_admin && <li className={activeKey === "repos:" ? "selected" : ""}><button className="nav-item" onClick={() => openTab({ kind: "repos", title: "Git repositories" })}><IconBranch size={16} />Git repositories</button></li>}</ul>
   </>;
 }
 
@@ -372,16 +373,23 @@ function ApisPanel({ hub, openTab, activeKey }: Props) {
 }
 
 /** Security: the pages carry their own lists and detail; the sidebar only switches between them. */
-function SecurityPanel({ openTab, activeKey }: Props) {
+/** Access: who (people, groups, service identities), the app profiles groups get, and credentials. What each
+ * object allows stays on its own Permissions tab. */
+function AccessPanel({ hub, openTab, activeKey }: Props) {
   const page = activeKey.split(":")[0];
-  const current = page === "service" ? "services" : page;
-  return <ul className="list" aria-label="Security pages" style={{ marginTop: 4 }}>
-    {SECURITY_PAGES.map((item) => <li key={item.kind} className={current === item.kind ? "selected" : ""}>
-      <button className="nav-item" aria-current={current === item.kind ? "page" : undefined} onClick={() => openTab({ kind: item.kind, title: item.title })}>
-        <SecurityIcon icon={item.icon} />{item.title}
-      </button>
-    </li>)}
-  </ul>;
+  const current = page === "service" ? "services" : page === "admin-app-profiles" ? "app-profiles" : page;
+  const item = (kind: TabRef["kind"], title: string, icon: JSX.Element) => <li key={kind} className={current === kind ? "selected" : ""}>
+    <button className="nav-item" aria-current={current === kind ? "page" : undefined} onClick={() => openTab({ kind, title })}>{icon}{title}</button></li>;
+  const who = SECURITY_PAGES.filter((p) => p.kind !== "secrets");
+  return <>
+    <div className="section-title">Who</div>
+    <ul className="list" aria-label="Who">{who.map((p) => item(p.kind, p.title, <SecurityIcon icon={p.icon} />))}</ul>
+    {hub.me?.is_admin && <><div className="section-title">What groups see</div>
+      <ul className="list" aria-label="What groups see">{item("app-profiles", "App profiles", <ProductIcon kind="layer" size={16} />)}</ul></>}
+    <div className="section-title">Credentials</div>
+    <ul className="list" aria-label="Credentials">{item("secrets", "Secrets", <SecurityIcon icon="key" />)}</ul>
+    <p className="sidebar-note muted">What each object allows is on its own Permissions tab. Your Git credentials are under Workspaces.</p>
+  </>;
 }
 
 function ComputePanel({ hub, openTab, activeRef }: Props) {
@@ -447,22 +455,20 @@ function PrivacyPanel({ hub, openTab, activeKey }: Props) {
 }
 
 function AdminPanel({ openTab, activeKey }: Props) {
+  // Platform configuration only. Things people work with have their settings on their own page: storage
+  // connections (Storage), Git repositories (Workloads), service accounts and app profiles (Access),
+  // classifications (Privacy).
   const items: TabRef[] = [
     { kind: "admin-layers", title: "Layers" },
-    { kind: "admin-app-profiles", title: "App profiles" },
-    { kind: "admin-classifications", title: "Classifications" },
-    { kind: "admin-notifications", title: "Notifications" },
-    { kind: "admin-sources", title: "Storage integrations" },
-    { kind: "admin-repos", title: "Git repositories" },
-    { kind: "admin-runtimes", title: "Runtimes (versions)" },
-    { kind: "admin-service-accounts", title: "Service accounts" },
     { kind: "admin-pools", title: "Compute pools" },
+    { kind: "admin-runtimes", title: "Runtimes (versions)" },
     { kind: "admin-workspace-templates", title: "Workspace templates" },
     { kind: "admin-network", title: "Network allowlist" },
+    { kind: "admin-notifications", title: "Notifications" },
     { kind: "admin-query-log", title: "Query log" },
     { kind: "admin-audit", title: "Audit log" },
   ];
-  return (
+  return (<>
     <ul className="list">
       {items.map((t) => (
         <li key={t.kind} className={activeKey === `${t.kind}:` ? "selected" : ""}>
@@ -470,5 +476,6 @@ function AdminPanel({ openTab, activeKey }: Props) {
         </li>
       ))}
     </ul>
-  );
+    <p className="sidebar-note muted">Storage connections are under Storage, Git repositories under Workloads, service accounts and app profiles under Access, classifications under Privacy.</p>
+  </>);
 }

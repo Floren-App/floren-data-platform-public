@@ -3,7 +3,7 @@ import { api, ApiError, CertificateInfo, Runtime, RuntimeKind, runtimeLabel, Sec
 import type { Hub } from "../hub";
 import { IconClose, IconKey, IconPlus, IconTrash } from "../components/Icons";
 import { PageHeader } from "../components/Page";
-import { OpenTab, resourceTab } from "../components/Permissions";
+import { OpenTab } from "../components/Permissions";
 import { useCached } from "../cache";
 import { ProductIcon } from "../components/ProductIcon";
 
@@ -326,65 +326,31 @@ export function AdminRuntimes({ withR = true }: { withR?: boolean }) {
 }
 
 /** Admin: service accounts (non-human identities for data products) and their tokens. */
-export function AdminServiceAccounts({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
-  const { data: accounts, error, setError, reload } = useLoad(api.serviceAccounts, [] as ServiceAccount[]);
-  const empty = { name: "", description: "", layer_id: hub.layerId };
-  const [form, setForm] = useState(empty);
-  const [open, setOpen] = useState(false);
-  const editing = accounts.some((a) => a.name === form.name);
-  const serviceFor = (a: ServiceAccount) => hub.resources.find((r) => r.config.service_account && r.object_id === a.id);
-
-  const save = async () => {
+/** Create or change a service account (platform administrators): for external clients or a shared identity. */
+export function ServiceAccountForm({ hub, existing, onDone, onCancel }: { hub: Hub; existing?: ServiceAccount; onDone: () => void; onCancel: () => void }) {
+  const [form, setForm] = useState({ name: existing?.name ?? "", description: existing?.description ?? "", layer_id: existing?.layer_id || hub.layerId });
+  const [error, setError] = useState("");
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault(); setError("");
     try {
-      const existing = accounts.find((a) => a.name === form.name);
       await api.admin.upsertServiceAccount(form.name, { layer_id: form.layer_id, description: form.description, groups: existing?.groups ?? [],
         allowed_groups: existing?.allowed_groups ?? [], disabled: existing?.disabled ?? false });
-      setForm(empty); setOpen(false); await reload(); await hub.refresh();
-    } catch (e) { setError((e as Error).message); }
+      await hub.refresh(); onDone();
+    } catch (err) { setError((err as Error).message); }
   };
-
-  return (
-    <>
-      <PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Service accounts"
-        subtitle={<>Workloads use their built-in managed identities by default. Create a separate service account for an external client or an intentionally shared identity. Manage its tokens here and grant data access directly on schemas or APIs.</>}
-        actions={<button className="btn" aria-expanded={open && !editing} onClick={() => { setForm(empty); setOpen(!(open && !editing)); }}><IconPlus size={14} />New service account</button>} />
-      {error && <p className="error" role="alert">{error}</p>}
-      {open && <form className="card" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-        <h3>{editing ? `Edit ${form.name}` : "New service account"}</h3>
-        <div className="arg-grid">
-          <div className="field"><label htmlFor="sa-name">Name</label>
-            <input id="sa-name" className="mono" autoFocus={!editing} disabled={editing} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="finance-etl" /></div>
-          <div className="field"><label htmlFor="sa-desc">Description</label>
-            <input id="sa-desc" autoFocus={editing} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-        </div>
-        <div className="field"><label htmlFor="sa-layer">Layer</label><select id="sa-layer" required disabled={editing} value={form.layer_id} onChange={(e) => setForm({ ...form, layer_id: e.target.value })}>{!form.layer_id && <option value="">Choose a layer</option>}{hub.layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.name}</option>)}</select></div>
-        <div className="form-actions">
-          <button className="btn" disabled={!form.name}>Save</button>
-          <button type="button" className="btn secondary" onClick={() => { setOpen(false); setForm(empty); }}>Cancel</button>
-        </div>
-      </form>}
-      <table>
-        <thead><tr><th>Name</th><th>Layer</th><th>Created</th><th /></tr></thead>
-        <tbody>
-          {accounts.map((a) => (
-            <tr key={a.id}>
-              <td>{serviceFor(a) ? <button className="text-button object-name mono" onClick={() => openTab(resourceTab(serviceFor(a)!))}>{a.principal}</button> : <b className="mono">{a.principal}</b>}
-                {a.disabled && <> <span className="badge">disabled</span></>}<div className="muted">{a.description}</div></td>
-              <td>{a.layer_name || "—"}</td><td className="muted">{when(a.created_at)} · {a.created_by}</td>
-              <td className="table-actions"><div className="row">
-                <button className="btn sm secondary" disabled={!serviceFor(a)} onClick={() => openTab(resourceTab(serviceFor(a)!, "permissions"))}>Permissions</button>
-                <button className="btn sm secondary" onClick={() => { setForm({ name: a.name, description: a.description, layer_id: a.layer_id || hub.layerId }); setOpen(true); }}>Edit</button>
-                <button className="btn sm secondary" onClick={() => api.admin.upsertServiceAccount(a.name, { ...a, disabled: !a.disabled }).then(reload).catch((e: Error) => setError(e.message))}>{a.disabled ? "Enable" : "Disable"}</button>
-                <button className="icon-btn" aria-label={`Delete ${a.name}`} title="Delete service account" onClick={() => confirm(`Delete ${a.principal}? Its tokens stop working.`)
-                  && api.admin.deleteServiceAccount(a.name).then(reload).catch((e: Error) => setError(e.message))}><IconTrash /></button>
-              </div></td>
-            </tr>
-          ))}
-          {!accounts.length && <tr><td colSpan={3}>No service accounts yet.</td></tr>}
-        </tbody>
-      </table>
-    </>
-  );
+  return <form className="card" onSubmit={(e) => void save(e)} aria-label={existing ? `Edit ${existing.name}` : "New service account"}>
+    <h3>{existing ? `Edit ${existing.name}` : "New service account"}</h3>
+    <p className="hint">Workloads have their own built-in identity. A service account is for an external client or an intentionally shared identity; manage its tokens on its page and give it roles on objects.</p>
+    {error && <p className="error" role="alert">{error}</p>}
+    <div className="arg-grid">
+      <div className="field"><label htmlFor="sa-name">Name</label>
+        <input id="sa-name" className="mono" autoFocus={!existing} disabled={!!existing} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="finance-etl" /></div>
+      <div className="field"><label htmlFor="sa-desc">Description</label>
+        <input id="sa-desc" autoFocus={!!existing} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+    </div>
+    <div className="field"><label htmlFor="sa-layer">Layer</label><select id="sa-layer" required disabled={!!existing} value={form.layer_id} onChange={(e) => setForm({ ...form, layer_id: e.target.value })}>{!form.layer_id && <option value="">Choose a layer</option>}{hub.layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.name}</option>)}</select></div>
+    <div className="form-actions"><button className="btn" disabled={!form.name}>Save</button><button type="button" className="btn secondary" onClick={onCancel}>Cancel</button></div>
+  </form>;
 }
 
 /** Tokens of one service account. A new token is shown exactly once (or saved straight into a secret). */

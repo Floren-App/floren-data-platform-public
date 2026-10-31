@@ -4,8 +4,8 @@ Floren Data Platform does not host data. It governs databases and buckets that a
 and each one it governs is an explicit **storage integration**. Until an administrator adds
 one, there is no storage in Floren Data Platform at all.
 
-Add one under **Administration → Storage integrations → Add integration**. First choose the
-type, then describe the location. The form asks for exactly what that type needs, and the
+Add one under **Storage → Add connection** (administrators). First choose the type, then
+describe the location. Change it later on the connection's **Settings** tab, which also removes it. The form asks for exactly what that type needs, and the
 control plane validates the same rules (`GET /v1/admin/storage-types` serves them; see
 `services/control-plane/app/storage_types.py`).
 

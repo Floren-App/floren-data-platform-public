@@ -53,10 +53,10 @@ without a profile get the whole app.
 
 ## Configure
 
-- **Administration → App profiles** shows profiles against features as a grid: tick features,
+- **Access → App profiles** shows profiles against features as a grid: tick features,
   rename a profile, choose the default and add or remove profiles. A profile given to a group
   cannot be removed.
-- **Security → App groups**: a group's page shows its profile; administrators change it there.
+- **Access → Groups**: a group's **Settings** show its profile; administrators change it there.
 - **Terraform**: `fdp_app_profile` declares a profile and `fdp_app_group.app_profile` gives it to a
   group (see the [Terraform reference](reference/terraform/fdp_app_profile.md)).
 

@@ -5,21 +5,25 @@ import { accessibleSchemas, accessibleSources, ago, api, AccessResource, inLayer
 import type { Hub } from "../hub";
 import { ObjectBreadcrumbs, ObjectTabs, OpenTab, PermissionsPanel, resourceChain, resourcePath, resourceTab } from "../components/Permissions";
 import { RunList, type TabRef } from "./Tabs";
-import { TokensCard } from "./Identity";
+import { ServiceAccountForm, TokensCard } from "./Identity";
+import { HasAccessTo } from "./AccessArea";
+import { StorageConnectionForm, StorageConnectionSettings } from "./Admin";
 import { DataListing } from "../components/DataBrowser";
 import { DataPoliciesPanel } from "../components/DataPolicies";
 import { MetadataSql } from "../components/MetadataSql";
 import { ProductIcon } from "../components/ProductIcon";
-import { IconBranch, IconPlus, IconDeployed } from "../components/Icons";
+import { IconBranch, IconPlus, IconDeployed, IconTrash } from "../components/Icons";
 import { PageHeader } from "../components/Page";
 
 interface ObjectProps { tab: TabRef; hub: Hub; openTab: OpenTab }
 
-export function DataSourcesView({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
+export function DataSourcesView({ hub, openTab, adding: initiallyAdding = false }: { hub: Hub; openTab: OpenTab; adding?: boolean }) {
   const all = accessibleSources(hub.resources);
   const sources = all.filter((s) => inLayer(hub.layerId, s.layer_id));
-  return <><PageHeader icon={<ProductIcon kind="data" size={22} />} title="Storage" subtitle="Storage connections contain schemas or storage namespaces. Expand them to browse tables, views, files and columns."
-      actions={hub.me?.is_admin && <button className="btn secondary" onClick={() => openTab({ kind: "admin-sources", title: "Storage integrations" })}>Storage integrations</button>} />
+  const [adding, setAdding] = useState(initiallyAdding);
+  return <><PageHeader icon={<ProductIcon kind="data" size={22} />} title="Storage" subtitle="Storage connections contain schemas or storage namespaces. Expand them to browse tables, views, files and columns. A connection's settings are on its Settings tab."
+      actions={hub.me?.is_admin && <button className="btn" aria-expanded={adding} onClick={() => setAdding(!adding)}><IconPlus size={14} />Add connection</button>} />
+    {adding && <StorageConnectionForm hub={hub} onCancel={() => setAdding(false)} onDone={(name) => { setAdding(false); openTab({ kind: "source", ref: name, title: name }); }} />}
     <table><thead><tr><th>Storage connection</th><th>Type</th><th>Layer</th><th>Schemas you can access</th></tr></thead><tbody>{sources.map((s) => <tr key={s.id}>
       <td><button className="text-button object-name" onClick={() => openTab(resourceTab(s))}><ProductIcon kind={String(s.config.source_kind)} size={16} />{s.name}</button></td>
       <td>{String(s.config.source_kind ?? "")}</td><td>{s.layer_name || "—"}</td><td>{accessibleSchemas(hub.resources, s.id).length}</td>
@@ -59,10 +63,11 @@ export function SourceView({ tab, hub, openTab }: ObjectProps) {
   return <>
     <ObjectBreadcrumbs resource={source} resources={hub.resources} openTab={openTab} />
     <PageHeader icon={<ProductIcon kind={sourceKind} size={22} />} title={source.name} subtitle={<>Storage connection · {sourceKind}{ds?.description && ` · ${ds.description}`}</>}
-      actions={hub.me?.is_admin && <button className="btn secondary" onClick={() => openTab({ kind: "admin-sources", title: "Storage integrations" })}>Integration settings</button>} />
+      />
     {source.layer_name && <p className="hint">Layer · <strong>{source.layer_name}</strong> · Schemas and data objects inherit this layer.</p>}
     {source.owner_group_name && <p className="hint">Owner group · <strong>{source.owner_group_name}</strong></p>}
-    <ObjectTabs active={section} lineage={source.actions.includes("read")} overview="Schemas & usage" onChange={(s) => openTab({ ...tab, section: s })} />
+    <ObjectTabs active={section} lineage={source.actions.includes("read")} settings={!!hub.me?.is_admin} overview="Schemas & usage" onChange={(s) => openTab({ ...tab, section: s })} />
+    {section === "settings" && hub.me?.is_admin ? <StorageConnectionSettings hub={hub} name={source.name} openTab={openTab} /> : <>
     {section === "permissions" ? <ObjectAccess resource={source} hub={hub} openTab={openTab} initialServiceId={tab.grantPrincipalId} /> : section === "lineage" ? <ObjectLineage resourceId={source.id} openTab={openTab} /> : <>
       <div className="section-heading" style={{ marginTop: 0 }}><div><h2>{sourceKind === "s3" ? "Storage namespaces" : "Schemas"} <span className="badge">{schemas.length}</span></h2>
         <p className="muted">Open a schema to manage its permissions and access setup.</p></div>
@@ -99,6 +104,7 @@ export function SourceView({ tab, hub, openTab }: ObjectProps) {
         <h3 style={{ marginTop: 12 }}>Python</h3><pre className="code">{`import fdp\n\nengine = fdp.connect(${JSON.stringify(source.name)})`}</pre>
         <h3>R</h3><pre className="code">{`con <- fdp::connect(${JSON.stringify(source.name)})`}</pre>
       </details>}
+    </>}
     </>}
   </>;
 }
@@ -277,40 +283,61 @@ export function OrganizationSettings({ resource, hub, openTab }: { resource: Acc
   </section>;
 }
 
+/** Access → Service identities: every workload's built-in identity and the service accounts, in one list. */
 export function ServicesView({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const [search, setSearch] = useState("");
   const [accounts, setAccounts] = useState<ServiceAccount[]>([]);
   const [showRetired, setShowRetired] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    api.serviceAccounts().then((rows) => { if (!cancelled) setAccounts(rows); })
-      .catch((e: Error) => { if (!cancelled) setError(e.message); });
-    return () => { cancelled = true; };
-  }, []);
+  const [editing, setEditing] = useState<ServiceAccount | "new" | null>(null);
+  const load = () => api.serviceAccounts().then(setAccounts).catch((e: Error) => setError(e.message));
+  useEffect(() => { void load(); }, []);
+  const admin = !!hub.me?.is_admin;
   const services = hub.resources.filter((r) => r.kind === "service"
     && (r.config.service_account
       ? showRetired || accounts.some((a) => a.id === r.object_id && !a.disabled)
       : hub.workloads.some((p) => p.resource_id === r.id && p.status !== "stopped"))
     && r.name.toLowerCase().includes(search.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
-  return <><PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Services"
-      subtitle="Each workload has a built-in managed identity. Separate service accounts are only needed for external clients or shared identities."
-      actions={hub.me?.is_admin && <button className="btn secondary" onClick={() => openTab({ kind: "admin-service-accounts", title: "Service accounts" })}><IconPlus size={14} />Create service account</button>} />
-    <div className="object-toolbar"><input type="search" aria-label="Search services" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search services…" />
-      {accounts.some((a) => a.disabled) && <label><input type="checkbox" checked={showRetired} onChange={(e) => setShowRetired(e.target.checked)} /> Show retired service accounts</label>}
+  const act = (p: Promise<unknown>) => p.then(async () => { await load(); await hub.refresh(); }).catch((e: Error) => setError(e.message));
+  return <><PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Service identities"
+      subtitle="Each workload has a built-in identity. Service accounts are for external clients or an intentionally shared identity. Give them roles on objects on the object's Permissions tab."
+      actions={admin && <button className="btn" aria-expanded={editing === "new"} onClick={() => setEditing(editing === "new" ? null : "new")}><IconPlus size={14} />New service account</button>} />
+    {editing && <ServiceAccountForm key={editing === "new" ? "new" : editing.name} hub={hub} existing={editing === "new" ? undefined : editing}
+      onDone={() => { setEditing(null); void load(); }} onCancel={() => setEditing(null)} />}
+    <div className="object-toolbar"><input type="search" aria-label="Search service identities" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search service identities…" />
+      {accounts.some((a) => a.disabled) && <label><input type="checkbox" checked={showRetired} onChange={(e) => setShowRetired(e.target.checked)} /> Show disabled service accounts</label>}
     </div>
     {error && <p className="error" role="alert">{error}</p>}
-    <table><thead><tr><th>Service</th><th>Type</th><th>Execution identity</th><th /></tr></thead><tbody>{services.map((r) => {
+    <table aria-label="Service identities"><thead><tr><th>Identity</th><th>Type</th><th>Runs as</th><th /></tr></thead><tbody>{services.map((r) => {
       const workload = hub.workloads.find((p) => p.resource_id === r.id);
       const account = accounts.find((a) => a.id === r.object_id);
       return <tr key={r.id}>
-        <td><button className="text-button object-name" onClick={() => openTab(resourceTab(r))}><ProductIcon kind={r.config.service_account ? "identity" : workload?.kind} runtime={workload?.runtime} size={16} />{r.name}</button>{account?.disabled && <span className="muted"> · retired</span>}</td>
-        <td>{r.config.service_account ? "Service account" : workload?.kind ?? "Workload"}</td>
-        <td>{r.config.service_account ? "External / shared identity" : workload?.execution_mode === "caller" ? "Caller for data requests" : workload?.run_as ? `Service account: ${workload.run_as}` : "Built-in managed identity"}</td>
-        <td className="table-actions"><button className="btn sm secondary" onClick={() => openTab(resourceTab(r, "permissions"))}>Permissions</button></td>
+        <td><button className="text-button object-name" onClick={() => openTab(resourceTab(r))}><ProductIcon kind={r.config.service_account ? "identity" : workload?.kind} runtime={workload?.runtime} size={16} />{r.name}</button>
+          {account?.disabled && <span className="badge">disabled</span>}{account?.description && <div className="muted">{account.description}</div>}</td>
+        <td>{r.config.service_account ? "Service account" : `Workload (${workload?.kind ?? "program"})`}</td>
+        <td>{r.config.service_account ? <span className="mono">{account?.principal ?? `sa:${String(r.config.account_name ?? "")}`}</span> : workload?.execution_mode === "caller" ? "The caller, for data" : workload?.run_as ? `Service account ${workload.run_as}` : "Its built-in identity"}</td>
+        <td className="table-actions"><div className="row">
+          <button className="btn sm secondary" onClick={() => openTab(resourceTab(r, "permissions"))}>Permissions</button>
+          {admin && account && <>
+            <button className="btn sm secondary" onClick={() => setEditing(account)}>Edit</button>
+            <button className="btn sm secondary" onClick={() => void act(api.admin.upsertServiceAccount(account.name, { ...account, disabled: !account.disabled }))}>{account.disabled ? "Enable" : "Disable"}</button>
+            <button className="icon-btn" aria-label={`Delete ${account.name}`} title="Delete service account" onClick={() => confirm(`Delete ${account.principal}? Its tokens stop working.`)
+              && void act(api.admin.deleteServiceAccount(account.name))}><IconTrash /></button></>}
+        </div></td>
       </tr>;
-    })}{!services.length && <tr><td colSpan={4} className="muted">No services match.</td></tr>}</tbody></table>
+    })}{!services.length && <tr><td colSpan={4} className="muted">No service identities match.</td></tr>}</tbody></table>
   </>;
+}
+
+/** What a service identity can reach: its own roles and its groups'. */
+function ServiceAccess({ principalId, hub, openTab }: { principalId: string; hub: Hub; openTab: OpenTab }) {
+  const [data, setData] = useState<Awaited<ReturnType<typeof api.access.principalAccess>> | null>(null), [error, setError] = useState("");
+  useEffect(() => { api.access.principalAccess(principalId).then(setData).catch((e: Error) => setError(e.message)); }, [principalId]);
+  return <section><div className="section-heading"><h2>Has access to</h2></div>
+    {error ? <p className="muted">{error}</p> : !data ? <p className="muted" role="status">Loading…</p> : <>
+      {!!data.groups.length && <p className="hint">Member of {data.groups.map((g) => g.name).join(", ")}.</p>}
+      <HasAccessTo rows={data.grants} hub={hub} openTab={openTab} showGroup label="What this identity can reach" /></>}
+  </section>;
 }
 
 export function ServiceView({ tab, hub, openTab }: ObjectProps) {
@@ -322,7 +349,7 @@ export function ServiceView({ tab, hub, openTab }: ObjectProps) {
   const name = String(resource.config.account_name);
   const account = accounts.find((a) => a.name === name);
   const section = tab.section ?? "overview";
-  return <><nav className="breadcrumbs" aria-label="Object location"><button className="text-button" onClick={() => openTab({ kind: "services", title: "Services" })}>Services</button><span className="breadcrumb-divider" aria-hidden="true">/</span><span aria-current="page">{name}</span></nav>
+  return <><nav className="breadcrumbs" aria-label="Object location"><button className="text-button" onClick={() => openTab({ kind: "services", title: "Service identities" })}>Service identities</button><span className="breadcrumb-divider" aria-hidden="true">/</span><span aria-current="page">{name}</span></nav>
     <PageHeader icon={<ProductIcon kind="identity" size={22} />} title={name} subtitle={<>Service account{account?.disabled && " · disabled"}{account?.description && ` · ${account.description}`}</>} />
     {resource.layer_name && <p className="hint">Layer · <strong>{resource.layer_name}</strong></p>}
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
@@ -332,8 +359,8 @@ export function ServiceView({ tab, hub, openTab }: ObjectProps) {
         <dl className="kv"><dt>Principal</dt><dd className="mono">sa:{name}</dd></dl>
         <p className="muted">Executor grants allow use of this identity. Owner grants also control tokens, secrets, and permission assignment.
           To grant data access, assign a role directly to this service identity on the relevant schema or data source. App-group bindings are also supported.</p>
-        <div className="form-actions"><button className="btn secondary" onClick={() => openTab({ kind: "access", title: "App groups" })}>App-group bindings</button></div>
       </section>
+      {hub.me?.is_admin && typeof resource.config.principal_id === "string" && <ServiceAccess principalId={resource.config.principal_id} hub={hub} openTab={openTab} />}
       {error && <p className="error" role="alert">{error}</p>}
       {resource.actions.includes("identity") && <TokensCard key={name} sa={name} onError={setError} />}
       <div className="section-heading"><h2>Workloads using this account</h2></div>

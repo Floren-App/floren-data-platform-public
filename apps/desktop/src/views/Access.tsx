@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, AccessResource, AppGroup, AppProfile, DirectoryPrincipal } from "../api";
-import { resourcePath, resourceTab } from "../components/Permissions";
+import { api, AppGroup, AppProfile, DirectoryPrincipal } from "../api";
+import { ComplianceRolesHeld, HasAccessTo } from "./AccessArea";
 import type { OpenTab } from "../components/Permissions";
 import type { TabRef } from "./Tabs";
 import type { Hub } from "../hub";
@@ -9,8 +9,12 @@ import { OriginBadge } from "./Directory";
 import { PageHeader } from "../components/Page";
 import { IconPlus } from "../components/Icons";
 
-/** Central IAM manages identities; resource permissions live on each object. */
-export function AccessTab({ hub, groupId, bindingPrincipalId, onSelect, openTab }: { hub: Hub; groupId?: string; bindingPrincipalId?: string; onSelect: (id: string, name: string) => void; openTab: OpenTab }) {
+type GroupSection = "members" | "access" | "settings";
+
+/** Access → Groups: who is in each group, what it can reach, and its settings. Permissions per object stay on
+ * the object's Permissions tab. */
+export function AccessTab({ hub, groupId, section, bindingPrincipalId, onSelect, openTab }: { hub: Hub; groupId?: string; section: GroupSection;
+  bindingPrincipalId?: string; onSelect: (id: string, name: string, section?: GroupSection) => void; openTab: OpenTab }) {
   const [groups, setGroups] = useState<AppGroup[]>([]);
   const [directory, setDirectory] = useState<DirectoryPrincipal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +28,8 @@ export function AccessTab({ hub, groupId, bindingPrincipalId, onSelect, openTab 
   const [owners, setOwners] = useState<string[]>([]);
   const [replacementOwners, setReplacementOwners] = useState<string[]>([]);
   const [principal, setPrincipal] = useState("");
-  const [grants, setGrants] = useState<{ resource: AccessResource; role: string }[]>([]);
+  const [access, setAccess] = useState<Awaited<ReturnType<typeof api.access.groupAccess>> | null>(null);
+  const [name, setName] = useState(""), [desc, setDesc] = useState("");
 
   const load = useCallback(async () => {
     const g = await api.access.groups();
@@ -35,11 +40,12 @@ export function AccessTab({ hub, groupId, bindingPrincipalId, onSelect, openTab 
   useEffect(() => { load().catch((e: Error) => setError(e.message)).finally(() => setLoading(false)); }, [load]);
   const group = groups.find((g) => g.id === groupId);
   useEffect(() => {
-    let cancelled = false; setGrants([]);
-    if (group && group.can_inspect !== false) api.access.groupAssignments(group.id)
-      .then((rows) => { if (!cancelled) setGrants(rows); }).catch((e: Error) => { if (!cancelled) setError(e.message); });
+    let cancelled = false; setAccess(null);
+    if (group && group.can_inspect !== false && section === "access") api.access.groupAccess(group.id)
+      .then((rows) => { if (!cancelled) setAccess(rows); }).catch((e: Error) => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [group?.id, group?.can_inspect]);
+  }, [group?.id, group?.can_inspect, section]);
+  useEffect(() => { setName(group?.name ?? ""); setDesc(group?.description ?? ""); }, [group?.id, group?.name, group?.description]);
   useEffect(() => { setReplacementOwners(group?.owners ?? []); setPrincipal(bindingPrincipalId ?? ""); setIdentitySearch(""); }, [group?.id, group?.owners.join(","), bindingPrincipalId]);
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true); setError("");
@@ -50,16 +56,15 @@ export function AccessTab({ hub, groupId, bindingPrincipalId, onSelect, openTab 
   const userName = (id: string) => directory.find((p) => p.id === id)?.name ?? id;
   const matching = groups.filter((g) => `${g.name} ${g.description}`.toLowerCase().includes(search.toLowerCase()));
   return <>
-    <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="App groups"
-      subtitle="App-managed security groups: assign them roles on schemas, objects, programs, and deployed folders, then bind users, IdP groups, roles, or services."
-      actions={hub.me?.is_admin && <button className="btn" aria-expanded={creating} onClick={() => setCreating(true)}><IconPlus size={14} />Create app group</button>} />
-    <p className="scope-note">Security groups represent who gets access. Workload folders organize programs and apps under Workloads, where each folder has its own Permissions tab.</p>
+    <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="Groups"
+      subtitle="Groups get roles on objects (on each object's Permissions tab) and an app profile; people, IdP groups and service identities are their members."
+      actions={hub.me?.is_admin && <button className="btn" aria-expanded={creating} onClick={() => setCreating(true)}><IconPlus size={14} />Create group</button>} />
     {error && <p className="error" role="alert">{error}</p>}
     {creating && hub.me?.is_admin && <form className="card" onSubmit={(e) => { e.preventDefault(); act(async () => {
       const created = await api.access.createGroup({ name: groupName.trim(), description, owners });
       setCreating(false); setGroupName(""); setDescription(""); setOwners([]); onSelect(created.id, created.name);
     }); }}>
-      <h3>Create app group</h3>
+      <h3>Create group</h3>
       <div className="arg-grid"><div className="field"><label htmlFor="group-name">Group name</label><input id="group-name" autoFocus required value={groupName} onChange={(e) => setGroupName(e.target.value)} /></div>
         <div className="field"><label htmlFor="group-desc">Description</label><input id="group-desc" value={description} onChange={(e) => setDescription(e.target.value)} /></div></div>
       <div className="field"><label htmlFor="group-owners">Designated owners</label>
@@ -72,41 +77,56 @@ export function AccessTab({ hub, groupId, bindingPrincipalId, onSelect, openTab 
       </div>
     </form>}
     {loading ? <p className="muted">Loading groups…</p> : <div className="master-detail">
-      <aside className="group-list" aria-label="App groups">
-        <input type="search" aria-label="Search app groups" placeholder="Search app groups…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <ul>{matching.map((g) => <li key={g.id}><button className={groupId === g.id ? "active" : ""} onClick={() => onSelect(g.id, g.name)}>
+      <aside className="group-list" aria-label="Groups">
+        <input type="search" aria-label="Search groups" placeholder="Search groups…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <ul>{matching.map((g) => <li key={g.id}><button className={groupId === g.id ? "active" : ""} onClick={() => onSelect(g.id, g.name, section)}>
           <strong className="row" style={{ gap: 6 }}><ProductIcon kind="groups" size={16} />{g.name}</strong>{g.description && <span className="muted">{g.description}</span>}
-          <span className="muted">{g.can_manage ? "You manage this group" : g.can_inspect ? `${g.bindings.length} identity bindings` : "App group"}</span>
+          <span className="muted">{g.can_manage ? "You manage this group" : g.can_inspect ? `${g.bindings.length} member${g.bindings.length === 1 ? "" : "s"}` : "Group"}</span>
         </button></li>)}</ul>
-        {!matching.length && <p className="muted">No matching app groups.</p>}
+        {!matching.length && <p className="muted">No matching groups.</p>}
       </aside>
       <section className="group-detail" aria-label="Group details">
-        {!group ? <div className="empty-state"><h2>{groupId ? "Group unavailable" : "Choose an app group"}</h2><p className="muted">Review its identity bindings and designated owners.</p></div> : <>
+        {!group ? <div className="empty-state"><h2>{groupId ? "Group unavailable" : "Choose a group"}</h2><p className="muted">See its members, what it can reach and its settings.</p></div> : <>
           <div className="section-heading"><h2 className="page-title"><ProductIcon kind="groups" />{group.name}</h2><OriginBadge /></div>
           {group.description && <p className="muted" style={{ marginTop: -4 }}>{group.description}</p>}
           {group.system && <p className="scope-note">Protected system group · Owner access to every current and future object. Object permissions cannot revoke this access. Workload layer boundaries still apply.</p>}
           {group.can_inspect !== false && <p className="muted">Owners: {group.owners.map(userName).join(", ") || "Platform administrators"}</p>}
-          {!group.system && <GroupProfile group={group} hub={hub} act={act} openTab={openTab} />}
-          {group.can_inspect !== false && <section><h3>Roles on objects</h3>
-            <p className="hint">These roles are inherited by the object's children. Only resource Owners can change the assignments; group owners manage membership.</p>
-            <table><thead><tr><th>Object</th><th>Role</th></tr></thead><tbody>{grants.map((grant) => <tr key={grant.resource.id}>
-              <td><button className="text-button" onClick={() => openTab(resourceTab(grant.resource, "permissions"))}>{resourcePath(grant.resource, hub.resources)}</button></td><td><span className="badge role-badge">{grant.role}</span></td>
-            </tr>)}{!grants.length && <tr><td colSpan={2} className="muted">No assignments on objects visible to you.</td></tr>}</tbody></table>
-          </section>}
-          {group.can_inspect === false ? <p className="muted">Identity bindings are visible to group members and owners.</p> : <>
-            <h3>Identity bindings</h3>
-            <div className="table-scroll"><table aria-label="Identity bindings"><thead><tr><th>Identity</th><th>Type</th><th /></tr></thead><tbody>
+          {group.can_inspect !== false && <nav className="object-tabs" aria-label="Group sections">
+            {([["members", "Members"], ["access", "Has access to"], ["settings", "Settings"]] as [GroupSection, string][]).map(([id, label]) =>
+              <button key={id} className={section === id ? "active" : ""} aria-current={section === id ? "page" : undefined} onClick={() => onSelect(group.id, group.name, id)}>{label}</button>)}
+          </nav>}
+          {section === "access" && group.can_inspect !== false && <>
+            {group.system && <p className="scope-note">Owner on every object, including what is added later.</p>}
+            {!access ? <p className="muted" role="status">Loading…</p> : <>
+              <p className="hint">Roles on objects, directly and through data products. Change them on the object's Permissions tab.
+                {access.app_profile ? <> App profile: <strong>{access.app_profile}</strong>.</> : null}</p>
+              <HasAccessTo rows={access.grants} hub={hub} openTab={openTab} />
+              <ComplianceRolesHeld roles={access.compliance_roles} openTab={openTab} />
+            </>}
+          </>}
+          {section === "settings" && group.can_inspect !== false && <>
+            {!group.system && <GroupProfile group={group} hub={hub} act={act} openTab={openTab} />}
+            {hub.me?.is_admin && !group.system && <form className="card" onSubmit={(e) => { e.preventDefault(); void act(() => api.access.updateGroup(group.id, { name: name.trim(), description: desc, owners: group.owners })); }}>
+              <h3>Name and description</h3>
+              <div className="arg-grid"><div className="field"><label htmlFor="group-rename">Name</label><input id="group-rename" required value={name} onChange={(e) => setName(e.target.value)} /></div>
+                <div className="field"><label htmlFor="group-redesc">Description</label><input id="group-redesc" value={desc} onChange={(e) => setDesc(e.target.value)} /></div></div>
+              <div className="form-actions"><button className="btn secondary" disabled={busy || !name.trim() || (name === group.name && desc === group.description)}>Save</button></div>
+            </form>}
+          </>}
+          {group.can_inspect === false ? <p className="muted">Members are visible to group members and owners.</p> : section === "members" && <>
+            <h3>Members</h3>
+            <p className="hint">People, IdP groups and roles, and service identities. Members get this group's roles wherever it has access.</p>
+            <div className="table-scroll"><table aria-label="Members"><thead><tr><th>Identity</th><th>Type</th><th /></tr></thead><tbody>
               {group.bindings.map((id) => { const p = directory.find((x) => x.id === id); return <tr key={id}>
                 <td><span className="row" style={{ gap: 6, flexWrap: "wrap" }}><ProductIcon kind={p?.kind === "user" ? "users" : p?.kind === "service" ? "identity" : "groups"} size={16} />{p?.name ?? id}{p && !p.active && <span className="badge">Inactive</span>} {p && <OriginBadge principal={p} />}</span></td><td>{p?.kind ?? "identity"}</td>
                 <td className="table-actions">{group.protected_bindings?.includes(id) ? <span className="badge">Protected</span> : group.can_manage && <button className="btn sm secondary" disabled={busy} aria-label={`Remove ${p?.name ?? id} from ${group.name}`}
                   onClick={() => act(() => api.access.unbind(group.id, id))}>Remove</button>}</td>
               </tr>; })}
-              {!group.bindings.length && <tr><td colSpan={3} className="muted">No identity bindings yet.</td></tr>}
+              {!group.bindings.length && <tr><td colSpan={3} className="muted">No members yet.</td></tr>}
             </tbody></table></div>
           </>}
-          {group.can_manage && <form className="card" onSubmit={(e) => { e.preventDefault(); act(async () => { await api.access.bind(group.id, principal); setPrincipal(""); }); }}>
-            <h3>Bind an identity</h3>
-            <p className="hint">Members receive this group's roles wherever it has access.</p>
+          {group.can_manage && section === "members" && <form className="card" onSubmit={(e) => { e.preventDefault(); act(async () => { await api.access.bind(group.id, principal); setPrincipal(""); }); }}>
+            <h3>Add a member</h3>
             <div className="field"><label htmlFor="identity-search">Find an IdP identity or service</label>
               <input id="identity-search" type="search" placeholder="Search identities…" value={identitySearch} onChange={(e) => setIdentitySearch(e.target.value)} />
               <select aria-label="Identity to bind" required value={principal} onChange={(e) => setPrincipal(e.target.value)}>
@@ -114,9 +134,9 @@ export function AccessTab({ hub, groupId, bindingPrincipalId, onSelect, openTab 
                 {directory.filter((p) => p.active && (!group.system || p.kind !== "service") && !group.bindings.includes(p.id) && (p.id === principal || p.name.toLowerCase().includes(identitySearch.toLowerCase())))
                   .map((p) => <option key={p.id} value={p.id}>{p.name} ({p.kind})</option>)}
               </select></div>
-            <div className="form-actions"><button className="btn" disabled={busy || !principal}>Bind identity</button></div>
+            <div className="form-actions"><button className="btn" disabled={busy || !principal}>Add member</button></div>
           </form>}
-          {hub.me?.is_admin && !group.system && <details className="card"><summary>Designated group owners</summary>
+          {hub.me?.is_admin && !group.system && section === "settings" && <details className="card" open><summary>Group owners</summary>
             <p className="muted">Changing owners leaves the group's identity bindings and assigned roles in place.</p>
             <div className="field"><label htmlFor="replacement-owners">Owners</label>
               <select id="replacement-owners" multiple size={5} value={replacementOwners} onChange={(e) => setReplacementOwners(Array.from(e.target.selectedOptions, (o) => o.value))}>
@@ -128,15 +148,6 @@ export function AccessTab({ hub, groupId, bindingPrincipalId, onSelect, openTab 
         </>}
       </section>
     </div>}
-    {directory.some((p) => p.kind === "group" || p.kind === "role") && <section className="card idp-groups"><h2 className="page-title"><ProductIcon kind="groups" />IdP groups &amp; roles</h2>
-      <p className="hint">Synced identity groups are read-only here. Bind one to an app security group above to grant its members object permissions.</p>
-      {directory.filter((p) => p.kind === "group" || p.kind === "role").map((p) => <details key={p.id}>
-        <summary><ProductIcon kind="groups" size={16} />{p.name} <OriginBadge principal={p} /> <span className="muted">{p.kind} · {p.active ? "Active" : "Inactive"}</span></summary>
-        <p className="muted">Provider: {p.provider || "Identity provider"}</p>
-        <ul>{(p.members ?? []).map((id) => <li key={id}>{directory.find((d) => d.id === id)?.name ?? id}</li>)}</ul>
-        {!p.members?.length && <p className="muted">No direct members.</p>}
-      </details>)}
-    </section>}
   </>;
 }
 

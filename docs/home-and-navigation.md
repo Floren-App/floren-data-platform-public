@@ -31,13 +31,17 @@ It groups the sections by what you do:
 | | **Catalog** | Data products to find and request, with their lineage; All objects for engineers ([catalog](catalog.md)) |
 | | **Usage** | How full each compute pool is and what runs on it, in your layer; **All layers** shows every layer ([compute pools](compute.md)) |
 | Build | **Workspaces** | Your private VS Code, RStudio and SQL editors; tabs for their runs and your Git credentials ([workspaces](workspaces.md)) |
-| | **Workloads** | Folders of published programs, apps, dbt projects and Airflow deployments; each folder has Recent runs and Logs tabs ([publishing](deploying.md), [logs](logging.md)) |
-| | **Storage** | Registered databases, buckets and their schemas, with metadata and data previews ([storage integrations](storage-integrations.md)) |
+| | **Workloads** | Folders of published programs, apps, dbt projects and Airflow deployments; each folder has Recent runs and Logs tabs; administrators manage the Git repositories here ([publishing](deploying.md), [logs](logging.md)) |
+| | **Storage** | Storage connections (databases, buckets) and their schemas, with metadata and data previews; administrators add connections here and change them on each connection's Settings tab ([storage integrations](storage-integrations.md)) |
 | | **Packages** | The platform's Python and R package repository ([packages](packages.md)) |
 | Integration | **Kafka** | Managed Kafka per layer and its topics; shown once a cluster is available to you |
 | | **APIs** | Internal and external REST/SOAP APIs ([API management](api-management.md)) |
-| Bottom | **Security** | App groups, users, service identities and secrets ([RBAC](rbac.md)) |
-| | **Administration** | Platform settings, layers, compute pools, runtimes, repositories and integrations (administrators only) |
+| Bottom | **Access** | Who: people, groups and service identities, each with what they can reach; app profiles; secrets ([RBAC](rbac.md)) |
+| | **Privacy** | Reviews, memberships, the access register, access policies, forms, compliance roles and classifications; for people with a compliance role ([access policies](access-policies.md)) |
+| | **Administration** | Platform configuration: layers, compute pools, runtimes, workspace templates, network allowlist, notifications, query and audit logs (administrators only) |
+
+Access is in two places only: what an **object** allows is on its **Permissions** tab, and what a
+**person, group or service identity** can reach is on its page under **Access**.
 
 The **Documentation** button in the activity bar opens the guide for the current section.
 
