@@ -3098,3 +3098,49 @@ test("To do lists access that needs a form, and a person's page leads to what th
   await expect.poll(() => audits.some((q) => q.includes("actor="))).toBe(true);
   expect(state.errors).toEqual([]);
 });
+
+test("a new group is made in one page and given access from its own page; people are added from theirs", async ({ page }) => {
+  const state = await setup(page);
+  const main = page.locator(".main"), sidebar = page.locator(".sidebar");
+  const calls: { method: string; path: string; body: any }[] = [];
+  await page.route(/\/v1\/rbac\/groups(\/[^/]+(\/bindings)?)?$/, (route) => {
+    const req = route.request(), path = new URL(req.url()).pathname.replace("/api", "");
+    if (req.method() === "GET") return route.fallback();
+    calls.push({ method: req.method(), path, body: req.postDataJSON() });
+    return route.fulfill({ status: req.method() === "POST" && path === "/v1/rbac/groups" ? 201 : 200,
+      json: { id: "mkt", name: "Marketing analysts", description: "", owners: ["admin"], bindings: [], can_manage: true, can_inspect: true } });
+  });
+  await page.route("https://iam.test/api/v1/app-profiles", (route) => route.fulfill({ json: { features: [],
+    profiles: [{ id: "p1", name: "Analyst", description: "", features: ["products.browse"], default: false, groups: [] }] } }));
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await sidebar.getByRole("button", { name: "Groups", exact: true }).click();
+  await main.getByRole("button", { name: "Create group" }).click();
+  const form = main.getByRole("form", { name: "New group" });
+  await form.getByLabel("Group name").fill("Marketing analysts");
+  await form.getByLabel("Designated owners").selectOption("admin");
+  await form.getByLabel(/What its people see/).selectOption("Analyst");
+  await form.getByLabel("Members").selectOption(["ana", "idp-finance"]);
+  await form.getByRole("button", { name: "Create group" }).click();
+  await expect.poll(() => calls.length).toBe(4);
+  expect(calls[0]).toMatchObject({ method: "POST", path: "/v1/rbac/groups", body: { name: "Marketing analysts", owners: ["admin"] } });
+  expect(calls[1]).toMatchObject({ method: "PUT", path: "/v1/rbac/groups/mkt", body: { app_profile: "Analyst" } });
+  expect(calls.slice(2).map((c) => c.body.principal_id)).toEqual(["ana", "idp-finance"]);
+  // The group's own page offers Give access: an object with a role (or a data product).
+  await page.route(/\/v1\/rbac\/groups\/analysts\/access$/, (route) => route.fulfill({ json: { system: false, grants: [], compliance_roles: [], app_profile: null } }));
+  await main.getByRole("button", { name: /^Analysts/ }).click();
+  await main.getByRole("navigation", { name: "Group sections" }).getByRole("button", { name: "Has access to" }).click();
+  const give = main.getByRole("region", { name: "Give Analysts access" });
+  await give.getByRole("button", { name: "An object" }).click();
+  await give.getByLabel("Object").selectOption({ label: "finance-dw / reporting" });
+  await give.getByLabel("Role").selectOption("Reader");
+  await give.getByRole("button", { name: "Give access" }).click();
+  await expect(main.getByRole("status")).toHaveText("Analysts is now Reader on reporting.");
+  expect(state.mutations.at(-1)).toMatchObject({ method: "PUT", path: "/v1/rbac/resources/pg-reporting/assignments", body: { app_group_id: "analysts", role: "Reader" } });
+  // From a person: add them to a group you manage.
+  await sidebar.getByRole("button", { name: "People", exact: true }).click();
+  await main.getByRole("button", { name: "Open ana", exact: true }).click();
+  await main.getByLabel("Add ana to a group").selectOption("operators");
+  await main.getByRole("button", { name: "Add to group" }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Added ana to Operators." })).toBeVisible();
+  expect(state.errors).toEqual([]);
+});

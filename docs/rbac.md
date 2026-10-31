@@ -32,10 +32,17 @@ sidebar only switches between them; each page carries its own list and detail.
 - **Groups** are app-managed security groups. Their members are people, IdP groups/roles and
   service identities; they get fixed roles on objects. A group's page has **Members**, **Has
   access to** (roles on objects, directly and through data products, with end dates and deadlines
-  from [access policies](access-policies.md), and its compliance roles) and **Settings** (name,
-  owners, app profile). Changing members and changing roles on objects remain separate powers.
+  from [access policies](access-policies.md), and its review duties) and **Settings** (name,
+  owners, app profile, review duties). Changing members and changing roles on objects remain
+  separate powers.
+- **New group** is one page: name and owners, what its people see (app profile) and its first
+  members. The group then opens on **Has access to**, where **Give access** offers the data products
+  and objects you own: a product with one of its options, or an object with a role. When an access
+  policy covers the data, its compliance form opens right there and the access follows the review.
 - **People** shows each person's groups (and the IdP group that put them there) and everything
-  those give them, for administrators and the person themselves.
+  those give them, for administrators and the person themselves. **Add to group** and **Remove**
+  work for the groups you manage; administrators also get links to what the person changed (audit
+  log) and queried (query log).
 - **Service identities** lists every workload's built-in identity and the service accounts;
   administrators create, disable and delete service accounts here, and a service account's page
   shows its tokens and what it can reach.
