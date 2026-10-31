@@ -5,7 +5,7 @@ import type { Hub } from "../hub";
 import { IconRuns, IconCompute, IconOpen, IconPlay, IconStop, IconTrash, IconWorkspaces } from "../components/Icons";
 import { PageHeader } from "../components/Page";
 import { LoadMoreRuns, NewRunForm, openEditor, RUN_SCOPE_TITLE, runsIn } from "./Sidebar";
-import { AdminLayers, AdminAudit, AdminNetwork, AdminPools, AdminSources, AdminWorkspaceTemplates } from "./Admin";
+import { AdminAppProfiles, AdminLayers, AdminAudit, AdminNetwork, AdminPools, AdminSources, AdminWorkspaceTemplates } from "./Admin";
 import { ProgramRunner } from "./Programs";
 import { AdminRepos, WorkloadView, DeployWizard } from "./Deploy";
 import { AccessTab } from "./Access";
@@ -29,7 +29,7 @@ import { KafkaClustersView, KafkaView } from "./Kafka";
 
 export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
   | "products" | "product" | "access-requests"
-  | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
+  | "admin-app-profiles" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
 
 export interface TabRef {
   kind: TabKind;
@@ -89,6 +89,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "deploy": return <DeployWizard hub={hub} openTab={openTab} initialFolder={tab.ref} />;
     case "workload": return <WorkloadView tab={tab} id={tab.ref!} hub={hub} openTab={openTab} runTab={runTab} />;
     case "admin-layers": return <AdminLayers hub={hub} />;
+    case "admin-app-profiles": return <AdminAppProfiles />;
     case "admin-sources": return <AdminSources hub={hub} openTab={openTab} />;
     case "admin-repos": return <AdminRepos />;
     case "admin-runtimes": return <AdminRuntimes withR={rEnabled(hub.me)} />;

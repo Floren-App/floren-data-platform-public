@@ -20,10 +20,10 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -92,6 +92,14 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/admin/settings/workspaces` | Set Workspace Settings |
 | `DELETE` | `/v1/admin/settings/workspaces` | Reset Workspace Settings |
 | `GET` | `/v1/admin/storage-types` | Storage Type List |
+
+## app profiles
+
+| Method | Path | Purpose |
+|---|---|---|
+| `PUT` | `/v1/admin/app-profiles/{name}` | Put Profile |
+| `DELETE` | `/v1/admin/app-profiles/{name}` | Delete Profile |
+| `GET` | `/v1/app-profiles` | List Profiles |
 
 ## catalog
 
@@ -304,8 +312,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/pages/{token}` | Page |
+| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

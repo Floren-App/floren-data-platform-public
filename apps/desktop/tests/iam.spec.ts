@@ -659,7 +659,7 @@ test("catalog: bundled data products as cards, lineage without access, requests 
   await expect(card).toContainText("Dashboard · 2 tables");
   await expect(card.getByRole("button", { name: "Request access", exact: true })).toBeVisible();  // partly: the dashboard only
   await expect(card).toContainText("Updated 2 hours ago");
-  await expect(main.getByRole("article", { name: "Pokemon dashboard" })).toContainText("You have access");
+  await expect(main.getByRole("article", { name: "Pokemon dashboard" }).getByRole("button", { name: "Open dashboard", exact: true })).toBeVisible();
   const box = await card.boundingBox(); expect(Math.round(box!.width / box!.height)).toBe(2);  // wide cards, 2:1
   expect(asked.some((a) => a.includes("layer_id=1a0000000002"))).toBeTruthy();                // follows the layer mode
   await main.getByRole("checkbox", { name: "Only what I can use" }).check();
@@ -712,6 +712,63 @@ test("catalog: bundled data products as cards, lineage without access, requests 
   await form.getByRole("textbox", { name: "Name in the catalog" }).fill("Sales");
   await form.getByRole("button", { name: "Publish", exact: true }).click();
   expect(posted.at(-1)).toMatchObject({ asset_ids: ["asset-sales", "asset-stats", "asset-raw"], title: "Sales" });
+  expect(state.errors).toEqual([]);
+});
+
+test("app profiles: a Viewer gets Home and Data products only, and admins edit profiles", async ({ page }) => {
+  const state = await setup(page);
+  const asked: string[] = [];
+  page.on("request", (r) => { if (r.url().includes("/api/v1/")) asked.push(new URL(r.url()).pathname); });
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "vera", is_admin: false, groups: [], data_sources: [], pools: [],
+    active_group_id: "viewers", active_layer_id: "1a0000000002", available_groups: [{ id: "viewers", name: "Viewers" }],
+    app_profile: "Viewer", app_features: ["products.browse"] } }));
+  const dashboard = { id: "p1", asset_id: "a1", title: "Pokemon dashboard", summary: "Prices per set.", kind: "app", runtime: "python", name: "dash", layer_id: "1a0000000002",
+    layer_name: "Non-Prod", domain: "Games", classification: "internal", status: "draft", steward: "", owner_group_name: "Data engineers", updated_at: null, sla_status: "",
+    published_at: "2026-10-31T09:00:00Z", published_by: "admin", access: "granted", can_manage: false,
+    members: [{ asset_id: "a1", name: "dash", kind: "app", runtime: "python", access: "granted", updated_at: null, open: { resource_kind: "service", resource_id: "sales-service", object_id: "sales", object_path: null } }],
+    grants: [], open: { resource_kind: "service", resource_id: "sales-service", object_id: "sales", object_path: null } };
+  await page.route(/\/v1\/catalog\/products\?/, (route) => route.fulfill({ json: { items: [dashboard], domains: ["Games"], kinds: ["app"] } }));
+  let opened = "";
+  await page.route("https://iam.test/api/v1/workloads/sales/open", (route) => { opened = "sales"; return route.fulfill({ json: { url: "https://apps.test/sales/" } }); });
+  await page.reload();
+  const views = page.getByRole("navigation", { name: "Views" });
+  // Only Home and Catalog in the activity bar; Documentation and Account stay.
+  await expect(views.getByRole("button", { name: "Catalog", exact: true })).toBeVisible();
+  for (const name of ["Workspaces", "Workloads", "Storage", "Packages", "APIs", "Usage", "Security", "Administration"])
+    await expect(views.getByRole("button", { name, exact: true })).toHaveCount(0);
+  // Home: the products and dashboards they can use, opened straight away.
+  const main = page.locator(".main");
+  await expect(main.getByRole("heading", { name: "Welcome back, vera" })).toBeVisible();
+  await main.getByRole("article", { name: "Pokemon dashboard" }).getByRole("button", { name: "Open dashboard", exact: true }).click();
+  await expect.poll(() => opened).toBe("sales");
+  // No listings of features they do not have were asked for.
+  expect(asked.filter((p) => p === "/v1/workspaces" || p === "/v1/workloads")).toEqual([]);
+  // In the catalog: no All objects, no publishing.
+  await views.getByRole("button", { name: "Catalog", exact: true }).click();
+  await expect(page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Publish a product", exact: true })).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+test("administrators edit app profiles in a grid of features", async ({ page }) => {
+  const state = await setup(page);
+  const profile = (id: string, name: string, features: string[], extra = {}) => ({ id, name, description: "", features, default: false, groups: [], ...extra });
+  let profiles = [profile("full", "Full access", ["products.browse", "workspaces"], { default: true, groups: ["Analysts"] }), profile("viewer", "Viewer", ["products.browse"])];
+  const saved: unknown[] = [];
+  await page.route("https://iam.test/api/v1/app-profiles", (route) => route.fulfill({ json: { profiles,
+    features: [{ key: "products.browse", label: "Data products" }, { key: "workspaces", label: "Workspaces" }] } }));
+  await page.route(/\/v1\/admin\/app-profiles\//, (route) => { const body = route.request().postDataJSON(); saved.push(body);
+    profiles = profiles.map((p) => p.name === decodeURIComponent(new URL(route.request().url()).pathname.split("/").pop()!) ? { ...p, ...body } : p);
+    return route.fulfill({ json: body }); });
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Administration", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "App profiles", exact: true }).click();
+  const grid = page.locator(".main").getByRole("table", { name: "App profiles" });
+  await expect(grid.getByRole("checkbox", { name: "Workspaces in Viewer" })).not.toBeChecked();
+  await grid.getByRole("checkbox", { name: "Workspaces in Viewer" }).check();
+  await grid.getByRole("button", { name: "Save", exact: true }).nth(1).click();
+  await expect(page.locator(".main").getByRole("status")).toHaveText("Saved Viewer.");
+  expect(saved[0]).toMatchObject({ name: "Viewer", features: ["products.browse", "workspaces"], default: false });
+  await expect(grid).toContainText("Analysts");
   expect(state.errors).toEqual([]);
 });
 

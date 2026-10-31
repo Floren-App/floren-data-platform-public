@@ -60,8 +60,9 @@ export function Sidebar(props: Props) {
 
 
 /** Catalog: shared data products first; every object (for engineers) below. */
-function CatalogPanel({ openTab, activeKey, activeRef }: Props) {
-  const requests = useCached("catalog:requests:approve", () => api.products.requests("approve"));
+function CatalogPanel({ hub, openTab, activeKey, activeRef }: Props) {
+  const publisher = hub.has("products.publish");
+  const requests = useCached("catalog:requests:approve", () => api.products.requests("approve"), publisher);
   const waiting = (requests.data ?? []).filter((r) => r.status === "pending").length;
   const item = (key: string, tab: TabRef, label: string, icon: JSX.Element, badge?: number) =>
     <li key={key} className={activeKey === key ? "selected" : ""}><button className="nav-item" onClick={() => openTab(tab)}>{icon}<span className="grow">{label}</span>
@@ -69,14 +70,17 @@ function CatalogPanel({ openTab, activeKey, activeRef }: Props) {
   return <>
     <ul className="list" style={{ marginTop: 4 }}>
       {item("products:", { kind: "products", title: "Data products" }, "Data products", <IconCatalog size={16} />)}
-      {item("products:mine", { kind: "products", ref: "mine", title: "My products" }, "My products", <ProductIcon kind="identity" size={16} />)}
-      {item("access-requests:", { kind: "access-requests", title: "Access requests" }, "Access requests", <IconKey size={16} />, waiting)}
+      {publisher && item("products:mine", { kind: "products", ref: "mine", title: "My products" }, "My products", <ProductIcon kind="identity" size={16} />)}
+      {publisher ? item("access-requests:", { kind: "access-requests", title: "Access requests" }, "Access requests", <IconKey size={16} />, waiting)
+        : hub.has("products.request") && item("access-requests:mine", { kind: "access-requests", ref: "mine", title: "My requests" }, "My requests", <IconKey size={16} />)}
     </ul>
+    {hub.has("catalog.objects") && <>
     <div className="section-title">All objects</div>
     <ul className="list">{[["", "Everything"], ["table", "Tables"], ["source", "Storage connections"], ["schema", "Schemas"], ["app", "Apps"], ["script", "Programs"], ["dbt", "dbt projects"], ["airflow", "Airflow deployments"]].map(([kind, label]) =>
       <li key={kind} className={activeKey === "catalog:" && (activeRef ?? "") === kind ? "selected" : ""}>
         <button className="nav-item" onClick={() => openTab({ kind: "catalog", ref: kind || undefined, title: "All objects" })}><ProductIcon kind={kind === "app" ? "streamlit" : kind === "script" ? "python" : kind} size={16} />{label}</button></li>)}</ul>
     <p className="sidebar-note muted">All objects shows what you can open, with lineage and governance. Data products are what owners share with everyone.</p>
+    </>}
   </>;
 }
 
@@ -419,6 +423,7 @@ function PackagesPanel({ hub, openTab, activeKey, activeRef }: Props) {
 function AdminPanel({ openTab, activeKey }: Props) {
   const items: TabRef[] = [
     { kind: "admin-layers", title: "Layers" },
+    { kind: "admin-app-profiles", title: "App profiles" },
     { kind: "admin-sources", title: "Storage integrations" },
     { kind: "admin-repos", title: "Git repositories" },
     { kind: "admin-runtimes", title: "Runtimes (versions)" },

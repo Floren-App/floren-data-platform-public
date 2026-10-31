@@ -675,3 +675,5 @@ tr.log-error td { background: color-mix(in srgb, var(--err) 6%, transparent); }
 .publish-members li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .publish-members label { gap: 8px; min-width: 0; }
 .publish-members .hint { margin: 0; }
+.profile-grid th, .profile-grid td { text-align: center; } .profile-grid th:first-child, .profile-grid td:first-child { text-align: left; }
+.profile-grid th input:not([type]) { width: 120px; } .profile-grid th label { justify-content: center; font-weight: 400; font-size: 12px; margin-top: 4px; }

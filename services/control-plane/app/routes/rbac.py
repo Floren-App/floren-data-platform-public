@@ -22,6 +22,8 @@ class GroupIn(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     description: str = Field(default="", max_length=500)
     owners: List[str] = Field(min_length=1)
+    app_profile: Optional[str] = Field(default=None, max_length=64,
+                                       description="Name of the app profile the group gets; empty: the default profile")
 
 class BindingIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -66,8 +68,23 @@ def admin(db, user):
     return user
 
 
+def _set_profile(db, group, name):
+    """The group's app profile, by name ("" or None for the default profile)."""
+    from ..models import AppProfile
+    if not name:
+        group.profile_id = None
+        return
+    profile = db.scalar(select(AppProfile).where(AppProfile.name == name))
+    if profile is None:
+        raise HTTPException(422, f"no app profile named {name}")
+    group.profile_id = profile.id
+
+
 def group_out(db, g, user):
+    from ..models import AppProfile
+    profile = db.get(AppProfile, g.profile_id) if g.profile_id else None
     return {"id": g.id, "name": g.name, "description": g.description, "owners": g.owners, "origin": "app",
+            "app_profile": profile.name if profile else None,
             "system":g.id == GLOBAL_ADMIN,
             "protected_bindings":[p.id for p in db.scalars(select(DirectoryPrincipal).where(
                 DirectoryPrincipal.kind == "role",DirectoryPrincipal.name == user.admin_role))] if g.id == GLOBAL_ADMIN else [],
@@ -186,7 +203,8 @@ def create_group(body: GroupIn, db: Session = Depends(get_db), user: User = Depe
     check_owners(db, body.owners)
     if db.scalar(select(AppGroup).where(AppGroup.name == body.name)):
         raise HTTPException(409, "group name already exists")
-    group = AppGroup(**body.model_dump())
+    group = AppGroup(**body.model_dump(exclude={"app_profile"}))
+    _set_profile(db, group, body.app_profile)
     db.add(group)
     db.flush()
     audit(db, user.username, "app_group.create", group.id, owners=body.owners)
@@ -208,7 +226,11 @@ def update_group(group_id: str, body: GroupIn, db: Session = Depends(get_db), us
         raise HTTPException(409, "group name already exists")
     before = group.owners
     group.name, group.description, group.owners = body.name, body.description, body.owners
-    audit(db, user.username, "app_group.update", group.id, before_owners=before, owners=body.owners)
+    before_profile = group.profile_id
+    if "app_profile" in body.model_fields_set:  # left out: unchanged
+        _set_profile(db, group, body.app_profile)
+    audit(db, user.username, "app_group.update", group.id, before_owners=before, owners=body.owners,
+          **({"app_profile": body.app_profile or "default"} if group.profile_id != before_profile else {}))
     db.commit()
     return group_out(db, group, user)
 
