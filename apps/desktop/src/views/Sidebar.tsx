@@ -43,16 +43,11 @@ export function Sidebar(props: Props) {
       {view === "home" && <><div className="section-title">Your platform</div><ul className="list">
         {([{ kind: "home", title: "Overview", icon: <IconHome size={16} /> }, { kind: "workspaces", title: "My workspaces", icon: <IconWorkspaces size={16} /> },
           { kind: "folder", ref: "workloads", title: "Browse workloads", icon: <IconDeployed size={16} /> }, { kind: "runs", title: "Recent runs", icon: <IconRuns size={16} /> },
-          { kind: "catalog", title: "Browse catalog", icon: <IconCatalog size={16} /> }] as (TabRef & { icon: JSX.Element })[]).map(({ icon, ...tab }) =>
-          <li key={tab.kind} className={tab.kind === "home" ? "selected" : ""}><button className="nav-item" onClick={() => props.openTab({ ...tab, title: tab.kind === "home" ? "Home" : tab.kind === "folder" ? "Workloads" : tab.kind === "catalog" ? "Catalog" : tab.kind === "workspaces" ? "Workspaces" : tab.title })}>{icon}{tab.title}</button></li>)}
+          { kind: "products", title: "Browse catalog", icon: <IconCatalog size={16} /> }] as (TabRef & { icon: JSX.Element })[]).map(({ icon, ...tab }) =>
+          <li key={tab.kind} className={tab.kind === "home" ? "selected" : ""}><button className="nav-item" onClick={() => props.openTab({ ...tab, title: tab.kind === "home" ? "Home" : tab.kind === "folder" ? "Workloads" : tab.kind === "products" ? "Data products" : tab.kind === "workspaces" ? "Workspaces" : tab.title })}>{icon}{tab.title}</button></li>)}
       </ul><p className="sidebar-note muted">Your work, recent activity, and the pipelines you follow. Search the catalog with ⌘K / Ctrl+K.</p></>}
       {view === "workloads" && <DeployedPanel {...props} />}
-      {view === "catalog" && <>
-        <div className="section-title">Browse catalog</div><ul className="list">{[["", "All objects"], ["table", "Tables"], ["source", "Storage connections"], ["schema", "Schemas"], ["app", "Apps"], ["script", "Programs"], ["dbt", "dbt projects"], ["airflow", "Airflow deployments"], ["folder", "Workload folders"]].map(([kind, label]) =>
-          <li key={kind} className={props.activeKey === "catalog:" && (props.activeRef ?? "") === kind ? "selected" : ""}>
-            <button className="nav-item" onClick={() => props.openTab({ kind: "catalog", ref: kind || undefined, title: "Catalog" })}><ProductIcon kind={kind === "app" ? "streamlit" : kind === "script" ? "python" : kind} size={16} />{label}</button></li>)}</ul>
-        <p className="sidebar-note muted">Open a catalog object to explore lineage, governance, SLAs, or access. Results follow your current roles.</p>
-      </>}
+      {view === "catalog" && <CatalogPanel {...props} />}
       {view === "data" && <DataPanel {...props} />}
       {view === "kafka" && <KafkaPanel {...props} />}
       {view === "apis" && <ApisPanel {...props} />}
@@ -63,6 +58,27 @@ export function Sidebar(props: Props) {
   );
 }
 
+
+/** Catalog: shared data products first; every object (for engineers) below. */
+function CatalogPanel({ openTab, activeKey, activeRef }: Props) {
+  const requests = useCached("catalog:requests:approve", () => api.products.requests("approve"));
+  const waiting = (requests.data ?? []).filter((r) => r.status === "pending").length;
+  const item = (key: string, tab: TabRef, label: string, icon: JSX.Element, badge?: number) =>
+    <li key={key} className={activeKey === key ? "selected" : ""}><button className="nav-item" onClick={() => openTab(tab)}>{icon}<span className="grow">{label}</span>
+      {!!badge && <span className="badge" aria-label={`${badge} waiting`}>{badge}</span>}</button></li>;
+  return <>
+    <ul className="list" style={{ marginTop: 4 }}>
+      {item("products:", { kind: "products", title: "Data products" }, "Data products", <IconCatalog size={16} />)}
+      {item("products:mine", { kind: "products", ref: "mine", title: "My products" }, "My products", <ProductIcon kind="identity" size={16} />)}
+      {item("access-requests:", { kind: "access-requests", title: "Access requests" }, "Access requests", <IconKey size={16} />, waiting)}
+    </ul>
+    <div className="section-title">All objects</div>
+    <ul className="list">{[["", "Everything"], ["table", "Tables"], ["source", "Storage connections"], ["schema", "Schemas"], ["app", "Apps"], ["script", "Programs"], ["dbt", "dbt projects"], ["airflow", "Airflow deployments"]].map(([kind, label]) =>
+      <li key={kind} className={activeKey === "catalog:" && (activeRef ?? "") === kind ? "selected" : ""}>
+        <button className="nav-item" onClick={() => openTab({ kind: "catalog", ref: kind || undefined, title: "All objects" })}><ProductIcon kind={kind === "app" ? "streamlit" : kind === "script" ? "python" : kind} size={16} />{label}</button></li>)}</ul>
+    <p className="sidebar-note muted">All objects shows what you can open, with lineage and governance. Data products are what owners share with everyone.</p>
+  </>;
+}
 
 /** "3 more in other layers": items the layer (and group) mode hides from this list. */
 function OtherLayers({ count, groups = false }: { count: number; groups?: boolean }) {

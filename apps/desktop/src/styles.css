@@ -631,3 +631,41 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 tr.log-error td { background: color-mix(in srgb, var(--err) 6%, transparent); }
 .log-message { white-space: pre-wrap; word-break: break-word; }
 .log-fields { margin: 6px 0 0; max-height: 240px; overflow: auto; }
+
+/* Data products: wide cards (2:1) with a large mark for the kind of product. */
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.product-card { aspect-ratio: 2 / 1; min-width: 0; display: grid; grid-template-columns: 56px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px 14px; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated, var(--bg)); }
+.product-card:hover { border-color: var(--border-strong); }
+.product-card .product-mark { grid-row: 1 / 3; }
+.product-card-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.product-title { font-size: 15px; font-weight: 600; color: var(--fg-strong); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.product-summary { grid-column: 2; margin: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; color: var(--fg); }
+.product-card-foot { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.product-mark { width: 56px; height: 56px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--fg-muted) 14%, transparent); }
+.product-mark.kind-app { background: color-mix(in srgb, #ef7077 18%, transparent); }
+.product-mark.kind-table, .product-mark.kind-view, .product-mark.kind-materialized_view { background: color-mix(in srgb, #91b9c8 18%, transparent); }
+.product-mark.kind-api { background: color-mix(in srgb, #6aa8d8 18%, transparent); }
+.product-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: var(--radius); border: 1px solid var(--border-strong); color: var(--fg-muted); font-size: 11px; white-space: nowrap; }
+.product-chip.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+.product-chip.wait { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
+.product-chip.cert { color: var(--info); border-color: color-mix(in srgb, var(--info) 50%, transparent); }
+.product-filters { flex-wrap: wrap; justify-content: flex-start; gap: 10px; }
+.publish-panel h2 { margin-top: 0; }
+.publish-also { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; display: grid; gap: 4px; margin: 8px 0; }
+.product-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 8px 0 12px; }
+.product-header-text { flex: 1; min-width: 200px; }
+.product-header h1 { margin: 0; font-size: 22px; }
+.product-header p { margin: 2px 0 0; }
+.product-actions { gap: 8px; flex-wrap: wrap; }
+.product-summary-lg { font-size: 15px; margin: 0 0 12px; }
+.product-uses { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.product-uses li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Lineage: columns from the sources (left) to the product (right). */
+.product-lineage { display: flex; align-items: center; gap: 28px; padding: 12px 4px; }
+.product-lineage-column { display: flex; flex-direction: column; gap: 10px; position: relative; }
+.product-lineage-column:not(:last-child)::after { content: "→"; position: absolute; right: -20px; top: 50%; transform: translateY(-50%); color: var(--fg-muted); }
+.product-step { min-width: 170px; max-width: 240px; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-side); display: grid; gap: 2px; }
+.product-step.hidden { border-style: dashed; background: transparent; }
+.product-step.current { border-color: var(--accent); }
+.empty-state { padding: 24px 0; }

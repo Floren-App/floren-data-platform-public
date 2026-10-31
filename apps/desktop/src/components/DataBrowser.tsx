@@ -9,6 +9,7 @@ import type { TabRef } from "../views/Tabs";
 import { ProductIcon } from "./ProductIcon";
 import { IconChevron, IconRefresh } from "./Icons";
 import { PageHeader } from "./Page";
+import { PublishButton } from "../views/Products";
 
 export function dataTab(schema: AccessResource, child: DataChild): TabRef {
   const data: DataLocation = { schemaId: schema.id, item: child,
@@ -120,7 +121,8 @@ export function DataObjectView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; o
   return <>
     <ObjectBreadcrumbs resource={schema} resources={hub.resources} openTab={openTab} trailing={parts} />
     <PageHeader icon={<ProductIcon kind={location.item?.kind === "folder" ? "directory" : location.item?.kind ?? "table"} size={22} />} title={location.item?.name ?? tab.title}
-      subtitle={<>{location.item ? kindLabel(location.item) : "Data object"} · {schema.name}</>} />
+      subtitle={<>{location.item ? kindLabel(location.item) : "Data object"} · {schema.name}</>}
+      actions={location.table !== undefined && <PublishButton resourceId={schema.id} objectPath={location.table} openTab={openTab} />} />
     {schema.layer_name && <p className="hint">Layer · <strong>{schema.layer_name}</strong></p>}
     <ObjectTabs active={section} lineage preview={location.table !== undefined} onChange={(s) => openTab({ ...tab, section: s })} />
     {section === "permissions" ? <><p className="scope-note">This object uses its schema's permissions. Grants apply to every current and future object in <strong>{schema.name}</strong>.</p>

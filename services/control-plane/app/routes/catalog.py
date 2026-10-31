@@ -138,6 +138,9 @@ class ProgramReport(BaseModel):
     outputs: List[DataReference] = Field(default_factory=list, max_length=500)
 
 
+HIDDEN_KINDS = ("file", "folder")
+
+
 @router.get("/search")
 def search(q: str = Query(default="", max_length=300), kind: str = "", domain: str = "", status: str = "",
            classification: str = "", sla_status: str = "", branch: str = "", layer: str = "",
@@ -157,7 +160,8 @@ def search(q: str = Query(default="", max_length=300), kind: str = "", domain: s
         candidates, resources = c.visible_assets(db, user)
         ranked = catalog_search.ranked(candidates, q, groups, fuzzy)
     rank = {asset.id: (score, fields, approximate) for asset, score, fields, approximate in ranked}
-    matches = [a for a, _, _, _ in ranked]
+    # Files and folders are storage and workload organization: Storage and Workloads show them, the catalog does not.
+    matches = [a for a, _, _, _ in ranked if a.kind not in HIDDEN_KINDS]
     # Facets and totals are computed only over objects the caller can read.
     facets = {"layer": sorted({a.catalog_layer["layer_name"] for a in matches if a.catalog_layer.get("layer_name")}), "kind": sorted({a.kind for a in matches}),
               "domain": sorted({a.governance.get("domain") for a in matches if a.governance.get("domain")}),
@@ -195,7 +199,7 @@ def suggest(q: str = Query(default="", max_length=300), db: Session = Depends(ge
         return {"items": []}
     assets, _ = c.visible_assets(db, user)
     groups = {g.id: g.name for g in db.scalars(select(AppGroup))}
-    return {"items": catalog_search.suggestions(assets, q, groups)}
+    return {"items": catalog_search.suggestions([a for a in assets if a.kind not in HIDDEN_KINDS], q, groups)}
 
 
 @router.get("/resources/{resource_id}/asset")

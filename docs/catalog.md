@@ -1,7 +1,43 @@
 # Catalog, governance, service levels, and lineage
 
-Open **Catalog** in the activity bar. Search registered data sources/schemas, known tables
-and files, workload folders, deployed apps/programs, and imported dbt/Airflow objects.
+The catalog answers three questions: which data products exist that I could use, where does
+a product I use come from, and what data does a dashboard use. It opens on **Data products**;
+**All objects** is the full catalog for engineers. Both follow the layer chosen at the bottom
+of the sidebar.
+
+## Data products
+
+Owners **publish** the objects they want to share: tables and views, dashboards (apps),
+APIs and Kafka topics. Everything else stays in the catalog as a lineage object: it shows up
+in a product's lineage, but is not offered on its own.
+
+- **Publish** from the object's own page (**Publish to catalog** on a dashboard, table, API
+  or topic) or with **Publish a product** on Data products. Give it a name, a short summary,
+  a domain and a classification. Publishing a dashboard offers the tables it reads, so they
+  can be published in the same step. Only the object's owners (the Owner role) publish,
+  change the summary or unpublish.
+- **Data products** shows products as cards to everyone in the layer, with or without
+  access: name, summary, owner group, domain, certification, when it was last updated, and
+  where you stand (*You have access*, *Request access*, *Requested*). **Only what I can use**
+  narrows it to products you can open. **My products** lists the ones you manage.
+- A **product page** has three tabs. **Overview**: what it is, owner and steward, domain and
+  classification, freshness and SLA, and for a dashboard the data it uses. **Lineage**: the
+  path from the sources to the product, left to right. Steps you cannot open are dashed and
+  show only their name, kind and owner. **Used by**: other products built on it. Columns,
+  previews and SQL are shown only with access, through the object's own pages.
+- **Request access** asks the owners for access for one of your groups, with a reason.
+  Owners answer under **Access requests** (the sidebar counts what waits) and may add a note.
+  Approving gives that group the product's reader role: Reader for tables and topics,
+  Executor for dashboards, Consumer for APIs. Access to a table is granted on its schema, so
+  it includes the schema's other tables; the request and the approval both say so. Requests,
+  decisions and grants are in the audit trail. Requesters see the outcome under **My
+  requests** and may withdraw a waiting request. Unpublishing withdraws waiting requests.
+
+## All objects
+
+**All objects** searches registered data sources/schemas, known tables, deployed
+apps/programs, and imported dbt/Airflow objects you may open. Files and folders are not
+listed: Storage and Workloads show them.
 Everything runs inside Floren Data Platform: its metadata database, API, UI, login, and IAM. There
 is no DataHub deployment or separate metadata login. PostgreSQL uses a native GIN text
 index; SQLite uses FTS5. The lineage explorer uses React Flow and Dagre for interaction

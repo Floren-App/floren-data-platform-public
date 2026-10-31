@@ -17,7 +17,7 @@ from .programs import json_schema
 from .deploying import gitops_loop
 from .reaper import reaper_loop
 from .runtimes import sync_installation_runtimes
-from .routes import layers, admin, apis, connect, gateway, identity, deploy, runs, workspaces, rbac, scim, delegation, sql, data_browser, catalog, measurements, compute, workspace_templates, git_credentials, packages, query_log, data_policies, kafka, logs
+from .routes import layers, admin, apis, connect, gateway, identity, deploy, runs, workspaces, rbac, scim, delegation, sql, data_browser, catalog, measurements, compute, workspace_templates, git_credentials, packages, query_log, data_policies, kafka, logs, products
 from . import workload_logs  # noqa: F401 -- records run and deploy events in the central log
 
 logging.basicConfig(level=logging.INFO)
@@ -165,7 +165,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-for module in (workspaces, workspace_templates, git_credentials, packages, query_log, runs, compute, admin, connect, deploy, identity, gateway, rbac, scim, delegation, sql, data_browser, catalog, apis, layers, data_policies, kafka, logs):
+for module in (workspaces, workspace_templates, git_credentials, packages, query_log, runs, compute, admin, connect, deploy, identity, gateway, rbac, scim, delegation, sql, data_browser, catalog, apis, layers, data_policies, kafka, logs, products):
     app.include_router(module.router)
 app.include_router(gateway.docs_router)
 

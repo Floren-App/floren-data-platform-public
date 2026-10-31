@@ -688,6 +688,40 @@ class CatalogAsset(Base):
     last_success_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class CatalogProduct(Base):
+    """A catalog object its owner published as a data product: shown as a card to everyone in its layer,
+    with or without access. Everything else in the catalog is a lineage object."""
+    __tablename__ = "catalog_products"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    asset_id: Mapped[str] = mapped_column(ForeignKey("catalog_assets.id", ondelete="CASCADE"), unique=True)
+    resource_id: Mapped[str] = mapped_column(String(12), index=True)   # the object's RBAC resource (a table's schema)
+    layer_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    summary: Mapped[str] = mapped_column(String(600), default="")
+    published_by: Mapped[str] = mapped_column(String(256), default="")
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AccessRequest(Base):
+    """Someone asks the owners of a data product for access for one of their groups."""
+    __tablename__ = "catalog_access_requests"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
+    requester: Mapped[str] = mapped_column(String(256))
+    requester_principal_id: Mapped[str] = mapped_column(String(12), default="", index=True)
+    app_group_id: Mapped[str] = mapped_column(String(12))
+    reason: Mapped[str] = mapped_column(String(1000), default="")
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending | approved | declined | withdrawn
+    role: Mapped[str] = mapped_column(String(32), default="")      # what approval grants
+    decided_by: Mapped[str] = mapped_column(String(256), default="")
+    decision_note: Mapped[str] = mapped_column(String(1000), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class LineageEdge(Base):
     __tablename__ = "catalog_lineage_edges"
     __table_args__ = (UniqueConstraint("producer_id", "source_id", "target_id", "relation", "origin"),)

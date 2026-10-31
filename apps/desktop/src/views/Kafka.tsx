@@ -4,6 +4,7 @@ import type { Hub } from "../hub";
 import type { TabRef } from "./Tabs";
 import { ObjectTabs, PermissionsPanel, resourceTab } from "../components/Permissions";
 import { PageHeader } from "../components/Page";
+import { PublishButton } from "./Products";
 import { ProductIcon } from "../components/ProductIcon";
 import { ObjectLineage } from "../components/ObjectLineage";
 
@@ -80,7 +81,8 @@ export function KafkaView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; openTa
   </div>;
   return <>
     <PageHeader icon={<ProductIcon kind={resource.kind} size={22} />} title={resource.name}
-      subtitle={`${cluster ? "Kafka cluster" : "Kafka topic"} · ${resource.layer_name ?? ""}${cluster ? "" : ` · ${resource.config.phase}`}`} />
+      subtitle={`${cluster ? "Kafka cluster" : "Kafka topic"} · ${resource.layer_name ?? ""}${cluster ? "" : ` · ${resource.config.phase}`}`}
+      actions={!cluster && <PublishButton resourceId={resource.id} openTab={openTab} />} />
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
     <ObjectTabs active={section} lineage settings={!cluster && resource.actions.includes("ddl")} onChange={(s) => openTab({ ...tab, section: s })} />
     {error && <p className="error" role="alert">{error}</p>}

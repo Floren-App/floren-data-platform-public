@@ -12,6 +12,7 @@ import type { TabRef } from "./Tabs";
 import { ObjectBreadcrumbs, ObjectTabs, PermissionsPanel, resourcePath } from "../components/Permissions";
 import { OrganizationSettings } from "./Objects";
 import { LogView } from "../components/LogView";
+import { PublishButton } from "./Products";
 import { LoadMoreRuns } from "./Sidebar";
 
 const short = (sha?: string | null) => (sha ? sha.slice(0, 7) : "—");
@@ -370,6 +371,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
               && act(() => api.undeploy(pub.id))}><IconTrash size={14} />Undeploy</button>
             <span className="divider" />
           </>}
+          {pub.kind === "app" && <PublishButton resourceId={pub.resource_id} openTab={openTab} />}
           {pub.can_manage && <button className="btn secondary" disabled={busy} title="Check the branch for new commits now"
                   onClick={() => act(() => api.syncWorkload(pub.id))}><IconRefresh size={14} />Check for updates</button>}
           {(pub.kind === "app" || pub.kind === "airflow" || pub.kind === "dbt") && pub.status === "live" && (

@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
+| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
 | `POST` | `/v1/egress/{slug}/{path}` | Egress |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
-| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -100,10 +100,21 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `GET` | `/v1/catalog/assets/{ident}` | Detail |
 | `PUT` | `/v1/catalog/assets/{ident}/governance` | Governance |
 | `GET` | `/v1/catalog/assets/{ident}/lineage` | Lineage |
+| `GET` | `/v1/catalog/assets/{ident}/product` | Asset Product |
 | `PUT` | `/v1/catalog/assets/{ident}/sla` | Sla |
 | `POST` | `/v1/catalog/ingest/airflow` | Ingest Airflow |
 | `POST` | `/v1/catalog/ingest/dbt` | Ingest Dbt |
 | `POST` | `/v1/catalog/ingest/program` | Ingest Program |
+| `GET` | `/v1/catalog/products` | List Products |
+| `POST` | `/v1/catalog/products` | Publish |
+| `GET` | `/v1/catalog/products/candidates` | Publish Candidates |
+| `PATCH` | `/v1/catalog/products/{product_id}` | Update Product |
+| `DELETE` | `/v1/catalog/products/{product_id}` | Unpublish |
+| `GET` | `/v1/catalog/products/{product_id}` | Product Detail |
+| `POST` | `/v1/catalog/products/{product_id}/requests` | Request Access |
+| `GET` | `/v1/catalog/requests` | List Requests |
+| `DELETE` | `/v1/catalog/requests/{request_id}` | Withdraw |
+| `POST` | `/v1/catalog/requests/{request_id}/decision` | Decide |
 | `GET` | `/v1/catalog/resources/{resource_id}/asset` | Resource Asset |
 | `POST` | `/v1/catalog/resources/{resource_id}/import/airflow` | Import Airflow |
 | `POST` | `/v1/catalog/resources/{resource_id}/import/dbt` | Import Dbt |
