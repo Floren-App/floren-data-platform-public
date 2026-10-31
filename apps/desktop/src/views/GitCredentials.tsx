@@ -26,7 +26,7 @@ function CredentialFields({ value, onChange, editing, idPrefix }: { value: GitCr
 const valid = (v: GitCredentialInput, editing: boolean) => !!v.host.trim() && !!v.username.trim() && (editing || !!v.token);
 
 /** Your own Git credentials: git in your VS Code and RStudio workspaces gets the token from the platform. */
-export function GitCredentialsTab() {
+export function GitCredentialsTab({ sections }: { sections?: React.ReactNode }) {
   const [rows, setRows] = useState<GitCredential[]>([]), [error, setError] = useState("");
   const [draft, setDraft] = useState<(GitCredentialInput & { id?: string }) | null>(null), [busy, setBusy] = useState(false);
   const reload = useCallback(() => api.gitCredentials.list().then(setRows).catch((e: Error) => setError(e.message)), []);
@@ -45,6 +45,7 @@ export function GitCredentialsTab() {
     <PageHeader icon={<IconKey size={22} />} title="Git credentials"
       subtitle="Your own Git tokens, for example one for work and one for personal repositories. Each VS Code or RStudio workspace uses the one you choose for it (asked at its first start): git gets the token from the platform when it needs it, so it is never saved in a workspace, and your commits carry the name and email set here. Deployments read repositories with the administrators' read-only credentials, never yours."
       actions={<button className="btn" onClick={() => setDraft(blank())}><IconPlus size={14} />Add credential</button>} />
+    {sections}
     {error && <p className="error" role="alert">{error}</p>}
     {draft && <form className="card" aria-label="Git credential" onSubmit={(e) => void save(e)}>
       <CredentialFields value={draft} onChange={(v) => setDraft({ ...draft, ...v })} editing={!!draft.id} idPrefix="gc" />

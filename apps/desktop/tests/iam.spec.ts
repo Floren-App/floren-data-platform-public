@@ -668,6 +668,11 @@ test("compute counts active products and scripts are ready on demand", async ({ 
   await expect(main.getByRole('meter', { name: 'Slots in use' })).toHaveAttribute('aria-valuenow', '4');
   await expect(main.getByRole('table', { name: 'Use by layer' })).toContainText('Non-Prod32');
   const using = main.getByRole('table', { name: 'Using this warehouse' });
+  // The layer mode (Non-Prod) hides Prod's work until All layers is chosen; the sidebar shares the choice.
+  await expect(using.getByRole('row', { name: /Sales app/ })).toHaveCount(0);
+  await expect(main.getByRole('table', { name: 'Use by layer' })).not.toContainText('Prod1');
+  await main.getByRole('group', { name: 'Layers shown' }).getByRole('button', { name: 'All layers', exact: true }).click();
+  await expect(page.locator('.sidebar').getByRole('button', { name: 'All layers', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(using.getByRole('row', { name: /Sales app/ })).toContainText('App');
   await expect(using.getByRole('row', { name: /Trino workers/ })).toContainText('SQL engine');
   await expect(using.getByRole('row', { name: /etl\.py/ })).toContainText('queued · 2nd in line');
@@ -1014,18 +1019,19 @@ test("recent runs load 20 at a time with an option to load more", async ({ page 
   });
   await page.reload();
   await page.getByRole("button", { name: "Workloads", exact: true }).click();
-  const sidebar = page.locator(".sidebar");
-  await expect(sidebar.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(20);
+  await page.locator(".sidebar").getByRole("button", { name: "Recent runs", exact: true }).click();
+  const runsTable = page.locator(".main").getByRole("table", { name: "Runs", exact: true }), more = page.locator(".main").getByRole("button", { name: "Load more runs", exact: true });
+  await expect(runsTable.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(20);
   expect(limits.at(-1)).toBe(21);
-  await sidebar.getByRole("button", { name: "Load more runs", exact: true }).click();
-  await expect(sidebar.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(40);
-  await sidebar.getByRole("button", { name: "Load more runs", exact: true }).click();
-  await expect(sidebar.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(45);
-  await expect(sidebar.getByRole("button", { name: "Load more runs", exact: true })).toHaveCount(0);
+  await more.click();
+  await expect(runsTable.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(40);
+  await more.click();
+  await expect(runsTable.getByRole("button", { name: /jobs\/job_/ })).toHaveCount(45);
+  await expect(more).toHaveCount(0);
   expect(state.errors).toEqual([]);
 });
 
-test("workspace runs are listed under Workspaces, apart from runs of deployed programs", async ({ page }) => {
+test("workspace runs are a tab of Workspaces, apart from runs of deployed programs", async ({ page }) => {
   const state = await setup(page);
   const base = { initiated_by: "admin", owner: "admin", commit_sha: null, kind: "script", program: null, args: {}, runtime: "python", runtime_version: "3.12",
     status: "pending", waiting_reason: "waiting for cluster capacity: no node has enough memory free", pool_name: "small", created_at: "2026-10-18T09:00:00Z", finished_at: null };
@@ -1035,20 +1041,19 @@ test("workspace runs are listed under Workspaces, apart from runs of deployed pr
   await page.reload();
   const sidebar = page.locator(".sidebar"), main = page.locator(".main");
   await page.getByRole("button", { name: "Workloads", exact: true }).click();
-  await expect(sidebar.getByRole("list", { name: "Recent runs" })).toContainText("jobs/daily.py");
-  await expect(sidebar.getByRole("list", { name: "Recent runs" })).not.toContainText("explore.py");
+  await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Recent runs", exact: true }).click();
+  await expect(main.getByRole("table", { name: "Runs", exact: true })).toContainText("jobs/daily.py");
+  await expect(main.getByRole("table", { name: "Runs", exact: true })).not.toContainText("explore.py");
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workspaces", exact: true }).click();
-  const workspaceRuns = sidebar.getByRole("list", { name: "Workspace runs" });
-  await expect(workspaceRuns).toContainText("explore.py");
-  await expect(workspaceRuns).not.toContainText("jobs/daily.py");
+  await main.getByRole("navigation", { name: "Workspace sections" }).getByRole("button", { name: "Runs", exact: true }).click();
+  await expect(main.getByRole("table", { name: "Runs", exact: true })).toContainText("explore.py");
+  await expect(main.getByRole("table", { name: "Runs", exact: true })).not.toContainText("jobs/daily.py");
   await sidebar.getByRole("button", { name: "Workspace runs", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Workspace runs" })).toBeVisible();
   await expect(main.getByRole("table", { name: "Runs" })).toContainText("no node has enough memory free");
   const views = page.getByRole("navigation", { name: "Views" });
   await main.getByRole("table", { name: "Runs" }).getByRole("button", { name: "explore.py", exact: true }).click();
   await expect(views.getByRole("button", { name: "Workspaces", exact: true })).toHaveAttribute("aria-current", "page");  // stays in Workspaces
-  await workspaceRuns.getByRole("button", { name: /explore\.py/ }).click();
-  await expect(views.getByRole("button", { name: "Workspaces", exact: true })).toHaveAttribute("aria-current", "page");
   expect(state.errors).toEqual([]);
 });
 
@@ -1724,7 +1729,7 @@ test("Home starts with scoped activity and submits global search into the catalo
   expect(state.errors).toEqual([]);
 });
 
-test("Workloads contains the run sidebar and a searchable history tab", async ({ page }) => {
+test("Workloads keeps runs in a searchable tab, not in the sidebar", async ({ page }) => {
   const state = await setup(page);
   const run = { id: "run-1", initiated_by: "admin", owner: "admin", workspace_id: null, workload_id: "script", commit_sha: null,
     kind: "script", entrypoint: "daily.py", program: "daily-report", args: {}, runtime: "python", runtime_version: "3.12", status: "failed", pool_name: "small", created_at: "2026-10-19T10:00:00Z", finished_at: "2026-10-19T11:00:00Z" };
@@ -1732,8 +1737,7 @@ test("Workloads contains the run sidebar and a searchable history tab", async ({
   await page.reload();
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
   const sidebar = page.locator(".sidebar"), main = page.locator(".main");
-  await expect(sidebar.getByRole("button", { name: /daily-report/ })).toBeVisible();
-  expect(await sidebar.locator(".object-tree").first().evaluate((tree) => !!(tree.compareDocumentPosition(document.querySelector(".sidebar-section-divider")!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+  await expect(sidebar.getByRole("button", { name: /daily-report/ })).toHaveCount(0);
   await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Recent runs", exact: true }).click();
   await expect(main.getByRole("table", { name: "Runs", exact: true })).toContainText("daily-report");
   await main.getByRole("combobox", { name: "Run status", exact: true }).selectOption("succeeded");
@@ -1910,7 +1914,40 @@ test("activity bar shows its labels on hover without taking room", async ({ page
   expect(state.errors).toEqual([]);
 });
 
-test("active group stays in the top bar across tabs and reloads", async ({ page }) => {
+test("folders follow the layer, workspaces follow the group, and Git credentials sit with Workspaces", async ({ page }) => {
+  const state = await setup(page);
+  state.resources.push({ ...resource("test-env", "folder", "Pokemon Test", "workloads", { environment: true }), layer_id: "1a0000000002" } as any,
+    { ...resource("prod-env", "folder", "Pokemon Prod", "workloads", { environment: true }), layer_id: "1a0000000001" } as any);
+  const ws = (id: string, name: string, group: string) => ({ id, owner: "admin", name, editor: "vscode", status: "stopped", owner_group_id: group,
+    layer_id: "1a0000000002", last_activity_at: "2026-10-20T10:00:00Z", created_at: "2026-10-20T10:00:00Z" });
+  await page.route("https://iam.test/api/v1/workspaces", (route) => route.fulfill({ json: [ws("ws-a", "Analysis", "analysts"), ws("ws-e", "Engineering", "operators")] }));
+  await page.reload();
+  const sidebar = page.locator(".sidebar"), main = page.locator(".main"), views = page.getByRole("navigation", { name: "Views" });
+  await views.getByRole("button", { name: "Workloads", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: "Pokemon Test", exact: true })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "Pokemon Prod", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Pokemon Prod", exact: true })).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Layer mode", exact: true }).selectOption("1a0000000001");
+  await expect(sidebar.getByRole("button", { name: "Pokemon Prod", exact: true })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "Pokemon Test", exact: true })).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Layer mode", exact: true }).selectOption("1a0000000002");
+  await views.getByRole("button", { name: "Workspaces", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: /^Analysis/ })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: /^Engineering/ })).toHaveCount(0);
+  await expect(sidebar).toContainText("1 more in other groups or layers");
+  await expect(main.getByRole("table", { name: "Your workspaces" })).not.toContainText("Engineering");
+  await page.getByRole("combobox", { name: "Active group", exact: true }).selectOption("operators");
+  await expect(sidebar.getByRole("button", { name: /^Engineering/ })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: /^Analysis/ })).toHaveCount(0);
+  await sidebar.getByRole("button", { name: "Git credentials", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "Git credentials" })).toBeVisible();
+  await expect(main.getByRole("navigation", { name: "Workspace sections" }).getByRole("button", { name: "Git credentials", exact: true })).toHaveAttribute("aria-current", "page");
+  await views.getByRole("button", { name: "Usage", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: /small/ }).locator(".dot")).toHaveClass(/queued/); // in use with work waiting
+  expect(state.errors).toEqual([]);
+});
+
+test("active group stays in the sidebar across tabs and reloads", async ({ page }) => {
   const state = await setup(page), picker=page.getByRole("combobox",{name:"Active group",exact:true});
   await expect(picker).toHaveValue("analysts");
   await picker.selectOption("operators");

@@ -7,7 +7,6 @@ import {
   IconPin, IconHome, IconBook, IconAccount, IconAdmin, IconCatalog, IconClose, IconCompute, IconApi, IconPackage, IconData, IconStream, IconDeployed, IconSettings, IconWorkspaces,
 } from "./components/Icons";
 import { MenuButton } from "./components/Menu";
-import { ProductIcon } from "./components/ProductIcon";
 import { Sidebar, View } from "./views/Sidebar";
 import { TabContent, TabRef } from "./views/Tabs";
 import { GitChoiceHost } from "./views/GitCredentials";
@@ -183,26 +182,6 @@ function Shell({ user }: { user: User }) {
 
   return (
     <div className="shell">
-      <header className="topbar" aria-label="Working context">
-        <div className="topbar-field">
-          <label htmlFor="active-group"><ProductIcon kind="groups" size={14} />Group</label>
-          <select id="active-group" aria-label="Active group" value={hub.me?.active_group_id ?? ""} disabled={switchingGroup || !hub.me?.available_groups?.length}
-            title="Shows this group's objects and owns new objects. Secondary groups still authorize existing-object actions."
-            onChange={(e) => void switchGroup(e.target.value)}>
-            <option value="" disabled>{hub.me?.available_groups?.length ? "Choose active group" : "No groups available"}</option>
-            {hub.me?.available_groups?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </div>
-        {!!hub.layers.length && <div className="topbar-field">
-          <label htmlFor="active-layer">Layer</label>
-          <select id="active-layer" aria-label="Layer mode" value={hub.layerId} title="Lists show this layer; what you create lands in it."
-            onChange={(e) => void hub.selectActiveLayer(e.target.value)}>
-            {!hub.layerId && <option value="" disabled>Choose a layer</option>}
-            {hub.layers.map((l) => <option key={l.id} value={l.id}>{l.name}{l.production ? " · production" : ""}</option>)}
-          </select>
-        </div>}
-        <button className="topbar-search" onClick={openSearch}>Search the catalog<span className="kbd">⌘K</span></button>
-      </header>
       <nav className="activity" aria-label="Views">
         {groups.filter((g) => g.items.length).map((g, i) => <div key={g.label} className="activity-group" role="group" aria-label={g.label}>
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
@@ -224,6 +203,25 @@ function Shell({ user }: { user: User }) {
 
       <aside className="sidebar">
         <div className="sidebar-content"><Sidebar key={hub.me?.active_group_id ?? ""} view={view} hub={hub} openTab={openTab} activeKey={active} activeRef={current?.ref} activeIntent={current?.intent} /></div>
+        {/* The working context: lists show this group's objects in this layer, and new work is created there. */}
+        <div className="context-picker" role="group" aria-label="Working context">
+          <label htmlFor="active-group">Group</label>
+          <select id="active-group" aria-label="Active group" value={hub.me?.active_group_id ?? ""} disabled={switchingGroup || !hub.me?.available_groups?.length}
+            title="Shows this group's objects and owns new objects. Secondary groups still authorize existing-object actions."
+            onChange={(e) => void switchGroup(e.target.value)}>
+            <option value="" disabled>{hub.me?.available_groups?.length ? "Choose active group" : "No groups available"}</option>
+            {hub.me?.available_groups?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+          {!!hub.layers.length && <>
+            <label htmlFor="active-layer">Layer</label>
+            <select id="active-layer" aria-label="Layer mode" value={hub.layerId} title="Lists show this layer; what you create lands in it."
+              onChange={(e) => void hub.selectActiveLayer(e.target.value)}>
+              {!hub.layerId && <option value="" disabled>Choose a layer</option>}
+              {hub.layers.map((l) => <option key={l.id} value={l.id}>{l.name}{l.production ? " · production" : ""}</option>)}
+            </select>
+          </>}
+          {switchingGroup && <small role="status">Switching group…</small>}
+        </div>
       </aside>
 
       <main className="main">

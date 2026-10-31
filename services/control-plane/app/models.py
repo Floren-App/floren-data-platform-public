@@ -323,6 +323,13 @@ class Run(Base):
 
     pool: Mapped[ComputePool] = relationship()
 
+    @property
+    def layer_id(self):
+        """The layer the run's work belongs to (its workload or workspace layer)."""
+        from sqlalchemy.orm import object_session
+        from .layers import layer_of
+        return layer_of(object_session(self), self.environment_id)
+
 
 class ServiceAccount(Base):
     """A non-human identity for a data product (pipelines, deployed apps, external tools).

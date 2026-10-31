@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { accessibleSchemas, accessibleSources, api, AccessResource, inLayer, ServiceAccount } from "../api";
 import type { Hub } from "../hub";
 import { ObjectBreadcrumbs, ObjectTabs, OpenTab, PermissionsPanel, resourceChain, resourcePath, resourceTab } from "../components/Permissions";
-import type { TabRef } from "./Tabs";
+import { RunList, type TabRef } from "./Tabs";
 import { TokensCard } from "./Identity";
 import { DataListing } from "../components/DataBrowser";
 import { DataPoliciesPanel } from "../components/DataPolicies";
@@ -125,7 +125,7 @@ export function SchemaView({ tab, hub, openTab }: ObjectProps) {
   };
   return <>
     <ObjectBreadcrumbs resource={resource} resources={hub.resources} openTab={openTab} />
-    <PageHeader icon={<ProductIcon kind={sourceKind === "s3" ? "folder" : "data"} size={22} />} title={resource.name}
+    <PageHeader icon={<ProductIcon kind={sourceKind === "s3" ? "bucket" : "data"} size={22} />} title={resource.name}
       subtitle={<>{sourceKind === "s3" ? "Storage namespace" : "Schema"} in {source?.name ?? "data source"} · <SetupState resource={resource} /></>} />
     {resource.layer_name && <p className="hint">Layer · <strong>{resource.layer_name}</strong></p>}
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
@@ -172,9 +172,15 @@ export function FolderView({ tab, hub, openTab }: ObjectProps) {
     }
   }, [tab.intent, resource, openTab, tab]);
   if (!resource) return <p className="muted">Folder not available.</p>;
-  const children = hub.resources.filter((r) => r.parent_id === resource.id && (r.kind === "folder" || hub.workloads.some((p) => p.resource_id === r.id && p.status !== "stopped")))
+  // The layer mode applies here as in the sidebar: folders and workloads of other layers are hidden.
+  const children = hub.resources.filter((r) => r.parent_id === resource.id && (r.kind === "folder" ? inLayer(hub.layerId, r.layer_id)
+      : hub.workloads.some((p) => p.resource_id === r.id && p.status !== "stopped" && inLayer(hub.layerId, p.layer_id))))
     .sort((a, b) => Number(b.kind === "folder") - Number(a.kind === "folder") || a.name.localeCompare(b.name));
   const section = tab.section ?? "overview";
+  // Runs of the workloads in this folder and its subfolders, in the layer mode.
+  const inside = new Set(hub.resources.filter((r) => resourceChain(r, hub.resources).some((a) => a.id === resource.id)).map((r) => r.id));
+  const runs = hub.runs.filter((r) => { const w = hub.workloads.find((p) => p.id === r.workload_id);
+    return !!w && (resource.kind === "root" || inside.has(w.resource_id ?? "")) && inLayer(hub.layerId, r.layer_id ?? w.layer_id); });
   const create = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError("");
     try {
@@ -195,9 +201,10 @@ export function FolderView({ tab, hub, openTab }: ObjectProps) {
     {resource.layer_name && <p className="hint">Layer · <strong>{resource.layer_name}</strong></p>}
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
     {!!resource.config.environment && <p className="hint">Branch policy · Deploy from <code>{String(resource.config.branch)}</code>. Promotion creates a separate instance in its target layer.</p>}
-    <ObjectTabs active={section} overview="Contents" runs={resource.kind === "root"} settings={resource.kind === "folder" && resource.actions.includes("delete")}
-      onChange={(s) => openTab(s === "runs" ? { kind: "runs", title: "Recent runs" } : { ...tab, section: s })} />
-    {section === "permissions" ? <ObjectAccess resource={resource} hub={hub} openTab={openTab} />
+    <ObjectTabs active={section} overview="Contents" runs settings={resource.kind === "folder" && resource.actions.includes("delete")}
+      onChange={(s) => openTab({ ...tab, section: s })} />
+    {section === "runs" ? <RunList runs={runs} hub={hub} openTab={openTab} />
+      : section === "permissions" ? <ObjectAccess resource={resource} hub={hub} openTab={openTab} />
       : section === "settings" ? <OrganizationSettings resource={resource} hub={hub} openTab={openTab} /> : <>
         {adding && <form className="card" onSubmit={create}><h3>New folder in {resource.name}</h3>
           <div className="field"><label htmlFor="folder-name">Folder name</label><input id="folder-name" autoFocus required maxLength={256} value={name} onChange={(e) => setName(e.target.value)} placeholder={resource.kind === "root" ? "Finance" : "tst, acp, prd, or a team name"} /></div>

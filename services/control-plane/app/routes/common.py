@@ -32,6 +32,7 @@ def run_out(run: Run) -> RunOut:
         status=run.status, pool_name=run.pool.name,
         created_at=run.created_at, finished_at=run.finished_at, queue_position=run.queue_position,
         waiting_reason=run.waiting_reason if run.status in ("pending", "failed") else None,
+        layer_id=run.layer_id,
     )
 
 
@@ -54,13 +55,14 @@ def pools_for(db: Session, groups: List[str], layer_id: Optional[str] = None, ki
 
 def describe_pools(db: Session, pools) -> List[PoolOut]:
     """Warehouses with what uses them now, which one is the default and which run Trino workers."""
-    from ..capacity import default_warehouse, held, layer_name, queue, scoped_defaults, trino_warehouses
+    from ..capacity import default_warehouse, held, infrastructure_layers, layer_name, queue, scoped_defaults, trino_warehouses
     in_use, default, trino, scoped = held(db), default_warehouse(db), trino_warehouses(db), scoped_defaults(db)
+    infrastructure = infrastructure_layers(db)
     def default_for(name):
         return [{"layer_id": e.get("layer_id"), "layer_name": layer_name(db, e["layer_id"]) if e.get("layer_id") else None,
                  "workload_kind": e.get("workload_kind")} for e in scoped if e["warehouse"] == name]
     return [PoolOut.model_validate(p).model_copy(update={
                 "in_use": in_use.get(p.name, 0), "queued": len(queue(db, p.name)), "default": p.name == default,
-                "trino_layers": trino.get(p.name, []), "layer_names": [layer_name(db, l) for l in p.layer_ids or []],
+                "trino_layers": trino.get(p.name, []), "infrastructure_layer_ids": infrastructure.get(p.name, []), "layer_names": [layer_name(db, l) for l in p.layer_ids or []],
                 "default_for": default_for(p.name)})
             for p in pools]

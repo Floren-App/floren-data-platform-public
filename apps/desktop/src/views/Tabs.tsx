@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, DataLocation, EDITOR_LABEL, inLine, isActive, openInWindow, OutputContent, OutputFile, Run, RunScope, runtimeLabel, WarehouseOccupant, WarehouseOverview } from "../api";
+import { api, DataLocation, EDITOR_LABEL, inLayer, inLine, isActive, poolDot, poolInLayer, openInWindow, OutputContent, OutputFile, Run, RunScope, runtimeLabel, WarehouseOccupant, WarehouseOverview } from "../api";
 import { DataObjectView } from "../components/DataBrowser";
 import type { Hub } from "../hub";
 import { IconRuns, IconCompute, IconOpen, IconPlay, IconStop, IconTrash, IconWorkspaces } from "../components/Icons";
@@ -16,9 +16,9 @@ import type { ObjectSection } from "../components/Permissions";
 import { AdminRuntimes, AdminServiceAccounts, SecretsTab } from "./Identity";
 import { CatalogObject, CatalogView } from "./Catalog";
 import { Home, WorkspacesView } from "./Home";
-import { ObjectTabs } from "../components/Permissions";
 import { ApisView, ApiView } from "./Apis";
 import { ensureGitChoice, GitCredentialsTab, WorkspaceGit } from "./GitCredentials";
+import { WorkspaceSections } from "./WorkspaceSections";
 import { PackageImportsView, PackagesView, PackageView } from "./Packages";
 import { QueryLogView } from "./QueryLog";
 import { rEnabled, type PackageKind } from "../api";
@@ -63,7 +63,8 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "users": return <UsersTab hub={hub} selectedId={tab.ref} openTab={openTab} />;
     case "home": return <Home hub={hub} openTab={openTab} />;
     case "workspaces": return <WorkspacesView hub={hub} openTab={openTab} />;
-    case "runs": return <RecentRuns hub={hub} openTab={openTab} scope={tab.ref === "workspace" ? "workspace" : "deployed"} />;
+    case "runs": return tab.ref === "workspace" ? <WorkspaceRuns hub={hub} openTab={openTab} />
+      : <FolderView tab={{ kind: "folder", ref: "workloads", title: "Workloads", section: "runs" }} hub={hub} openTab={openTab} />;
     case "workspace": return <WorkspaceTab id={tab.ref!} hub={hub} openTab={openTab} />;
     case "run": return <RunTab id={tab.ref!} hub={hub} openTab={openTab} />;
     case "source": return <SourceView tab={tab} hub={hub} openTab={openTab} />;
@@ -89,7 +90,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "admin-workspace-templates": return <AdminWorkspaceTemplates hub={hub} />;
     case "admin-network": return <AdminNetwork />;
     case "admin-query-log": return <QueryLogView hub={hub} />;
-    case "git-credentials": return <GitCredentialsTab />;
+    case "git-credentials": return <GitCredentialsTab sections={<WorkspaceSections active="git" openTab={openTab} />} />;
     case "packages": return <PackagesView key={tab.ref ?? "all"} hub={hub} openTab={openTab} kind={tab.ref as PackageKind | undefined} />;
     case "package": return <PackageView key={tab.ref} hub={hub} openTab={openTab} reference={tab.ref!} />;
     case "package-imports": return <PackageImportsView />;
@@ -115,11 +116,16 @@ function PoolView({ name, hub, openTab }: { name?: string; hub: Hub; openTab: (t
     const t = setInterval(load, 10000);
     return () => { cancelled = true; clearInterval(t); };
   }, []);
-  const pools = hub.me?.pools ?? [];
+  // The layer mode applies unless "All layers" is chosen (shared with the sidebar).
+  const all = hub.usageAllLayers, here = (layer?: string | null) => all || inLayer(hub.layerId, layer);
+  const pools = (hub.me?.pools ?? []).filter((p) => all || poolInLayer(p, hub.layerId) || p.name === name);
   const pool = pools.find((p) => p.name === name);
-  const view = overview?.find((w) => w.name === name);
+  const overviewOf = (n: string) => { const w = overview?.find((o) => o.name === n);
+    return w && { ...w, layers: w.layers.filter((l) => here(l.layer_id)), occupants: w.occupants.filter((o) => here(o.layer_id)) }; };
+  const view = name ? overviewOf(name) : undefined;
   if (name && !pool) return <p className="muted">Compute pool not available.</p>;
-  const runs = hub.runs.filter((r) => !name || r.pool_name === name);
+  const runs = hub.runs.filter((r) => (!name || r.pool_name === name) && here(r.layer_id));
+  const layerName = hub.layers.find((l) => l.id === hub.layerId)?.name;
   const open = (o: WarehouseOccupant) => {
     if (o.run_id) { const run = hub.runs.find((r) => r.id === o.run_id); openTab(run ? runTab(run) : { kind: "run", ref: o.run_id, title: o.name }); }
     else if (o.workload_id) openTab({ kind: "workload", ref: o.workload_id, title: o.name });
@@ -128,7 +134,12 @@ function PoolView({ name, hub, openTab }: { name?: string; hub: Hub; openTab: (t
   return <>
     <PageHeader icon={<IconCompute size={22} />} title={pool?.name ?? "Warehouses"}
       subtitle="Every job, deployed app, Airflow component and Trino worker takes one slot; work beyond the limit waits in line and starts in order. Queries share the Trino workers and workspaces have their own limits. You see details of your own work; the rest is counted."
-      actions={hub.me?.is_admin && <button className="btn secondary" onClick={() => openTab({ kind: "admin-pools", title: "Compute pool settings" })}>Configure pools</button>} />
+      actions={<>
+        <div className="segmented" role="group" aria-label="Layers shown">
+          <button aria-pressed={!all} className={all ? "" : "active"} onClick={() => hub.setUsageAllLayers(false)}>{layerName ?? "This layer"}</button>
+          <button aria-pressed={all} className={all ? "active" : ""} onClick={() => hub.setUsageAllLayers(true)}>All layers</button>
+        </div>
+        {hub.me?.is_admin && <button className="btn secondary" onClick={() => openTab({ kind: "admin-pools", title: "Compute pool settings" })}>Configure pools</button>}</>} />
     {error && <p className="error" role="alert">{error}</p>}
     {pool ? <>
       <section className="card"><dl className="kv"><dt>Size</dt><dd>{pool.cpu} vCPU · {pool.memory_gb} GB{pool.gpu ? ` · ${pool.gpu} GPU` : ""}</dd>
@@ -162,9 +173,9 @@ function PoolView({ name, hub, openTab }: { name?: string; hub: Hub; openTab: (t
         {(view.others_in_use > 0 || view.others_queued > 0) && <p className="muted">Work of others you cannot see: {view.others_in_use} slot{view.others_in_use === 1 ? "" : "s"} in use{view.others_queued ? `, ${view.others_queued} waiting` : ""}.</p>}
       </>}
     </> : <table aria-label="Warehouses"><thead><tr><th>Warehouse</th><th>Size</th><th>Slots in use</th><th>Waiting</th><th>Layers</th></tr></thead><tbody>{pools.map((p) => {
-        const w = overview?.find((o) => o.name === p.name);
+        const w = overviewOf(p.name);
         return <tr key={p.id}>
-          <td><button className="text-button object-name" onClick={() => openTab({ kind: "pool", ref: p.name, title: p.name })}>{p.name}</button>{w?.workspaces && <span className="badge" title="Editors are sized by this warehouse">workspaces</span>}{p.dedicated && <span className="badge" title={`Dedicated to ${p.allowed_groups.join(", ")}: no slot limit`}>dedicated</span>}</td>
+          <td><span className="status"><span className={`dot ${poolDot(w ?? p)}`} /><button className="text-button object-name" onClick={() => openTab({ kind: "pool", ref: p.name, title: p.name })}>{p.name}</button></span>{w?.workspaces && <span className="badge" title="Editors are sized by this warehouse">workspaces</span>}{p.dedicated && <span className="badge" title={`Dedicated to ${p.allowed_groups.join(", ")}: no slot limit`}>dedicated</span>}</td>
           <td>{p.cpu} vCPU · {p.memory_gb} GB</td>
           <td>{p.dedicated ? `${w?.in_use ?? p.in_use ?? "—"} · no limit` : w ? <Usage used={w.in_use} max={w.max_concurrent} /> : `${p.in_use ?? "—"} / ${p.max_concurrent}`}</td>
           <td>{(w?.queued ?? p.queued) || "—"}</td>
@@ -196,21 +207,29 @@ export function RunTable({ runs, hub, openTab, warehouse = true }: { runs: Run[]
   </table>{hub.hasMoreRuns && <div className="row pagination"><span className="muted">Showing your {hub.runs.length} most recent runs</span><LoadMoreRuns hub={hub} className="btn sm secondary" /></div>}</div>;
 }
 
-function RecentRuns({ hub, openTab, scope }: { hub: Hub; openTab: (tab: TabRef) => void; scope: RunScope }) {
-  const [query, setQuery] = useState(""), [status, setStatus] = useState(""), [adding, setAdding] = useState(false);
-  const workspace = scope === "workspace";
-  const runs = runsIn(hub.runs, scope).filter((r) => (!status || (status === "active" ? isActive(r) : r.status === status)) &&
+/** Runs with search and a status filter: the Runs tab of the Workloads folders and of Workspaces. */
+export function RunList({ runs, hub, openTab }: { runs: Run[]; hub: Hub; openTab: (tab: TabRef) => void }) {
+  const [query, setQuery] = useState(""), [status, setStatus] = useState("");
+  const shown = runs.filter((r) => (!status || (status === "active" ? isActive(r) : r.status === status)) &&
     `${r.program ?? ""} ${r.entrypoint} ${r.pool_name} ${hub.workloads.find((p) => p.id === r.workload_id)?.title ?? ""}`.toLowerCase().includes(query.toLowerCase()));
   return <>
-    <PageHeader icon={<IconRuns size={22} />} title={RUN_SCOPE_TITLE[scope]}
-      subtitle={workspace ? "Runs started in workspaces. Only the workspace's owner and administrators see them. Open a run for its console and outputs."
-        : "Runs of deployed programs you can access. Open a run for its console, outputs, and rerun controls."}
-      actions={workspace && !!hub.workspaces.length && <button className="btn" onClick={() => setAdding(!adding)} aria-expanded={adding}><IconPlay size={14} />New run</button>} />
-    {!workspace && <ObjectTabs active="runs" runs onChange={(section) => { if (section !== "runs") openTab({ kind: "folder", ref: "workloads", title: "Workloads", section }); }} overview="Contents" />}
-    {adding && <div className="card"><NewRunForm hub={hub} onDone={() => setAdding(false)} /></div>}
     <div className="object-toolbar"><input type="search" aria-label="Search recent runs" placeholder="Search programs, files, or pools…" value={query} onChange={(e) => setQuery(e.target.value)} />
       <select aria-label="Run status" value={status} onChange={(e) => setStatus(e.target.value)}><option value="">All statuses</option><option value="active">Active</option>{["succeeded", "failed", "stopped"].map((value) => <option key={value}>{value}</option>)}</select></div>
-    {!runs.length && runsIn(hub.runs, scope).length ? <p className="muted">No loaded runs match these filters.{hub.hasMoreRuns && <> <LoadMoreRuns hub={hub} /></>}</p> : <RunTable runs={runs} hub={hub} openTab={openTab} />}
+    {!shown.length && runs.length ? <p className="muted">No loaded runs match these filters.{hub.hasMoreRuns && <> <LoadMoreRuns hub={hub} /></>}</p> : <RunTable runs={shown} hub={hub} openTab={openTab} />}
+  </>;
+}
+
+/** Runs started in workspaces; runs of deployed programs are the Runs tab of the Workloads folders. */
+function WorkspaceRuns({ hub, openTab }: { hub: Hub; openTab: (tab: TabRef) => void }) {
+  const [adding, setAdding] = useState(false);
+  const runs = runsIn(hub.runs, "workspace").filter((r) => inLayer(hub.layerId, r.layer_id));
+  return <>
+    <PageHeader icon={<IconRuns size={22} />} title={RUN_SCOPE_TITLE.workspace}
+      subtitle="Runs started in your workspaces, in this layer. Only the workspace's owner and administrators see them. Open a run for its console and outputs."
+      actions={!!hub.workspaces.length && <button className="btn" onClick={() => setAdding(!adding)} aria-expanded={adding}><IconPlay size={14} />New run</button>} />
+    <WorkspaceSections active="runs" openTab={openTab} />
+    {adding && <div className="card"><NewRunForm hub={hub} onDone={() => setAdding(false)} /></div>}
+    <RunList runs={runs} hub={hub} openTab={openTab} />
   </>;
 }
 

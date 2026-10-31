@@ -53,7 +53,7 @@ function DataTreeItem({ schema, child, openTab }: { schema: AccessResource; chil
   const tab = dataTab(schema, child);
   return <li><div className="tree-node">
     <button className="tree-expander" aria-label={`${open ? "Collapse" : "Expand"} ${child.kind} ${child.name}`} aria-expanded={open} onClick={() => setOpen(!open)}><IconChevron /></button>
-    <button className="tree-label tree-name" onClick={() => { setOpen(true); openTab(tab); }}><ProductIcon kind={child.kind === "folder" ? "folder" : "table"} size={16} />{child.name}</button>
+    <button className="tree-label tree-name" onClick={() => { setOpen(true); openTab(tab); }}><ProductIcon kind={child.kind === "folder" ? "directory" : "table"} size={16} />{child.name}</button>
     <span className="muted tree-type">{child.kind === "folder" ? "" : kindLabel(child)}</span>
   </div>{open && <DataTreeChildren schema={schema} location={tab.data} openTab={openTab} />}</li>;
 }
@@ -87,7 +87,7 @@ export function DataListing({ schema, location = { schemaId: schema.id }, openTa
       : state.status === "error" ? <p className="error" role="alert">{state.error}</p>
       : <div className="table-scroll"><table><thead><tr><th>Name</th><th>{columns ? "Data type" : "Type"}</th>{columns && <th>Nullable</th>}</tr></thead><tbody>
         {items.map((child) => <tr key={child.name}>
-          <td>{columns ? <span className="mono">{child.name}</span> : <button className="text-button object-name" onClick={() => openTab(dataTab(schema, child))}><ProductIcon kind={child.kind === "folder" ? "folder" : child.kind === "file" ? "data" : "table"} size={16} />{child.name}</button>}</td>
+          <td>{columns ? <span className="mono">{child.name}</span> : <button className="text-button object-name" onClick={() => openTab(dataTab(schema, child))}><ProductIcon kind={child.kind === "folder" ? "directory" : child.kind === "file" ? "data" : "table"} size={16} />{child.name}</button>}</td>
           <td className={columns ? "mono muted" : ""}>{columns ? child.data_type : kindLabel(child)}</td>
           {columns && <td>{child.nullable ? "Yes" : "No"}</td>}
         </tr>)}{!items.length && <tr><td colSpan={columns ? 3 : 2} className="muted">{search ? "No matching objects on this page." : "No objects found in this scope."}</td></tr>}
@@ -110,7 +110,7 @@ export function DataObjectView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; o
     ...(i < all.length - 1 ? { onClick: () => openTab(dataTab(schema, { kind: "folder", name, path: all.slice(0, i + 1).join("/") })) } : {}) }));
   return <>
     <ObjectBreadcrumbs resource={schema} resources={hub.resources} openTab={openTab} trailing={parts} />
-    <PageHeader icon={<ProductIcon kind={location.item?.kind ?? "table"} size={22} />} title={location.item?.name ?? tab.title}
+    <PageHeader icon={<ProductIcon kind={location.item?.kind === "folder" ? "directory" : location.item?.kind ?? "table"} size={22} />} title={location.item?.name ?? tab.title}
       subtitle={<>{location.item ? kindLabel(location.item) : "Data object"} · {schema.name}</>} />
     {schema.layer_name && <p className="hint">Layer · <strong>{schema.layer_name}</strong></p>}
     <ObjectTabs active={section} lineage preview={location.table !== undefined} onChange={(s) => openTab({ ...tab, section: s })} />

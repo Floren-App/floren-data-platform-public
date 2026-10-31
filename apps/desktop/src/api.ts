@@ -9,11 +9,16 @@ export interface Layer {
 }
 /** The configured default layer, or nothing so the person chooses. */
 export const defaultLayerId = (layers: Layer[]) => layers.find((l) => l.default)?.id ?? "";
-/** The app's layer mode: the person's chosen layer (top bar) while it exists, else the default layer. */
+/** The app's layer mode: the person's chosen layer (sidebar) while it exists, else the default layer. */
 export const modeLayerId = (me: { active_layer_id?: string | null } | null | undefined, layers: Layer[]) =>
   me?.active_layer_id && layers.some((l) => l.id === me.active_layer_id) ? me.active_layer_id : defaultLayerId(layers);
 /** Whether an item belongs to the layer mode. Items without a layer belong to every layer. */
 export const inLayer = (mode: string, itemLayer: string | null | undefined) => !mode || !itemLayer || itemLayer === mode;
+/** The Global Admin group: in that group mode, every group's objects are shown. */
+export const GLOBAL_ADMIN_GROUP = "000000000001";
+/** Whether an item belongs to the group mode. Items without an owner group belong to every group. */
+export const inGroup = (mode: string | null | undefined, itemGroup: string | null | undefined) =>
+  !mode || mode === GLOBAL_ADMIN_GROUP || !itemGroup || itemGroup === mode;
 
 export interface DataSource {
   id: string;
@@ -156,6 +161,8 @@ export interface Pool {
   default?: boolean;
   /** Layers whose Trino workers run here: only Trino uses this warehouse. */
   trino_layers?: string[];
+  /** Layers whose infrastructure (Trino workers, Kafka brokers) runs here: the warehouse belongs to them. */
+  infrastructure_layer_ids?: string[];
   /** Scope: the layers (ids) and kinds of work this warehouse is for; empty = every layer / kind. */
   layer_ids?: string[]; layer_names?: string[];
   workload_kinds?: WorkloadKind[];
@@ -198,7 +205,12 @@ export interface WarehouseOverview {
   workspaces: { running: number; queued: number; max_running: number | null } | null;
 }
 
-/** Warehouses work can be placed on: all but those that run Trino workers. */
+/** A warehouse belongs to a layer when it is limited to it or runs that layer's infrastructure; others serve every layer. */
+export const poolInLayer = (p: Pick<Pool, "layer_ids" | "infrastructure_layer_ids">, mode: string) =>
+  !mode || (p.layer_ids?.length ? p.layer_ids.includes(mode) : p.infrastructure_layer_ids?.length ? p.infrastructure_layer_ids.includes(mode) : true);
+/** One status dot for a warehouse everywhere: work waiting (yellow ring), in use (green), idle (gray). */
+export const poolDot = (p: { in_use?: number | null; queued?: number | null; active_executions?: number | null }) =>
+  p.queued ? "queued" : p.in_use || p.active_executions ? "running" : "idle";
 /** Warehouses work may choose: not Trino's, and meant for its layer and kind when those are known. */
 export const usablePools = (pools?: Pool[], layerId?: string | null, kind?: string | null) => (pools ?? []).filter((p) =>
   !p.trino_layers?.length
@@ -290,6 +302,8 @@ export interface Run {
   pool_name: string;
   created_at: string;
   finished_at: string | null;
+  /** The layer the run's work belongs to. */
+  layer_id?: string | null;
 }
 
 /** Runs of deployed programs, or runs started in workspaces (private to the workspace's owner and admins). */

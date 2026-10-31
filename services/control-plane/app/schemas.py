@@ -75,6 +75,8 @@ class PoolOut(ORM, PoolIn):
     queued: Optional[int] = Field(default=None, description="Jobs and deploys waiting for this warehouse")
     default: bool = Field(default=False, description="Work without a warehouse runs here")
     trino_layers: List[str] = Field(default_factory=list, description="Layers whose Trino workers run here; only Trino uses it")
+    infrastructure_layer_ids: List[str] = Field(default_factory=list,
+        description="Layers whose infrastructure (Trino workers, Kafka brokers) runs here; it belongs to those layers")
     layer_names: List[str] = Field(default_factory=list, description="Names of layer_ids, in the same order")
     default_for: List[Dict[str, Optional[str]]] = Field(default_factory=list,
         description="Scoped defaults that point here: {layer_id, layer_name, workload_kind}")
@@ -145,6 +147,7 @@ class RunOut(ORM):
     finished_at: Optional[datetime]
     queue_position: Optional[int] = Field(default=None, description="Place in the warehouse's queue while queued")
     waiting_reason: Optional[str] = Field(default=None, description="Why a pending run has not started yet")
+    layer_id: Optional[str] = Field(default=None, description="The layer the run's work belongs to")
 
 
 class ConfigOut(BaseModel):

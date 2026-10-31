@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { IconApi } from "./Icons";
 
-export type ProductKind = "kafka" | "topic" | "python" | "r" | "shiny" | "streamlit" | "airflow" | "dbt" | "iceberg" | "postgres" | "groups" | "users" | "identity" | "folder" | "table" | "data" | "file";
+export type ProductKind = "kafka" | "topic" | "python" | "r" | "shiny" | "streamlit" | "airflow" | "dbt" | "iceberg" | "postgres" | "groups" | "users" | "identity" | "folder" | "directory" | "bucket" | "layer" | "table" | "data" | "file";
 
 // Original SVG artwork, kept locally with the app. No remote assets or icon CDN.
 const paths: Record<ProductKind, { color: string; drawing: ReactNode }> = {
-  kafka: { color: "#abb8c9", drawing: <><circle cx="9" cy="12" r="3" /><circle cx="15" cy="4" r="2" /><circle cx="19" cy="12" r="2" /><circle cx="15" cy="20" r="2" /><path d="m11 10 3-4m-2 6h5m-6 2 3 4M6 12H2" /></> },
+  // A broker cluster: nodes linked to the partition leaders.
+  kafka: { color: "#abb8c9", drawing: <><circle cx="8" cy="12" r="2.5" /><circle cx="8" cy="4.5" r="2" /><circle cx="8" cy="19.5" r="2" /><circle cx="17" cy="8" r="2" /><circle cx="17" cy="16" r="2" /><path d="M8 6.5v3M8 14.5v3m2.3-6.6 4.9-2.1m-4.9 4.4 4.9 2.1" /></> },
   topic: { color: "#abb8c9", drawing: <><path d="M3 6h18M3 12h18M3 18h18" /><circle cx="8" cy="6" r="2" fill="currentColor" /><circle cx="15" cy="12" r="2" fill="currentColor" /><circle cx="10" cy="18" r="2" fill="currentColor" /></> },
   python: { color: "#4b9bd3", drawing: <><path d="M12 3H8a3 3 0 0 0-3 3v4h8V7h4V6a3 3 0 0 0-3-3z" /><path d="M12 21h4a3 3 0 0 0 3-3v-4h-8v3H7v1a3 3 0 0 0 3 3z" stroke="#d6b344" /><path d="M5 8H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4v-4h8V8h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1" /><circle cx="9" cy="6" r=".6" fill="currentColor" /><circle cx="15" cy="18" r=".6" fill="#d6b344" /></> },
   r: { color: "#5794db", drawing: <><ellipse cx="11" cy="11" rx="9" ry="6" /><path d="M9 19V8h5a3 3 0 0 1 0 6H9m5 0 5 6" strokeWidth="2.5" /></> },
@@ -18,7 +19,12 @@ const paths: Record<ProductKind, { color: string; drawing: ReactNode }> = {
   groups: { color: "#a99ade", drawing: <><circle cx="9" cy="8" r="3" /><circle cx="18" cy="9" r="2" /><path d="M2 20v-2a7 7 0 0 1 14 0v2m1-6a5 5 0 0 1 5 4v2" /></> },
   users: { color: "#8ebcd5", drawing: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a8 8 0 0 1 16 0v1" /></> },
   identity: { color: "#9ebc87", drawing: <><path d="m12 2 8 4v6c0 5-4 8-8 10-4-2-8-5-8-10V6z" /><circle cx="11" cy="11" r="2.5" /><path d="m13 13 4 4m-1-1 2-2" /></> },
-  folder: { color: "#d2b36d", drawing: <path d="M3 6h7l2 2h9v12H3zM3 6V4h6l2 2h9v2" /> },
+  // A workload folder groups deployed work; it is deliberately not a file folder (that is storage).
+  folder: { color: "#9fb0d0", drawing: <><rect x="3" y="9" width="18" height="11" rx="2" /><path d="M6 6h12M9 3h6" /><path d="M7 13h4m-4 3h7" /></> },
+  // A prefix in object storage.
+  directory: { color: "#d2b36d", drawing: <path d="M3 6h7l2 2h9v12H3zM3 6V4h6l2 2h9v2" /> },
+  bucket: { color: "#d9a35b", drawing: <><ellipse cx="12" cy="6" rx="8" ry="2.5" /><path d="M4 6l2 13c.3 1.7 2.8 2.5 6 2.5s5.7-.8 6-2.5L20 6" /><path d="M5 11c2 1.5 12 1.5 14 0" /></> },
+  layer: { color: "#9fb0d0", drawing: <><path d="m12 3 9 5-9 5-9-5z" /><path d="m3 12.5 9 5 9-5" /><path d="m3 17 9 5 9-5" /></> },
   table: { color: "#91b9c8", drawing: <><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M3 9h18M3 14h18M9 9v11M15 9v11" /></> },
   file: { color: "#91b9c8", drawing: <><path d="M5 3h9l5 5v13H5zM14 3v6h5M8 13h8M8 17h8" /></> },
   data: { color: "#91b9c8", drawing: <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0" /></> },
@@ -29,7 +35,7 @@ export function productKind(kind?: string, runtime?: string): ProductKind {
   if (kind?.startsWith("airflow_")) return "airflow";
   if (kind === "view" || kind === "materialized_view") return "table";
   if (kind === "pg") return "postgres";
-  if (kind === "s3") return "folder";
+  if (kind === "s3") return "bucket";
   if (kind === "app") return runtime === "r" ? "shiny" : "streamlit";
   if (kind === "stream") return "topic";
   if (kind === "script" || kind === "notebook") return runtime === "r" ? "r" : "python";

@@ -141,6 +141,22 @@ def trino_warehouses(db) -> Dict[str, List[str]]:
     return dict(out)
 
 
+def infrastructure_layers(db) -> Dict[str, List[str]]:
+    """Warehouses that run a layer's Trino workers or Kafka brokers, with those layers' ids."""
+    from .layer_infrastructure import trino_workers
+    from .layers import all_layers
+    out: Dict[str, List[str]] = defaultdict(list)
+    for layer, name, _ in trino_workers(db):
+        out[name].append(layer.id)
+    for layer in all_layers(db):
+        infrastructure = (layer.config or {}).get("infrastructure") or {}
+        kafka = infrastructure.get("kafka") or {}
+        if infrastructure.get("enabled") and not infrastructure.get("retired") and kafka.get("enabled") and kafka.get("warehouse"):
+            if layer.id not in out[kafka["warehouse"]]:
+                out[kafka["warehouse"]].append(layer.id)
+    return dict(out)
+
+
 def refuse_trino_warehouse(db, name: Optional[str]) -> None:
     from fastapi import HTTPException
     layers = trino_warehouses(db).get(name or "")

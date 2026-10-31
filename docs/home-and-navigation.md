@@ -2,18 +2,19 @@
 
 FDP runs in the browser or as a desktop app. Both use the same API and the same sign-in.
 
-## Top bar
+## Group and layer
 
-The top bar shows your working context and stays visible on every page:
+The bottom of the sidebar shows your working context:
 
-- **Group**: which app group creates and owns new objects, and which objects the
-  Workloads, Storage and Catalog lists show. Your other memberships still authorize actions
-  on existing objects. See [active groups](active-groups.md).
-- **Layer**: the layer you work in. Lists show that layer's workspaces, workloads,
-  storage, Kafka and APIs (items without a layer show in every layer), and what you create
-  lands in it. A note in each list counts what is in other layers. Production layers are
-  marked "production" in the picker. Your choice is remembered for your account.
-- **Search the catalog** (or **Ctrl/Cmd+K**) opens catalog search from anywhere.
+- **Group**: which app group creates and owns new objects, and which objects the lists show
+  (workspaces, workloads, storage and catalog). Your other memberships still authorize
+  actions on existing objects. See [active groups](active-groups.md).
+- **Layer**: the layer you work in. Home, Workspaces, Workloads (folders included), Storage,
+  Kafka, APIs and Usage show that layer (items without a layer show in every layer), and what
+  you create lands in it. A note in each list counts what is in other layers. Production
+  layers are marked "production" in the picker. Your choice is remembered for your account.
+
+Search the catalog from anywhere with **Ctrl/Cmd+K**.
 
 ## Activity bar
 
@@ -25,9 +26,9 @@ It groups the sections by what you do:
 |---|---|---|
 | Overview | **Home** | Your workspaces, recent runs, recent deployments and followed Airflow pipelines |
 | | **Catalog** | Search, governance, lineage, quality and SLAs ([catalog](catalog.md)) |
-| | **Usage** | How full each compute pool is and what runs on it; **This layer / All layers** switches the scope ([compute pools](compute.md)) |
-| Build | **Workspaces** | Your private VS Code, RStudio and SQL editors ([workspaces](workspaces.md)) |
-| | **Workloads** | Folders of published programs, apps, dbt projects and Airflow deployments, plus run history ([publishing](deploying.md)) |
+| | **Usage** | How full each compute pool is and what runs on it, in your layer; **All layers** shows every layer ([compute pools](compute.md)) |
+| Build | **Workspaces** | Your private VS Code, RStudio and SQL editors; tabs for their runs and your Git credentials ([workspaces](workspaces.md)) |
+| | **Workloads** | Folders of published programs, apps, dbt projects and Airflow deployments; each folder has a Recent runs tab ([publishing](deploying.md)) |
 | | **Storage** | Registered databases, buckets and their schemas, with metadata and data previews ([storage integrations](storage-integrations.md)) |
 | | **Packages** | The platform's Python and R package repository ([packages](packages.md)) |
 | Integration | **Kafka** | Managed Kafka per layer and its topics; shown once a cluster is available to you |
@@ -36,6 +37,9 @@ It groups the sections by what you do:
 | | **Administration** | Platform settings, layers, compute pools, runtimes, repositories and integrations (administrators only) |
 
 The **Documentation** button in the activity bar opens the guide for the current section.
+
+Status dots mean the same on every page: green is running or succeeded, blue is ready (runs on
+demand), yellow is starting or waiting, red is failed, and gray is stopped or idle.
 
 Opening an object opens it in a tab. New pages replace the single unpinned preview tab;
 pin a tab to keep it open.

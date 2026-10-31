@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, EDITOR_NAME, isActive, openInWindow, workloadStatus, type OrchestratorHistory, type OrchestratorRun, type Workload, type Run } from "../api";
+import { api, EDITOR_NAME, inGroup, inLayer, isActive, openInWindow, workloadDot, workloadStatus, type OrchestratorHistory, type OrchestratorRun, type Workload, type Run } from "../api";
 import { getServer } from "../auth";
 import type { Hub } from "../hub";
 import type { TabRef } from "./Tabs";
@@ -8,13 +8,16 @@ import { IconHome, IconOpen, IconPlus, IconDeployed, IconRefresh, IconRuns, Icon
 import { ProductIcon } from "../components/ProductIcon";
 import { CatalogSearchBox } from "./Catalog";
 import { openEditor } from "./Sidebar";
+import { WorkspaceSections } from "./WorkspaceSections";
 
 type OpenTab = (tab: TabRef) => void;
 const stamp = (value?: string | null) => value ? new Date(value).getTime() : 0;
 const time = (value?: string | null) => value ? new Date(value).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 const runTab = (run: Run): TabRef => ({ kind: "run", ref: run.id, title: run.program || run.entrypoint.split("/").pop() || run.id,
   runScope: run.workload_id ? "deployed" : "workspace" });
-const historyTab: TabRef = { kind: "runs", title: "Recent runs" };
+const historyTab: TabRef = { kind: "folder", ref: "workloads", title: "Workloads", section: "runs" };
+/** Home and the Workspaces page follow the working context: the active group's workspaces in the layer mode. */
+const myWorkspaces = (hub: Hub) => hub.workspaces.filter((w) => inLayer(hub.layerId, w.layer_id ?? w.environment_id) && inGroup(hub.me?.active_group_id, w.owner_group_id));
 const workloadsTab: TabRef = { kind: "folder", ref: "workloads", title: "Workloads" };
 
 function Status({ value }: { value: string }) {
@@ -35,9 +38,11 @@ function ActivityList({ runs, hub, openTab, updated = false }: { runs: Run[]; hu
 
 export function Home({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const [query, setQuery] = useState("");
-  const workspaces = [...hub.workspaces].sort((a, b) => stamp(b.last_activity_at) - stamp(a.last_activity_at));
-  const recent = [...hub.runs].sort((a, b) => stamp(b.created_at) - stamp(a.created_at));
-  const products = [...hub.workloads].sort((a, b) => stamp(b.deployed_at || b.created_at) - stamp(a.deployed_at || a.created_at));
+  const workspaces = myWorkspaces(hub).sort((a, b) => stamp(b.last_activity_at) - stamp(a.last_activity_at));
+  const runs = hub.runs.filter((r) => inLayer(hub.layerId, r.layer_id));
+  const recent = [...runs].sort((a, b) => stamp(b.created_at) - stamp(a.created_at));
+  const workloads = hub.workloads.filter((p) => inLayer(hub.layerId, p.layer_id));
+  const products = [...workloads].sort((a, b) => stamp(b.deployed_at || b.created_at) - stamp(a.deployed_at || a.created_at));
   const search = () => openTab({ kind: "catalog", title: "Catalog", search: query.trim() });
   const newWorkspace = () => openTab({ kind: "workspaces", title: "Workspaces", intent: "create" });
   return <div className="home-dashboard">
@@ -48,10 +53,10 @@ export function Home({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
       <p className="hint">Find workloads, datasets, APIs, columns, owners, and tags in the catalog.</p>
     </div>
     <div className="home-stats" aria-label="Your activity at a glance">
-      <button onClick={() => openTab({ kind: "workspaces", title: "Workspaces" })}><IconWorkspaces size={18} /><strong>{hub.workspaces.filter((w) => w.status === "running").length}</strong><span>Workspaces running</span></button>
-      <button onClick={() => openTab(historyTab)}><IconRuns size={18} /><strong>{hub.runs.filter(isActive).length}</strong><span>Active in recent runs</span></button>
-      <button onClick={() => openTab(workloadsTab)}><IconDeployed size={18} /><strong>{hub.workloads.length}</strong><span>Available workloads</span></button>
-      <button onClick={() => openTab(historyTab)}><span className="dot failed" /><strong>{hub.runs.filter((r) => r.status === "failed").length}</strong><span>Failures in recent runs</span></button>
+      <button onClick={() => openTab({ kind: "workspaces", title: "Workspaces" })}><IconWorkspaces size={18} /><strong>{workspaces.filter((w) => w.status === "running").length}</strong><span>Workspaces running</span></button>
+      <button onClick={() => openTab(historyTab)}><IconRuns size={18} /><strong>{runs.filter(isActive).length}</strong><span>Active in recent runs</span></button>
+      <button onClick={() => openTab(workloadsTab)}><IconDeployed size={18} /><strong>{workloads.length}</strong><span>Available workloads</span></button>
+      <button onClick={() => openTab(historyTab)}><span className="dot failed" /><strong>{runs.filter((r) => r.status === "failed").length}</strong><span>Failures in recent runs</span></button>
     </div>
     <div className="home-grid">
       <section className="home-card" aria-labelledby="home-workspaces"><div className="home-card-heading"><h2 id="home-workspaces"><IconWorkspaces size={18} />Your workspaces</h2><button className="text-button" onClick={() => openTab({ kind: "workspaces", title: "Workspaces" })}>View all</button></div>
@@ -65,7 +70,7 @@ export function Home({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
       <RecentUpdates hub={hub} openTab={openTab} />
       <section className="home-card" aria-labelledby="home-workloads"><div className="home-card-heading"><h2 id="home-workloads"><IconDeployed size={18} />Recently deployed</h2><button className="text-button" onClick={() => openTab(workloadsTab)}>View all</button></div>
         {products.length ? <ul className="home-list">{products.slice(0, 4).map((pub) => <li key={pub.id}><button className="home-list-link" onClick={() => openTab({ kind: "workload", ref: pub.id, title: pub.title })}>
-          <ProductIcon kind={pub.kind} runtime={pub.runtime} size={18} /><span className="home-item-text"><strong>{pub.title}</strong><small>{pub.branch} · {time(pub.deployed_at || pub.created_at)}</small></span><span className={pub.sync_error ? "error" : "muted"}>{pub.sync_error ? "Needs attention" : workloadStatus(pub)}</span>
+          <ProductIcon kind={pub.kind} runtime={pub.runtime} size={18} /><span className="home-item-text"><strong>{pub.title}</strong><small>{pub.branch} · {time(pub.deployed_at || pub.created_at)}</small></span><span className={`status ${pub.sync_error ? "error" : "muted"}`}><span className={`dot ${pub.sync_error ? "failed" : workloadDot(pub)}`} />{pub.sync_error ? "Needs attention" : workloadStatus(pub)}</span>
         </button></li>)}</ul> : <p className="home-empty">Apps and programs will appear here when deployed.</p>}
       </section>
     </div>
@@ -83,17 +88,20 @@ function RecentUpdates({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   }, [hub.runs, hub.me?.username]);
   return <section className="home-card" aria-labelledby="home-updated"><div className="home-card-heading"><h2 id="home-updated"><IconRefresh size={18} />Recently updated runs</h2></div><p className="hint">Latest starts and completions, including jobs started earlier.</p>
     {error && <p role="alert" className="error">{error}</p>}
-    {runs ? <ActivityList runs={runs} hub={hub} openTab={openTab} updated /> : !error && <p className="home-empty" role="status">Loading run activity…</p>}
+    {runs ? <ActivityList runs={runs.filter((r) => inLayer(hub.layerId, r.layer_id))} hub={hub} openTab={openTab} updated /> : !error && <p className="home-empty" role="status">Loading run activity…</p>}
   </section>;
 }
 
 export function WorkspacesView({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
+  const workspaces = myWorkspaces(hub), hidden = hub.workspaces.length - workspaces.length;
   return <><PageHeader icon={<IconWorkspaces size={22} />} title="Workspaces" subtitle="Your private development environments. Each workspace has private files and a layer boundary. Your object permissions still apply."
     actions={<button className="btn" onClick={() => openTab({ kind: "workspaces", title: "Workspaces", intent: "create" })}><IconPlus size={14} />New workspace</button>} />
+    <WorkspaceSections active="workspaces" openTab={openTab} />
     <div className="table-scroll"><table aria-label="Your workspaces"><thead><tr><th>Workspace</th><th>Owner</th><th>Editor</th><th>Layer</th><th>Status</th><th /></tr></thead><tbody>
-      {hub.workspaces.map((ws) => <tr key={ws.id}><td><button className="text-button" onClick={() => openTab({ kind: "workspace", ref: ws.id, title: ws.name })}>{ws.name}</button></td><td>{ws.owner}</td><td>{EDITOR_NAME[ws.editor]}</td><td>{hub.layers.find((r) => r.id === (ws.layer_id || ws.environment_id))?.name || "—"}</td><td><Status value={ws.status} /></td><td>{ws.status === "running" && <button className="btn sm secondary" onClick={() => void openEditor(hub, ws.id, ws.name)}><IconOpen size={14} />Open editor</button>}</td></tr>)}
-      {!hub.workspaces.length && <tr><td colSpan={6} className="muted">No workspaces yet. Create one to start developing.</td></tr>}
-    </tbody></table></div></>;
+      {workspaces.map((ws) => <tr key={ws.id}><td><button className="text-button" onClick={() => openTab({ kind: "workspace", ref: ws.id, title: ws.name })}>{ws.name}</button></td><td>{ws.owner}</td><td>{EDITOR_NAME[ws.editor]}</td><td>{hub.layers.find((r) => r.id === (ws.layer_id || ws.environment_id))?.name || "—"}</td><td><Status value={ws.status} /></td><td>{ws.status === "running" && <button className="btn sm secondary" onClick={() => void openEditor(hub, ws.id, ws.name)}><IconOpen size={14} />Open editor</button>}</td></tr>)}
+      {!workspaces.length && <tr><td colSpan={6} className="muted">{hidden ? "No workspaces of this group in this layer." : "No workspaces yet. Create one to start developing."}</td></tr>}
+    </tbody></table></div>
+    {!!hidden && <p className="muted">{hidden} more in other groups or layers. Switch at the bottom of the sidebar to see {hidden === 1 ? "it" : "them"}.</p>}</>;
 }
 
 type Watches = Record<string, string>;

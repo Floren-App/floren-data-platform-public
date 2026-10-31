@@ -3114,6 +3114,14 @@
             "description": "Containers counted against max_concurrent now",
             "title": "In Use"
           },
+          "infrastructure_layer_ids": {
+            "description": "Layers whose infrastructure (Trino workers, Kafka brokers) runs here; it belongs to those layers",
+            "items": {
+              "type": "string"
+            },
+            "title": "Infrastructure Layer Ids",
+            "type": "array"
+          },
           "layer_ids": {
             "description": "Layers whose work may use this warehouse; empty: every layer",
             "items": {
@@ -3556,6 +3564,18 @@
           "kind": {
             "title": "Kind",
             "type": "string"
+          },
+          "layer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The layer the run's work belongs to",
+            "title": "Layer Id"
           },
           "owner": {
             "title": "Owner",
