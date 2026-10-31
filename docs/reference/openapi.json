@@ -3447,6 +3447,23 @@
       "ProductPatch": {
         "additionalProperties": false,
         "properties": {
+          "asset_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replace the objects in the product; the first leads",
+            "title": "Asset Ids"
+          },
           "summary": {
             "anyOf": [
               {
@@ -3502,20 +3519,15 @@
       "PublishIn": {
         "additionalProperties": false,
         "properties": {
-          "also": {
-            "description": "Objects it uses to publish as well",
+          "asset_ids": {
+            "description": "Objects in the product; the first leads (its icon)",
             "items": {
               "type": "string"
             },
             "maxItems": 20,
-            "title": "Also",
+            "minItems": 1,
+            "title": "Asset Ids",
             "type": "array"
-          },
-          "asset_id": {
-            "maxLength": 32,
-            "minLength": 1,
-            "title": "Asset Id",
-            "type": "string"
           },
           "classification": {
             "anyOf": [
@@ -3547,14 +3559,15 @@
             "type": "string"
           },
           "title": {
-            "default": "",
             "maxLength": 200,
+            "minLength": 1,
             "title": "Title",
             "type": "string"
           }
         },
         "required": [
-          "asset_id"
+          "asset_ids",
+          "title"
         ],
         "title": "PublishIn",
         "type": "object"
@@ -11561,7 +11574,7 @@
     },
     "/v1/catalog/assets/{ident}/product": {
       "get": {
-        "description": "Whether an object is published, and what it uses that you could publish with it.",
+        "description": "The products an object is in, and what it uses directly that you could bundle with it.",
         "operationId": "get_v1_catalog_assets_ident_product",
         "parameters": [
           {
@@ -11971,7 +11984,7 @@
     },
     "/v1/catalog/products": {
       "get": {
-        "description": "Published data products in a layer, for everyone in it. accessible: only ones you can use;\nmine: only ones you manage.",
+        "description": "Published data products in a layer, for everyone in it. kind: products containing that kind of object;\naccessible: only ones you can fully use; mine: only ones you manage.",
         "operationId": "get_v1_catalog_products",
         "parameters": [
           {
@@ -12094,6 +12107,7 @@
         ]
       },
       "post": {
+        "description": "Publish one or more objects you own as a data product.",
         "operationId": "post_v1_catalog_products",
         "parameters": [
           {
@@ -12167,7 +12181,7 @@
     },
     "/v1/catalog/products/candidates": {
       "get": {
-        "description": "Objects you may publish: tables and views, dashboards, APIs and topics you own, not yet published.",
+        "description": "Objects you may put in a product: tables and views, dashboards, APIs and topics you own.",
         "operationId": "get_v1_catalog_products_candidates",
         "parameters": [
           {
@@ -12317,7 +12331,7 @@
         ]
       },
       "get": {
-        "description": "The card, its upstream lineage (from the sources), and the products built on it.\nSteps you may not open show only their name, kind and owner.",
+        "description": "The card, the lineage of everything in it (from the sources), and the products built on it.\nSteps you may not open show only their name, kind and owner.",
         "operationId": "get_v1_catalog_products_product_id",
         "parameters": [
           {
@@ -12470,7 +12484,7 @@
     },
     "/v1/catalog/products/{product_id}/requests": {
       "post": {
-        "description": "Ask the owners for access for one of your groups.",
+        "description": "Ask the owners for access to the whole product, for one of your groups.",
         "operationId": "post_v1_catalog_products_product_id_requests",
         "parameters": [
           {
@@ -12708,7 +12722,7 @@
     },
     "/v1/catalog/requests/{request_id}/decision": {
       "post": {
-        "description": "Approve (grants the product's reader role to the requested group) or decline, with an optional note.",
+        "description": "Approve (grants each object's reader role to the requested group) or decline, with an optional note.",
         "operationId": "post_v1_catalog_requests_request_id_decision",
         "parameters": [
           {

@@ -94,6 +94,10 @@ const PACKAGE_ROLES = {
   Owner: "Full control, including deleting versions and assigning permissions.",
 };
 const PACKAGE_KINDS = ["package-root", "package"];
+const PRODUCT_ROLES = {
+  Consumer: "Use everything in this data product: read its tables and topics, open its dashboards, call its APIs.",
+  Owner: "Also change the product, decide access requests and assign permissions.",
+};
 const PROGRAM_ROLES = {
   Executor: "Run programs and open apps.",
   Contributor: "Run and update existing programs and apps, including deployment.",
@@ -127,8 +131,9 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
   const isData = resource.kind === "source" || resource.kind === "schema" || isKafka;
   const isApi = API_KINDS.includes(resource.kind);
   const isPackage = PACKAGE_KINDS.includes(resource.kind);
-  const roles: Record<string, string> = isKafka ? { Reader: "Consume and commit offsets for own groups", Contributor: "Also produce messages", Admin: "Also create, alter and delete topics", Owner: "All topic permissions and role assignments" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
-  const [role, setRole] = useState(isData ? "Reader" : isApi ? "Consumer" : isPackage ? (resource.kind === "package" ? "Maintainer" : "Publisher") : "Executor");
+  const isProduct = resource.kind === "product";
+  const roles: Record<string, string> = isProduct ? PRODUCT_ROLES : isKafka ? { Reader: "Consume and commit offsets for own groups", Contributor: "Also produce messages", Admin: "Also create, alter and delete topics", Owner: "All topic permissions and role assignments" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
+  const [role, setRole] = useState(isProduct ? "Consumer" : isData ? "Reader" : isApi ? "Consumer" : isPackage ? (resource.kind === "package" ? "Maintainer" : "Publisher") : "Executor");
   const canRead = resource.actions.includes("read");
   const canAssign = resource.actions.includes("assign");
 
@@ -192,12 +197,13 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
 
   return <section className="permissions-panel" aria-label={`Permissions for ${resource.name}`}>
     <div className="section-heading"><div><h2>Permissions <span className="badge">{resource.kind === "source" ? "Data source" : resource.kind === "schema" ? "Schema" : resource.kind === "root" ? "Workloads"
-        : resource.kind === "api" ? "API" : resource.kind === "api-group" ? "Endpoint group" : resource.kind === "api-operation" ? "Operation" : resource.kind === "api-root" ? "All APIs" : resource.kind === "package-root" ? "Package repository" : resource.kind === "package" ? "Package" : resource.kind}</span></h2>
+        : resource.kind === "api" ? "API" : resource.kind === "api-group" ? "Endpoint group" : resource.kind === "api-operation" ? "Operation" : resource.kind === "api-root" ? "All APIs" : resource.kind === "package-root" ? "Package repository" : resource.kind === "package" ? "Package" : resource.kind === "product" ? "Data product" : resource.kind}</span></h2>
       <p className="muted">Who can access <strong>{resource.name}</strong>.</p></div>
       {canRead && <button className="btn secondary" disabled={busy || loading} onClick={() => { setMessage(""); setReloadVersion((v) => v + 1); }}><IconRefresh size={14} />Refresh permissions</button>}
     </div>
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
-    <p className="scope-note">{resource.kind === "source" ? "Grants apply to all registered schemas in this data source, including schemas registered later."
+    <p className="scope-note">{resource.kind === "product" ? "Consumer gives the use of everything in this product, also what is added later. Removing a group, an object or the product ends that access; grants on the objects themselves are separate."
+      : resource.kind === "source" ? "Grants apply to all registered schemas in this data source, including schemas registered later."
       : resource.kind === "schema" ? "Grants cover every current and future object in this schema."
       : resource.kind === "kafka" ? "Grants apply to every current and future topic in this Kafka cluster."
       : resource.kind === "topic" ? "Grants govern producing, consuming and managing this topic. Consumer groups are isolated by identity."

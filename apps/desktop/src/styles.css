@@ -669,3 +669,9 @@ tr.log-error td { background: color-mix(in srgb, var(--err) 6%, transparent); }
 .product-step.hidden { border-style: dashed; background: transparent; }
 .product-step.current { border-color: var(--accent); }
 .empty-state { padding: 24px 0; }
+.product-contents { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-muted); font-size: 12px; margin-right: 4px; }
+.publish-members { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; margin: 8px 0; display: grid; gap: 6px; }
+.publish-members ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 260px; overflow: auto; }
+.publish-members li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.publish-members label { gap: 8px; min-width: 0; }
+.publish-members .hint { margin: 0; }

@@ -7,31 +7,48 @@ of the sidebar.
 
 ## Data products
 
-Owners **publish** the objects they want to share: tables and views, dashboards (apps),
-APIs and Kafka topics. Everything else stays in the catalog as a lineage object: it shows up
-in a product's lineage, but is not offered on its own.
+A data product is what owners share: one or more catalog objects published together, for
+example a dashboard with the tables it uses. It can hold tables and views, dashboards (apps),
+APIs and Kafka topics, all in one layer. Everything else stays in the catalog as a lineage
+object: it shows up in a product's lineage, but is not offered on its own.
 
-- **Publish** from the object's own page (**Publish to catalog** on a dashboard, table, API
-  or topic) or with **Publish a product** on Data products. Give it a name, a short summary,
-  a domain and a classification. Publishing a dashboard offers the tables it reads, so they
-  can be published in the same step. Only the object's owners (the Owner role) publish,
-  change the summary or unpublish.
-- **Data products** shows products as cards to everyone in the layer, with or without
-  access: name, summary, owner group, domain, certification, when it was last updated, and
-  where you stand (*You have access*, *Request access*, *Requested*). **Only what I can use**
-  narrows it to products you can open. **My products** lists the ones you manage.
-- A **product page** has three tabs. **Overview**: what it is, owner and steward, domain and
-  classification, freshness and SLA, and for a dashboard the data it uses. **Lineage**: the
-  path from the sources to the product, left to right. Steps you cannot open are dashed and
-  show only their name, kind and owner. **Used by**: other products built on it. Columns,
-  previews and SQL are shown only with access, through the object's own pages.
-- **Request access** asks the owners for access for one of your groups, with a reason.
-  Owners answer under **Access requests** (the sidebar counts what waits) and may add a note.
-  Approving gives that group the product's reader role: Reader for tables and topics,
-  Executor for dashboards, Consumer for APIs. Access to a table is granted on its schema, so
-  it includes the schema's other tables; the request and the approval both say so. Requests,
-  decisions and grants are in the audit trail. Requesters see the outcome under **My
-  requests** and may withdraw a waiting request. Unpublishing withdraws waiting requests.
+- **Publish** from an object's own page (**Publish to catalog** on a dashboard, table, API or
+  topic) or with **Publish a product** on Data products. Give it a name, a summary, a domain and
+  a classification, and choose what is in it: starting from a dashboard, the tables it reads are
+  already ticked, and you can add any other object you own. The first object leads and sets the
+  card's icon; an object leads at most one product, but may be in several. You must own (the
+  Owner role) everything you put in a product. Your active group becomes the product's owner.
+- **Data products** shows products as cards to everyone in the layer, with or without access:
+  name, summary, owner group, domain, what is in it ("Dashboard · 2 tables"), certification,
+  when it was last updated, and where you stand: *You have access*, *Partly* (some of it),
+  *Request access*, *Requested*. **Only what I can use** narrows it to products you can fully
+  use. **My products** lists the ones your groups own.
+- A **product page** has **Overview** (what it is, owner and steward, domain and
+  classification, freshness and SLA, and what is in it with your access to each), **Lineage**
+  (from the sources, left, to the objects in the product, right; steps you cannot open are
+  dashed and show only their name, kind and owner), **Used by** (other products built on it)
+  and, for owners, **Permissions**. Columns, previews and SQL stay on each object's own page,
+  for people with access.
+
+### Access through the product
+
+Access is a role on the product itself. Groups with **Consumer** on a product may use
+everything in it: Reader on its tables and topics (on a table's schema, so including the
+schema's other tables), Executor on its dashboards, Consumer on its APIs. These roles are not
+copied onto the objects; the platform derives them from the product. So:
+
+- removing a group's Consumer role, removing an object from the product or unpublishing it
+  ends that access everywhere, at once;
+- adding an object to the product gives its consumers the use of it too;
+- grants that groups have on the objects themselves are separate and stay.
+
+**Owner** on the product also lets a group change it and decide requests. Owners manage both
+roles on the product's **Permissions** tab, also without a request.
+
+**Request access** asks the owners for access for one of your groups, with a reason. Owners
+answer under **Access requests** (the sidebar counts what waits) and may add a note; approving
+makes the group a Consumer. Requests, decisions and role changes are in the audit trail.
+Requesters see the outcome under **My requests** and may withdraw a waiting request.
 
 ## All objects
 

@@ -133,8 +133,12 @@ def browsing_scope(db, user):
     elif user.active_group_id == GLOBAL_ADMIN and user.is_admin:
         result = {r.id:{"Owner"} for r in resources.values() if permits(db,user,r)}
     else:
-        grants = {g.resource_id:g.role for g in db.scalars(select(RoleAssignment).where(
-            RoleAssignment.app_group_id == user.active_group_id))}
+        grants = {}
+        for g in rbac.group_grants(db, {user.active_group_id}):  # includes what data product roles give
+            order = list(rbac.roles_for(resources[g.resource_id])) if g.resource_id in resources else []
+            current = grants.get(g.resource_id)
+            if current is None or (g.role in order and current in order and order.index(g.role) > order.index(current)):
+                grants[g.resource_id] = g.role
         result = {}
         for resource in resources.values():
             if not permits(db,user,resource):

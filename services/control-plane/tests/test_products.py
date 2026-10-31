@@ -3,7 +3,7 @@ from sqlalchemy import select
 
 from app import catalog
 from app.db import SessionLocal
-from app.models import AccessRequest, AppGroup, AuditEvent, Resource
+from app.models import AccessRequest, AppGroup, AuditEvent, Resource, RoleAssignment
 from .conftest import as_
 from .rbac_helpers import grant_group
 from .test_catalog import register
@@ -31,78 +31,98 @@ def setup_products(client, repo):  # noqa: F811
     return ids
 
 
-def test_publish_browse_lineage_request_and_approve(client, repo):  # noqa: F811
+def test_bundle_publish_browse_lineage_request_and_approve(client, repo):  # noqa: F811
     ids = setup_products(client, repo)
-    # Only owners publish, and only products people can use.
-    assert client.post("/v1/catalog/products", headers=as_("bob"), json={"asset_id": ids["sales"]}).status_code == 404  # cannot even open it
-    assert client.post("/v1/catalog/products", headers=as_("bob"), json={"asset_id": ids["dash"]}).status_code == 403  # can use, not own
-    with SessionLocal() as db:
-        schema_asset = catalog.asset_id(ids["public"])
-    assert client.post("/v1/catalog/products", headers=as_("ana"), json={"asset_id": schema_asset}).status_code in (404, 422)
+    # Only owners publish, and only objects people can use.
+    assert client.post("/v1/catalog/products", headers=as_("bob"), json={"asset_ids": [ids["sales"]], "title": "x"}).status_code == 404  # cannot open it
+    assert client.post("/v1/catalog/products", headers=as_("bob"), json={"asset_ids": [ids["dash"]], "title": "x"}).status_code == 403  # can use, not own
+    schema_asset = catalog.asset_id(ids["public"])
+    assert client.post("/v1/catalog/products", headers=as_("ana"), json={"asset_ids": [schema_asset], "title": "x"}).status_code in (404, 422)
     offered = client.get(f"/v1/catalog/assets/{ids['dash']}/product", headers=as_("ana")).json()
-    assert offered["can_publish"] and offered["product"] is None and [u["name"] for u in offered["uses"]] == ["sales"]
+    assert offered["can_publish"] and offered["products"] == [] and [u["name"] for u in offered["uses"]] == ["sales"]
+    # One product: the dashboard and the table it uses, bundled.
     published = client.post("/v1/catalog/products", headers=as_("ana"), json={
-        "asset_id": ids["dash"], "title": "Sales dashboard", "summary": "Daily sales per region.", "domain": "Finance",
-        "classification": "internal", "also": [ids["sales"]]})
+        "asset_ids": [ids["dash"], ids["sales"]], "title": "Sales", "summary": "Daily sales per region, with its table.",
+        "domain": "Finance", "classification": "internal"})
     assert published.status_code == 201, published.text
-    dash = published.json()
-    assert dash["title"] == "Sales dashboard" and dash["domain"] == "Finance" and dash["can_manage"]
+    product = published.json()
+    assert product["title"] == "Sales" and product["kind"] == "app" and product["domain"] == "Finance" and product["can_manage"]
+    assert [(m["name"], m["kind"]) for m in product["members"]] == [("dash", "app"), ("sales", "table")]
+    assert {(g["kind"], g["name"], g["role"]) for g in product["grants"]} == {("service", "dash", "Executor"), ("schema", "public", "Reader")}
+    # The lead leads one product; an object may still be in others.
+    assert client.post("/v1/catalog/products", headers=as_("ana"), json={"asset_ids": [ids["dash"]], "title": "again"}).status_code == 409
+    in_products = client.get(f"/v1/catalog/assets/{ids['sales']}/product", headers=as_("ana")).json()["products"]
+    assert [p["id"] for p in in_products] == [product["id"]]
 
-    # Everyone in the layer sees the cards, with or without access.
-    cards = {c["name"]: c for c in client.get("/v1/catalog/products", headers=as_("bob")).json()["items"]}
-    assert set(cards) == {"dash", "sales"}
-    assert cards["dash"]["access"] == "granted"          # bob may execute deployed workloads
-    assert cards["sales"]["access"] == "none" and cards["sales"]["grants"] == "Reader"
-    assert cards["sales"]["grants_on"] == {"kind": "schema", "name": "public"}
-    assert client.get("/v1/catalog/products", headers=as_("bob"), params={"accessible": True}).json()["items"][0]["name"] == "dash"
+    # Everyone in the layer sees the card; bob can use the dashboard but not the table: partly.
+    cards = client.get("/v1/catalog/products", headers=as_("bob")).json()
+    card = cards["items"][0]
+    assert len(cards["items"]) == 1 and card["access"] == "partial" and cards["kinds"] == ["app", "table"]
+    assert [m["access"] for m in card["members"]] == ["granted", "none"]
+    assert card["members"][1]["open"] is None and card["members"][0]["open"]["resource_kind"] == "service"
+    assert client.get("/v1/catalog/products", headers=as_("bob"), params={"accessible": True}).json()["items"] == []
+    assert len(client.get("/v1/catalog/products", headers=as_("bob"), params={"kind": "table"}).json()["items"]) == 1
+    assert client.get("/v1/catalog/products", headers=as_("bob"), params={"q": "sales region"}).json()["items"][0]["id"] == product["id"]
     assert client.get("/v1/catalog/products", headers=as_("bob"), params={"layer_id": "nolayer00000"}).json()["items"] == []
 
-    # Lineage: steps bob cannot open show only name, kind and owner, and connect by position.
-    detail = client.get(f"/v1/catalog/products/{dash['id']}", headers=as_("bob")).json()
+    # Lineage of the whole bundle: members are the product; upstream steps bob cannot open show only name, kind, owner.
+    detail = client.get(f"/v1/catalog/products/{product['id']}", headers=as_("bob")).json()
     steps = {s["name"]: s for s in detail["lineage"]}
-    assert set(steps) == {"sales", "raw_sales"}
-    assert steps["sales"]["visible"] is False and steps["sales"]["asset_id"] is None and steps["sales"]["product_id"] == cards["sales"]["id"]
-    assert steps["raw_sales"]["depth"] == 2 and "runtime" not in steps["raw_sales"]
-    assert {(e["source"], e["target"]) for e in detail["lineage_edges"]} == {(steps["sales"]["key"], "product"), (steps["raw_sales"]["key"], steps["sales"]["key"])}
-    sales_detail = client.get(f"/v1/catalog/products/{cards['sales']['id']}", headers=as_("bob")).json()
-    assert [p["name"] for p in sales_detail["used_by"]] == ["dash"]
+    assert set(steps) == {"raw_sales"} and steps["raw_sales"]["visible"] is False and steps["raw_sales"]["asset_id"] is None
+    assert {(e["source"], e["target"]) for e in detail["lineage_edges"]} == {("member-1", "member-0"), (steps["raw_sales"]["key"], "member-1")}
 
-    # Request access for one of your groups; owners approve, which grants Reader on the schema.
+    # One request covers the bundle; approval grants what each object needs.
     with SessionLocal() as db:
         executors = db.scalar(select(AppGroup).where(AppGroup.name == "Deployed executors")).id
         finance = db.scalar(select(AppGroup).where(AppGroup.name == "Finance data")).id
-    url = f"/v1/catalog/products/{cards['sales']['id']}/requests"
+    url = f"/v1/catalog/products/{product['id']}/requests"
     assert client.post(url, headers=as_("bob"), json={"app_group_id": finance, "reason": "not mine"}).status_code == 422
     request = client.post(url, headers=as_("bob"), json={"app_group_id": executors, "reason": "Weekly sales report"})
     assert request.status_code == 201, request.text
     assert client.post(url, headers=as_("bob"), json={"app_group_id": executors, "reason": "again"}).status_code == 409
-    mine = client.get("/v1/catalog/products", headers=as_("bob")).json()["items"]
-    assert next(c for c in mine if c["name"] == "sales")["access"] == "requested"
+    assert client.get("/v1/catalog/products", headers=as_("bob")).json()["items"][0]["access"] == "requested"
     inbox = client.get("/v1/catalog/requests", headers=as_("ana")).json()
-    assert [(r["product"], r["group"], r["status"]) for r in inbox] == [("sales", "Deployed executors", "pending")]
+    assert [(r["product"], r["group"], r["status"]) for r in inbox] == [("Sales", "Deployed executors", "pending")]
+    assert {g["name"] for g in inbox[0]["grants"]} == {"dash", "public"}
     assert client.get("/v1/catalog/requests", headers=as_("bob")).json() == []          # not an owner
     assert client.post(f"/v1/catalog/requests/{request.json()['id']}/decision", headers=as_("bob"), json={"approve": True}).status_code == 404
     decided = client.post(f"/v1/catalog/requests/{request.json()['id']}/decision", headers=as_("ana"), json={"approve": True, "note": "Welcome"})
     assert decided.status_code == 200 and decided.json()["status"] == "approved"
     assert client.post(f"/v1/catalog/requests/{request.json()['id']}/decision", headers=as_("ana"), json={"approve": False}).status_code == 409
-    cards = {c["name"]: c for c in client.get("/v1/catalog/products", headers=as_("bob")).json()["items"]}
-    assert cards["sales"]["access"] == "granted"
-    assert [r["status"] for r in client.get("/v1/catalog/requests", headers=as_("bob"), params={"box": "mine"}).json()] == ["approved"]
+    assert client.get("/v1/catalog/products", headers=as_("bob")).json()["items"][0]["access"] == "granted"
     with SessionLocal() as db:
+        roles = {(a.resource_id, a.role) for a in db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id == executors))}
         actions = {e.action for e in db.scalars(select(AuditEvent))}
+    # Access is a role on the product itself; what it gives on each object is derived, never copied.
+    with SessionLocal() as db:
+        from app.models import CatalogProduct
+        access_resource = db.get(CatalogProduct, product["id"]).access_resource_id
+    assert (access_resource, "Consumer") in roles and ("workloads", "Executor") in roles  # existing roles are kept
+    assert (ids["public"], "Reader") not in roles
     assert {"catalog.publish", "catalog.access_request", "catalog.access_approved"} <= actions
+    assert client.post(url, headers=as_("bob"), json={"app_group_id": executors, "reason": "x y z"}).status_code == 409  # has it all
+    # Owners see who has access on the product page, and revoking Consumer ends it everywhere.
+    detail = client.get(f"/v1/catalog/products/{product['id']}", headers=as_("ana")).json()
+    assert detail["access_resource"]["kind"] == "product" and detail["access_resource"]["id"] == access_resource
+    assert "access_resource" not in client.get(f"/v1/catalog/products/{product['id']}", headers=as_("bob")).json()
+    sales_asset = client.get(f"/v1/catalog/resources/{ids['public']}/asset", headers=as_("bob"), params={"object_path": "sales"})
+    assert sales_asset.status_code == 200  # bob may open the table now
+    assert client.delete(f"/v1/rbac/resources/{access_resource}/assignments/{executors}", headers=as_("ana")).status_code == 204
+    assert client.get("/v1/catalog/products", headers=as_("bob")).json()["items"][0]["access"] == "partial"
+    assert client.get(f"/v1/catalog/resources/{ids['public']}/asset", headers=as_("bob"), params={"object_path": "sales"}).status_code == 404
 
-    # Unpublishing withdraws waiting requests and removes the card.
-    second = client.post(f"/v1/catalog/products/{dash['id']}/requests", headers=as_("bob"), json={"app_group_id": executors, "reason": "x y z"})
-    assert second.status_code == 409  # that group can already use the dashboard
-    assert client.delete(f"/v1/catalog/products/{dash['id']}", headers=as_("bob")).status_code == 403
-    assert client.delete(f"/v1/catalog/products/{dash['id']}", headers=as_("ana")).status_code == 204
-    assert {c["name"] for c in client.get("/v1/catalog/products", headers=as_("bob")).json()["items"]} == {"sales"}
+    # Owners change what is in it; unpublishing removes the card.
+    changed = client.patch(f"/v1/catalog/products/{product['id']}", headers=as_("ana"), json={"asset_ids": [ids["sales"]], "summary": "Just the table."})
+    assert changed.status_code == 200 and [m["name"] for m in changed.json()["members"]] == ["sales"] and changed.json()["kind"] == "table"
+    assert client.patch(f"/v1/catalog/products/{product['id']}", headers=as_("bob"), json={"title": "mine"}).status_code == 403
+    assert client.delete(f"/v1/catalog/products/{product['id']}", headers=as_("bob")).status_code == 403
+    assert client.delete(f"/v1/catalog/products/{product['id']}", headers=as_("ana")).status_code == 204
+    assert client.get("/v1/catalog/products", headers=as_("bob")).json()["items"] == []
 
 
 def test_declining_and_withdrawing(client, repo):  # noqa: F811
     ids = setup_products(client, repo)
-    product = client.post("/v1/catalog/products", headers=as_("ana"), json={"asset_id": ids["sales"]}).json()
+    product = client.post("/v1/catalog/products", headers=as_("ana"), json={"asset_ids": [ids["sales"]], "title": "Sales table"}).json()
     with SessionLocal() as db:
         executors = db.scalar(select(AppGroup).where(AppGroup.name == "Deployed executors")).id
     url = f"/v1/catalog/products/{product['id']}/requests"

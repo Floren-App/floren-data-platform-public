@@ -689,19 +689,34 @@ class CatalogAsset(Base):
 
 
 class CatalogProduct(Base):
-    """A catalog object its owner published as a data product: shown as a card to everyone in its layer,
-    with or without access. Everything else in the catalog is a lineage object."""
+    """A data product: one or more catalog objects (say a dashboard and the tables it uses) that their owners
+    published together. Its card is shown to everyone in its layer, with or without access. Everything else in
+    the catalog is a lineage object."""
     __tablename__ = "catalog_products"
 
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    # The lead object (first member): it sets the card's icon. An object leads at most one product.
     asset_id: Mapped[str] = mapped_column(ForeignKey("catalog_assets.id", ondelete="CASCADE"), unique=True)
-    resource_id: Mapped[str] = mapped_column(String(12), index=True)   # the object's RBAC resource (a table's schema)
+    resource_id: Mapped[str] = mapped_column(String(12), index=True)   # the lead's RBAC resource (a table's schema)
+    # The product's own RBAC resource: Consumer on it gives read or use of everything in the product.
+    access_resource_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
     layer_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200))
     summary: Mapped[str] = mapped_column(String(600), default="")
     published_by: Mapped[str] = mapped_column(String(256), default="")
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CatalogProductMember(Base):
+    """An object in a data product; the lead (position 0) is one of them. An object may be in several products."""
+    __tablename__ = "catalog_product_members"
+    __table_args__ = (UniqueConstraint("product_id", "asset_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
+    asset_id: Mapped[str] = mapped_column(ForeignKey("catalog_assets.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class AccessRequest(Base):

@@ -63,7 +63,7 @@ export type DataPolicyChange = Pick<DataPolicy, "method" | "expression" | "exemp
 export interface AccessResource {
   owner_group_id?: string | null; owner_group_name?: string | null;
   layer_id?: string | null; layer_name?: string | null;
-  id: string; name: string; kind: "root" | "folder" | "service" | "source" | "schema" | "kafka" | "topic" | "api-root" | "api" | "api-group" | "api-operation" | "package-root" | "package";
+  id: string; name: string; kind: "root" | "folder" | "service" | "source" | "schema" | "kafka" | "topic" | "api-root" | "api" | "api-group" | "api-operation" | "package-root" | "package" | "product-root" | "product";
   parent_id: string | null; object_id: string | null; config: Record<string, unknown>; actions: string[];
   /** Sources and schemas: a data role here/on a parent, or protected Global Admin access. */
   data_access?: boolean;
@@ -521,25 +521,30 @@ export function ago(iso?: string | null): string {
   return `${n} ${unit}${n === 1 || unit === "min" ? "" : "s"} ago`;
 }
 
-/** A published data product: its card is visible to everyone in its layer, with or without access. */
+export interface ProductOpen { resource_kind: string; resource_id: string; object_id: string | null; object_path: string | null }
+/** An object in a data product (the first one leads: it sets the card's icon). */
+export interface ProductMember { asset_id: string; name: string; kind: string; runtime: string | null; access: "granted" | "none"; updated_at: string | null; open: ProductOpen | null }
+/** What Consumer on a product gives on each object: one role per distinct resource (tables share their schema's). */
+export interface ProductGrant { resource_id: string; kind: string; name: string; role: string; object: string }
+/** A published data product: one or more objects; its card is visible to everyone in its layer, with or without access. */
 export interface Product {
   id: string; asset_id: string; title: string; summary: string; kind: string; runtime: string | null; name: string;
   layer_id: string | null; layer_name: string | null; domain: string; classification: string; status: string; steward: string;
   owner_group_name: string | null; updated_at: string | null; sla_status: string; published_at: string; published_by: string;
-  access: "granted" | "requested" | "none"; can_manage: boolean; grants: string; grants_on: { kind: string; name: string };
-  open: { resource_kind: string; resource_id: string; object_id: string | null; object_path: string | null } | null;
+  access: "granted" | "partial" | "requested" | "none"; can_manage: boolean; members: ProductMember[]; grants: ProductGrant[];
+  open: ProductOpen | null;
 }
 /** A step in a product's lineage. Steps you may not open carry only name, kind and owner. */
 export interface ProductStep { key: string; asset_id: string | null; name: string; kind: string; depth: number; owner_group_name: string | null; visible: boolean; product_id: string | null; runtime?: string | null }
-export interface ProductDetail extends Product { lineage: ProductStep[]; lineage_edges: { source: string; target: string }[]; used_by: Product[]; used_by_others: number }
+export interface ProductDetail extends Product { lineage: ProductStep[]; lineage_edges: { source: string; target: string }[]; used_by: Product[]; used_by_others: number; access_resource?: AccessResource }
 export interface ProductCandidate { asset_id: string; name: string; kind: string; path: string; layer_id: string | null; layer_name: string | null }
-export interface AssetProduct { publishable: boolean; can_publish: boolean; product: Product | null; uses: { asset_id: string; name: string; kind: string; published: boolean }[]; domain: string; classification: string }
+export interface AssetProduct { publishable: boolean; can_publish: boolean; products: Product[]; uses: { asset_id: string; name: string; kind: string }[]; name: string; kind: string; domain: string; classification: string }
 export interface AccessRequestItem {
   id: string; product_id: string; product: string; requester: string; app_group_id: string; group: string; reason: string;
-  status: "pending" | "approved" | "declined" | "withdrawn"; role: string; decided_by: string; decision_note: string;
-  created_at: string; decided_at: string | null; grants_on: { kind: string; name: string } | null;
+  status: "pending" | "approved" | "declined" | "withdrawn"; decided_by: string; decision_note: string;
+  created_at: string; decided_at: string | null; grants: ProductGrant[];
 }
-export interface PublishInput { asset_id: string; title?: string; summary?: string; domain?: string; classification?: string; also?: string[] }
+export interface PublishInput { asset_ids: string[]; title: string; summary?: string; domain?: string; classification?: string }
 
 /** One line of the central log. Run, workload, commit and layer are stamped by the platform. */
 export interface LogEntry {
@@ -833,7 +838,7 @@ export const api = {
     candidates: (layerId: string, q = "") => request<ProductCandidate[]>("GET", `/v1/catalog/products/candidates?${new URLSearchParams({ layer_id: layerId, q })}`),
     forAsset: (assetId: string) => request<AssetProduct>("GET", `/v1/catalog/assets/${assetId}/product`),
     publish: (body: PublishInput) => request<Product>("POST", "/v1/catalog/products", body),
-    update: (id: string, body: { title?: string; summary?: string }) => request<Product>("PATCH", `/v1/catalog/products/${id}`, body),
+    update: (id: string, body: { title?: string; summary?: string; asset_ids?: string[] }) => request<Product>("PATCH", `/v1/catalog/products/${id}`, body),
     unpublish: (id: string) => request<void>("DELETE", `/v1/catalog/products/${id}`),
     requestAccess: (id: string, app_group_id: string, reason: string) => request<AccessRequestItem>("POST", `/v1/catalog/products/${id}/requests`, { app_group_id, reason }),
     requests: (box: "approve" | "mine") => request<AccessRequestItem[]>("GET", `/v1/catalog/requests?box=${box}`),

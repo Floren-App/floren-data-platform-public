@@ -41,7 +41,7 @@ export interface TabRef {
   intent?: "create-folder" | "create" | "publish" | "request";
   /** Data products: the catalog object to publish (intent "publish"). */
   assetId?: string;
-  productSection?: "overview" | "lineage" | "used-by";
+  productSection?: "overview" | "lineage" | "used-by" | "permissions";
   catalogSection?: "overview" | "lineage" | "governance" | "sla" | "access" | "metrics";
   apiSection?: "operations" | "settings" | "calls" | "permissions";
   /** An endpoint group or operation resource to select on the API page. */
