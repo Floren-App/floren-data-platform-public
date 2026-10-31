@@ -50,8 +50,10 @@ export function CatalogSearchBox({ value, onChange, openTab, id = "catalog-searc
     </div></div>;
 }
 
-export function CatalogView({ openTab, initialKind = "", initialQuery = "" }: { openTab: (tab: TabRef) => void; initialKind?: string; initialQuery?: string }) {
-  const [filters, setFilters] = useState<Record<string, string>>({ q: initialQuery, kind: initialKind, domain: "", branch: "", status: "", classification: "", sla_status: "", layer: "", tag: "", owner: "", platform: "", column: "", sort: "relevance", offset: "0" });
+export function CatalogView({ openTab, initialKind = "", initialQuery = "", layerId = "" }: { openTab: (tab: TabRef) => void; initialKind?: string; initialQuery?: string; layerId?: string }) {
+  // The layer follows the app's layer mode, like every other list.
+  const [filters, setFilters] = useState<Record<string, string>>({ q: initialQuery, kind: initialKind, domain: "", branch: "", status: "", classification: "", sla_status: "", layer: layerId, tag: "", owner: "", platform: "", column: "", sort: "relevance", offset: "0" });
+  useEffect(() => { setFilters((f) => ({ ...f, layer: layerId, offset: "0" })); }, [layerId]);
   const [result, setResult] = useState<CatalogSearch | null>(null);
   const [busy, setBusy] = useState(true), [error, setError] = useState("");
   const [version, setVersion] = useState(0);
@@ -65,12 +67,12 @@ export function CatalogView({ openTab, initialKind = "", initialQuery = "" }: { 
   }, [filters, version]);
   const filter = (key: string, value: string) => setFilters((f) => ({ ...f, [key]: value, offset: "0" }));
   return <>
-    <PageHeader icon={<IconCatalog size={22} />} title="Catalog" subtitle="Find tables, schemas, storage connections, apps and workloads with their dependencies."
+    <PageHeader icon={<IconCatalog size={22} />} title="All objects" subtitle="Every catalog object you can open in this layer: tables, schemas, storage connections, apps, programs, dbt projects and pipelines, with their lineage. Data products are the shared view."
       actions={<button className="btn secondary" onClick={() => setVersion((v) => v + 1)}><IconRefresh size={14} />Refresh catalog</button>} />
     <CatalogSearchBox value={filters.q} onChange={(value) => filter("q", value)} openTab={openTab} />
     <CatalogAlerts key={version} openTab={openTab}/>
     <div className="catalog-filters">
-      {([['kind', 'Type', result?.facets.kind ?? []], ['domain', 'Domain', result?.facets.domain ?? []], ['branch', 'Branch', result?.facets.branch ?? []], ['layer', 'Layer', result?.facets.layer ?? []],
+      {([['kind', 'Type', result?.facets.kind ?? []], ['domain', 'Domain', result?.facets.domain ?? []], ['branch', 'Branch', result?.facets.branch ?? []],
         ['platform', 'Platform', result?.facets.platform ?? []], ['owner', 'Owner group', result?.facets.owner ?? []], ['tag', 'Tag', result?.facets.tag ?? []],
         ['status', 'Governance', ['draft', 'reviewed', 'certified', 'deprecated']], ['classification', 'Classification', ['unclassified', 'public', 'internal', 'confidential', 'restricted']],
         ['sla_status', 'SLA', ['not_configured', 'unknown', 'healthy', 'at_risk', 'breached']]] as [string, string, string[]][]).map(([key, label, options]) => <div className="field" key={key}>
@@ -84,8 +86,8 @@ export function CatalogView({ openTab, initialKind = "", initialQuery = "" }: { 
       <div className="toolbar-group"><span className="muted result-count" role="status">{busy ? "Searching…" : `${result?.total ?? 0} objects you can access`}</span>
         {result?.approximate && <span className="muted result-count">· includes close spelling matches; exact matches rank first</span>}</div>
       <div className="toolbar-group">
-        <button className="btn sm ghost" disabled={Object.entries(filters).every(([k, v]) => k === "sort" ? v === "relevance" : k === "offset" || !v)}
-          onClick={() => setFilters((f) => Object.fromEntries(Object.keys(f).map((k) => [k, k === "sort" ? "relevance" : k === "offset" ? "0" : ""])))}>Clear filters</button>
+        <button className="btn sm ghost" disabled={Object.entries(filters).every(([k, v]) => k === "sort" ? v === "relevance" : k === "offset" || k === "layer" || !v)}
+          onClick={() => setFilters((f) => Object.fromEntries(Object.keys(f).map((k) => [k, k === "sort" ? "relevance" : k === "offset" ? "0" : k === "layer" ? layerId : ""])))}>Clear filters</button>
         <label className="row muted" htmlFor="catalog-sort" style={{ fontSize: 12, gap: 6 }}>Sort results
           <select id="catalog-sort" style={{ height: 22 }} value={filters.sort} onChange={(e) => filter("sort", e.target.value)}><option value="relevance">Relevance</option><option value="name">Name</option><option value="recent">Recently observed</option></select></label>
       </div>

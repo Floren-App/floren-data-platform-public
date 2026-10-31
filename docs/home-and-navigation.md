@@ -25,7 +25,7 @@ It groups the sections by what you do:
 | Group | Section | What it is for |
 |---|---|---|
 | Overview | **Home** | Your workspaces, recent runs, recent deployments and followed Airflow pipelines |
-| | **Catalog** | Search, governance, lineage, quality and SLAs ([catalog](catalog.md)) |
+| | **Catalog** | Data products to find and request, with their lineage; All objects for engineers ([catalog](catalog.md)) |
 | | **Usage** | How full each compute pool is and what runs on it, in your layer; **All layers** shows every layer ([compute pools](compute.md)) |
 | Build | **Workspaces** | Your private VS Code, RStudio and SQL editors; tabs for their runs and your Git credentials ([workspaces](workspaces.md)) |
 | | **Workloads** | Folders of published programs, apps, dbt projects and Airflow deployments; each folder has Recent runs and Logs tabs ([publishing](deploying.md), [logs](logging.md)) |

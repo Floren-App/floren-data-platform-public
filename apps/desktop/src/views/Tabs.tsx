@@ -15,6 +15,7 @@ import { DataSourcesView, FolderView, SchemaView, ServiceView, ServicesView, Sou
 import type { ObjectSection } from "../components/Permissions";
 import { AdminRuntimes, AdminServiceAccounts, SecretsTab } from "./Identity";
 import { CatalogObject, CatalogView } from "./Catalog";
+import { AccessRequestsView, ProductsView, ProductView } from "./Products";
 import { Home, WorkspacesView } from "./Home";
 import { ApisView, ApiView } from "./Apis";
 import { ensureGitChoice, GitCredentialsTab, WorkspaceGit } from "./GitCredentials";
@@ -27,6 +28,7 @@ import { rEnabled, type PackageKind } from "../api";
 import { KafkaClustersView, KafkaView } from "./Kafka";
 
 export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
+  | "products" | "product" | "access-requests"
   | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
 
 export interface TabRef {
@@ -36,7 +38,10 @@ export interface TabRef {
   title: string;
   section?: ObjectSection;
   search?: string;
-  intent?: "create-folder" | "create";
+  intent?: "create-folder" | "create" | "publish" | "request";
+  /** Data products: the catalog object to publish (intent "publish"). */
+  assetId?: string;
+  productSection?: "overview" | "lineage" | "used-by";
   catalogSection?: "overview" | "lineage" | "governance" | "sla" | "access" | "metrics";
   apiSection?: "operations" | "settings" | "calls" | "permissions";
   /** An endpoint group or operation resource to select on the API page. */
@@ -58,7 +63,10 @@ export function TabContent({ tab, hub, openTab }: Props) {
   switch (tab.kind) {
     case "apis": return <ApisView direction={tab.ref === "external" ? "external" : "internal"} hub={hub} openTab={openTab} />;
     case "api": return <ApiView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
-    case "catalog": return <CatalogView openTab={openTab} initialKind={tab.ref} initialQuery={tab.search} />;
+    case "catalog": return <CatalogView openTab={openTab} initialKind={tab.ref} initialQuery={tab.search} layerId={hub.layerId} />;
+    case "products": return <ProductsView key={tab.ref ?? ""} tab={tab} hub={hub} openTab={openTab} />;
+    case "product": return <ProductView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
+    case "access-requests": return <AccessRequestsView key={tab.ref ?? ""} tab={tab} hub={hub} openTab={openTab} />;
     case "catalog-object": return <CatalogObject tab={tab} hub={hub} openTab={openTab} />;
     case "access": return <AccessTab hub={hub} openTab={openTab} groupId={tab.ref} bindingPrincipalId={tab.bindingPrincipalId} onSelect={(id, name) => openTab({ kind: "access", ref: id, title: name, bindingPrincipalId: tab.bindingPrincipalId })} />;
     case "users": return <UsersTab hub={hub} selectedId={tab.ref} openTab={openTab} />;

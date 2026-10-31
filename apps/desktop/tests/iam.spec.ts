@@ -165,6 +165,9 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     if (path === "/v1/repos/analytics/branches") return respond([{ name: "main", sha: "abc1234" }]);
     if (path === "/v1/repos/analytics/pull") return respond({ commit: { sha: "abc1234" }, errors: [], programs: { transform: { kind: "script", runtime: "python", entrypoint: "transform.py", data_sources: [], args: [], warehouse: "small" } } });
     if (path === "/v1/workspaces" || path === "/v1/runs" || path.endsWith("/tokens")) return respond([]);
+    if (path === "/v1/catalog/products") return respond({ items: [], domains: [], kinds: [] });
+    if (path === "/v1/catalog/requests") return respond([]);
+    if (/^\/v1\/catalog\/assets\/[^/]+\/product$/.test(path)) return respond({ publishable: false, can_publish: false, product: null, uses: [], domain: "", classification: "unclassified" });
     return respond({ detail: `Unexpected test request: ${method} ${path}` }, 404);
   });
   await page.goto("/");
@@ -611,6 +614,83 @@ test("a workload's Versions tab follows Git and shows what ran when", async ({ p
   expect(state.errors).toEqual([]);
 });
 
+test("catalog: data products as cards, lineage without access, requests and approval", async ({ page }) => {
+  const state = await setup(page);
+  const product = (id: string, title: string, kind: string, access: string, extra: Record<string, unknown> = {}) => ({ id, asset_id: "asset-" + id, title, summary: `${title} summary.`,
+    kind, runtime: kind === "app" ? "python" : null, name: title.toLowerCase(), layer_id: "1a0000000002", layer_name: "Non-Prod", domain: "Games", classification: "internal",
+    status: "certified", steward: "Jesse", owner_group_name: "Data engineers", updated_at: new Date(Date.now() - 2 * 3600_000).toISOString(), sla_status: "healthy",
+    published_at: "2026-10-31T09:00:00Z", published_by: "admin", access, can_manage: false, grants: kind === "app" ? "Executor" : "Reader",
+    grants_on: kind === "app" ? { kind: "service", name: title } : { kind: "schema", name: "pokemon_history" },
+    open: access === "granted" ? { resource_kind: "service", resource_id: "sales-service", object_id: "sales", object_path: null } : null, ...extra });
+  const dash = product("p1", "Pokemon dashboard", "app", "granted"), stats = product("p2", "pokemon_stats", "table", "none");
+  const asked: string[] = [], posted: unknown[] = [];
+  let requests: Record<string, unknown>[] = [{ id: "r1", product_id: "p2", product: "pokemon_stats", requester: "bob", app_group_id: "analysts", group: "Analysts", reason: "Weekly report",
+    status: "pending", role: "Reader", decided_by: "", decision_note: "", created_at: new Date().toISOString(), decided_at: null, grants_on: { kind: "schema", name: "pokemon_history" } }];
+  await page.route(/\/v1\/catalog\/(products|requests|assets\/[^/]+\/product)/, async (route) => {
+    const url = new URL(route.request().url()), method = route.request().method(); asked.push(`${method} ${url.pathname}${url.search}`);
+    if (url.pathname.endsWith("/products") && method === "GET") return route.fulfill({ json: { items: url.searchParams.get("accessible") ? [dash] : [dash, stats], domains: ["Games"], kinds: ["app", "table"] } });
+    if (url.pathname.endsWith("/products/p2") && method === "GET") return route.fulfill({ json: { ...stats, used_by: [dash], used_by_others: 1,
+      lineage: [{ key: "step-0", asset_id: null, name: "stg_pokemon", kind: "dbt_model", depth: 1, owner_group_name: "Data engineers", visible: false, product_id: null },
+        { key: "step-1", asset_id: null, name: "pokemon-landing", kind: "schema", depth: 2, owner_group_name: "Platform", visible: false, product_id: null }],
+      lineage_edges: [{ source: "step-0", target: "product" }, { source: "step-1", target: "step-0" }] } });
+    if (url.pathname.endsWith("/products/p2/requests")) { posted.push(route.request().postDataJSON()); return route.fulfill({ status: 201, json: { ...requests[0], id: "r2", requester: "admin" } }); }
+    if (url.pathname.endsWith("/requests") && method === "GET") return route.fulfill({ json: url.searchParams.get("box") === "mine" ? [] : requests });
+    if (url.pathname.endsWith("/requests/r1/decision")) { posted.push(route.request().postDataJSON()); requests = [{ ...requests[0], status: "approved", decided_by: "admin" }]; return route.fulfill({ json: requests[0] }); }
+    if (url.pathname.includes("/assets/")) return route.fulfill({ json: { publishable: true, can_publish: true, product: null, uses: [{ asset_id: "asset-p2", name: "pokemon_stats", kind: "table", published: false }], domain: "", classification: "unclassified" } });
+    return route.fulfill({ status: 404, json: { detail: "not mocked" } });
+  });
+  const main = page.locator(".main"), sidebar = page.locator(".sidebar");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "Data products", exact: true })).toBeVisible();
+  const card = main.getByRole("article", { name: "pokemon_stats" });
+  await expect(card).toContainText("Data engineers · Games");
+  await expect(card).toContainText("Updated 2 hours ago");
+  await expect(main.getByRole("article", { name: "Pokemon dashboard" })).toContainText("You have access");
+  const box = await card.boundingBox(); expect(Math.round(box!.width / box!.height)).toBe(2);  // wide cards, 2:1
+  expect(asked.some((a) => a.includes("layer_id=1a0000000002"))).toBeTruthy();                // follows the layer mode
+  await main.getByRole("checkbox", { name: "Only what I can use" }).check();
+  await expect(main.getByRole("article")).toHaveCount(1);
+  await main.getByRole("checkbox", { name: "Only what I can use" }).uncheck();
+
+  // Without access: what it is and its lineage, no details; request access for a group.
+  await card.getByRole("button", { name: "Request access", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "pokemon_stats", exact: true })).toBeVisible();
+  await expect(main).toContainText("Reader on schema pokemon_history (all its tables)");
+  await expect(main).toContainText("Columns, previews and SQL are shown once you have access.");
+  await main.getByRole("textbox", { name: "Why you need it" }).fill("Weekly price report");
+  await main.getByRole("button", { name: "Send request", exact: true }).click();
+  await expect(main.getByRole("status")).toContainText("Request sent");
+  expect(posted[0]).toEqual({ app_group_id: "analysts", reason: "Weekly price report" });
+  await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
+  const lineage = main.getByRole("list", { name: "Lineage" });
+  await expect(lineage.getByRole("listitem")).toHaveCount(3);
+  await expect(lineage.getByRole("listitem").first()).toContainText("pokemon-landing");      // sources on the left
+  await expect(lineage.locator(".product-step.hidden")).toHaveCount(2);
+  await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Used by", exact: true }).click();
+  await expect(main.getByRole("article", { name: "Pokemon dashboard" })).toBeVisible();
+  await expect(main).toContainText("1 other object uses it (not published).");
+
+  // Owners approve in Access requests (the sidebar counts what waits).
+  await expect(sidebar.getByRole("button", { name: /Access requests/ })).toContainText("1");
+  await sidebar.getByRole("button", { name: /Access requests/ }).click();
+  const inbox = main.getByRole("table", { name: "Requests to approve" });
+  await expect(inbox).toContainText("grants Reader on schema pokemon_history");
+  await inbox.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(inbox).toContainText("approved");
+  expect(posted[1]).toEqual({ approve: true, note: "" });
+
+  // Publish from the object's own page: it opens the publish form with what it uses offered too.
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
+  await main.getByRole("button", { name: "Finance", exact: true }).click();
+  await main.getByRole("button", { name: "Reports", exact: true }).click();
+  await page.route("https://iam.test/api/v1/catalog/resources/sales-service/asset", (route) => route.fulfill({ json: { id: "asset-sales" } }));
+  await main.getByRole("button", { name: "Sales app", exact: true }).click();
+  await main.getByRole("button", { name: "Publish to catalog", exact: true }).click();
+  const form = main.getByRole("form", { name: "Publish a data product" });
+  await expect(form.getByRole("checkbox", { name: /pokemon_stats/ })).toBeChecked();
+  expect(state.errors).toEqual([]);
+});
+
 test("logs: a workload's Logs tab, the joint Workloads log and a run's log", async ({ page }) => {
   const state = await setup(page);
   const asked: URLSearchParams[] = [];
@@ -803,6 +883,7 @@ test("lineage containers reroute all four model and schema expansion combination
     .map(([source,target,relation],i) => ({ id: "detail-"+i, source,target,relation,origin:"dbt_manifest",revision:"sha",observed_at:"2026-10-28T12:00:00Z" }));
   await page.route("https://iam.test/api/v1/catalog/assets/*/lineage?*", route => route.fulfill({ json: { nodes, edges, truncated: false } }));
   await page.getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   const main = page.locator(".main");
   await main.getByRole("button", { name: "Card models", exact: true }).click();
   await main.getByRole("navigation", { name: "Catalog sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
@@ -854,6 +935,7 @@ for (const inspectChild of [false, true]) test(`Airflow hierarchy ${inspectChild
   const edges = [{ id: "task-dependency", source: extract.id, target: load.id, relation: "depends_on", origin: "airflow_dag", revision: "sha", observed_at: "2026-10-28T12:00:00Z", control: true }];
   await page.route("https://iam.test/api/v1/catalog/assets/*/lineage?*", route => route.fulfill({json:{nodes,edges,truncated:false}}));
   await page.getByRole("button", {name:"Catalog",exact:true}).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   const main=page.locator(".main");
   await main.getByRole("button", {name:inspected.name,exact:true}).click();
   await main.getByRole("navigation", {name:"Catalog sections"}).getByRole("button",{name:"Lineage",exact:true}).click();
@@ -894,6 +976,7 @@ test("dbt project lineage groups models and highlights their paths and output im
     .map(([source, target, relation], i) => ({ id: `edge-${i}`, source, target, relation, origin: "dbt_manifest", revision: "sha", observed_at: "2026-10-19T12:00:00Z" }));
   await page.route("https://iam.test/api/v1/catalog/assets/*/lineage?*", route => route.fulfill({ json: { nodes, edges, truncated: false } }));
   await page.getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   const main = page.locator(".main");
   await main.getByRole("button", { name: "Card models", exact: true }).click();
   await main.getByRole("navigation", { name: "Catalog sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
@@ -960,6 +1043,7 @@ test("catalog searches products and exposes governance SLA access and interactiv
   const state = await setup(page);
   const main = page.locator(".main");
   await page.getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   await expect(main.getByRole("table", { name: "Catalog results" })).toBeVisible();
   await main.getByLabel("Search the catalog", { exact: true }).fill("Sales app");
   await expect(main.getByRole("status")).toHaveText("1 objects you can access");
@@ -1006,6 +1090,7 @@ test("catalog readers cannot edit governance SLAs or grants and table access sta
   const state = await setup(page, "reader");
   const main = page.locator(".main");
   await page.getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   await main.getByRole("button", { name: "Revenue", exact: true }).click();
   const nav = page.getByRole("navigation", { name: "Catalog sections" });
   await nav.getByRole("button", { name: "Governance", exact: true }).click();
@@ -1049,6 +1134,7 @@ test("lineage groups native Airflow tasks and supports expansion columns and dow
   });
   const main = page.locator(".main");
   await page.getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   await main.getByRole("button", { name: "Revenue", exact: true }).click();
   await page.getByRole("navigation", { name: "Catalog sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
   await main.getByRole("button", { name: "Upstream & downstream", exact: true }).click();
@@ -1277,6 +1363,7 @@ test("large lineage graphs start compact and trace the selected path", async ({ 
     route.fulfill({ json: { nodes: [{ ...table, distance: 0 }, ...ids.map(node)], edges, truncated: false } }));
   const main = page.locator(".main");
   await page.getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   await main.getByRole("button", { name: "Revenue", exact: true }).click();
   await page.getByRole("navigation", { name: "Catalog sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
   const graph = main.getByRole("region", { name: "Interactive lineage graph" });
@@ -1753,6 +1840,7 @@ test("lineage keeps data scope and overlays only relevant orchestration on deman
   });
   const main = page.locator(".main");
   await page.getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   await main.getByRole("button", { name: "Sales app", exact: true }).click();
   await page.getByRole("navigation", { name: "Catalog sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
   await expect(main.getByRole("button", { name: "Upstream lineage", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -1885,25 +1973,26 @@ test("navigation replaces the preview page and only pinned tabs stay open", asyn
   await expect(tabs.getByRole("tab")).toHaveCount(1);
   await expect(tabs.getByRole("tab", { name: "Home", exact: true })).toHaveCount(0);
   await nav.getByRole("button", { name: "Catalog", exact: true }).click();
-  await tabs.getByRole("button", { name: "Pin Catalog", exact: true }).click();
-  await expect(tabs.getByRole("button", { name: "Unpin Catalog", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await tabs.getByRole("button", { name: "Pin Data products", exact: true }).click();
+  await expect(tabs.getByRole("button", { name: "Unpin Data products", exact: true })).toHaveAttribute("aria-pressed", "true");
   await nav.getByRole("button", { name: "Workloads", exact: true }).click();
   await expect(tabs.getByRole("tab")).toHaveCount(2);
   await nav.getByRole("button", { name: "APIs", exact: true }).click();
   await expect(tabs.getByRole("tab")).toHaveCount(2);
-  await expect(tabs.getByRole("tab", { name: "Catalog", exact: true })).toBeVisible();
+  await expect(tabs.getByRole("tab", { name: "Data products", exact: true })).toBeVisible();
   await expect(tabs.getByRole("tab", { name: "Workloads", exact: true })).toHaveCount(0);
-  await tabs.getByRole("button", { name: "Unpin Catalog", exact: true }).click();
+  await tabs.getByRole("button", { name: "Unpin Data products", exact: true }).click();
   await expect(tabs.getByRole("tab")).toHaveCount(1);
-  await expect(tabs.getByRole("tab", { name: "Catalog", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(tabs.getByRole("tab", { name: "Data products", exact: true })).toHaveAttribute("aria-selected", "true");
   await nav.getByRole("button", { name: "Home", exact: true }).click();
-  await expect(tabs.getByRole("tab", { name: "Catalog", exact: true })).toHaveCount(0);
+  await expect(tabs.getByRole("tab", { name: "Data products", exact: true })).toHaveCount(0);
   expect(state.errors).toEqual([]);
 });
 
 test("pin state survives object section changes and pinned tabs can be closed", async ({ page }) => {
   const state = await setup(page), main = page.locator(".main");
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   await main.getByRole("button", { name: "Sales app", exact: true }).click();
   await main.getByRole("button", { name: "Pin Sales app", exact: true }).click();
   await page.getByRole("navigation", { name: "Catalog sections" }).getByRole("button", { name: "SLA", exact: true }).click();
@@ -2121,6 +2210,7 @@ test("switching group refreshes storage and catalog without reusing the previous
   await openSchema(page);
   expect(state.dataReads.length).toBeGreaterThan(0);
   await nav.getByRole("button",{name:"Catalog",exact:true}).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click(); // All objects
   await expect(main.getByRole("table",{name:"Catalog results"})).toContainText("Revenue");
   await picker.selectOption("operators");
   await expect(picker).toBeEnabled();
@@ -2253,7 +2343,7 @@ test('catalog owners define and measure a KPI and inspect its history',async({pa
   const observation={id:'measurement',observed_at:'2026-10-20T10:00:00Z',value:98.7,status:'at_risk',definition_version:1,origin:'trino',revision:'',run_id:'',detail:{}};
   await page.route('https://iam.test/api/v1/catalog/assets/cat-table/metrics/coverage/measure',route=>{metrics[0].latest=observation;return route.fulfill({json:observation});});
   await page.route('https://iam.test/api/v1/catalog/assets/cat-table/metrics/coverage/history',route=>route.fulfill({json:[observation]}));
-  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Catalog',exact:true}).click();
+  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Catalog',exact:true}).click(); await page.locator('.sidebar').getByRole('button',{name:'Everything',exact:true}).click();
   await main.getByRole('button',{name:'Revenue',exact:true}).click();
   await page.getByRole('navigation',{name:'Catalog sections'}).getByRole('button',{name:'KPIs & quality',exact:true}).click();
   await main.getByRole('button',{name:'Add definition',exact:true}).click();
@@ -2276,7 +2366,7 @@ test('SLA policies support schedules and quality requirements with alert acknowl
   const incident={id:'late-data',asset_id:'cat-table',status:'breached',opened_at:'2026-10-20T05:16:00Z',updated_at:'2026-10-20T05:16:00Z',resolved_at:null,acknowledged_at:null as string|null,detail:{}};
   await page.route('https://iam.test/api/v1/catalog/alerts?asset_id=cat-table',route=>route.fulfill({json:[incident]}));
   await page.route('https://iam.test/api/v1/catalog/alerts/late-data/acknowledge',route=>{incident.acknowledged_at='2026-10-20T06:00:00Z';return route.fulfill({json:{id:incident.id}});});
-  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Catalog',exact:true}).click();
+  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Catalog',exact:true}).click(); await page.locator('.sidebar').getByRole('button',{name:'Everything',exact:true}).click();
   await main.getByRole('button',{name:'Revenue',exact:true}).click();
   await page.getByRole('navigation',{name:'Catalog sections'}).getByRole('button',{name:'SLA',exact:true}).click();
   await main.getByLabel('Daily deadline',{exact:true}).fill('07:00');

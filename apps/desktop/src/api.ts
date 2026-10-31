@@ -521,6 +521,26 @@ export function ago(iso?: string | null): string {
   return `${n} ${unit}${n === 1 || unit === "min" ? "" : "s"} ago`;
 }
 
+/** A published data product: its card is visible to everyone in its layer, with or without access. */
+export interface Product {
+  id: string; asset_id: string; title: string; summary: string; kind: string; runtime: string | null; name: string;
+  layer_id: string | null; layer_name: string | null; domain: string; classification: string; status: string; steward: string;
+  owner_group_name: string | null; updated_at: string | null; sla_status: string; published_at: string; published_by: string;
+  access: "granted" | "requested" | "none"; can_manage: boolean; grants: string; grants_on: { kind: string; name: string };
+  open: { resource_kind: string; resource_id: string; object_id: string | null; object_path: string | null } | null;
+}
+/** A step in a product's lineage. Steps you may not open carry only name, kind and owner. */
+export interface ProductStep { key: string; asset_id: string | null; name: string; kind: string; depth: number; owner_group_name: string | null; visible: boolean; product_id: string | null; runtime?: string | null }
+export interface ProductDetail extends Product { lineage: ProductStep[]; lineage_edges: { source: string; target: string }[]; used_by: Product[]; used_by_others: number }
+export interface ProductCandidate { asset_id: string; name: string; kind: string; path: string; layer_id: string | null; layer_name: string | null }
+export interface AssetProduct { publishable: boolean; can_publish: boolean; product: Product | null; uses: { asset_id: string; name: string; kind: string; published: boolean }[]; domain: string; classification: string }
+export interface AccessRequestItem {
+  id: string; product_id: string; product: string; requester: string; app_group_id: string; group: string; reason: string;
+  status: "pending" | "approved" | "declined" | "withdrawn"; role: string; decided_by: string; decision_note: string;
+  created_at: string; decided_at: string | null; grants_on: { kind: string; name: string } | null;
+}
+export interface PublishInput { asset_id: string; title?: string; summary?: string; domain?: string; classification?: string; also?: string[] }
+
 /** One line of the central log. Run, workload, commit and layer are stamped by the platform. */
 export interface LogEntry {
   id: number; at: string; level: "debug" | "info" | "warning" | "error"; source: "platform" | "program" | "airflow";
@@ -806,6 +826,20 @@ export const api = {
   workloads: () => request<Workload[]>("GET", "/v1/workloads"),
   workload: (id: string) => request<Workload>("GET", `/v1/workloads/${id}`),
   workloadVersions: (id: string) => request<WorkloadVersions>("GET", `/v1/workloads/${id}/versions`),
+  products: {
+    list: (filters: Record<string, string | boolean> = {}) => request<{ items: Product[]; domains: string[]; kinds: string[] }>("GET",
+      `/v1/catalog/products?${new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== "" && v !== false).map(([k, v]) => [k, String(v)]))}`),
+    get: (id: string) => request<ProductDetail>("GET", `/v1/catalog/products/${id}`),
+    candidates: (layerId: string, q = "") => request<ProductCandidate[]>("GET", `/v1/catalog/products/candidates?${new URLSearchParams({ layer_id: layerId, q })}`),
+    forAsset: (assetId: string) => request<AssetProduct>("GET", `/v1/catalog/assets/${assetId}/product`),
+    publish: (body: PublishInput) => request<Product>("POST", "/v1/catalog/products", body),
+    update: (id: string, body: { title?: string; summary?: string }) => request<Product>("PATCH", `/v1/catalog/products/${id}`, body),
+    unpublish: (id: string) => request<void>("DELETE", `/v1/catalog/products/${id}`),
+    requestAccess: (id: string, app_group_id: string, reason: string) => request<AccessRequestItem>("POST", `/v1/catalog/products/${id}/requests`, { app_group_id, reason }),
+    requests: (box: "approve" | "mine") => request<AccessRequestItem[]>("GET", `/v1/catalog/requests?box=${box}`),
+    decide: (id: string, approve: boolean, note: string) => request<AccessRequestItem>("POST", `/v1/catalog/requests/${id}/decision`, { approve, note }),
+    withdraw: (id: string) => request<void>("DELETE", `/v1/catalog/requests/${id}`),
+  },
   logs: (query: LogQuery) => request<LogPage>("GET", `/v1/logs?${new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]))}`),
   deploy: (body: { repo_id: string; branch: string; program: string; slug: string; title: string;
                     layer_id?: string; warehouse?: string; allowed_groups: string[]; auto_update: boolean; run_as?: string;

@@ -21,7 +21,7 @@ const viewForTab = (tab: TabRef): View => {
   // Workspace runs belong with workspaces; runs of deployed programs with workloads.
   if ((tab.kind === "run" && tab.runScope === "workspace") || (tab.kind === "runs" && tab.ref === "workspace")) return "workspaces";
   if (["run", "runs", "workload", "deploy", "folder", "docs"].includes(tab.kind)) return "workloads";
-  if (tab.kind.startsWith("catalog")) return "catalog";
+  if (tab.kind.startsWith("catalog") || ["products", "product", "access-requests"].includes(tab.kind)) return "catalog";
   if (["apis", "api"].includes(tab.kind)) return "apis";
   if (["kafka", "kafka-clusters"].includes(tab.kind)) return "kafka";
   if (["data", "source", "schema", "data-object"].includes(tab.kind)) return "data";
@@ -170,7 +170,7 @@ function Shell({ user }: { user: User }) {
       workspaces: { kind: "workspaces", title: "Workspaces" },
       access: { kind: "access", title: "App groups" },
       workloads: { kind: "folder", ref: "workloads", title: "Workloads" },
-      catalog: { kind: "catalog", title: "Catalog" },
+      catalog: { kind: "products", title: "Data products" },
       apis: { kind: "apis", ref: "internal", title: "API management" },
       data: { kind: "data", title: "Storage" },
       kafka: { kind: "kafka-clusters", title: "Kafka" },
