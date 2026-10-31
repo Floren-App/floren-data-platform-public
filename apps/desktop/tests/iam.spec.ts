@@ -2009,6 +2009,14 @@ test("activity bar shows its labels on hover without taking room", async ({ page
   await expect(bar.getByRole("button", { name: "Workspaces", exact: true })).toContainText("Workspaces");
   await page.mouse.move(700, 300);
   await expect.poll(async () => (await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
+  // Choosing a section closes the labels at once, so the sidebar is usable; they open again on the next hover.
+  await bar.getByRole("button", { name: "Workspaces", exact: true }).click();
+  await page.waitForTimeout(300);
+  expect((await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
+  await expect(sidebar.getByRole("button", { name: "Git credentials", exact: true })).toBeVisible();
+  await page.mouse.move(700, 300);
+  await bar.getByRole("button", { name: "Catalog", exact: true }).hover();
+  await expect.poll(async () => (await bar.boundingBox())!.width).toBeGreaterThan(150);
   expect(state.errors).toEqual([]);
 });
 
@@ -2040,6 +2048,13 @@ test("folders follow the layer, workspaces follow the group, and Git credentials
   await sidebar.getByRole("button", { name: "Git credentials", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Git credentials" })).toBeVisible();
   await expect(main.getByRole("navigation", { name: "Workspace sections" }).getByRole("button", { name: "Git credentials", exact: true })).toHaveAttribute("aria-current", "page");
+  // Git credentials belong to Workspaces, also when opened from the Account menu.
+  await expect(views.getByRole("button", { name: "Workspaces", exact: true })).toHaveAttribute("aria-current", "page");
+  await views.getByRole("button", { name: "Catalog", exact: true }).click();
+  await views.getByRole("button", { name: "Account", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Git credentials", exact: true }).click();
+  await expect(views.getByRole("button", { name: "Workspaces", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(sidebar.getByRole("button", { name: "Git credentials", exact: true })).toBeVisible();
   await views.getByRole("button", { name: "Usage", exact: true }).click();
   await expect(sidebar.getByRole("button", { name: /small/ }).locator(".dot")).toHaveClass(/queued/); // in use with work waiting
   expect(state.errors).toEqual([]);
