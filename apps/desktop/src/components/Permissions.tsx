@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, AccessResource, AppGroup, RoleAssignment, ServicePrincipal } from "../api";
+import { api, AccessResource, ApiError, AppGroup, CaseTarget, Requirement, RoleAssignment, ServicePrincipal } from "../api";
+import { JustifyPanel } from "./ComplianceForm";
 import { ProductIcon } from "./ProductIcon";
 import type { TabRef } from "../views/Tabs";
 import { IconRefresh } from "./Icons";
@@ -160,14 +161,20 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
     if (initialServiceId) { setRecipientType("service"); setServiceId(initialServiceId); }
   }, [initialServiceId]);
 
+  const [justify, setJustify] = useState<{ target: CaseTarget; requirement: Requirement } | null>(null);
   const change = async (fn: () => Promise<unknown>, success: string) => {
-    setBusy(true); setError(""); setMessage("");
+    setBusy(true); setError(""); setMessage(""); setJustify(null);
     try {
       await fn();
       // Refresh capabilities even when the change removes our own access.
       await onChanged();
       setAssignments(await api.access.assignments(resource.id)); setMessage(success);
-    } catch (e) { setError((e as Error).message); }
+    } catch (e) {
+      // Data under an access policy: the role is given once a compliance form is approved.
+      if (e instanceof ApiError && e.requirement && recipientType === "group" && groupId)
+        setJustify({ target: { kind: "role", resource_id: resource.id, role, app_group_id: groupId }, requirement: e.requirement });
+      setError((e as Error).message);
+    }
     finally { setBusy(false); }
   };
   const selectedGroup = groups.find((g) => g.id === groupId);
@@ -216,7 +223,9 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
       : resource.kind === "package" ? "Who publishes new versions of this package and yanks versions. Everyone can install it."
       : "Grants control access to this service. Data access is granted separately on data sources and schemas."}
       {resource.parent_id && " Parent access always applies. Additional grants can be added here."}</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && !justify && <p className="error" role="alert">{error}</p>}
+    {justify && <JustifyPanel target={justify.target} requirement={justify.requirement} onCancel={() => setJustify(null)}
+      onDone={(text) => { setJustify(null); setError(""); setMessage(text); }} />}
     {message && <p className="success-message" role="status">{message}</p>}
     {!canRead ? <p className="muted">You can browse this object's children. Permission details require access to this object.</p>
       : loading ? <p className="muted" role="status">Loading permissions…</p> : <>

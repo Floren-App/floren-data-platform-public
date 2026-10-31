@@ -202,10 +202,11 @@ func (r *dataProductResource) Delete(ctx context.Context, req resource.DeleteReq
 type productConsumerResource struct{ api *client.Client }
 
 type productConsumerModel struct {
-	ID         types.String `tfsdk:"id"`
-	ProductID  types.String `tfsdk:"product_id"`
-	AppGroupID types.String `tfsdk:"app_group_id"`
-	Option     types.String `tfsdk:"option"`
+	ID            types.String `tfsdk:"id"`
+	ProductID     types.String `tfsdk:"product_id"`
+	AppGroupID    types.String `tfsdk:"app_group_id"`
+	Option        types.String `tfsdk:"option"`
+	Justification types.String `tfsdk:"justification_id"`
 }
 
 type productDetail struct {
@@ -237,6 +238,8 @@ func (r *productConsumerResource) Schema(_ context.Context, _ resource.SchemaReq
 			"app_group_id": schema.StringAttribute{Required: true, PlanModifiers: replaceString},
 			"option": schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: keepComputed,
 				Description: "Name of the access option; left out: the product's default option."},
+			"justification_id": schema.StringAttribute{Optional: true,
+				Description: "An approved compliance case for this group and option, needed when an access policy applies."},
 		},
 	}
 }
@@ -278,6 +281,9 @@ func (r *productConsumerResource) put(ctx context.Context, m *productConsumerMod
 			d.d.AddError("Unknown option", "the product has no access option named "+m.Option.ValueString())
 			return
 		}
+	}
+	if !m.Justification.IsNull() && m.Justification.ValueString() != "" {
+		body["justification_id"] = m.Justification.ValueString()
 	}
 	var out struct {
 		Option string `json:"option"`

@@ -20,6 +20,8 @@ export const IconCompute = ({ size = 24 }: P) =>
   svg(size, <><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" /></>);
 export const IconAdmin = ({ size = 24 }: P) =>
   svg(size, <><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z" /><path d="M9 12l2 2 4-4" /></>);
+export const IconPrivacy = ({ size = 24 }: P) =>
+  svg(size, <><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 13l2 2 4-4" /></>);
 export const IconAccount = ({ size = 24 }: P) =>
   svg(size, <><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>);
 export const IconHome = ({ size = 24 }: P) =>

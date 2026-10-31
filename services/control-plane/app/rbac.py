@@ -228,8 +228,9 @@ class ProductGrant:
 
 
 def product_grants(db: Session, assignments) -> list:
-    """Consumers and owners of a data product may read or use everything in it."""
-    from .models import CatalogAsset, CatalogProductMember
+    """Consumers and owners of a data product may read or use everything in it (under an access policy: what their
+    approval covered; objects added later wait for a new approval)."""
+    from .models import CatalogAsset, CatalogProductMember, ProductAccess
     out = []
     for a in assignments:
         if a.role not in PRODUCT_ROLES:
@@ -237,7 +238,12 @@ def product_grants(db: Session, assignments) -> list:
         product = db.get(Resource, a.resource_id)
         if not product or product.kind != "product":
             continue
+        access = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.object_id,
+                                                       ProductAccess.app_group_id == a.app_group_id)) if a.role == "Consumer" else None
+        covered = set(access.approved_assets) if access is not None and access.approved_assets is not None else None
         for m in db.scalars(select(CatalogProductMember).where(CatalogProductMember.product_id == product.object_id)):
+            if covered is not None and m.asset_id not in covered:
+                continue
             asset = db.get(CatalogAsset, m.asset_id)
             target = db.get(Resource, asset.resource_id) if asset else None
             if target is not None and target.kind in READER_ROLE:
@@ -245,16 +251,22 @@ def product_grants(db: Session, assignments) -> list:
     return out
 
 
-def group_grants(db: Session, group_ids) -> list:
-    """Role assignments of these groups, plus what their data product roles give them."""
+def group_grants(db: Session, group_ids, user=None) -> list:
+    """Role assignments of these groups, plus what their data product roles give them. With a user: justified
+    access of a group counts only once the user's membership of it is approved."""
     assigned = list(db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id.in_(list(group_ids)))))
+    if user is not None:
+        from .compliance import unapproved_justified
+        held = unapproved_justified(db, user, group_ids)
+        if held:
+            assigned = [a for a in assigned if (a.resource_id, a.app_group_id) not in held]
     return assigned + product_grants(db, assigned)
 
 
 @cached
 def _role_grants(db, user):
     groups = app_groups(db, user)
-    result = group_grants(db, groups)
+    result = group_grants(db, groups, user)
     principal = db.get(DirectoryPrincipal, user.principal_id)
     if principal and principal.active and principal.kind in ("service", "user"):
         result.extend(db.scalars(select(ServiceRoleAssignment).where(ServiceRoleAssignment.principal_id == user.principal_id)))

@@ -15,6 +15,7 @@ export function documentationUrl(view: View): string {
     catalog: "catalog/",
     access: "rbac/",
     compute: "compute/",
+    privacy: "access-policies/",
     admin: "configuration/",
   };
   return new URL(routes[view], BASE.endsWith("/") ? BASE : `${BASE}/`).href;

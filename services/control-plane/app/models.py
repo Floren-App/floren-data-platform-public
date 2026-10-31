@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, BigInteger, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -756,6 +756,135 @@ class ProductAccess(Base):
     product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
     app_group_id: Mapped[str] = mapped_column(String(12), index=True)
     option_id: Mapped[str] = mapped_column(String(12))
+    # Objects of the product this group may use: None for all; under a policy, the objects its approval covered.
+    approved_assets: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+
+
+class AccessForm(Base):
+    """A compliance form the privacy team designs: versions with pages and fields."""
+    __tablename__ = "compliance_forms"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    description: Mapped[str] = mapped_column(String(1000), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AccessFormVersion(Base):
+    """One version of a form. Edits go to the draft; publishing makes it the version new cases use.
+    Cases keep the version they were filled in with."""
+    __tablename__ = "compliance_form_versions"
+    __table_args__ = (UniqueConstraint("form_id", "version"),)
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    form_id: Mapped[str] = mapped_column(ForeignKey("compliance_forms.id", ondelete="CASCADE"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    definition: Mapped[dict] = mapped_column(JSON, default=dict)   # {"pages": [{id, title, intro, show_if, fields: [...]}]}
+    published: Mapped[bool] = mapped_column(default=False)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_by: Mapped[str] = mapped_column(String(256), default="")
+
+
+class AccessPolicy(Base):
+    """One cell of the policy grid: access to data of this classification in this layer needs this form and review."""
+    __tablename__ = "compliance_policies"
+    __table_args__ = (UniqueConstraint("layer_id", "classification"),)
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    layer_id: Mapped[str] = mapped_column(String(12), index=True)
+    classification: Mapped[str] = mapped_column(String(32))
+    form_id: Mapped[str] = mapped_column(ForeignKey("compliance_forms.id"))
+    steps: Mapped[list] = mapped_column(JSON, default=list)        # [{"role": "data_owner" | "compliance_reviewer", "approvals": 1}]
+    max_days: Mapped[int] = mapped_column(Integer, default=365)    # longest approved access
+    review_days: Mapped[int] = mapped_column(Integer, default=10)  # reviews are due within this many days
+
+
+class ComplianceRole(Base):
+    """A compliance role a group holds, within a scope: objects (resource subtrees), layers, classifications, groups.
+    An empty list in the scope means all."""
+    __tablename__ = "compliance_roles"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    role: Mapped[str] = mapped_column(String(32))   # compliance_reviewer | membership_approver | compliance_admin
+    app_group_id: Mapped[str] = mapped_column(String(12), index=True)
+    scope: Mapped[dict] = mapped_column(JSON, default=dict)  # {resource_ids, layers, classifications, group_ids}
+
+
+class AccessCase(Base):
+    """A justification for access: the filled-in form and its review. Kinds: product (a group as a product's
+    consumer), role (a role on an object) and membership (a person joining a group with justified access)."""
+    __tablename__ = "compliance_cases"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    # draft | in_review | changes_requested | approved | declined | withdrawn | expired
+    requester: Mapped[str] = mapped_column(String(256))
+    requester_principal_id: Mapped[str] = mapped_column(String(12), default="")
+    app_group_id: Mapped[str] = mapped_column(String(12), index=True)   # who gets access
+    resource_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)  # role: the object
+    role: Mapped[str] = mapped_column(String(32), default="")
+    product_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    option_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    principal_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)  # membership: who joins
+    request_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)     # the product access request
+    layer_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    classification: Mapped[str] = mapped_column(String(32), default="")
+    policy_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    form_version_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    answers: Mapped[dict] = mapped_column(JSON, default=dict)
+    steps: Mapped[list] = mapped_column(JSON, default=list)       # the policy's steps when it was submitted
+    step: Mapped[int] = mapped_column(Integer, default=0)
+    decisions: Mapped[list] = mapped_column(JSON, default=list)   # [{step, role, by, decision, note, at}]
+    comments: Mapped[list] = mapped_column(JSON, default=list)    # [{by, text, at}]
+    until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)           # asked for
+    approved_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AccessCaseFile(Base):
+    """A file answer of a case (for example a DPIA document)."""
+    __tablename__ = "compliance_case_files"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    case_id: Mapped[str] = mapped_column(ForeignKey("compliance_cases.id", ondelete="CASCADE"), index=True)
+    field_id: Mapped[str] = mapped_column(String(64))
+    name: Mapped[str] = mapped_column(String(256))
+    content_type: Mapped[str] = mapped_column(String(128), default="application/octet-stream")
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    uploaded_by: Mapped[str] = mapped_column(String(256), default="")
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class JustifiedGrant(Base):
+    """Access given because a case was approved: until when, and which case. New members of the group get it
+    only after their membership is approved (MembershipApproval)."""
+    __tablename__ = "compliance_grants"
+    __table_args__ = (UniqueConstraint("resource_id", "app_group_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    resource_id: Mapped[str] = mapped_column(String(12), index=True)   # the object, or the product's access resource
+    app_group_id: Mapped[str] = mapped_column(String(12), index=True)
+    role: Mapped[str] = mapped_column(String(32))
+    case_id: Mapped[str] = mapped_column(String(12))
+    until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MembershipApproval(Base):
+    """A person may use the justified access of a group they are in."""
+    __tablename__ = "compliance_memberships"
+    __table_args__ = (UniqueConstraint("app_group_id", "principal_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    app_group_id: Mapped[str] = mapped_column(String(12), index=True)
+    principal_id: Mapped[str] = mapped_column(String(12), index=True)
+    approved_by: Mapped[str] = mapped_column(String(256), default="")
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    case_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
 
 
 class AccessRequest(Base):
@@ -771,6 +900,7 @@ class AccessRequest(Base):
     status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending | approved | declined | withdrawn
     role: Mapped[str] = mapped_column(String(32), default="")      # what approval grants
     option_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)  # the product option asked for
+    case_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)    # its justification, when a policy applies
     decided_by: Mapped[str] = mapped_column(String(256), default="")
     decision_note: Mapped[str] = mapped_column(String(1000), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

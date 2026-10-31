@@ -4,7 +4,7 @@ import { currentUser, getServer, onSessionExpired, resetManager, setServer, sign
 import { useHub } from "./hub";
 import { ObjectCacheProvider } from "./cache";
 import {
-  IconPin, IconHome, IconBook, IconAccount, IconAdmin, IconCatalog, IconClose, IconCompute, IconApi, IconPackage, IconData, IconStream, IconDeployed, IconSettings, IconWorkspaces,
+  IconPin, IconHome, IconBook, IconAccount, IconAdmin, IconCatalog, IconClose, IconCompute, IconApi, IconPackage, IconData, IconStream, IconDeployed, IconPrivacy, IconSettings, IconWorkspaces,
 } from "./components/Icons";
 import { MenuButton } from "./components/Menu";
 import { Sidebar, View } from "./views/Sidebar";
@@ -28,6 +28,7 @@ const viewForTab = (tab: TabRef): View => {
   if (tab.kind === "pool") return "compute";
   if (tab.kind.startsWith("package")) return "packages";
   if (tab.kind.startsWith("admin-")) return "admin";
+  if (tab.kind.startsWith("privacy-")) return "privacy";
   return "access";
 };
 const key = (t: TabRef) => t.kind === "access" || t.kind === "users" || t.kind === "catalog" || t.kind === "apis" ? `${t.kind}:` : `${t.kind}:${t.ref ?? ""}`;
@@ -180,6 +181,7 @@ function Shell({ user }: { user: User }) {
       kafka: { kind: "kafka-clusters", title: "Kafka" },
       compute: { kind: "pool", title: "Usage" },
       admin: { kind: "admin-sources", title: "Storage integrations" },
+      privacy: { kind: "privacy-policies", title: "Access policies" },
     };
     if (defaults[next]) openTab(defaults[next]!);
   };
@@ -194,6 +196,7 @@ function Shell({ user }: { user: User }) {
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />
         {(hub.has("security") || hub.has("workspaces")) && activityButton({ id: "access", label: "Security", icon: <IconAdmin /> })}
+        {!!hub.me?.compliance_roles?.length && activityButton({ id: "privacy", label: "Privacy", icon: <IconPrivacy /> })}
         {hub.me?.is_admin && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}
         <button aria-label="Documentation" onClick={() => {
           void hub.act(() => openInWindow(documentationUrl(view), "FDP documentation", `fdp-help-${view}`));

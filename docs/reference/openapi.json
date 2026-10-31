@@ -238,6 +238,19 @@
             ],
             "title": "App Group Id"
           },
+          "justification_id": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An approved compliance case for this access, when an access policy applies (API and Terraform)",
+            "title": "Justification Id"
+          },
           "principal_id": {
             "anyOf": [
               {
@@ -304,6 +317,129 @@
           "sha"
         ],
         "title": "BranchOut",
+        "type": "object"
+      },
+      "CaseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "answers": {
+            "additionalProperties": true,
+            "title": "Answers",
+            "type": "object"
+          },
+          "app_group_id": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "App Group Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "product",
+              "role"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "option_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Option Id"
+          },
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "submit": {
+            "default": true,
+            "title": "Submit",
+            "type": "boolean"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Access needed until (at most the policy's maximum)",
+            "title": "Until"
+          }
+        },
+        "required": [
+          "kind",
+          "app_group_id"
+        ],
+        "title": "CaseIn",
+        "type": "object"
+      },
+      "CasePatch": {
+        "additionalProperties": false,
+        "properties": {
+          "answers": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answers"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "title": "CasePatch",
         "type": "object"
       },
       "CertificatePolicy": {
@@ -409,6 +545,22 @@
           "columns"
         ],
         "title": "ColumnsIn",
+        "type": "object"
+      },
+      "CommentIn": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "CommentIn",
         "type": "object"
       },
       "CommitOut": {
@@ -529,6 +681,19 @@
       "ConsumerIn": {
         "additionalProperties": false,
         "properties": {
+          "justification_id": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An approved compliance case for this group and option, when an access policy applies",
+            "title": "Justification Id"
+          },
           "option_id": {
             "anyOf": [
               {
@@ -796,26 +961,6 @@
           "manifest"
         ],
         "title": "DbtImport",
-        "type": "object"
-      },
-      "DecisionIn": {
-        "additionalProperties": false,
-        "properties": {
-          "approve": {
-            "title": "Approve",
-            "type": "boolean"
-          },
-          "note": {
-            "default": "",
-            "maxLength": 1000,
-            "title": "Note",
-            "type": "string"
-          }
-        },
-        "required": [
-          "approve"
-        ],
-        "title": "DecisionIn",
         "type": "object"
       },
       "DefaultLayerIn": {
@@ -1092,49 +1237,6 @@
         "title": "ExternalOperation",
         "type": "object"
       },
-      "FileIn": {
-        "additionalProperties": false,
-        "properties": {
-          "content_type": {
-            "default": "application/octet-stream",
-            "maxLength": 128,
-            "title": "Content Type",
-            "type": "string"
-          },
-          "data": {
-            "default": "",
-            "maxLength": 7340032,
-            "title": "Data",
-            "type": "string"
-          },
-          "operation": {
-            "enum": [
-              "read",
-              "write",
-              "delete",
-              "list"
-            ],
-            "title": "Operation",
-            "type": "string"
-          },
-          "path": {
-            "default": "",
-            "maxLength": 1024,
-            "title": "Path",
-            "type": "string"
-          },
-          "source": {
-            "title": "Source",
-            "type": "string"
-          }
-        },
-        "required": [
-          "source",
-          "operation"
-        ],
-        "title": "FileIn",
-        "type": "object"
-      },
       "FilterIn": {
         "additionalProperties": false,
         "properties": {
@@ -1183,6 +1285,35 @@
           "expression"
         ],
         "title": "FilterIn",
+        "type": "object"
+      },
+      "FormIn": {
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "additionalProperties": true,
+            "description": "{pages: [{id, title, intro, show_if, fields: [{id, label, help, type, required, options, show_if}]}]}",
+            "title": "Definition",
+            "type": "object"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "definition"
+        ],
+        "title": "FormIn",
         "type": "object"
       },
       "GitCredentialIn": {
@@ -2354,6 +2485,14 @@
             "title": "Available Groups",
             "type": "array"
           },
+          "compliance_roles": {
+            "description": "Compliance roles this person holds (in any scope)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Compliance Roles",
+            "type": "array"
+          },
           "data_sources": {
             "items": {
               "$ref": "#/components/schemas/DataSourceOut"
@@ -2435,6 +2574,26 @@
           "resource_id"
         ],
         "title": "MemberRef",
+        "type": "object"
+      },
+      "MembershipDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approve"
+        ],
+        "title": "MembershipDecision",
         "type": "object"
       },
       "MetricIn": {
@@ -3315,75 +3474,6 @@
         "title": "PolicyChange",
         "type": "object"
       },
-      "PolicyIn": {
-        "properties": {
-          "column": {
-            "default": "",
-            "description": "Column masks: the masked column",
-            "maxLength": 256,
-            "title": "Column",
-            "type": "string"
-          },
-          "description": {
-            "default": "",
-            "maxLength": 1024,
-            "title": "Description",
-            "type": "string"
-          },
-          "exempt_groups": {
-            "description": "App group IDs that see the real values / all rows",
-            "items": {
-              "type": "string"
-            },
-            "title": "Exempt Groups",
-            "type": "array"
-          },
-          "exempt_principals": {
-            "description": "Identity IDs (people or managed identities) exempted",
-            "items": {
-              "type": "string"
-            },
-            "title": "Exempt Principals",
-            "type": "array"
-          },
-          "expression": {
-            "default": "",
-            "description": "The mask expression (method expression) or the row filter condition, in Trino SQL",
-            "maxLength": 4000,
-            "title": "Expression",
-            "type": "string"
-          },
-          "kind": {
-            "description": "column_mask or row_filter",
-            "title": "Kind",
-            "type": "string"
-          },
-          "method": {
-            "default": "",
-            "description": "Column masks: null, redact, hash, partial or expression",
-            "title": "Method",
-            "type": "string"
-          },
-          "schema_id": {
-            "description": "The governed schema (its resource ID)",
-            "title": "Schema Id",
-            "type": "string"
-          },
-          "table": {
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Table",
-            "type": "string"
-          }
-        },
-        "required": [
-          "schema_id",
-          "table",
-          "kind"
-        ],
-        "title": "PolicyIn",
-        "type": "object"
-      },
       "PolicyOut": {
         "properties": {
           "column": {
@@ -4143,6 +4233,12 @@
       "RequestIn": {
         "additionalProperties": false,
         "properties": {
+          "answers": {
+            "additionalProperties": true,
+            "description": "The compliance form, when an access policy applies",
+            "title": "Answers",
+            "type": "object"
+          },
           "app_group_id": {
             "maxLength": 12,
             "minLength": 1,
@@ -4167,6 +4263,25 @@
             "minLength": 3,
             "title": "Reason",
             "type": "string"
+          },
+          "submit": {
+            "default": true,
+            "description": "False: the compliance form stays a draft (to attach files first)",
+            "title": "Submit",
+            "type": "boolean"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Access needed until, when an access policy applies",
+            "title": "Until"
           }
         },
         "required": [
@@ -4221,6 +4336,35 @@
           "name"
         ],
         "title": "ResourceIn",
+        "type": "object"
+      },
+      "RoleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "app_group_id": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "App Group Id",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "compliance_reviewer",
+              "membership_approver",
+              "compliance_admin"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ScopeIn"
+          }
+        },
+        "required": [
+          "role",
+          "app_group_id"
+        ],
+        "title": "RoleIn",
         "type": "object"
       },
       "RunIn": {
@@ -4580,6 +4724,49 @@
           "name"
         ],
         "title": "SchemaIn",
+        "type": "object"
+      },
+      "ScopeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "classifications": {
+            "description": "Empty: all",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Classifications",
+            "type": "array"
+          },
+          "group_ids": {
+            "description": "For membership approvers: groups; empty: all",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "layers": {
+            "description": "Layer IDs; empty: all",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Layers",
+            "type": "array"
+          },
+          "resource_ids": {
+            "description": "Objects (and what is under them); empty: all",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Resource Ids",
+            "type": "array"
+          }
+        },
+        "title": "ScopeIn",
         "type": "object"
       },
       "SecretIn": {
@@ -5072,6 +5259,100 @@
           "mode"
         ],
         "title": "SessionIn",
+        "type": "object"
+      },
+      "StepIn": {
+        "additionalProperties": false,
+        "properties": {
+          "approvals": {
+            "default": 1,
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Approvals",
+            "type": "integer"
+          },
+          "role": {
+            "enum": [
+              "data_owner",
+              "compliance_reviewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "StepIn",
+        "type": "object"
+      },
+      "TargetIn": {
+        "additionalProperties": false,
+        "properties": {
+          "app_group_id": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "App Group Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "product",
+              "role"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "option_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Option Id"
+          },
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "required": [
+          "kind",
+          "app_group_id"
+        ],
+        "title": "TargetIn",
         "type": "object"
       },
       "TemplateIn": {
@@ -6619,6 +6900,233 @@
         "title": "YankIn",
         "type": "object"
       },
+      "app__routes__compliance__DecisionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "enum": [
+              "approve",
+              "changes",
+              "decline"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Note",
+            "type": "string"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Approve for a shorter time",
+            "title": "Until"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "DecisionIn",
+        "type": "object"
+      },
+      "app__routes__compliance__FileIn": {
+        "additionalProperties": false,
+        "properties": {
+          "content_type": {
+            "default": "application/octet-stream",
+            "maxLength": 128,
+            "title": "Content Type",
+            "type": "string"
+          },
+          "data": {
+            "description": "Base64; at most 5 MB",
+            "title": "Data",
+            "type": "string"
+          },
+          "field_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Field Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field_id",
+          "name",
+          "data"
+        ],
+        "title": "FileIn",
+        "type": "object"
+      },
+      "app__routes__compliance__PolicyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "form_id": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "Form Id",
+            "type": "string"
+          },
+          "max_days": {
+            "default": 365,
+            "description": "Longest time approved access lasts",
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Max Days",
+            "type": "integer"
+          },
+          "review_days": {
+            "default": 10,
+            "description": "Reviews are due within this many days",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Review Days",
+            "type": "integer"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepIn"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "form_id",
+          "steps"
+        ],
+        "title": "PolicyIn",
+        "type": "object"
+      },
+      "app__routes__data_policies__PolicyIn": {
+        "properties": {
+          "column": {
+            "default": "",
+            "description": "Column masks: the masked column",
+            "maxLength": 256,
+            "title": "Column",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 1024,
+            "title": "Description",
+            "type": "string"
+          },
+          "exempt_groups": {
+            "description": "App group IDs that see the real values / all rows",
+            "items": {
+              "type": "string"
+            },
+            "title": "Exempt Groups",
+            "type": "array"
+          },
+          "exempt_principals": {
+            "description": "Identity IDs (people or managed identities) exempted",
+            "items": {
+              "type": "string"
+            },
+            "title": "Exempt Principals",
+            "type": "array"
+          },
+          "expression": {
+            "default": "",
+            "description": "The mask expression (method expression) or the row filter condition, in Trino SQL",
+            "maxLength": 4000,
+            "title": "Expression",
+            "type": "string"
+          },
+          "kind": {
+            "description": "column_mask or row_filter",
+            "title": "Kind",
+            "type": "string"
+          },
+          "method": {
+            "default": "",
+            "description": "Column masks: null, redact, hash, partial or expression",
+            "title": "Method",
+            "type": "string"
+          },
+          "schema_id": {
+            "description": "The governed schema (its resource ID)",
+            "title": "Schema Id",
+            "type": "string"
+          },
+          "table": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_id",
+          "table",
+          "kind"
+        ],
+        "title": "PolicyIn",
+        "type": "object"
+      },
+      "app__routes__delegation__FileIn": {
+        "additionalProperties": false,
+        "properties": {
+          "content_type": {
+            "default": "application/octet-stream",
+            "maxLength": 128,
+            "title": "Content Type",
+            "type": "string"
+          },
+          "data": {
+            "default": "",
+            "maxLength": 7340032,
+            "title": "Data",
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "read",
+              "write",
+              "delete",
+              "list"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "path": {
+            "default": "",
+            "maxLength": 1024,
+            "title": "Path",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "operation"
+        ],
+        "title": "FileIn",
+        "type": "object"
+      },
       "app__routes__delegation__QueryIn": {
         "additionalProperties": false,
         "properties": {
@@ -6648,6 +7156,26 @@
           "sql"
         ],
         "title": "QueryIn",
+        "type": "object"
+      },
+      "app__routes__products__DecisionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approve"
+        ],
+        "title": "DecisionIn",
         "type": "object"
       },
       "app__routes__sql__QueryIn": {
@@ -13352,7 +13880,7 @@
         ]
       },
       "put": {
-        "description": "Change the classifications (platform administrators). A level still in use cannot be removed.",
+        "description": "Change the classifications (platform or compliance administrators). A level still in use cannot be removed.",
         "operationId": "put_v1_catalog_classifications",
         "parameters": [
           {
@@ -14599,7 +15127,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DecisionIn"
+                "$ref": "#/components/schemas/app__routes__products__DecisionIn"
               }
             }
           },
@@ -15341,6 +15869,1806 @@
         ]
       }
     },
+    "/v1/compliance/cases": {
+      "get": {
+        "description": "mine: cases you started; review: cases waiting for your decision; all: every case you may see.",
+        "operationId": "get_v1_compliance_cases",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "box",
+            "required": false,
+            "schema": {
+              "default": "mine",
+              "enum": [
+                "mine",
+                "review",
+                "all"
+              ],
+              "title": "Box",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Cases",
+        "tags": [
+          "compliance"
+        ]
+      },
+      "post": {
+        "description": "Justify access: for a role on an object (its owners), or a group's use of a product (its members).",
+        "operationId": "post_v1_compliance_cases",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Case",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/cases/{case_id}": {
+      "get": {
+        "operationId": "get_v1_compliance_cases_case_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Case",
+        "tags": [
+          "compliance"
+        ]
+      },
+      "patch": {
+        "description": "The requester changes answers of a draft, or after the reviewer asked for changes.",
+        "operationId": "patch_v1_compliance_cases_case_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CasePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Case",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/cases/{case_id}/comments": {
+      "post": {
+        "operationId": "post_v1_compliance_cases_case_id_comments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Comment",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/cases/{case_id}/decision": {
+      "post": {
+        "operationId": "post_v1_compliance_cases_case_id_decision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routes__compliance__DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide Case",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/cases/{case_id}/files": {
+      "post": {
+        "operationId": "post_v1_compliance_cases_case_id_files",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routes__compliance__FileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add File",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/cases/{case_id}/files/{file_id}": {
+      "get": {
+        "operationId": "get_v1_compliance_cases_case_id_files_file_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "title": "File Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get File",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/cases/{case_id}/submit": {
+      "post": {
+        "operationId": "post_v1_compliance_cases_case_id_submit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Case",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/cases/{case_id}/withdraw": {
+      "post": {
+        "operationId": "post_v1_compliance_cases_case_id_withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Withdraw Case",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/forms": {
+      "get": {
+        "operationId": "get_v1_compliance_forms",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Forms",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/forms/{form_id}": {
+      "delete": {
+        "operationId": "delete_v1_compliance_forms_form_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "form_id",
+            "required": true,
+            "schema": {
+              "title": "Form Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Form",
+        "tags": [
+          "compliance"
+        ]
+      },
+      "get": {
+        "operationId": "get_v1_compliance_forms_form_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "form_id",
+            "required": true,
+            "schema": {
+              "title": "Form Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Form",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/forms/{form_id}/publish": {
+      "post": {
+        "operationId": "post_v1_compliance_forms_form_id_publish",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "form_id",
+            "required": true,
+            "schema": {
+              "title": "Form Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Form",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/forms/{name}": {
+      "put": {
+        "description": "Save a form's draft (created when missing). Publishing makes it the version new cases use.",
+        "operationId": "put_v1_compliance_forms_name",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Form",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/memberships": {
+      "get": {
+        "description": "People in groups with justified access whose membership waits for your approval.",
+        "operationId": "get_v1_compliance_memberships",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pending Memberships",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/memberships/{group_id}/{principal_id}": {
+      "post": {
+        "operationId": "post_v1_compliance_memberships_group_id_principal_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "principal_id",
+            "required": true,
+            "schema": {
+              "title": "Principal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide Membership",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/policies": {
+      "get": {
+        "description": "The grid: layers \u00d7 classifications, with the policy of each filled cell.",
+        "operationId": "get_v1_compliance_policies",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Policies",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/policies/{layer_id}/{level}": {
+      "delete": {
+        "operationId": "delete_v1_compliance_policies_layer_id_level",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layer_id",
+            "required": true,
+            "schema": {
+              "title": "Layer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "level",
+            "required": true,
+            "schema": {
+              "title": "Level",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Policy",
+        "tags": [
+          "compliance"
+        ]
+      },
+      "put": {
+        "operationId": "put_v1_compliance_policies_layer_id_level",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layer_id",
+            "required": true,
+            "schema": {
+              "title": "Layer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "level",
+            "required": true,
+            "schema": {
+              "title": "Level",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routes__compliance__PolicyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Policy",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/requirement": {
+      "post": {
+        "description": "Whether giving this access needs a compliance form, and which.",
+        "operationId": "post_v1_compliance_requirement",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Requirement",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/roles": {
+      "get": {
+        "operationId": "get_v1_compliance_roles",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Roles",
+        "tags": [
+          "compliance"
+        ]
+      },
+      "post": {
+        "description": "Give a group a compliance role within a scope (platform administrators; compliance administrators for the\nreviewer and membership roles).",
+        "operationId": "post_v1_compliance_roles",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Role",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
+    "/v1/compliance/roles/{role_id}": {
+      "delete": {
+        "operationId": "delete_v1_compliance_roles_role_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "role_id",
+            "required": true,
+            "schema": {
+              "title": "Role Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Role",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
     "/v1/compute/warehouses": {
       "get": {
         "operationId": "get_v1_compute_warehouses",
@@ -15697,7 +18025,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PolicyIn"
+                "$ref": "#/components/schemas/app__routes__data_policies__PolicyIn"
               }
             }
           },
@@ -16302,7 +18630,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FileIn"
+                "$ref": "#/components/schemas/app__routes__delegation__FileIn"
               }
             }
           },

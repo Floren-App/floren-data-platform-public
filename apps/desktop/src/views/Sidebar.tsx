@@ -11,7 +11,7 @@ import { SECURITY_PAGES, SecurityIcon } from "./Directory";
 import type { TabRef } from "./Tabs";
 import { ensureGitChoice } from "./GitCredentials";
 
-export type View = "home" | "apis" | "catalog" | "access" | "workspaces" | "workloads" | "data" | "kafka" | "compute" | "packages" | "admin";
+export type View = "home" | "apis" | "catalog" | "access" | "workspaces" | "workloads" | "data" | "kafka" | "compute" | "packages" | "privacy" | "admin";
 
 interface Props {
   view: View;
@@ -25,7 +25,7 @@ interface Props {
 export function Sidebar(props: Props) {
   const { view, hub } = props;
   const cache = useObjectCache();
-  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Security", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Usage", packages: "Packages", admin: "Administration" }[view];
+  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Security", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Usage", packages: "Packages", privacy: "Privacy", admin: "Administration" }[view];
   return (
     <>
       <h2>
@@ -53,6 +53,7 @@ export function Sidebar(props: Props) {
       {view === "apis" && <ApisPanel {...props} />}
       {view === "compute" && <ComputePanel {...props} />}
       {view === "packages" && <PackagesPanel {...props} />}
+      {view === "privacy" && <PrivacyPanel {...props} />}
       {view === "admin" && <AdminPanel {...props} />}
     </>
   );
@@ -417,6 +418,23 @@ function PackagesPanel({ hub, openTab, activeKey, activeRef }: Props) {
         <button className="nav-item" onClick={() => openTab(t)}>{icon}{label}</button></li>)}
     </ul>
     <p className="sidebar-note muted">Workspaces and programs install packages only from here. pip, uv, install.packages and renv are already set up to use it.</p>
+  </>;
+}
+
+/** The privacy team's part of the app: only what their job needs. */
+function PrivacyPanel({ hub, openTab, activeKey }: Props) {
+  const admin = !!hub.me?.compliance_roles?.includes("compliance_admin");
+  const items: TabRef[] = [
+    { kind: "privacy-policies", title: "Access policies" },
+    ...(admin ? [{ kind: "privacy-forms", title: "Compliance forms" }, { kind: "privacy-roles", title: "Compliance roles" },
+      { kind: "privacy-classifications", title: "Classifications" }] as TabRef[] : []),
+  ];
+  return <>
+    <ul className="list">
+      {items.map((t) => <li key={t.kind} className={activeKey === `${t.kind}:` ? "selected" : ""}>
+        <button className="nav-item" onClick={() => openTab(t)}>{t.title}</button></li>)}
+    </ul>
+    <p className="sidebar-note muted">Which data needs a compliance form, the forms people fill in, and who reviews them.</p>
   </>;
 }
 
