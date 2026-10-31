@@ -191,6 +191,25 @@ class CommitOut(BaseModel):
     date: str
 
 
+class WorkloadCommitOut(CommitOut):
+    # running: what serves / runs now; queued: waiting for capacity; failed: its deploy failed;
+    # deployed: ran before; pending: newer than the running version, not deployed yet; skipped: never deployed.
+    state: Literal["running", "queued", "failed", "deployed", "pending", "skipped"]
+    deployed_at: Optional[datetime] = Field(default=None, description="When this commit was last deployed")
+
+
+class WorkloadVersionsOut(BaseModel):
+    """Git is the source of truth: the branch's commits, and which of them ran here and when."""
+    repo: str
+    branch: str
+    head_sha: Optional[str] = Field(default=None, description="The branch head at the last check")
+    deployed_sha: Optional[str] = None
+    last_checked_at: Optional[datetime] = None
+    auto_update: bool
+    behind: int = Field(default=0, description="Commits on the branch newer than the running version")
+    commits: List[WorkloadCommitOut]
+
+
 class PullOut(BaseModel):
     commit: CommitOut
     programs: Dict[str, Any]

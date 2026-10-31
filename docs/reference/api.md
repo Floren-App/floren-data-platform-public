@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -161,6 +161,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `GET` | `/v1/workloads/{pub_id}/orchestrator-runs` | Orchestrator Runs |
 | `POST` | `/v1/workloads/{pub_id}/runs` | Run Deployed |
 | `POST` | `/v1/workloads/{pub_id}/sync` | Sync Now |
+| `GET` | `/v1/workloads/{pub_id}/versions` | Workload Versions |
 
 ## identity
 

@@ -498,6 +498,29 @@ export function programRuntime(p: ProgramDef): { kind: RuntimeKind; version: str
   return p.runtime === "r" ? { kind: "r", version: p.r ?? null } : { kind: "python", version: p.python ?? null };
 }
 
+/** Git is the source of truth: a branch commit and whether (and when) it ran here. */
+export interface WorkloadCommit {
+  sha: string; subject: string; author: string; date: string;
+  state: "running" | "queued" | "failed" | "deployed" | "pending" | "skipped";
+  deployed_at: string | null;
+}
+export interface WorkloadVersions {
+  repo: string; branch: string; head_sha: string | null; deployed_sha: string | null;
+  last_checked_at: string | null; auto_update: boolean; behind: number; commits: WorkloadCommit[];
+}
+/** A short commit hash, as Git shows it. */
+export const shortSha = (sha?: string | null) => (sha ? sha.slice(0, 7) : "—");
+/** "5 min ago", "3 days ago": for when something was updated. */
+export function ago(iso?: string | null): string {
+  if (!iso) return "—";
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  const [n, unit] = seconds < 60 ? [0, ""] : seconds < 3600 ? [Math.floor(seconds / 60), "min"] : seconds < 86400 ? [Math.floor(seconds / 3600), "hour"]
+    : seconds < 86400 * 30 ? [Math.floor(seconds / 86400), "day"] : [0, "date"];
+  if (unit === "") return "just now";
+  if (unit === "date") return new Date(iso).toLocaleDateString();
+  return `${n} ${unit}${n === 1 || unit === "min" ? "" : "s"} ago`;
+}
+
 export interface WorkloadEvent {
   at: string;
   kind: string;
@@ -772,6 +795,7 @@ export const api = {
     request<PullResult>("POST", `/v1/repos/${repoId}/pull?branch=${encodeURIComponent(branch)}`),
   workloads: () => request<Workload[]>("GET", "/v1/workloads"),
   workload: (id: string) => request<Workload>("GET", `/v1/workloads/${id}`),
+  workloadVersions: (id: string) => request<WorkloadVersions>("GET", `/v1/workloads/${id}/versions`),
   deploy: (body: { repo_id: string; branch: string; program: string; slug: string; title: string;
                     layer_id?: string; warehouse?: string; allowed_groups: string[]; auto_update: boolean; run_as?: string;
                     env: Record<string, string>; secrets: Record<string, string>; folder_id: string; execution_mode: "caller" | "fixed" }) =>

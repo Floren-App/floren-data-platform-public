@@ -4877,6 +4877,60 @@
         "title": "WarehouseOverview",
         "type": "object"
       },
+      "WorkloadCommitOut": {
+        "properties": {
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "deployed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When this commit was last deployed",
+            "title": "Deployed At"
+          },
+          "sha": {
+            "title": "Sha",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "running",
+              "queued",
+              "failed",
+              "deployed",
+              "pending",
+              "skipped"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha",
+          "subject",
+          "author",
+          "date",
+          "state"
+        ],
+        "title": "WorkloadCommitOut",
+        "type": "object"
+      },
       "WorkloadEventOut": {
         "properties": {
           "at": {
@@ -5378,6 +5432,79 @@
           }
         },
         "title": "WorkloadPatch",
+        "type": "object"
+      },
+      "WorkloadVersionsOut": {
+        "description": "Git is the source of truth: the branch's commits, and which of them ran here and when.",
+        "properties": {
+          "auto_update": {
+            "title": "Auto Update",
+            "type": "boolean"
+          },
+          "behind": {
+            "default": 0,
+            "description": "Commits on the branch newer than the running version",
+            "title": "Behind",
+            "type": "integer"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "commits": {
+            "items": {
+              "$ref": "#/components/schemas/WorkloadCommitOut"
+            },
+            "title": "Commits",
+            "type": "array"
+          },
+          "deployed_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployed Sha"
+          },
+          "head_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The branch head at the last check",
+            "title": "Head Sha"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "repo": {
+            "title": "Repo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo",
+          "branch",
+          "auto_update",
+          "commits"
+        ],
+        "title": "WorkloadVersionsOut",
         "type": "object"
       },
       "WorkspaceGitIn": {
@@ -20224,6 +20351,93 @@
           }
         },
         "summary": "Sync Now",
+        "tags": [
+          "deploying"
+        ]
+      }
+    },
+    "/v1/workloads/{pub_id}/versions": {
+      "get": {
+        "description": "The branch's newest commits, newest first, with which one runs here and when each was deployed.",
+        "operationId": "get_v1_workloads_pub_id_versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pub_id",
+            "required": true,
+            "schema": {
+              "title": "Pub Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkloadVersionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Workload Versions",
         "tags": [
           "deploying"
         ]

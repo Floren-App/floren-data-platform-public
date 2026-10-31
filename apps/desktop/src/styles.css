@@ -383,6 +383,7 @@ th { color: var(--fg-muted); font-weight: 500; font-size: 12px; white-space: now
 td .muted { font-size: 12px; }
 tbody tr:hover > td { background: color-mix(in srgb, var(--bg-hover) 55%, transparent); }
 tr.clickable { cursor: pointer; }
+tr.current td { background: color-mix(in srgb, var(--ok) 8%, transparent); }
 td.empty, tbody td[colspan] { color: var(--fg-muted); padding: 14px 10px; }
 .table-actions { text-align: right; white-space: nowrap; width: 1%; }
 .table-actions .row { justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }

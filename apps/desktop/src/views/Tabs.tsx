@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, DataLocation, EDITOR_LABEL, inLayer, inLine, isActive, poolDot, poolInLayer, openInWindow, OutputContent, OutputFile, Run, RunScope, runtimeLabel, WarehouseOccupant, WarehouseOverview } from "../api";
+import { api, DataLocation, EDITOR_LABEL, inLayer, inLine, isActive, poolDot, poolInLayer, shortSha, openInWindow, OutputContent, OutputFile, Run, RunScope, runtimeLabel, WarehouseOccupant, WarehouseOverview } from "../api";
 import { DataObjectView } from "../components/DataBrowser";
 import type { Hub } from "../hub";
 import { IconRuns, IconCompute, IconOpen, IconPlay, IconStop, IconTrash, IconWorkspaces } from "../components/Icons";
@@ -191,11 +191,11 @@ function PoolView({ name, hub, openTab }: { name?: string; hub: Hub; openTab: (t
 export function RunTable({ runs, hub, openTab, warehouse = true }: { runs: Run[]; hub: Hub; openTab: (t: TabRef) => void; warehouse?: boolean }) {
   if (!runs.length) return hub.hasMoreRuns ? <p className="muted">None of your recent runs. <LoadMoreRuns hub={hub} /></p> : <p className="muted">No runs yet.</p>;
   return <div className="table-scroll"><table aria-label="Runs">
-    <thead><tr><th>Program / file</th><th>Type</th>{warehouse && <th>Warehouse</th>}<th>Status</th><th>Started</th><th /></tr></thead>
+    <thead><tr><th>Program / file</th><th>Type</th><th>Version</th>{warehouse && <th>Warehouse</th>}<th>Status</th><th>Started</th><th /></tr></thead>
     <tbody>{runs.map((r) => (
       <tr key={r.id} className="clickable" onClick={() => openTab(runTab(r))}>
         <td><button className="text-button mono" onClick={(e) => { e.stopPropagation(); openTab(runTab(r)); }}>{r.program ?? r.entrypoint}</button></td>
-        <td>{r.kind}</td>{warehouse && <td>{r.pool_name}</td>}
+        <td>{r.kind}</td><td className="mono" title={r.commit_sha ?? "Workspace files (no commit)"}>{r.commit_sha ? shortSha(r.commit_sha) : <span className="muted">workspace</span>}</td>{warehouse && <td>{r.pool_name}</td>}
         <td><span className="status" title={r.waiting_reason ?? undefined}><span className={`dot ${r.status}`} />{r.status === "queued" ? `queued · ${inLine(r.queue_position)}` : r.status}</span>
           {r.waiting_reason && <div className="muted small">{r.waiting_reason}</div>}</td>
         <td className="muted">{new Date(r.created_at).toLocaleString()}</td>

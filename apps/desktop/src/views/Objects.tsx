@@ -1,6 +1,6 @@
 import { ObjectLineage } from "../components/ObjectLineage";
 import { useEffect, useState } from "react";
-import { accessibleSchemas, accessibleSources, api, AccessResource, inLayer, ServiceAccount } from "../api";
+import { accessibleSchemas, accessibleSources, ago, api, AccessResource, inLayer, ServiceAccount, shortSha } from "../api";
 import type { Hub } from "../hub";
 import { ObjectBreadcrumbs, ObjectTabs, OpenTab, PermissionsPanel, resourceChain, resourcePath, resourceTab } from "../components/Permissions";
 import { RunList, type TabRef } from "./Tabs";
@@ -216,17 +216,18 @@ export function FolderView({ tab, hub, openTab }: ObjectProps) {
             <button type="button" className="btn secondary" onClick={() => { setAdding(false); setName(""); setError(""); }}>Cancel</button>
           </div></form>}
         <div className="object-toolbar"><input type="search" aria-label="Search folder contents" placeholder="Search this folder…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <div className="table-scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Layer</th><th>Git branch</th><th /></tr></thead><tbody>
+        <div className="table-scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Layer</th><th>Git</th><th>Updated</th><th /></tr></thead><tbody>
           {children.filter((r) => r.name.toLowerCase().includes(search.toLowerCase())).map((r) => {
             const workload = hub.workloads.find((p) => p.resource_id === r.id);
             return <tr key={r.id}>
             <td><button className="text-button object-name" onClick={() => openTab(resourceTab(r))}><ProductIcon kind={r.kind === "folder" ? "folder" : workload?.kind} runtime={workload?.runtime} size={16} />{r.name}</button></td>
             <td>{r.kind === "folder" ? "Folder" : workload?.kind ?? "Service"}</td>
-            <td>{r.layer_name || workload?.layer_name || "—"}</td><td>{workload ? <><span className="mono">{workload.branch}</span><div className="muted">{workload.repo} · {workload.program}</div></> : <span className="muted">—</span>}</td>
+            <td>{r.layer_name || workload?.layer_name || "—"}</td><td>{workload ? <><span className="mono">{workload.branch} · <span title={workload.deployed_sha ?? undefined}>{shortSha(workload.deployed_sha)}</span></span><div className="muted">{workload.repo} · {workload.program}</div></> : <span className="muted">—</span>}</td>
+            <td title={workload?.deployed_at ? new Date(workload.deployed_at).toLocaleString() : undefined}>{workload ? ago(workload.deployed_at) : <span className="muted">—</span>}</td>
             <td className="table-actions"><button className="btn sm secondary" onClick={() => openTab(resourceTab(r, "permissions"))}>Permissions</button></td>
           </tr>; })}
-          {!children.length && <tr><td colSpan={5} className="muted">This folder is empty. Use New folder to group teams or environments, or Deploy here to add a program from a Git branch.</td></tr>}
-          {!!children.length && !children.some((r) => r.name.toLowerCase().includes(search.toLowerCase())) && <tr><td colSpan={5} className="muted">No items match your search.</td></tr>}
+          {!children.length && <tr><td colSpan={6} className="muted">This folder is empty. Use New folder to group teams or environments, or Deploy here to add a program from a Git branch.</td></tr>}
+          {!!children.length && !children.some((r) => r.name.toLowerCase().includes(search.toLowerCase())) && <tr><td colSpan={6} className="muted">No items match your search.</td></tr>}
         </tbody></table></div>
       </>}
   </>;

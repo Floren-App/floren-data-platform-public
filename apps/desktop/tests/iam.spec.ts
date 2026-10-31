@@ -401,8 +401,9 @@ test("folder IAM flows to apps and nested folders while keeping branches visible
   await expect(page.getByRole("status")).toHaveText("Assigned Executor to Analysts.");
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Contents", exact: true }).click();
   await main.getByRole("button", { name: "Reports", exact: true }).click();
-  await expect(main.getByRole("columnheader", { name: "Git branch", exact: true })).toBeVisible();
-  await expect(main.getByRole("row").filter({ hasText: "Sales app" }).getByText("main", { exact: true })).toBeVisible();
+  await expect(main.getByRole("columnheader", { name: "Git", exact: true })).toBeVisible();
+  await expect(main.getByRole("columnheader", { name: "Updated", exact: true })).toBeVisible();
+  await expect(main.getByRole("row").filter({ hasText: "Sales app" })).toContainText("main · abc1234");
   await main.getByRole("button", { name: "Sales app", exact: true }).click();
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Permissions", exact: true }).click();
   const inherited = main.getByRole("row").filter({ hasText: "Analysts" });
@@ -582,6 +583,31 @@ test("data children are fetched only when opened and shared between tree and det
   await page.screenshot({ path: test.info().outputPath("data-hierarchy.png") });
   await main.getByRole("button", { name: "Refresh columns", exact: true }).click();
   await expect.poll(() => live().length).toBe(3);
+  expect(state.errors).toEqual([]);
+});
+
+test("a workload's Versions tab follows Git and shows what ran when", async ({ page }) => {
+  const state = await setup(page);
+  const hour = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
+  await page.route("https://iam.test/api/v1/workloads/sales/versions", (route) => route.fulfill({ json: {
+    repo: "analytics", branch: "main", head_sha: "f".repeat(40), deployed_sha: "abc1234" + "0".repeat(33), last_checked_at: hour(0), auto_update: false, behind: 1,
+    commits: [{ sha: "f".repeat(40), subject: "Add filters", author: "Jesse", date: hour(1), state: "pending", deployed_at: null },
+      { sha: "abc1234" + "0".repeat(33), subject: "First version", author: "Jesse", date: hour(30), state: "running", deployed_at: hour(26) },
+      { sha: "e".repeat(40), subject: "Draft", author: "Jesse", date: hour(50), state: "deployed", deployed_at: hour(48) }] } }));
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
+  await page.locator(".main").getByRole("button", { name: "Finance", exact: true }).click();
+  await page.locator(".main").getByRole("button", { name: "Reports", exact: true }).click();
+  const main = page.locator(".main");
+  await expect(main.getByRole("table")).toContainText("main · abc1234");
+  await main.getByRole("button", { name: "Sales app", exact: true }).click();
+  await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Versions", exact: true }).click();
+  const versions = main.getByRole("table", { name: "Versions" });
+  await expect(versions.getByRole("row", { name: /Add filters/ })).toContainText("Not deployed yet");
+  await expect(versions.getByRole("row", { name: /First version/ })).toContainText("Running now");
+  await expect(versions.getByRole("row", { name: /First version/ })).toContainText("deployed 1 day ago");
+  await expect(versions.getByRole("row", { name: /Draft/ })).toContainText("Ran before");
+  await expect(main.getByText("1 newer commit", { exact: true })).toBeVisible();
+  await expect(main.getByText(/Git is the source of truth/)).toBeVisible();
   expect(state.errors).toEqual([]);
 });
 
@@ -796,6 +822,8 @@ for (const inspectChild of [false, true]) test(`Airflow hierarchy ${inspectChild
   await expect(graph.locator(`[data-id="${dag.id}"]`)).toHaveClass(/react-flow__node/);
   await expect(graph.locator(`[data-id="${load.id}"]`)).toBeVisible();
   await expect(graph.locator('[data-id="task-dependency"] .react-flow__edge-path')).toHaveCSS("stroke-dasharray", "5px, 4px");
+  // Expanding can leave nodes partly outside the canvas; fit the chain as a person would before pointing at one.
+  await page.getByRole("navigation", { name: "Jump to lineage stage" }).getByRole("button", { name: "Fit entire chain", exact: true }).click();
   await graph.locator(`[data-id="${program.id}"] .lineage-entity-title`).first().hover();
   await expect(graph.locator(`[data-id="${load.id}"]`)).not.toHaveClass(/dimmed/);
   await page.screenshot({path:test.info().outputPath("nested-airflow.png")});

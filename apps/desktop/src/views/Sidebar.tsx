@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { accessibleSchemas, accessibleSources, api, AccessResource, inGroup, inLayer, poolDot, poolInLayer, rEnabled, EDITOR_LABEL, EDITOR_NAME, Editor, openInWindow, Run, RunKind, RunScope, startingPool, usablePools, workloadDot, workloadStatus } from "../api";
+import { accessibleSchemas, accessibleSources, ago, api, AccessResource, inGroup, shortSha, inLayer, poolDot, poolInLayer, rEnabled, EDITOR_LABEL, EDITOR_NAME, Editor, openInWindow, Run, RunKind, RunScope, startingPool, usablePools, workloadDot, workloadStatus } from "../api";
 import { ProductIcon } from "../components/ProductIcon";
 import { resourceTab } from "../components/Permissions";
 import { SchemaTreeNode } from "../components/DataBrowser";
@@ -239,7 +239,7 @@ function DeployedPanel({ hub, openTab, activeKey }: Props) {
       </summary>{folder(r.id)}</details>
     </li>)}
     {hub.workloads.filter((p) => p.folder_id === parent && inLayer(hub.layerId, p.layer_id)).map((p) => <li key={p.id}>
-      <button className={`tree-leaf ${activeKey === `workload:${p.id}` ? "selected" : ""}`} title={`${p.title} · ${workloadStatus(p)}`}
+      <button className={`tree-leaf ${activeKey === `workload:${p.id}` ? "selected" : ""}`} title={`${p.title} · ${workloadStatus(p)}${p.deployed_sha ? ` · version ${shortSha(p.deployed_sha)}, updated ${ago(p.deployed_at)}` : ""}`}
         onClick={() => openTab({ kind: "workload", ref: p.id, title: p.title })}>
         <span className={`dot ${workloadDot(p)}`} /><ProductIcon kind={p.kind} runtime={p.runtime} size={16} />
         <span className="tree-name">{p.title}</span><span className="muted">{p.kind === "script" || p.kind === "notebook" ? "on demand" : p.kind}</span>
