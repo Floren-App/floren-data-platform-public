@@ -163,6 +163,8 @@ type accessPolicyModel struct {
 	Steps          []policyStep `tfsdk:"steps"`
 	MaxDays        types.Int64  `tfsdk:"max_days"`
 	ReviewDays     types.Int64  `tfsdk:"review_days"`
+	RenewDays      types.Int64  `tfsdk:"renew_days"`
+	GraceDays      types.Int64  `tfsdk:"grace_days"`
 }
 
 type policyOut struct {
@@ -172,6 +174,8 @@ type policyOut struct {
 	FormID   string `json:"form_id"`
 	MaxDays  int64  `json:"max_days"`
 	Review   int64  `json:"review_days"`
+	Renew    int64  `json:"renew_days"`
+	Grace    int64  `json:"grace_days"`
 	StepList []struct {
 		Role      string `json:"role"`
 		Approvals int64  `json:"approvals"`
@@ -200,6 +204,10 @@ func (r *accessPolicyResource) Schema(_ context.Context, _ resource.SchemaReques
 				}}},
 			"max_days":    schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(365), Description: "Longest approved access."},
 			"review_days": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(10), Description: "Reviews are due within this many days."},
+			"renew_days": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(30),
+				Description: "A renewal, prefilled with the answers, opens this many days before approved access ends."},
+			"grace_days": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(30),
+				Description: "Access that existed before the policy, or whose data was classified higher since, is kept this many days for a form to be approved; then it is removed."},
 		},
 	}
 }
@@ -221,6 +229,7 @@ func (r *accessPolicyResource) ImportState(ctx context.Context, req resource.Imp
 func (m *accessPolicyModel) apply(out *policyOut) {
 	m.ID, m.LayerID, m.Classification, m.FormID = types.StringValue(out.ID), types.StringValue(out.LayerID), types.StringValue(out.Level), types.StringValue(out.FormID)
 	m.MaxDays, m.ReviewDays = types.Int64Value(out.MaxDays), types.Int64Value(out.Review)
+	m.RenewDays, m.GraceDays = types.Int64Value(out.Renew), types.Int64Value(out.Grace)
 	m.Steps = nil
 	for _, s := range out.StepList {
 		m.Steps = append(m.Steps, policyStep{Role: types.StringValue(s.Role), Approvals: types.Int64Value(s.Approvals)})
@@ -232,7 +241,8 @@ func (r *accessPolicyResource) put(ctx context.Context, m *accessPolicyModel, d 
 	for _, s := range m.Steps {
 		steps = append(steps, map[string]any{"role": s.Role.ValueString(), "approvals": s.Approvals.ValueInt64()})
 	}
-	body := map[string]any{"form_id": m.FormID.ValueString(), "steps": steps, "max_days": m.MaxDays.ValueInt64(), "review_days": m.ReviewDays.ValueInt64()}
+	body := map[string]any{"form_id": m.FormID.ValueString(), "steps": steps, "max_days": m.MaxDays.ValueInt64(), "review_days": m.ReviewDays.ValueInt64(),
+		"renew_days": m.RenewDays.ValueInt64(), "grace_days": m.GraceDays.ValueInt64()}
 	var out policyOut
 	target := "/v1/compliance/policies/" + m.LayerID.ValueString() + "/" + url.PathEscape(m.Classification.ValueString())
 	if err := r.api.Do(ctx, "PUT", target, body, &out); err != nil {

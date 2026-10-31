@@ -53,6 +53,7 @@ def client(monkeypatch):
     with TestClient(app) as c:
         configure_layers()
         configure_warehouses()
+        configure_classifications()
         yield c
     app.dependency_overrides.clear()
 
@@ -70,6 +71,24 @@ def configure_warehouses():
     with SessionLocal() as db:
         for name, cpu, memory, suspend in TEST_WAREHOUSES:
             db.add(ComputePool(name=name, cpu=cpu, memory_gb=memory, auto_suspend_seconds=suspend))
+        db.commit()
+
+
+# Nor classification levels: tests use these four, as Terraform (fdp_classifications) would configure them.
+TEST_LEVELS = [
+    {"name": "public", "masked_as": "public", "description": "Anyone may see it."},
+    {"name": "internal", "masked_as": "internal", "description": "For people in the organization."},
+    {"name": "confidential", "masked_as": "internal", "description": "For people who need it for their work."},
+    {"name": "restricted", "masked_as": "internal", "description": "Personal or sensitive data."},
+]
+
+
+def configure_classifications():
+    from app import classification
+    from app.db import SessionLocal
+    from app.models import PlatformSetting
+    with SessionLocal() as db:
+        db.add(PlatformSetting(key=classification.SETTING, value={"levels": TEST_LEVELS}))
         db.commit()
 
 

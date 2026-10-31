@@ -32,25 +32,25 @@ dashboards they can use; a dashboard opens straight away.
 
 ## Profiles
 
-The platform starts with five profiles (on a new installation; add Privacy yourself on an existing one). They are configuration like any other: rename them,
-change their features, add and remove profiles.
+The platform comes with **no** profiles: until you define them, every group gets the whole app and
+object permissions decide what people may open, as before. Profiles are configuration like layers
+and compute pools; declare them in Terraform. For example:
 
 | Profile | Features |
 |---|---|
-| Full access (the default) | Everything |
 | Engineer | Everything except `security` |
-| Analyst | Browse and request products, all objects, workspaces, view workloads, storage |
-| Viewer | Browse products and open the dashboards you can use |
-| Privacy | Browse products; with a compliance role, the privacy area comes on top (see [access policies](access-policies.md)) |
+| Analyst | `products.request`, `catalog.objects`, `workspaces`, `workloads.view`, `storage` |
+| Viewer | `products.browse` |
+| Privacy | `products.browse`; with a compliance role, the privacy area comes on top (see [access policies](access-policies.md)) |
 
-One profile is the **default**: groups without a profile get it. Full access is the default at
-first, so nothing changes for existing groups until you give them a profile.
+At most one profile is the **default**: groups without a profile get it. Without a default, groups
+without a profile get the whole app.
 
 ## Configure
 
 - **Administration → App profiles** shows profiles against features as a grid: tick features,
-  rename a profile, choose the default and add or remove profiles. A profile in use or the
-  default cannot be removed.
+  rename a profile, choose the default and add or remove profiles. A profile given to a group
+  cannot be removed.
 - **Security → App groups**: a group's page shows its profile; administrators change it there.
 - **Terraform**: `fdp_app_profile` declares a profile and `fdp_app_group.app_profile` gives it to a
   group (see the [Terraform reference](reference/terraform/fdp_app_profile.md)).

@@ -451,6 +451,7 @@ function AdminPanel({ openTab, activeKey }: Props) {
     { kind: "admin-layers", title: "Layers" },
     { kind: "admin-app-profiles", title: "App profiles" },
     { kind: "admin-classifications", title: "Classifications" },
+    { kind: "admin-notifications", title: "Notifications" },
     { kind: "admin-sources", title: "Storage integrations" },
     { kind: "admin-repos", title: "Git repositories" },
     { kind: "admin-runtimes", title: "Runtimes (versions)" },

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AccessCaseItem, AccessFormItem, AccessPolicyItem, api, RegisterRow, saveFile, AppGroup, ClassificationLevel, ComplianceRoleItem, FieldType, FormCondition, FormDefinition, FormField, FormPage } from "../api";
+import { AccessCaseItem, AccessFormItem, AccessPolicyItem, api, JustifyDeadline, RegisterRow, saveFile, AppGroup, ClassificationLevel, ComplianceRoleItem, FieldType, FormCondition, FormDefinition, FormField, FormPage } from "../api";
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
@@ -50,8 +50,9 @@ function PolicyEditor({ layer, level, policy, forms, readOnly, onClose, onSaved 
   const [form, setForm] = useState(policy?.form_id ?? published[0]?.id ?? "");
   const [steps, setSteps] = useState<AccessPolicyItem["steps"]>(policy?.steps ?? [{ role: "compliance_reviewer", approvals: 1 }]);
   const [maxDays, setMaxDays] = useState(policy?.max_days ?? 365), [reviewDays, setReviewDays] = useState(policy?.review_days ?? 10), [error, setError] = useState("");
+  const [renewDays, setRenewDays] = useState(policy?.renew_days ?? 30), [graceDays, setGraceDays] = useState(policy?.grace_days ?? 30);
   const save = () => { setError("");
-    api.compliance.putPolicy(layer.id, level, { form_id: form, steps, max_days: maxDays, review_days: reviewDays })
+    api.compliance.putPolicy(layer.id, level, { form_id: form, steps, max_days: maxDays, review_days: reviewDays, renew_days: renewDays, grace_days: graceDays })
       .then(() => onSaved(`${layer.name}, ${level}: access needs a form.`)).catch((e: Error) => setError(e.message)); };
   const remove = () => { setError("");
     api.compliance.deletePolicy(layer.id, level).then(() => onSaved(`${layer.name}, ${level}: no form needed any more.`)).catch((e: Error) => setError(e.message)); };
@@ -67,6 +68,11 @@ function PolicyEditor({ layer, level, policy, forms, readOnly, onClose, onSaved 
         <input id="policy-max" type="number" min={1} max={3650} disabled={readOnly} value={maxDays} onChange={(e) => setMaxDays(Number(e.target.value))} /></div>
       <div className="field"><label htmlFor="policy-review">Reviews are due within (days)</label>
         <input id="policy-review" type="number" min={1} max={365} disabled={readOnly} value={reviewDays} onChange={(e) => setReviewDays(Number(e.target.value))} /></div>
+      <div className="field"><label htmlFor="policy-renew">Renewal opens before the end (days)</label>
+        <input id="policy-renew" type="number" min={1} max={365} disabled={readOnly} value={renewDays} onChange={(e) => setRenewDays(Number(e.target.value))} /></div>
+      <div className="field"><label htmlFor="policy-grace">Existing access must be justified within (days)</label>
+        <input id="policy-grace" type="number" min={1} max={365} disabled={readOnly} value={graceDays} onChange={(e) => setGraceDays(Number(e.target.value))} />
+        <span className="hint">For access that existed before this policy, or whose data was classified higher later. Without an approved form by then, it is removed.</span></div>
     </div>
     <fieldset className="field"><legend>Review steps, in order</legend>
       <p className="hint">Data owners are the owners of the product or object. Compliance reviewers are groups with that role for this layer and classification.</p>
@@ -344,7 +350,10 @@ export function PrivacyMemberships({ hub }: { hub: Hub }) {
 /** Access given through compliance forms: who has what, why, approved by whom and until when. */
 export function PrivacyRegister({ openTab }: { openTab: (t: TabRef) => void }) {
   const [rows, setRows] = useState<RegisterRow[] | null>(null), [error, setError] = useState(""), [query, setQuery] = useState("");
-  useEffect(() => { api.compliance.register().then(setRows).catch((e: Error) => setError(e.message)); }, []);
+  const [deadlines, setDeadlines] = useState<JustifyDeadline[]>([]);
+  useEffect(() => { api.compliance.register().then(setRows).catch((e: Error) => setError(e.message));
+    api.compliance.deadlines().then(setDeadlines).catch(() => setDeadlines([])); }, []);
+  const soon = (v: string | null) => !!v && new Date(v).getTime() - Date.now() < 30 * 86400000;
   const shown = (rows ?? []).filter((r) => !query || JSON.stringify(r).toLowerCase().includes(query.toLowerCase()));
   const exportCsv = () => api.compliance.registerCsv().then((text) => saveFile(new Blob([text], { type: "text/csv" }), "access-register.csv")).catch((e: Error) => setError(e.message));
   const day = (v: string | null) => v ? new Date(v).toLocaleDateString() : "—";
@@ -359,7 +368,14 @@ export function PrivacyRegister({ openTab }: { openTab: (t: TabRef) => void }) {
       {shown.map((r) => <tr key={r.case_id}><td>{r.group}</td>
         <td><button className="text-button" onClick={() => openTab({ kind: "privacy-case", ref: r.case_id, title: r.access })}>{r.access}</button></td>
         <td><span className="product-chip">{r.classification}</span>{r.layer && <span className="muted"> · {r.layer}</span>}</td>
-        <td>{r.form}<div className="muted small">asked by {r.requester}</div></td><td>{r.approved_by}</td><td>{day(r.approved_at)}</td><td>{day(r.until)}</td><td>{r.members}</td></tr>)}
+        <td>{r.form}<div className="muted small">asked by {r.requester}</div></td><td>{r.approved_by}</td><td>{day(r.approved_at)}</td>
+        <td className={soon(r.until) ? "error-text" : ""}>{day(r.until)}</td><td>{r.members}</td></tr>)}
       {!shown.length && <tr><td colSpan={8} className="muted">No access given through forms{query && " matches"}.</td></tr>}</tbody></table></div>}
+    {!!deadlines.length && <><h2>Waiting for a form</h2>
+      <p className="hint">Access that needs a compliance form and has none: it existed before the policy, or its data was classified higher since. It is removed at the deadline unless a form is approved.</p>
+      <div className="table-scroll"><table aria-label="Waiting for a form"><thead><tr><th>Group</th><th>Access</th><th>Data</th><th>Deadline</th></tr></thead><tbody>
+        {deadlines.map((d) => <tr key={d.resource_id + d.app_group_id}><td>{d.group}</td>
+          <td>{d.product_id ? <button className="text-button" onClick={() => openTab({ kind: "product", ref: d.product_id!, title: d.resource })}>{d.resource}</button> : `${d.role} on ${d.resource}`}</td>
+          <td><span className="product-chip">{d.classification}</span></td><td className={soon(d.due_at) ? "error-text" : ""}>{day(d.due_at)}</td></tr>)}</tbody></table></div></>}
   </>;
 }

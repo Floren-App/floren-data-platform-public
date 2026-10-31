@@ -81,7 +81,7 @@ func (p *fdpProvider) Resources(context.Context) []func() resource.Resource {
 		NewAppGroupMemberResource, NewRoleAssignmentResource, NewRepositoryResource, NewWorkloadResource,
 		NewFolderResource, NewServiceAccountResource, NewSecretResource, NewAPIResource, NewAPIOperationResource,
 		NewGovernanceResource, NewSLAResource, NewMetricResource, NewWorkspaceSettingsResource, NewDefaultLayerResource, NewDefaultWarehouseResource, NewWorkspaceTemplateResource,
-		NewAppProfileResource, NewAccessFormResource, NewAccessPolicyResource, NewComplianceRoleResource, NewClassificationsResource, NewColumnClassificationResource, NewDataProductResource, NewProductConsumerResource,
+		NewAppProfileResource, NewNotificationWebhookResource, NewAccessFormResource, NewAccessPolicyResource, NewComplianceRoleResource, NewClassificationsResource, NewColumnClassificationResource, NewDataProductResource, NewProductConsumerResource,
 		NewEgressAllowlistResource, NewRuntimeResource, NewQueryLogSettingsResource, NewPackageAllowlistResource, NewPackageResource, NewDataPolicyResource,
 	}
 }

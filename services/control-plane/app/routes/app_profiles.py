@@ -37,8 +37,6 @@ def profile_out(db, p: AppProfile) -> dict:
 @router.get("/v1/app-profiles")
 def list_profiles(db: Session = Depends(get_db), _: User = Depends(get_actor)):
     """Every profile with its features and groups, and the features there are."""
-    app_profiles.ensure_defaults(db)
-    db.commit()
     return {"profiles": [profile_out(db, p) for p in db.scalars(select(AppProfile).order_by(AppProfile.name))],
             "features": [{"key": k, "label": v} for k, v in app_profiles.FEATURES.items()]}
 
@@ -46,15 +44,12 @@ def list_profiles(db: Session = Depends(get_db), _: User = Depends(get_actor)):
 @router.put("/v1/admin/app-profiles/{name}")
 def put_profile(name: str, body: ProfileIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     """Create or change a profile by name (a different body name renames it)."""
-    app_profiles.ensure_defaults(db)
     profile = db.scalar(select(AppProfile).where(AppProfile.name == name))
     if body.name != name and db.scalar(select(AppProfile).where(AppProfile.name == body.name)):
         raise HTTPException(409, f"an app profile named {body.name} already exists")
     if profile is None:
         profile = AppProfile(name=body.name)
         db.add(profile)
-    if profile.default and not body.default:
-        raise HTTPException(409, "one profile must be the default: make another profile the default instead")
     before = list(profile.features or [])
     profile.name, profile.description, profile.features = body.name, body.description, app_profiles.normalize(body.features)
     if body.default and not profile.default:
@@ -72,8 +67,6 @@ def delete_profile(name: str, db: Session = Depends(get_db), user: User = Depend
     profile = db.scalar(select(AppProfile).where(AppProfile.name == name))
     if profile is None:
         raise HTTPException(404, "app profile not found")
-    if profile.default:
-        raise HTTPException(409, "the default profile cannot be removed: make another profile the default first")
     used = sorted(g.name for g in db.scalars(select(AppGroup).where(AppGroup.profile_id == profile.id)))
     if used:
         raise HTTPException(409, "still given to: " + ", ".join(used))

@@ -16,19 +16,14 @@ from .models import CatalogAsset, PlatformSetting
 
 SETTING = "classifications"
 UNCLASSIFIED = "unclassified"
-DEFAULT_LEVELS = [
-    {"name": "public", "masked_as": "public", "description": "Anyone may see it."},
-    {"name": "internal", "masked_as": "internal", "description": "For people in the organization."},
-    {"name": "confidential", "masked_as": "internal", "description": "For people who need it for their work."},
-    {"name": "restricted", "masked_as": "internal", "description": "Personal or sensitive data, under the strictest rules."},
-]
 _NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 
 
 def levels(db) -> List[dict]:
-    """Ordered from least to most sensitive."""
+    """Ordered from least to most sensitive. The platform has none until they are configured (Terraform:
+    fdp_classifications); until then everything is unclassified."""
     setting = db.get(PlatformSetting, SETTING)
-    return list((setting.value or {}).get("levels") or DEFAULT_LEVELS) if setting else list(DEFAULT_LEVELS)
+    return list((setting.value or {}).get("levels") or []) if setting else []
 
 
 def ranks(db) -> Dict[str, int]:
@@ -82,8 +77,6 @@ def describe(db, asset: CatalogAsset) -> dict:
 
 def validate_levels(db, proposed: List[dict]) -> List[dict]:
     names = [l["name"] for l in proposed]
-    if not proposed:
-        raise HTTPException(422, "keep at least one classification")
     if len(set(names)) != len(names):
         raise HTTPException(422, "classification names must be unique")
     for i, level in enumerate(proposed):
@@ -92,10 +85,14 @@ def validate_levels(db, proposed: List[dict]) -> List[dict]:
         target = level.get("masked_as") or level["name"]
         if target not in names or names.index(target) > i:
             raise HTTPException(422, f"{level['name']}: masked data must count as itself or a lower level")
-    removed = set(l["name"] for l in levels(db)) - set(names)
-    if removed:
-        for asset in db.scalars(select(CatalogAsset)):
-            used = {(asset.governance or {}).get("classification")} | {g.get("classification") for g in column_governance(asset).values()}
-            if used & removed:
-                raise HTTPException(409, f"{', '.join(sorted(used & removed))} is still used, for example by {asset.name}")
+    # Every level in use must stay, also values set before the levels were configured.
+    keep = set(names) | {UNCLASSIFIED, None}
+    for asset in db.scalars(select(CatalogAsset)):
+        used = {(asset.governance or {}).get("classification")} | {g.get("classification") for g in column_governance(asset).values()}
+        if used - keep:
+            raise HTTPException(409, f"{', '.join(sorted(str(u) for u in used - keep))} is still used, for example by {asset.name}")
+    from .models import AccessPolicy
+    for policy in db.scalars(select(AccessPolicy)):
+        if policy.classification not in keep:
+            raise HTTPException(409, f"{policy.classification} is still used by an access policy")
     return [{"name": l["name"], "masked_as": l.get("masked_as") or l["name"], "description": l.get("description", "")} for l in proposed]

@@ -76,9 +76,11 @@ owners, compliance reviewers decide.
 ## Classification
 
 Classifications are configurable under **Administration → Classifications** (or
-`fdp_classifications` in Terraform): an ordered list from least to most sensitive, starting with
-public, internal, confidential and restricted. Each level says what **masked** data of that level
-counts as (itself or a lower level).
+`fdp_classifications` in Terraform): an ordered list from least to most sensitive, for example
+public, internal, confidential and restricted. The platform comes with none: until they are
+configured, everything is unclassified. Each level says what **masked** data of that level counts as
+(itself or a lower level). A level that columns, objects or access policies use cannot be left out,
+also values set before the levels were configured.
 
 - **Columns** are classified and tagged (for example `pii`) on a table's Overview by its owners,
   or with `fdp_column_classification`.

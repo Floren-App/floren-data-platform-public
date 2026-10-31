@@ -17,7 +17,7 @@ from .programs import json_schema
 from .deploying import gitops_loop
 from .reaper import reaper_loop
 from .runtimes import sync_installation_runtimes
-from .routes import layers, admin, apis, connect, gateway, identity, deploy, runs, workspaces, rbac, scim, delegation, sql, data_browser, catalog, measurements, compute, workspace_templates, git_credentials, packages, query_log, data_policies, kafka, logs, products, app_profiles as app_profile_routes, compliance as compliance_routes
+from .routes import layers, admin, apis, connect, gateway, identity, deploy, runs, workspaces, rbac, scim, delegation, sql, data_browser, catalog, measurements, compute, workspace_templates, git_credentials, packages, query_log, data_policies, kafka, logs, products, app_profiles as app_profile_routes, compliance as compliance_routes, webhooks as webhook_routes
 from .app_profiles import feature_gate
 from . import workload_logs  # noqa: F401 -- records run and deploy events in the central log
 
@@ -80,10 +80,6 @@ async def lifespan(app: FastAPI):
     upgrade()
     upgrade_git_credentials()
     seed()
-    with SessionLocal() as db:
-        from .app_profiles import ensure_defaults
-        ensure_defaults(db)
-        db.commit()
     with SessionLocal() as db:  # create well-known roots up front rather than racing on first use
         from .rbac import api_root, packages_root, root
         root(db)
@@ -122,9 +118,10 @@ async def lifespan(app: FastAPI):
         if hasattr(orch, 'write_layer_secret'):
             from .source_catalogs import catalog_loop
             loops.append(lambda: catalog_loop(SessionLocal, orch, secrets))
-        if s.smtp_host:  # compliance review emails
-            from .notify import notification_loop
-            loops.append(lambda: notification_loop(SessionLocal, s.notification_interval_seconds))
+        from .expiry import compliance_loop
+        loops.append(lambda: compliance_loop(SessionLocal, s.compliance_interval_seconds))
+        from .notify import notification_loop  # posts to the configured webhooks
+        loops.append(lambda: notification_loop(SessionLocal, s.notification_interval_seconds))
         if s.gateway_tls_endpoints:
             from .cert_monitor import gateway_loop
             loops.append(lambda: gateway_loop(SessionLocal, s.gateway_tls_endpoints, s.certificate_check_interval_seconds))
@@ -174,7 +171,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-for module in (workspaces, workspace_templates, git_credentials, packages, query_log, runs, compute, admin, connect, deploy, identity, gateway, rbac, scim, delegation, sql, data_browser, catalog, apis, layers, data_policies, kafka, logs, products, app_profile_routes, compliance_routes):
+for module in (workspaces, workspace_templates, git_credentials, packages, query_log, runs, compute, admin, connect, deploy, identity, gateway, rbac, scim, delegation, sql, data_browser, catalog, apis, layers, data_policies, kafka, logs, products, app_profile_routes, compliance_routes, webhook_routes):
     app.include_router(module.router)
 app.include_router(gateway.docs_router)
 

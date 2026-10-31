@@ -153,10 +153,9 @@ export function CatalogObject({ tab, hub, openTab }: { tab: TabRef; hub: Hub; op
 /** The configured classifications, from least to most sensitive. */
 export function useLevels(): ClassificationLevel[] {
   const state = useCached("catalog:classifications", () => api.catalog.classifications());
-  return state.data?.levels ?? DEFAULT_LEVELS;  // the platform's defaults until the configured list arrives
+  return state.data?.levels ?? NO_LEVELS;  // none until configured (Terraform: fdp_classifications)
 }
-const DEFAULT_LEVELS: ClassificationLevel[] = ["public", "internal", "confidential", "restricted"].map((name) =>
-  ({ name, masked_as: name === "confidential" || name === "restricted" ? "internal" : name, description: "" }));
+const NO_LEVELS: ClassificationLevel[] = [];
 
 /** Columns with their classification and tags; owners classify them, and the object follows the highest. */
 function ColumnClassifier({ asset, onSaved }: { asset: CatalogAsset; onSaved: (asset: CatalogAsset) => void }) {

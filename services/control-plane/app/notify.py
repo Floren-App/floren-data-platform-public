@@ -1,25 +1,43 @@
-"""Email notifications for compliance reviews. Emails only say what waits and link to the app; nothing is
-decided by email, and answers to forms never leave the platform in an email."""
+"""Notifications: the platform posts events (a review waits, access ends, ...) to the webhooks that are configured,
+for example a chat channel or automation that sends email. A message says what happened, who should act and where;
+nothing is decided outside the app, and answers to forms are never sent. Without webhooks, the app alone shows
+what waits."""
 import asyncio
+import hashlib
+import hmac
+import json
 import logging
-import smtplib
-import ssl
-from email.message import EmailMessage
 from typing import Iterable, List, Optional
 
+import httpx
 from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
 
 from .config import get_settings
 from .models import (AccessCase, AccessForm, AccessFormVersion, AppGroup, CatalogProduct, DirectoryPrincipal, Notification,
-                     ProductOption, Resource, RoleAssignment, utcnow)
+                     NotificationWebhook, ProductOption, Resource, RoleAssignment, utcnow)
 
 log = logging.getLogger(__name__)
 MAX_ATTEMPTS = 5
+EVENTS = {
+    "review.waiting": "A compliance form waits for a review step",
+    "review.due": "A review is due within a day",
+    "review.overdue": "A review is overdue",
+    "case.approved": "A compliance form was approved",
+    "case.declined": "A compliance form was declined",
+    "case.changes_requested": "Reviewers asked for changes",
+    "case.comment": "A comment on a compliance form",
+    "membership.waiting": "Someone joined a group with justified access",
+    "access.renewal_ready": "A renewal is ready before access ends",
+    "access.ending": "Access ends soon and the renewal was not sent",
+    "access.ended": "Justified access ended",
+    "access.deadline": "Existing access needs a compliance form by a deadline",
+    "access.removed": "Access without a form was removed at its deadline",
+}
 
 
-def enabled() -> bool:
-    return bool(get_settings().smtp_host)
+def secret_path(webhook_id: str) -> str:
+    return f"webhooks/{webhook_id}"
 
 
 def link(case_id: str) -> str:
@@ -45,19 +63,39 @@ def principal_of(db, username: str) -> Optional[str]:
     return db.scalar(select(DirectoryPrincipal.id).where(DirectoryPrincipal.kind == "user", DirectoryPrincipal.name == username))
 
 
-def queue(db, principal_ids: Iterable[str], subject: str, body: str, case_id: Optional[str] = None, key: Optional[str] = None) -> int:
-    """Put emails in the outbox (sent by the notification loop). With a key, each person gets it once."""
-    if not enabled():
+def queue(db, event: str, principal_ids: Iterable[str], subject: str, text: str, case: Optional[AccessCase] = None,
+          key: Optional[str] = None, link_to: Optional[str] = None) -> int:
+    """Put the event in the outbox of every enabled webhook that wants it. With a key, each webhook gets it once."""
+    hooks = [h for h in db.scalars(select(NotificationWebhook).where(NotificationWebhook.enabled.is_(True)))
+             if not h.events or event in h.events]
+    if not hooks:
         return 0
-    sent = 0
-    for address in sorted({email_of(db, p) for p in principal_ids} - {""}):
-        item_key = f"{key}:{address}"[:300] if key else None
+    people = []
+    for principal_id in sorted(set(principal_ids)):
+        p = db.get(DirectoryPrincipal, principal_id)
+        if p is not None and p.kind == "user" and p.active:
+            people.append({"username": p.name, "email": email_of(db, principal_id) or None})
+    people.sort(key=lambda r: (r["email"] or "", r["username"]))
+    payload = {"event": event, "subject": subject[:300], "text": text, "link": link_to or (link(case.id) if case else None),
+               "recipients": people, "case": case_summary(db, case) if case else None}
+    queued = 0
+    for hook in hooks:
+        item_key = f"{key}:{hook.id}"[:300] if key else None
         if item_key and db.scalar(select(Notification.id).where(Notification.key == item_key)) is not None:
             continue
-        db.add(Notification(key=item_key, recipient=address, subject=subject[:300], body=body, case_id=case_id))
-        sent += 1
+        db.add(Notification(key=item_key, webhook_id=hook.id, event=event, payload=payload, case_id=case.id if case else None))
+        queued += 1
     db.flush()
-    return sent
+    return queued
+
+
+def case_summary(db, case: AccessCase) -> dict:
+    group = db.get(AppGroup, case.app_group_id)
+    layer = db.get(Resource, case.layer_id) if case.layer_id else None
+    when = lambda v: v.isoformat() if v else None  # noqa: E731
+    return {"id": case.id, "kind": case.kind, "status": case.status, "what": describe(db, case), "group": group.name if group else case.app_group_id,
+            "classification": case.classification, "layer": layer.name if layer else None, "requester": case.requester,
+            "due_at": when(case.due_at), "approved_until": when(case.approved_until)}
 
 
 # --- who to tell ---------------------------------------------------------------------------------------
@@ -133,28 +171,27 @@ def _facts(db, case: AccessCase) -> str:
 
 
 def _body(db, case: AccessCase, lead: str) -> str:
-    return (f"{lead}\n\n{_facts(db, case)}\n\nOpen the case: {link(case.id)}\n\n"
-            "This email only lets you know. Decisions are made in the app.")
+    return f"{lead}\n\n{_facts(db, case)}\n\nOpen the case: {link(case.id)}"
 
 
 def case_event(db, case: AccessCase, event: str, by: str = "", note: str = "") -> None:
     """Tell the people who act next. Events: review (waits for a step), approved, declined, changes, comment."""
     what = describe(db, case)
     if event == "review":
-        queue(db, reviewers(db, case), f"Review needed: {what}",
-              _body(db, case, f"{case.requester} asks for {what}. It waits for your review."), case.id,
+        queue(db, "review.waiting", reviewers(db, case), f"Review needed: {what}",
+              _body(db, case, f"{case.requester} asks for {what}. It waits for your review."), case,
               key=f"review:{case.id}:{case.step}:{len(case.decisions or [])}")
     elif event == "approved":
         until = f" until {case.approved_until:%Y-%m-%d}" if case.approved_until else ""
-        queue(db, requester(db, case), f"Approved: {what}", _body(db, case, f"Your request for {what} is approved{until}."), case.id)
+        queue(db, "case.approved", requester(db, case), f"Approved: {what}", _body(db, case, f"Your request for {what} is approved{until}."), case)
     elif event == "declined":
-        queue(db, requester(db, case), f"Declined: {what}", _body(db, case, f"{by} declined your request for {what}: {note}"), case.id)
+        queue(db, "case.declined", requester(db, case), f"Declined: {what}", _body(db, case, f"{by} declined your request for {what}: {note}"), case)
     elif event == "changes":
-        queue(db, requester(db, case), f"Changes asked: {what}",
-              _body(db, case, f"{by} asks you to change your request for {what}: {note}"), case.id)
+        queue(db, "case.changes_requested", requester(db, case), f"Changes asked: {what}",
+              _body(db, case, f"{by} asks you to change your request for {what}: {note}"), case)
     elif event == "comment":
         to = reviewers(db, case) if by == case.requester else requester(db, case)
-        queue(db, to - {principal_of(db, by)}, f"New comment: {what}", _body(db, case, f"{by} commented on the request for {what}."), case.id)
+        queue(db, "case.comment", to - {principal_of(db, by)}, f"New comment: {what}", _body(db, case, f"{by} commented on the request for {what}."), case)
 
 
 def membership_notices(db) -> int:
@@ -166,65 +203,60 @@ def membership_notices(db) -> int:
         person = db.get(DirectoryPrincipal, item["principal_id"])
         groups = cp.role_groups(db, "membership_approver", group_id=item["app_group_id"]) or cp.role_groups(db, "compliance_admin")
         name = group.name if group else item["app_group_id"]
-        body = (f"{person.name if person else 'Someone'} joined {name}. The group has access that was given through a compliance "
-                f"form; they get it once a membership approver approves them.\n\n"
-                f"Open memberships: {get_settings().public_url.rstrip('/')}/#memberships\n\n"
-                "This email only lets you know. Decisions are made in the app.")
-        sent += queue(db, people(db, groups) - {item["principal_id"]}, f"Membership to approve: {name}", body,
-                      key=f"member:{item['app_group_id']}:{item['principal_id']}")
+        text = (f"{person.name if person else 'Someone'} joined {name}. The group has access that was given through a compliance "
+                f"form; they get it once a membership approver approves them.")
+        sent += queue(db, "membership.waiting", people(db, groups) - {item["principal_id"]}, f"Membership to approve: {name}", text,
+                      key=f"member:{item['app_group_id']}:{item['principal_id']}",
+                      link_to=f"{get_settings().public_url.rstrip('/')}/#memberships")
     return sent
 
 
 # --- sending -----------------------------------------------------------------------------------------------
 
-def _connect(s):
-    if s.smtp_security == "tls":
-        smtp = smtplib.SMTP_SSL(s.smtp_host, s.smtp_port, timeout=30, context=ssl.create_default_context())
-    else:
-        smtp = smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=30)
-        if s.smtp_security == "starttls":
-            smtp.starttls(context=ssl.create_default_context())
-    if s.smtp_username:
-        smtp.login(s.smtp_username, s.smtp_password)
-    return smtp
+def _post(url: str, body: bytes, headers: dict) -> int:
+    with httpx.Client(timeout=10, follow_redirects=False) as client:
+        return client.post(url, content=body, headers=headers).status_code
 
 
-def deliver(db, limit: int = 50) -> int:
-    """Send what waits in the outbox; failures are retried a few times, then kept with their error."""
-    s = get_settings()
-    if not s.smtp_host:
-        return 0
+def deliver(db, secrets=None, limit: int = 50) -> int:
+    """Post what waits in the outbox; failures are retried a few times, then kept with their error.
+    With a signing secret, X-FDP-Signature is sha256=<HMAC-SHA256 of the body>."""
     waiting = list(db.scalars(select(Notification).where(Notification.sent_at.is_(None), Notification.attempts < MAX_ATTEMPTS)
                               .order_by(Notification.id).limit(limit)))
-    if not waiting:
-        return 0
     sent = 0
-    try:
-        smtp = _connect(s)
-    except (OSError, smtplib.SMTPException) as exc:
-        for item in waiting:
-            item.attempts, item.error = item.attempts + 1, f"connect: {exc}"[:500]
-        log.warning("SMTP connection failed: %s", exc)
-        return 0
-    with smtp:
-        for item in waiting:
-            message = EmailMessage()
-            message["From"], message["To"], message["Subject"] = s.smtp_from or s.smtp_username, item.recipient, item.subject
-            message.set_content(item.body)
-            try:
-                smtp.send_message(message)
-                item.sent_at, item.error = utcnow(), ""
-                sent += 1
-            except smtplib.SMTPException as exc:
-                item.attempts, item.error = item.attempts + 1, str(exc)[:500]
+    for item in waiting:
+        hook = db.get(NotificationWebhook, item.webhook_id)
+        if hook is not None and hook.enabled:
+            sent += deliver_one(db, item, hook, secrets)
     return sent
 
 
+def deliver_one(db, item: Notification, hook: NotificationWebhook, secrets=None) -> int:
+    body = json.dumps({"id": item.id, "at": item.created_at.isoformat(), **item.payload}, default=str).encode()
+    headers = {"Content-Type": "application/json", "User-Agent": "fdp-notifications", "X-FDP-Event": item.event,
+               "X-FDP-Delivery": str(item.id)}
+    if hook.has_secret and secrets is not None:
+        secret = (secrets.read(secret_path(hook.id)) or {}).get("secret", "")
+        if secret:
+            headers["X-FDP-Signature"] = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    try:
+        status = _post(hook.url, body, headers)
+        if 200 <= status < 300:
+            item.sent_at, item.error = utcnow(), ""
+            return 1
+        item.error = f"HTTP {status}"
+    except httpx.HTTPError as exc:
+        item.error = f"{type(exc).__name__}: {exc}"[:500]
+    item.attempts += 1
+    return 0
+
+
 def tick(factory) -> None:
+    from .deps import get_secret_store
     with factory() as db:
         membership_notices(db)
         db.commit()
-        deliver(db)
+        deliver(db, get_secret_store())
         db.commit()
 
 
