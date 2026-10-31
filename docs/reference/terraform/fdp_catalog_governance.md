@@ -6,10 +6,11 @@ Catalog documentation and stewardship of one governed object (schema, workload, 
 
 | Attribute | Type | Behavior | Description |
 |---|---|---|---|
-| `classification` | `basetypes.StringType` | Optional, Computed | unclassified, public, internal, confidential or restricted. |
+| `classification` | `basetypes.StringType` | Optional, Computed | unclassified or a configured classification (fdp_classifications). A table is never below its columns. |
 | `description` | `basetypes.StringType` | Optional, Computed |  |
 | `domain` | `basetypes.StringType` | Optional, Computed |  |
 | `id` | `basetypes.StringType` | Computed | Catalog asset ID. |
+| `object_path` | `basetypes.StringType` | Optional | A table or view in the schema named by resource_id; left out: the resource itself. |
 | `owner_group_id` | `basetypes.StringType` | Optional | Accountable app group. |
 | `resource_id` | `basetypes.StringType` | Required |  |
 | `status` | `basetypes.StringType` | Optional, Computed | draft, reviewed, certified or deprecated. |

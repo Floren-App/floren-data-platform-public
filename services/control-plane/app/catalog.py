@@ -397,6 +397,7 @@ def successful_query(db, query):
 
 
 def asset_out(db, asset, resource, user):
+    from . import classification
     from .models import AppGroup
     _, actions = permissions(db, user)
     permitted = actions.get(resource.id, set())
@@ -405,6 +406,7 @@ def asset_out(db, asset, resource, user):
         "resource": {"id": resource.id, "name": resource.name, "kind": resource.kind, "parent_id": resource.parent_id,
             "object_id": resource.object_id, "config": resource.config or {}, "actions": sorted(permitted)}, "attributes": asset.attributes,
         "governance": asset.governance, "sla": asset.sla, "service_level": service_level(db, asset, resource),
+        "classification": classification.describe(db, asset),
         "owner_group_name": group.name if group else None,
         "observed_at": asset.observed_at,
         "can_edit": bool(permitted & {"edit", "write", "ddl"}), "can_govern": "assign" in permitted}

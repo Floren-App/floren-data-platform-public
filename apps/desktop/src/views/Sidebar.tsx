@@ -424,6 +424,7 @@ function AdminPanel({ openTab, activeKey }: Props) {
   const items: TabRef[] = [
     { kind: "admin-layers", title: "Layers" },
     { kind: "admin-app-profiles", title: "App profiles" },
+    { kind: "admin-classifications", title: "Classifications" },
     { kind: "admin-sources", title: "Storage integrations" },
     { kind: "admin-repos", title: "Git repositories" },
     { kind: "admin-runtimes", title: "Runtimes (versions)" },
