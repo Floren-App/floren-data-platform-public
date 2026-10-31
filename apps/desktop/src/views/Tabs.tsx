@@ -28,9 +28,10 @@ import { rEnabled, type PackageKind } from "../api";
 import { KafkaClustersView, KafkaView } from "./Kafka";
 import { PrivacyForm, PrivacyForms, PrivacyMemberships, PrivacyPolicies, PrivacyRegister, PrivacyReviews, PrivacyRoles } from "./Privacy";
 import { CaseView } from "./Cases";
+import { DeadlinesView } from "./AccessArea";
 
 export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
-  | "products" | "product" | "access-requests" | "app-profiles" | "repos"
+  | "products" | "product" | "access-requests" | "app-profiles" | "repos" | "deadlines"
   | "privacy-reviews" | "privacy-case" | "case" | "privacy-memberships" | "privacy-register"
   | "privacy-policies" | "privacy-forms" | "privacy-form" | "privacy-roles" | "privacy-classifications"
   | "admin-app-profiles" | "admin-notifications" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
@@ -116,12 +117,13 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "admin-pools": return <AdminPools hub={hub} />;
     case "admin-workspace-templates": return <AdminWorkspaceTemplates hub={hub} />;
     case "admin-network": return <AdminNetwork />;
-    case "admin-query-log": return <QueryLogView hub={hub} />;
+    case "admin-query-log": return <QueryLogView key={tab.search ?? ""} hub={hub} initialActor={tab.search} />;
     case "git-credentials": return <GitCredentialsTab sections={<WorkspaceSections active="git" openTab={openTab} />} />;
     case "packages": return <PackagesView key={tab.ref ?? "all"} hub={hub} openTab={openTab} kind={tab.ref as PackageKind | undefined} />;
     case "package": return <PackageView key={tab.ref} hub={hub} openTab={openTab} reference={tab.ref!} />;
     case "package-imports": return <PackageImportsView />;
-    case "admin-audit": return <AdminAudit />;
+    case "admin-audit": return <AdminAudit key={tab.search ?? ""} initialActor={tab.search} />;
+    case "deadlines": return <DeadlinesView hub={hub} openTab={openTab} />;
   }
 }
 

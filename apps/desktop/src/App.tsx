@@ -33,7 +33,7 @@ const viewForTab = (tab: TabRef): View => {
   // records); Administration the rules.
   if (tab.kind === "admin-sources") return "data";
   if (["repos", "admin-repos"].includes(tab.kind)) return "workloads";
-  if (["admin-service-accounts", "admin-audit", "admin-query-log", "privacy-reviews", "privacy-memberships", "privacy-register", "privacy-case"].includes(tab.kind)) return "access";
+  if (["admin-service-accounts", "admin-audit", "admin-query-log", "privacy-reviews", "privacy-memberships", "privacy-register", "privacy-case", "deadlines"].includes(tab.kind)) return "access";
   if (["app-profiles", "admin-app-profiles", "admin-classifications"].includes(tab.kind) || tab.kind.startsWith("privacy-") || tab.kind.startsWith("admin-")) return "admin";
   return "access";
 };

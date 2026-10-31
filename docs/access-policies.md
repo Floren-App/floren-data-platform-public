@@ -157,7 +157,8 @@ The object's owners and the group's owners are told. The group's row on the obje
 **Permissions** (or on the product's **Access options**) says *Needs a form by …* with **Justify**,
 which opens the form for exactly that access. An approved case clears the deadline; at the
 deadline, the access is removed. **Access → Records → Access register** lists everything waiting
-for a form.
+for a form, and so does **Access → To do → Needs a form**, with a **Justify** button that opens where
+the form is filled in.
 
 The data's owners need no form for their own use of it: a group with a role that may give access
 (such as Owner) on the object, or on anything above it, also gets roles below that without a form,
