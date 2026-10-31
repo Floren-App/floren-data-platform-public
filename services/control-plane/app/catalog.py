@@ -115,7 +115,7 @@ def sync_registry(db):
     for resource in resources:
         if resource.kind in ('kafka', 'topic') and resource.config.get('deleted'):
             continue
-        if resource.kind in ("root", "api-root", "layer", "package-root", "package"):
+        if resource.kind in ("root", "api-root", "layer", "package-root", "package", "product-root", "product"):
             continue  # Navigation roots are not deployed products.
         if resource.kind == "service" and resource.object_id not in {p.id for p in pubs}:
             continue

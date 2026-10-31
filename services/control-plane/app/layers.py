@@ -121,7 +121,7 @@ def resource_layer(db, resource):
     if layer:
         return layer
     # Organization folders may span layers; every actual executable/data/API object is bound.
-    return (default_layer(db) or "") if resource and resource.kind not in ("root", "folder", "api-root") else ""
+    return (default_layer(db) or "") if resource and resource.kind not in ("root", "folder", "api-root", "product-root") else ""
 
 
 def info(db, resource):

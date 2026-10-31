@@ -102,7 +102,8 @@ def roles(_: User = Depends(get_actor)):
     return {"data": {k: sorted(v) for k, v in rbac.DATA_ROLES.items()},
             "program": {k: sorted(v) for k, v in rbac.PROGRAM_ROLES.items()},
             "api": {k: sorted(v) for k, v in rbac.API_ROLES.items()},
-            "package": {k: sorted(v) for k, v in rbac.PACKAGE_ROLES.items()}}
+            "package": {k: sorted(v) for k, v in rbac.PACKAGE_ROLES.items()},
+            "product": {k: sorted(v) for k, v in rbac.PRODUCT_ROLES.items()}}
 
 
 @router.get("/directory")

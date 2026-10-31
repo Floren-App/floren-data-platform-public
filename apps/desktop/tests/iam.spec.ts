@@ -167,7 +167,7 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     if (path === "/v1/workspaces" || path === "/v1/runs" || path.endsWith("/tokens")) return respond([]);
     if (path === "/v1/catalog/products") return respond({ items: [], domains: [], kinds: [] });
     if (path === "/v1/catalog/requests") return respond([]);
-    if (/^\/v1\/catalog\/assets\/[^/]+\/product$/.test(path)) return respond({ publishable: false, can_publish: false, product: null, uses: [], domain: "", classification: "unclassified" });
+    if (/^\/v1\/catalog\/assets\/[^/]+\/product$/.test(path)) return respond({ publishable: false, can_publish: false, products: [], uses: [], name: "", kind: "", domain: "", classification: "unclassified" });
     return respond({ detail: `Unexpected test request: ${method} ${path}` }, 404);
   });
   await page.goto("/");
@@ -614,36 +614,50 @@ test("a workload's Versions tab follows Git and shows what ran when", async ({ p
   expect(state.errors).toEqual([]);
 });
 
-test("catalog: data products as cards, lineage without access, requests and approval", async ({ page }) => {
+test("catalog: bundled data products as cards, lineage without access, requests and approval", async ({ page }) => {
   const state = await setup(page);
   const product = (id: string, title: string, kind: string, access: string, extra: Record<string, unknown> = {}) => ({ id, asset_id: "asset-" + id, title, summary: `${title} summary.`,
     kind, runtime: kind === "app" ? "python" : null, name: title.toLowerCase(), layer_id: "1a0000000002", layer_name: "Non-Prod", domain: "Games", classification: "internal",
     status: "certified", steward: "Jesse", owner_group_name: "Data engineers", updated_at: new Date(Date.now() - 2 * 3600_000).toISOString(), sla_status: "healthy",
-    published_at: "2026-10-31T09:00:00Z", published_by: "admin", access, can_manage: false, grants: kind === "app" ? "Executor" : "Reader",
-    grants_on: kind === "app" ? { kind: "service", name: title } : { kind: "schema", name: "pokemon_history" },
+    published_at: "2026-10-31T09:00:00Z", published_by: "admin", access, can_manage: false,
+    members: [{ asset_id: "asset-" + id, name: title.toLowerCase(), kind, runtime: null, access: access === "granted" ? "granted" : "none", updated_at: null, open: null }],
+    grants: [kind === "app" ? { resource_id: "sales-service", kind: "service", name: title, role: "Executor", object: title } : { resource_id: "s", kind: "schema", name: "pokemon_history", role: "Reader", object: "pokemon_stats" }],
     open: access === "granted" ? { resource_kind: "service", resource_id: "sales-service", object_id: "sales", object_path: null } : null, ...extra });
-  const dash = product("p1", "Pokemon dashboard", "app", "granted"), stats = product("p2", "pokemon_stats", "table", "none");
+  const dash = product("p1", "Pokemon dashboard", "app", "granted");
+  // A bundle: the cards dashboard with the tables it uses; bob can open the dashboard, not the tables.
+  const stats = product("p2", "Pokemon cards", "app", "partial", { members: [
+    { asset_id: "a-dash", name: "Cards dashboard", kind: "app", runtime: "python", access: "granted", updated_at: null, open: { resource_kind: "service", resource_id: "sales-service", object_id: "sales", object_path: null } },
+    { asset_id: "a-stats", name: "pokemon_stats", kind: "table", runtime: null, access: "none", updated_at: null, open: null },
+    { asset_id: "a-prices", name: "card_prices_daily", kind: "table", runtime: null, access: "none", updated_at: null, open: null }],
+    grants: [{ resource_id: "sales-service", kind: "service", name: "Cards dashboard", role: "Executor", object: "Cards dashboard" },
+      { resource_id: "s", kind: "schema", name: "pokemon_history", role: "Reader", object: "pokemon_stats" }] });
   const asked: string[] = [], posted: unknown[] = [];
-  let requests: Record<string, unknown>[] = [{ id: "r1", product_id: "p2", product: "pokemon_stats", requester: "bob", app_group_id: "analysts", group: "Analysts", reason: "Weekly report",
-    status: "pending", role: "Reader", decided_by: "", decision_note: "", created_at: new Date().toISOString(), decided_at: null, grants_on: { kind: "schema", name: "pokemon_history" } }];
+  let requests: Record<string, unknown>[] = [{ id: "r1", product_id: "p2", product: "Pokemon cards", requester: "bob", app_group_id: "analysts", group: "Analysts", reason: "Weekly report",
+    status: "pending", decided_by: "", decision_note: "", created_at: new Date().toISOString(), decided_at: null, grants: stats.grants }];
   await page.route(/\/v1\/catalog\/(products|requests|assets\/[^/]+\/product)/, async (route) => {
     const url = new URL(route.request().url()), method = route.request().method(); asked.push(`${method} ${url.pathname}${url.search}`);
     if (url.pathname.endsWith("/products") && method === "GET") return route.fulfill({ json: { items: url.searchParams.get("accessible") ? [dash] : [dash, stats], domains: ["Games"], kinds: ["app", "table"] } });
     if (url.pathname.endsWith("/products/p2") && method === "GET") return route.fulfill({ json: { ...stats, used_by: [dash], used_by_others: 1,
       lineage: [{ key: "step-0", asset_id: null, name: "stg_pokemon", kind: "dbt_model", depth: 1, owner_group_name: "Data engineers", visible: false, product_id: null },
         { key: "step-1", asset_id: null, name: "pokemon-landing", kind: "schema", depth: 2, owner_group_name: "Platform", visible: false, product_id: null }],
-      lineage_edges: [{ source: "step-0", target: "product" }, { source: "step-1", target: "step-0" }] } });
+      lineage_edges: [{ source: "step-0", target: "member-1" }, { source: "step-1", target: "step-0" }] } });
     if (url.pathname.endsWith("/products/p2/requests")) { posted.push(route.request().postDataJSON()); return route.fulfill({ status: 201, json: { ...requests[0], id: "r2", requester: "admin" } }); }
     if (url.pathname.endsWith("/requests") && method === "GET") return route.fulfill({ json: url.searchParams.get("box") === "mine" ? [] : requests });
     if (url.pathname.endsWith("/requests/r1/decision")) { posted.push(route.request().postDataJSON()); requests = [{ ...requests[0], status: "approved", decided_by: "admin" }]; return route.fulfill({ json: requests[0] }); }
-    if (url.pathname.includes("/assets/")) return route.fulfill({ json: { publishable: true, can_publish: true, product: null, uses: [{ asset_id: "asset-p2", name: "pokemon_stats", kind: "table", published: false }], domain: "", classification: "unclassified" } });
+    if (url.pathname.includes("/assets/")) return route.fulfill({ json: { publishable: true, can_publish: true, products: [], uses: [{ asset_id: "asset-stats", name: "pokemon_stats", kind: "table" }], name: "Sales app", kind: "app", domain: "", classification: "unclassified" } });
+    if (url.pathname.endsWith("/products/candidates")) return route.fulfill({ json: [{ asset_id: "asset-sales", name: "Sales app", kind: "app", path: "", layer_id: "1a0000000002", layer_name: "Non-Prod" },
+      { asset_id: "asset-stats", name: "pokemon_stats", kind: "table", path: "pokemon_history", layer_id: "1a0000000002", layer_name: "Non-Prod" },
+      { asset_id: "asset-raw", name: "raw_cards", kind: "table", path: "pokemon_history", layer_id: "1a0000000002", layer_name: "Non-Prod" }] });
+    if (url.pathname.endsWith("/products") && method === "POST") { posted.push(route.request().postDataJSON()); return route.fulfill({ status: 201, json: dash }); }
     return route.fulfill({ status: 404, json: { detail: "not mocked" } });
   });
   const main = page.locator(".main"), sidebar = page.locator(".sidebar");
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Data products", exact: true })).toBeVisible();
-  const card = main.getByRole("article", { name: "pokemon_stats" });
+  const card = main.getByRole("article", { name: "Pokemon cards" });
   await expect(card).toContainText("Data engineers · Games");
+  await expect(card).toContainText("Dashboard · 2 tables");
+  await expect(card.getByRole("button", { name: "Request access", exact: true })).toBeVisible();  // partly: the dashboard only
   await expect(card).toContainText("Updated 2 hours ago");
   await expect(main.getByRole("article", { name: "Pokemon dashboard" })).toContainText("You have access");
   const box = await card.boundingBox(); expect(Math.round(box!.width / box!.height)).toBe(2);  // wide cards, 2:1
@@ -654,16 +668,19 @@ test("catalog: data products as cards, lineage without access, requests and appr
 
   // Without access: what it is and its lineage, no details; request access for a group.
   await card.getByRole("button", { name: "Request access", exact: true }).click();
-  await expect(main.getByRole("heading", { name: "pokemon_stats", exact: true })).toBeVisible();
-  await expect(main).toContainText("Reader on schema pokemon_history (all its tables)");
-  await expect(main).toContainText("Columns, previews and SQL are shown once you have access.");
+  await expect(main.getByRole("heading", { name: "Pokemon cards", exact: true })).toBeVisible();
+  await expect(main).toContainText("Approval makes the group you choose a Consumer of this product: Executor on Cards dashboard, Reader on schema pokemon_history (all its tables).");
+  const inside = main.getByRole("list", { name: "In this product" });
+  await expect(inside.getByRole("listitem")).toHaveCount(3);
+  await expect(inside.getByRole("listitem").filter({ hasText: "Cards dashboard" })).toContainText("You have access");
+  await expect(inside.getByRole("listitem").filter({ hasText: "pokemon_stats" })).toContainText("No access");
   await main.getByRole("textbox", { name: "Why you need it" }).fill("Weekly price report");
   await main.getByRole("button", { name: "Send request", exact: true }).click();
   await expect(main.getByRole("status")).toContainText("Request sent");
   expect(posted[0]).toEqual({ app_group_id: "analysts", reason: "Weekly price report" });
   await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
   const lineage = main.getByRole("list", { name: "Lineage" });
-  await expect(lineage.getByRole("listitem")).toHaveCount(3);
+  await expect(lineage.getByRole("listitem")).toHaveCount(5);                                 // 2 steps + the 3 objects in it
   await expect(lineage.getByRole("listitem").first()).toContainText("pokemon-landing");      // sources on the left
   await expect(lineage.locator(".product-step.hidden")).toHaveCount(2);
   await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Used by", exact: true }).click();
@@ -674,12 +691,12 @@ test("catalog: data products as cards, lineage without access, requests and appr
   await expect(sidebar.getByRole("button", { name: /Access requests/ })).toContainText("1");
   await sidebar.getByRole("button", { name: /Access requests/ }).click();
   const inbox = main.getByRole("table", { name: "Requests to approve" });
-  await expect(inbox).toContainText("grants Reader on schema pokemon_history");
+  await expect(inbox).toContainText("gives Executor on Cards dashboard, Reader on schema pokemon_history");
   await inbox.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(inbox).toContainText("approved");
   expect(posted[1]).toEqual({ approve: true, note: "" });
 
-  // Publish from the object's own page: it opens the publish form with what it uses offered too.
+  // Publish from the object's own page: the form starts with it and ticks what it uses; more can be added.
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
   await main.getByRole("button", { name: "Finance", exact: true }).click();
   await main.getByRole("button", { name: "Reports", exact: true }).click();
@@ -688,6 +705,13 @@ test("catalog: data products as cards, lineage without access, requests and appr
   await main.getByRole("button", { name: "Publish to catalog", exact: true }).click();
   const form = main.getByRole("form", { name: "Publish a data product" });
   await expect(form.getByRole("checkbox", { name: /pokemon_stats/ })).toBeChecked();
+  await expect(form.getByRole("checkbox", { name: /Sales app/ })).toBeChecked();
+  await expect(form).toContainText("Leads");
+  await form.getByRole("searchbox", { name: "Find objects to add" }).fill("raw");
+  await form.getByRole("checkbox", { name: /raw_cards/ }).check();
+  await form.getByRole("textbox", { name: "Name in the catalog" }).fill("Sales");
+  await form.getByRole("button", { name: "Publish", exact: true }).click();
+  expect(posted.at(-1)).toMatchObject({ asset_ids: ["asset-sales", "asset-stats", "asset-raw"], title: "Sales" });
   expect(state.errors).toEqual([]);
 });
 

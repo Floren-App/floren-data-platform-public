@@ -33,6 +33,16 @@ PACKAGE_ROLES = {
     "Owner": {"read", "create", "import", "publish", "yank", "delete", "assign"},
 }
 PACKAGE_KINDS = ("package-root", "package")
+# Data products: Consumer may read or use everything in the product (see product_grants); Owner also
+# manages the product and decides access requests.
+PRODUCT_ROLES = {
+    "Consumer": {"read", "use"},
+    "Owner": {"read", "use", "assign"},
+}
+PRODUCT_KINDS = ("product-root", "product")
+# What a product's consumers get on each object in it: the role that lets someone read or use it.
+READER_ROLE = {"schema": "Reader", "source": "Reader", "topic": "Reader", "kafka": "Reader", "service": "Executor",
+               "api": "Consumer", "api-group": "Consumer", "api-operation": "Consumer"}
 DATA_ROLES = {
     "Reader": {"read"},
     "Contributor": {"read", "write"},
@@ -193,6 +203,8 @@ def roles_for(resource: Resource) -> dict:
         return API_ROLES
     if resource.kind in PACKAGE_KINDS:
         return PACKAGE_ROLES
+    if resource.kind in PRODUCT_KINDS:
+        return PRODUCT_ROLES
     return DATA_ROLES if resource.kind in ("source", "schema", "kafka", "topic") else PROGRAM_ROLES
 
 
@@ -206,10 +218,43 @@ def role_grants(db: Session, user: User, resource_ids=None) -> list:
     return [g for g in result if permits(db, user, db.get(Resource, g.resource_id))]
 
 
+class ProductGrant:
+    """A role a group holds on an object because it holds Consumer (or Owner) on a data product containing it.
+    Never stored: revoking the product role, removing the object from the product or unpublishing ends it."""
+
+    def __init__(self, resource_id, role, app_group_id, product_resource_id):
+        self.resource_id, self.role, self.app_group_id = resource_id, role, app_group_id
+        self.product_resource_id = product_resource_id
+
+
+def product_grants(db: Session, assignments) -> list:
+    """Consumers and owners of a data product may read or use everything in it."""
+    from .models import CatalogAsset, CatalogProductMember
+    out = []
+    for a in assignments:
+        if a.role not in PRODUCT_ROLES:
+            continue
+        product = db.get(Resource, a.resource_id)
+        if not product or product.kind != "product":
+            continue
+        for m in db.scalars(select(CatalogProductMember).where(CatalogProductMember.product_id == product.object_id)):
+            asset = db.get(CatalogAsset, m.asset_id)
+            target = db.get(Resource, asset.resource_id) if asset else None
+            if target is not None and target.kind in READER_ROLE:
+                out.append(ProductGrant(target.id, READER_ROLE[target.kind], a.app_group_id, product.id))
+    return out
+
+
+def group_grants(db: Session, group_ids) -> list:
+    """Role assignments of these groups, plus what their data product roles give them."""
+    assigned = list(db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id.in_(list(group_ids)))))
+    return assigned + product_grants(db, assigned)
+
+
 @cached
 def _role_grants(db, user):
     groups = app_groups(db, user)
-    result = list(db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id.in_(groups))))
+    result = group_grants(db, groups)
     principal = db.get(DirectoryPrincipal, user.principal_id)
     if principal and principal.active and principal.kind in ("service", "user"):
         result.extend(db.scalars(select(ServiceRoleAssignment).where(ServiceRoleAssignment.principal_id == user.principal_id)))
@@ -315,6 +360,11 @@ def _fixed_resource(db: Session, ident: str, kind: str, name: str) -> Resource:
             pass  # another request created it first
         item = db.get(Resource, ident)
     return item
+
+
+def products_root(db: Session) -> Resource:
+    """Parent of every data product resource."""
+    return _fixed_resource(db, "products", "product-root", "Data products")
 
 
 def api_root(db: Session) -> Resource:
