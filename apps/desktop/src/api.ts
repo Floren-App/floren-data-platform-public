@@ -521,6 +521,16 @@ export function ago(iso?: string | null): string {
   return `${n} ${unit}${n === 1 || unit === "min" ? "" : "s"} ago`;
 }
 
+/** One line of the central log. Run, workload, commit and layer are stamped by the platform. */
+export interface LogEntry {
+  id: number; at: string; level: "debug" | "info" | "warning" | "error"; source: "platform" | "program" | "airflow";
+  event: string; message: string; fields: Record<string, unknown>;
+  workload_id: string | null; workload: string | null; run_id: string | null; workspace_id: string | null;
+  commit_sha: string | null; layer_id: string | null; actor: string;
+}
+export interface LogPage { entries: LogEntry[]; next_before: number | null }
+export interface LogQuery { workload_id?: string; folder_id?: string; run_id?: string; layer_id?: string; level?: string; q?: string; before?: number; limit?: number }
+
 export interface WorkloadEvent {
   at: string;
   kind: string;
@@ -796,6 +806,7 @@ export const api = {
   workloads: () => request<Workload[]>("GET", "/v1/workloads"),
   workload: (id: string) => request<Workload>("GET", `/v1/workloads/${id}`),
   workloadVersions: (id: string) => request<WorkloadVersions>("GET", `/v1/workloads/${id}/versions`),
+  logs: (query: LogQuery) => request<LogPage>("GET", `/v1/logs?${new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]))}`),
   deploy: (body: { repo_id: string; branch: string; program: string; slug: string; title: string;
                     layer_id?: string; warehouse?: string; allowed_groups: string[]; auto_update: boolean; run_as?: string;
                     env: Record<string, string>; secrets: Record<string, string>; folder_id: string; execution_mode: "caller" | "fixed" }) =>

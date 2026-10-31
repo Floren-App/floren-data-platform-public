@@ -28,7 +28,7 @@ It groups the sections by what you do:
 | | **Catalog** | Search, governance, lineage, quality and SLAs ([catalog](catalog.md)) |
 | | **Usage** | How full each compute pool is and what runs on it, in your layer; **All layers** shows every layer ([compute pools](compute.md)) |
 | Build | **Workspaces** | Your private VS Code, RStudio and SQL editors; tabs for their runs and your Git credentials ([workspaces](workspaces.md)) |
-| | **Workloads** | Folders of published programs, apps, dbt projects and Airflow deployments; each folder has a Recent runs tab ([publishing](deploying.md)) |
+| | **Workloads** | Folders of published programs, apps, dbt projects and Airflow deployments; each folder has Recent runs and Logs tabs ([publishing](deploying.md), [logs](logging.md)) |
 | | **Storage** | Registered databases, buckets and their schemas, with metadata and data previews ([storage integrations](storage-integrations.md)) |
 | | **Packages** | The platform's Python and R package repository ([packages](packages.md)) |
 | Integration | **Kafka** | Managed Kafka per layer and its topics; shown once a cluster is available to you |

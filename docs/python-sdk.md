@@ -45,6 +45,12 @@ split JSON lists into rows when loading raw tables, not into one object per reco
 [API management](api-management.md). SDK file/API calls and governed queries can
 supply lineage observations; see [catalog lineage](catalog.md).
 
+## Logging
+
+`fdp.log.info/warning/error/debug(message, **fields)` and `fdp.log.exception(...)` write to the
+[workload log](logging.md); `logging.getLogger().addHandler(fdp.log.handler())` sends standard
+Python logging there too. The platform stamps the run, workload, commit and layer.
+
 ## Caller-mode dashboards
 
 Resolve the gateway's viewer token for each viewer session and pass it with each

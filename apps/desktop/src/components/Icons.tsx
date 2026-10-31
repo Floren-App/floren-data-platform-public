@@ -58,3 +58,5 @@ export const IconMore = ({ size = 16 }: P) =>
   svg(size, <><circle cx="5" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="19" cy="12" r="1" fill="currentColor" /></>);
 export const IconApi = ({ size = 24 }: P) =>
   svg(size, <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z" /></>);
+export const IconLog = ({ size = 24 }: P) =>
+  svg(size, <><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></>);

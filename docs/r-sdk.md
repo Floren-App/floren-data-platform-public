@@ -37,6 +37,11 @@ Shiny publication uses its managed identity. Caller-mode data access must resolv
 and authorize each viewer's requests; see [RBAC](rbac.md) before sharing connections
 or caching results across sessions.
 
+## Logging
+
+`fdp::log_info()`, `fdp::log_warning()`, `fdp::log_error()` and `fdp::log_debug()` write to the
+[workload log](logging.md) and print to the console: `fdp::log_info("loaded rows", rows = 120)`.
+
 ## Dependencies
 
 Use the platform package repository and a committed `renv.lock` where applicable.

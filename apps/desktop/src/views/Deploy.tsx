@@ -11,6 +11,7 @@ import { ArgField } from "./Programs";
 import type { TabRef } from "./Tabs";
 import { ObjectBreadcrumbs, ObjectTabs, PermissionsPanel, resourcePath } from "../components/Permissions";
 import { OrganizationSettings } from "./Objects";
+import { LogView } from "../components/LogView";
 import { LoadMoreRuns } from "./Sidebar";
 
 const short = (sha?: string | null) => (sha ? sha.slice(0, 7) : "—");
@@ -376,7 +377,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
           )}
         </>} />
 
-      <ObjectTabs active={section} lineage={!!resource} versions settings={pub.actions.includes("identity") || !!parent?.actions.includes("delete")}
+      <ObjectTabs active={section} lineage={!!resource} versions logs settings={pub.actions.includes("identity") || !!parent?.actions.includes("delete")}
         onChange={(s) => openTab({ ...tab, section: s })} />
       {error && <AccessError error={error} openTab={openTab} />}
       {!error && loadError && <AccessError error={loadError} openTab={openTab} />}
@@ -384,6 +385,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
         : <p className="muted">Permission details are unavailable.</p>)}
       {section === "lineage" && resource && <ObjectLineage resourceId={resource.id} openTab={openTab} />}
       {section === "versions" && <VersionsPanel pub={pub} />}
+      {section === "logs" && <LogView scope={{ workload_id: pub.id }} openTab={openTab} showWorkload={false} label={`Log of ${pub.title}`} />}
       {section === "settings" && <>
         {pub.actions.includes("identity") && <ProductionSettings pub={pub} onSave={(patch) => act(() => api.updateWorkload(pub.id, patch))} />}
         {resource && parent?.actions.includes("delete") && <OrganizationSettings resource={resource} hub={hub} openTab={openTab} />}

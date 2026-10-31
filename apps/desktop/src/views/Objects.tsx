@@ -1,4 +1,5 @@
 import { ObjectLineage } from "../components/ObjectLineage";
+import { LogView } from "../components/LogView";
 import { useEffect, useState } from "react";
 import { accessibleSchemas, accessibleSources, ago, api, AccessResource, inLayer, ServiceAccount, shortSha } from "../api";
 import type { Hub } from "../hub";
@@ -201,9 +202,10 @@ export function FolderView({ tab, hub, openTab }: ObjectProps) {
     {resource.layer_name && <p className="hint">Layer · <strong>{resource.layer_name}</strong></p>}
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
     {!!resource.config.environment && <p className="hint">Branch policy · Deploy from <code>{String(resource.config.branch)}</code>. Promotion creates a separate instance in its target layer.</p>}
-    <ObjectTabs active={section} overview="Contents" runs settings={resource.kind === "folder" && resource.actions.includes("delete")}
+    <ObjectTabs active={section} overview="Contents" runs logs settings={resource.kind === "folder" && resource.actions.includes("delete")}
       onChange={(s) => openTab({ ...tab, section: s })} />
-    {section === "runs" ? <RunList runs={runs} hub={hub} openTab={openTab} />
+    {section === "logs" ? <LogView scope={{ folder_id: resource.id }} layerId={hub.layerId} openTab={openTab} label={`Log of ${resource.name}`} />
+      : section === "runs" ? <RunList runs={runs} hub={hub} openTab={openTab} />
       : section === "permissions" ? <ObjectAccess resource={resource} hub={hub} openTab={openTab} />
       : section === "settings" ? <OrganizationSettings resource={resource} hub={hub} openTab={openTab} /> : <>
         {adding && <form className="card" onSubmit={create}><h3>New folder in {resource.name}</h3>

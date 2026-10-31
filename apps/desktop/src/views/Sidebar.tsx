@@ -5,7 +5,7 @@ import { resourceTab } from "../components/Permissions";
 import { SchemaTreeNode } from "../components/DataBrowser";
 import { useCached, useObjectCache } from "../cache";
 import type { Hub } from "../hub";
-import { IconHome, IconWorkspaces, IconDeployed, IconCatalog, IconRuns, IconApi, IconBranch, IconChevron, IconClose, IconOpen, IconPlay, IconPlus, IconRefresh, IconStop, IconPackage, IconImport, IconKey } from "../components/Icons";
+import { IconHome, IconWorkspaces, IconDeployed, IconCatalog, IconRuns, IconApi, IconBranch, IconChevron, IconClose, IconOpen, IconPlay, IconPlus, IconRefresh, IconStop, IconPackage, IconImport, IconKey, IconLog } from "../components/Icons";
 import { MenuButton } from "../components/Menu";
 import { SECURITY_PAGES, SecurityIcon } from "./Directory";
 import type { TabRef } from "./Tabs";
@@ -264,7 +264,8 @@ function DeployedPanel({ hub, openTab, activeKey }: Props) {
     <OtherLayers count={hub.workloads.filter((p) => !inLayer(hub.layerId, p.layer_id)).length} />
     <div className="sidebar-section-divider" />
     <ul className="list"><li className={activeKey === "runs:" || activeKey === "runs:deployed" ? "selected" : ""}>
-      <button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "runs" })}><IconRuns size={16} />Recent runs</button></li></ul>
+      <button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "runs" })}><IconRuns size={16} />Recent runs</button></li>
+      <li><button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "logs" })}><IconLog size={16} />Logs</button></li></ul>
   </>;
 }
 

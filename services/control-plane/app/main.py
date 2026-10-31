@@ -17,7 +17,8 @@ from .programs import json_schema
 from .deploying import gitops_loop
 from .reaper import reaper_loop
 from .runtimes import sync_installation_runtimes
-from .routes import layers, admin, apis, connect, gateway, identity, deploy, runs, workspaces, rbac, scim, delegation, sql, data_browser, catalog, measurements, compute, workspace_templates, git_credentials, packages, query_log, data_policies, kafka
+from .routes import layers, admin, apis, connect, gateway, identity, deploy, runs, workspaces, rbac, scim, delegation, sql, data_browser, catalog, measurements, compute, workspace_templates, git_credentials, packages, query_log, data_policies, kafka, logs
+from . import workload_logs  # noqa: F401 -- records run and deploy events in the central log
 
 logging.basicConfig(level=logging.INFO)
 
@@ -106,6 +107,7 @@ async def lifespan(app: FastAPI):
                  lambda: import_loop(SessionLocal)]
         from .query_log import retention_loop
         loops.append(lambda: retention_loop(SessionLocal))
+        loops.append(lambda: workload_logs.retention_loop(SessionLocal))
         from .siem import siem_loop, sinks_safe
         if sinks_safe(s):   # audit trail and data access to the configured SIEM destinations
             loops.append(lambda: siem_loop(SessionLocal, s))
@@ -163,7 +165,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-for module in (workspaces, workspace_templates, git_credentials, packages, query_log, runs, compute, admin, connect, deploy, identity, gateway, rbac, scim, delegation, sql, data_browser, catalog, apis, layers, data_policies, kafka):
+for module in (workspaces, workspace_templates, git_credentials, packages, query_log, runs, compute, admin, connect, deploy, identity, gateway, rbac, scim, delegation, sql, data_browser, catalog, apis, layers, data_policies, kafka, logs):
     app.include_router(module.router)
 app.include_router(gateway.docs_router)
 

@@ -19,6 +19,7 @@ import { Home, WorkspacesView } from "./Home";
 import { ApisView, ApiView } from "./Apis";
 import { ensureGitChoice, GitCredentialsTab, WorkspaceGit } from "./GitCredentials";
 import { WorkspaceSections } from "./WorkspaceSections";
+import { LogView } from "../components/LogView";
 import { PackageImportsView, PackagesView, PackageView } from "./Packages";
 import { QueryLogView } from "./QueryLog";
 import { rEnabled, type PackageKind } from "../api";
@@ -388,6 +389,9 @@ function RunTab({ id, hub, openTab }: { id: string; hub: Hub; openTab: (t: TabRe
         </label>
       </div>
       <pre ref={consoleRef} className="terminal">{logs || (live ? "Waiting for output…" : "No output.")}</pre>
+
+      <div className="section-heading"><h2>Log</h2><span className="muted" style={{ fontSize: 12 }}>Platform events and <code>fdp.log</code> lines of this run</span></div>
+      <LogView scope={{ run_id: run.id }} openTab={openTab} showWorkload={false} label="Log of this run" />
 
       {/* Deployed runs keep outputs on the server's data volume, not in a workspace. */}
       {!live && <Outputs run={run} workspaceRunning={!!run.workload_id || ws?.status === "running"} />}

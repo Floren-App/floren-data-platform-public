@@ -16,6 +16,9 @@ all = ["fdp[sql,lake,kafka]"]
 [project.scripts]
 fdp = "fdp.cli:main"
 
+[project.entry-points."airflow.plugins"]
+fdp_log = "fdp.airflow_listener:FDPLogPlugin"
+
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"

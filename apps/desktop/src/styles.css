@@ -613,3 +613,14 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 
 .lineage-container-toggle { margin-top: 7px; border: 1px solid var(--border); background: var(--bg-side); color: var(--fg); border-radius: var(--radius); padding: 3px 7px; font-size: 11px; cursor: pointer; }
 .lineage-container-toggle:hover { background: var(--bg-hover); border-color: var(--accent); }
+
+/* Central log: levels use the shared status colors (info blue, warning yellow, error red, debug gray). */
+.log-table td { vertical-align: top; }
+.log-level { display: inline-block; min-width: 56px; padding: 0 6px; border-radius: var(--radius); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; text-align: center; border: 1px solid currentColor; }
+.log-level.debug { color: var(--fg-muted); }
+.log-level.info { color: var(--info); }
+.log-level.warning { color: var(--warn); }
+.log-level.error { color: var(--err); }
+tr.log-error td { background: color-mix(in srgb, var(--err) 6%, transparent); }
+.log-message { white-space: pre-wrap; word-break: break-word; }
+.log-fields { margin: 6px 0 0; max-height: 240px; overflow: auto; }

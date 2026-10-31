@@ -611,6 +611,50 @@ test("a workload's Versions tab follows Git and shows what ran when", async ({ p
   expect(state.errors).toEqual([]);
 });
 
+test("logs: a workload's Logs tab, the joint Workloads log and a run's log", async ({ page }) => {
+  const state = await setup(page);
+  const asked: URLSearchParams[] = [];
+  const line = (id: number, level: string, message: string, extra: Record<string, unknown> = {}) => ({ id, at: new Date(Date.now() - id * 60_000).toISOString(), level, source: "program",
+    event: "", message, fields: {}, workload_id: "sales", workload: "Sales app", run_id: null, workspace_id: null, commit_sha: "abc1234" + "0".repeat(33), layer_id: "1a0000000002", actor: "admin", ...extra });
+  await page.route("https://iam.test/api/v1/runs?*", (route) => route.fulfill({ json: [{ id: "run-1", initiated_by: "admin", owner: "admin", workspace_id: null, workload_id: "script",
+    commit_sha: "abc1234" + "0".repeat(33), kind: "script", entrypoint: "daily.py", program: "daily-report", args: {}, runtime: "python", runtime_version: "3.12",
+    status: "succeeded", pool_name: "small", created_at: "2026-10-19T10:00:00Z", finished_at: "2026-10-19T11:00:00Z" }] }));
+  await page.reload();
+  await page.route(/\/v1\/logs\?/, (route) => {
+    const params = new URL(route.request().url()).searchParams; asked.push(params);
+    const all = [line(1, "error", "upload failed", { fields: { attempt: 2 } }), line(2, "warning", "3 rows without a region"),
+      line(3, "info", "DAG pokemon started", { source: "airflow", event: "dag.started" }), line(4, "info", "daily.py started", { source: "platform", event: "run.started", run_id: "run-1" })];
+    const min = ["debug", "info", "warning", "error"].indexOf(params.get("level") || "debug");
+    return route.fulfill({ json: { entries: all.filter((e) => ["debug", "info", "warning", "error"].indexOf(e.level) >= min && e.message.includes(params.get("q") || "")), next_before: null } });
+  });
+  const main = page.locator(".main");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Logs", exact: true }).click();
+  const lines = main.getByRole("table", { name: "Log lines" });
+  await expect(lines.getByRole("row")).toHaveCount(5);
+  await expect(lines.getByRole("row", { name: /upload failed/ })).toContainText("abc1234");
+  await expect(lines.getByRole("row", { name: /DAG pokemon started/ })).toContainText("Airflow ·");
+  expect(asked.at(-1)!.get("folder_id")).toBe("workloads");
+  expect(asked.at(-1)!.get("layer_id")).toBe("1a0000000002"); // the joint log follows the layer mode
+  await main.getByRole("combobox", { name: "Log level", exact: true }).selectOption("warning");
+  await expect(lines.getByRole("row")).toHaveCount(3);
+  await lines.getByRole("row", { name: /upload failed/ }).getByRole("button", { name: "details", exact: true }).click();
+  await expect(lines).toContainText('"attempt": 2');
+  await main.getByRole("combobox", { name: "Log level", exact: true }).selectOption("debug");
+  await lines.getByRole("row", { name: /daily.py started/ }).getByRole("button", { name: "Run", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "Log", exact: true })).toBeVisible();
+  expect(asked.at(-1)!.get("run_id")).toBe("run-1");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workloads", exact: true }).click();
+  await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Contents", exact: true }).click();
+  await main.getByRole("button", { name: "Finance", exact: true }).click();
+  await main.getByRole("button", { name: "Reports", exact: true }).click();
+  await main.getByRole("button", { name: "Sales app", exact: true }).click();
+  await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Logs", exact: true }).click();
+  await expect(main.getByRole("table", { name: "Log lines" })).toBeVisible();
+  expect(asked.at(-1)!.get("workload_id")).toBe("sales");
+  expect(state.errors).toEqual([]);
+});
+
 test("a schema shows its last listing at once while the live listing loads", async ({ page }) => {
   const state = await setup(page);
   let release!: () => void;
@@ -822,9 +866,9 @@ for (const inspectChild of [false, true]) test(`Airflow hierarchy ${inspectChild
   await expect(graph.locator(`[data-id="${dag.id}"]`)).toHaveClass(/react-flow__node/);
   await expect(graph.locator(`[data-id="${load.id}"]`)).toBeVisible();
   await expect(graph.locator('[data-id="task-dependency"] .react-flow__edge-path')).toHaveCSS("stroke-dasharray", "5px, 4px");
-  // Expanding can leave nodes partly outside the canvas; fit the chain as a person would before pointing at one.
-  await page.getByRole("navigation", { name: "Jump to lineage stage" }).getByRole("button", { name: "Fit entire chain", exact: true }).click();
-  await graph.locator(`[data-id="${program.id}"] .lineage-entity-title`).first().hover();
+  // The expanded program contains its DAG and tasks and can be taller than the canvas, so its title may sit
+  // outside the visible area: point at the node itself rather than at a screen position.
+  await graph.locator(`[data-id="${program.id}"] .lineage-entity-title`).first().dispatchEvent("mouseover");
   await expect(graph.locator(`[data-id="${load.id}"]`)).not.toHaveClass(/dimmed/);
   await page.screenshot({path:test.info().outputPath("nested-airflow.png")});
   if (!inspectChild) {
