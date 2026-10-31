@@ -37,9 +37,6 @@
   --focus: #7cc63c;
   --status-bg: #5a9e2a;
   --status-fg: #0b1404;
-  /* Production layer mode: the top bar and status bar turn amber. */
-  --prod-bg: #d29922;
-  --prod-fg: #1c1404;
   --ok: #2ea043;
   --warn: #cca700;
   --err: #f85149;
@@ -115,22 +112,21 @@ button:focus-visible, summary:focus-visible, [role="tab"]:focus-visible { outlin
 .topbar-field { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .topbar-field label { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
 .topbar-field select { height: 24px; max-width: 220px; }
-.topbar-note { font-size: 12px; font-weight: 600; }
 .topbar-search { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; height: 24px; min-width: 220px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg-input); color: var(--fg-muted); cursor: pointer; font: inherit; }
 .topbar-search .kbd { margin-left: auto; }
 .topbar-search:hover { color: var(--fg); border-color: var(--fg-muted); }
-.shell.prod .topbar { background: var(--prod-bg); color: var(--prod-fg); border-bottom-color: var(--prod-bg); }
-.shell.prod .topbar-field label { color: var(--prod-fg); }
-.shell.prod .topbar-field select { background: color-mix(in srgb, var(--prod-bg) 70%, #fff); border-color: color-mix(in srgb, var(--prod-bg) 60%, #000); color: var(--prod-fg); color-scheme: light; }
-.shell.prod .topbar-search { background: color-mix(in srgb, var(--prod-bg) 70%, #fff); border-color: color-mix(in srgb, var(--prod-bg) 60%, #000); color: var(--prod-fg); }
-.shell.prod .statusbar { background: var(--prod-bg); color: var(--prod-fg); }
-.activity-group { display: flex; flex-direction: column; align-items: center; }
-.activity-group hr { width: 24px; border: 0; border-top: 1px solid var(--border-strong); margin: 4px 0; }
-.activity-group > button { width: 48px; height: 44px; background: none; border: none; color: var(--fg-muted); cursor: pointer; border-left: 2px solid transparent; border-right: 2px solid transparent; display: grid; place-items: center; }
+/* Activity bar: icons only; hovering a moment (or keyboard focus) slides the labels out over the sidebar,
+   so the bar never takes more room. */
+.activity { grid-row: 2; position: relative; z-index: 30; width: 48px; background: var(--bg-activity); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: stretch; padding: 4px 0; transition: width .12s ease, box-shadow .12s ease; }
+@media (hover: hover) { .activity:hover { width: 176px; box-shadow: var(--shadow); transition-delay: .35s; } }
+.activity:focus-within:has(:focus-visible) { width: 176px; box-shadow: var(--shadow); }
+.activity-label { justify-self: start; padding-right: 12px; font-size: 13px; white-space: nowrap; }
+.activity-group { display: flex; flex-direction: column; align-items: stretch; }
+.activity-group hr { width: 24px; border: 0; border-top: 1px solid var(--border-strong); margin: 4px 0 4px 12px; }
+.activity-group > button { width: 100%; height: 44px; background: none; border: none; color: var(--fg-muted); cursor: pointer; border-left: 2px solid transparent; border-right: 2px solid transparent; display: grid; grid-template-columns: 44px max-content; align-items: center; justify-items: center; overflow: hidden; padding: 0; }
 .activity-group > button:hover { color: var(--fg-strong); }
 .activity-group > button.active { color: var(--fg-strong); border-left-color: var(--accent); }
-.activity { grid-row: 2; background: var(--bg-activity); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 4px 0; }
-.activity > button, .activity > .menu-anchor > button { width: 48px; height: 48px; background: none; border: none; color: var(--fg-muted); cursor: pointer; border-left: 2px solid transparent; border-right: 2px solid transparent; display: grid; place-items: center; }
+.activity > button, .activity > .menu-anchor > button { width: 100%; height: 48px; background: none; border: none; color: var(--fg-muted); cursor: pointer; border-left: 2px solid transparent; border-right: 2px solid transparent; display: grid; grid-template-columns: 44px max-content; align-items: center; justify-items: center; overflow: hidden; padding: 0; }
 .activity > button:hover, .activity > .menu-anchor > button:hover, .activity > .menu-anchor > button[aria-expanded="true"] { color: var(--fg-strong); }
 .activity > button.active { color: var(--fg-strong); border-left-color: var(--accent); }
 .activity .spacer { flex: 1; }

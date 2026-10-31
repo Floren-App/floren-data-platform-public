@@ -11,13 +11,15 @@ The top bar shows your working context and stays visible on every page:
   on existing objects. See [active groups](active-groups.md).
 - **Layer**: the layer you work in. Lists show that layer's workspaces, workloads,
   storage, Kafka and APIs (items without a layer show in every layer), and what you create
-  lands in it. A note in each list counts what is in other layers. In a production layer
-  the top bar and status bar turn amber. Your choice is remembered for your account.
+  lands in it. A note in each list counts what is in other layers. Production layers are
+  marked "production" in the picker. Your choice is remembered for your account.
 - **Search the catalog** (or **Ctrl/Cmd+K**) opens catalog search from anywhere.
 
 ## Activity bar
 
-The activity bar groups the sections by what you do:
+The activity bar on the left shows icons. Hold the pointer over it for a moment, or move
+to it with the keyboard, and it slides out over the sidebar with the name of each section.
+It groups the sections by what you do:
 
 | Group | Section | What it is for |
 |---|---|---|

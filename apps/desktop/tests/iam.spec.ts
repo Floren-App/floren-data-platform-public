@@ -1875,7 +1875,7 @@ test("schema Owners grant a person access directly and see User as the recipient
   expect(state.errors).toEqual([]);
 });
 
-test("the layer mode filters lists, is remembered, and marks production", async ({ page }) => {
+test("the layer mode filters lists, is remembered, and names production in the picker", async ({ page }) => {
   const state = await setup(page);
   (state.resources.find((r) => r.id === "source-lake") as any).layer_id = "1a0000000001";
   await page.reload();
@@ -1885,14 +1885,28 @@ test("the layer mode filters lists, is remembered, and marks production", async 
   await expect(sidebar.getByRole("button", { name: "finance-dw", exact: true })).toBeVisible(); // No layer: shown in every layer.
   await expect(sidebar.getByRole("button", { name: "lake", exact: true })).toHaveCount(0);
   await expect(sidebar).toContainText("1 more in other layers");
-  await expect(page.locator(".shell")).not.toHaveClass(/prod/);
+  await expect(layer.locator("option:checked")).toHaveText("Non-Prod");
   await layer.selectOption("1a0000000001");
   await expect(sidebar.getByRole("button", { name: "lake", exact: true })).toBeVisible();
-  await expect(page.locator(".shell")).toHaveClass(/prod/);
-  await expect(page.getByRole("banner", { name: "Working context" })).toContainText("Changes here affect production");
+  await expect(layer.locator("option:checked")).toHaveText("Prod · production");
+  await expect(page.locator(".shell")).toHaveAttribute("class", "shell"); // Same styling in every layer.
   expect(state.mutations.some((m) => m.method === "PUT" && m.path === "/v1/me/active-layer" && m.body.layer_id === "1a0000000001")).toBeTruthy();
   await page.reload();
   await expect(layer).toHaveValue("1a0000000001");
+  expect(state.errors).toEqual([]);
+});
+
+test("activity bar shows its labels on hover without taking room", async ({ page }) => {
+  const state = await setup(page);
+  const bar = page.getByRole("navigation", { name: "Views" }), sidebar = page.locator(".sidebar");
+  const sidebarLeft = (await sidebar.boundingBox())!.x;
+  expect((await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
+  await bar.getByRole("button", { name: "Workspaces", exact: true }).hover();
+  await expect.poll(async () => (await bar.boundingBox())!.width).toBeGreaterThan(150);
+  expect((await sidebar.boundingBox())!.x).toBe(sidebarLeft); // Overlays the sidebar; nothing shifts.
+  await expect(bar.getByRole("button", { name: "Workspaces", exact: true })).toContainText("Workspaces");
+  await page.mouse.move(700, 300);
+  await expect.poll(async () => (await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
   expect(state.errors).toEqual([]);
 });
 

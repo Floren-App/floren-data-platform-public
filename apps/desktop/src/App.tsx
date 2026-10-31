@@ -156,9 +156,9 @@ function Shell({ user }: { user: User }) {
   ];
   const layer = hub.layers.find((l) => l.id === hub.layerId);
   const activityButton = (a: Activity) => (
-    <button key={a.id} title={a.label} aria-label={a.label} aria-current={view === a.id ? "page" : undefined}
+    <button key={a.id} aria-label={a.label} aria-current={view === a.id ? "page" : undefined}
             className={view === a.id ? "active" : ""} onClick={() => selectView(a.id)}>
-      {a.icon}
+      {a.icon}<span className="activity-label">{a.label}</span>
     </button>
   );
   const current = tabs.find((t) => key(t) === active);
@@ -182,7 +182,7 @@ function Shell({ user }: { user: User }) {
   const activeRuns = hub.runs.filter((r) => r.status === "running" || r.status === "pending").length;
 
   return (
-    <div className={`shell ${layer?.production ? "prod" : ""}`}>
+    <div className="shell">
       <header className="topbar" aria-label="Working context">
         <div className="topbar-field">
           <label htmlFor="active-group"><ProductIcon kind="groups" size={14} />Group</label>
@@ -201,7 +201,6 @@ function Shell({ user }: { user: User }) {
             {hub.layers.map((l) => <option key={l.id} value={l.id}>{l.name}{l.production ? " · production" : ""}</option>)}
           </select>
         </div>}
-        {layer?.production && <span className="topbar-note">Changes here affect production</span>}
         <button className="topbar-search" onClick={openSearch}>Search the catalog<span className="kbd">⌘K</span></button>
       </header>
       <nav className="activity" aria-label="Views">
@@ -210,10 +209,10 @@ function Shell({ user }: { user: User }) {
         <div className="spacer" />
         {activityButton({ id: "access", label: "Security", icon: <IconAdmin /> })}
         {hub.me?.is_admin && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}
-        <button title="Documentation for this section" aria-label="Documentation" onClick={() => {
+        <button aria-label="Documentation" onClick={() => {
           void hub.act(() => openInWindow(documentationUrl(view), "FDP documentation", `fdp-help-${view}`));
-        }}><IconBook /></button>
-        <MenuButton id="account-menu" label="Account" menuLabel="Account" className="" icon={<IconAccount />}>
+        }}><IconBook /><span className="activity-label">Documentation</span></button>
+        <MenuButton id="account-menu" label="Account" menuLabel="Account" className="" icon={<><IconAccount /><span className="activity-label">Account</span></>}>
           {(close) => <>
             <div className="menu-header"><strong>{user.profile.preferred_username ?? hub.me?.username}</strong>
               <span className="muted">{new URL(getServer()).host}</span></div>
