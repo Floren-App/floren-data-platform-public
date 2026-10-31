@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AccessRequestItem, ago, api, openInWindow, AssetProduct, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
+import { AccessRequestItem, ago, api, openInWindow, AppGroup, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
@@ -205,9 +205,10 @@ function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDon
   const groups = hub.me?.available_groups ?? [];
   const [group, setGroup] = useState(hub.me?.active_group_id && groups.some((g) => g.id === hub.me?.active_group_id) ? hub.me.active_group_id : groups[0]?.id ?? "");
   const [reason, setReason] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [option, setOption] = useState(((p.options ?? []).find((o) => o.default) ?? (p.options ?? [])[0])?.id ?? "");
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError("");
-    try { await api.products.requestAccess(p.id, group, reason.trim()); onDone(); } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+    try { await api.products.requestAccess(p.id, group, reason.trim(), option || undefined); onDone(); } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
   };
   return <form className="card" aria-label={`Request access to ${p.title}`} onSubmit={(e) => void submit(e)}>
     <h2>Request access</h2>
@@ -215,6 +216,11 @@ function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDon
     <div className="arg-grid">
       <div className="field"><label htmlFor="request-group">For your group</label>
         <select id="request-group" value={group} onChange={(e) => setGroup(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>
+      {(p.options ?? []).length > 1 && <fieldset className="field request-options" style={{ gridColumn: "1 / -1" }}><legend>Access option</legend>
+        {(p.options ?? []).map((o) => <label key={o.id} className="row"><input type="radio" name="request-option" checked={option === o.id} onChange={() => setOption(o.id)} />
+          <span><strong>{o.name}</strong>{o.default && <span className="muted"> · default</span>} <span className="product-chip">{words(o.classification)}</span>
+            {o.description && <span className="muted"> · {o.description}</span>}</span></label>)}
+      </fieldset>}
       <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="request-reason">Why you need it</label>
         <textarea id="request-reason" rows={2} maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What you will use it for" /></div>
     </div>
@@ -227,13 +233,17 @@ function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDon
 function EditForm({ detail, hub, onSaved, onCancel, openTab }: { detail: ProductDetail; hub: Hub; onSaved: () => void; onCancel: () => void; openTab: OpenTab }) {
   const [title, setTitle] = useState(detail.title), [summary, setSummary] = useState(detail.summary);
   const [chosen, setChosen] = useState(detail.members.map((m) => m.asset_id)), [error, setError] = useState(""), [confirming, setConfirming] = useState(false);
+  const [options, setOptions] = useState<OptionInput[]>((detail.options ?? []).map((o) => ({ name: o.name, description: o.description, default: o.default,
+    masks: (o.masks ?? []).map((m) => ({ asset_id: m.asset_id, column: m.column, method: m.method, expression: m.expression })),
+    filters: (o.filters ?? []).map((f) => ({ asset_id: f.asset_id, expression: f.expression })) })));
   const save = (e: React.FormEvent) => { e.preventDefault();
-    void api.products.update(detail.id, { title: title.trim(), summary, asset_ids: chosen }).then(onSaved).catch((err: Error) => setError(err.message)); };
+    void api.products.update(detail.id, { title: title.trim(), summary, asset_ids: chosen, options }).then(onSaved).catch((err: Error) => setError(err.message)); };
   return <form className="card" aria-label="Edit product" onSubmit={save}>
     <div className="arg-grid"><div className="field"><label htmlFor="product-title">Name in the catalog</label><input id="product-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} /></div>
       <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="product-summary">Summary</label><textarea id="product-summary" rows={2} maxLength={600} value={summary} onChange={(e) => setSummary(e.target.value)} /></div></div>
     <MemberPicker hub={hub} chosen={chosen} onChange={setChosen} />
     <p className="hint">Consumers get the use of what you add, and lose what you remove.</p>
+    <OptionsEditor detail={detail} options={options} onChange={setOptions} />
     {error && <p className="error" role="alert">{error}</p>}
     <div className="form-actions"><button className="btn" disabled={!title.trim() || !chosen.length}>Save</button><button type="button" className="btn secondary" onClick={onCancel}>Cancel</button>
       <span className="grow" />
@@ -254,7 +264,7 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
   if (!detail) return <p className="muted" role="status">Loading…</p>;
   const section = tab.productSection ?? "overview";
   const target = openTarget(detail.open, detail.name, detail.kind);
-  const sections: [NonNullable<TabRef["productSection"]>, string][] = [["overview", "Overview"], ["lineage", "Lineage"], ["used-by", "Used by"]];
+  const sections: [NonNullable<TabRef["productSection"]>, string][] = [["overview", "Overview"], ["options", "Access options"], ["lineage", "Lineage"], ["used-by", "Used by"]];
   if (detail.access_resource) sections.push(["permissions", "Permissions"]);
   return <>
     <div className="crumbs muted"><button className="text-button" onClick={() => openTab({ kind: "products", title: "Data products" })}>Data products</button>{detail.domain && <> › {detail.domain}</>}</div>
@@ -296,6 +306,7 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
         {m.access === "granted" ? <span className="product-chip ok">You have access</span> : <span className="product-chip">No access</span>}</li>; })}</ul>
       {detail.access !== "granted" && <p className="hint">Columns, previews and SQL are shown on each object's own page once you have access.</p>}
     </>}
+    {section === "options" && <AccessOptions detail={detail} onChanged={() => void load()} />}
     {section === "lineage" && <><Lineage detail={detail} openTab={openTab} />
       <p className="hint">Dashed steps are ones you cannot open: you see their name, kind and owner. {hub.has("catalog.objects") && detail.members.some((m) => m.access === "granted") &&
         <button className="text-button" onClick={() => { const m = detail.members.find((x) => x.access === "granted")!; openTab({ kind: "catalog-object", ref: m.asset_id, title: m.name, catalogSection: "lineage" }); }}>Open the full lineage graph</button>}</p></>}
@@ -304,6 +315,68 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
       {detail.used_by_others > 0 && <p className="hint">{detail.used_by_others} other object{detail.used_by_others === 1 ? " uses" : "s use"} it (not published).</p>}</>}
     {section === "permissions" && detail.access_resource && <PermissionsPanel resource={detail.access_resource} resources={[detail.access_resource]} openTab={openTab} onChanged={async () => { await load(); }} />}
   </>;
+}
+
+/** The product's access options: what each shows, the level that leads to, and (for owners) which groups have it. */
+function AccessOptions({ detail, onChanged }: { detail: ProductDetail; onChanged: () => void }) {
+  const [groups, setGroups] = useState<AppGroup[]>([]), [group, setGroup] = useState(""), [option, setOption] = useState(""), [error, setError] = useState("");
+  useEffect(() => { if (detail.can_manage) api.access.groups().then(setGroups).catch(() => setGroups([])); }, [detail.can_manage]);
+  const consumers = detail.consumers ?? [];
+  const act = (p: Promise<unknown>) => { setError(""); void p.then(onChanged).catch((e: Error) => setError(e.message)); };
+  return <>
+    <p className="hint">Each option is a way to use this product: the masks and row filters its consumers get. The level shows what consumers of the option really see; masked columns count lower.</p>
+    <div className="table-scroll"><table aria-label="Access options"><thead><tr><th>Option</th><th>Consumers see</th><th>Level</th>{detail.can_manage && <th>Groups</th>}</tr></thead><tbody>
+      {(detail.options ?? []).map((o) => <tr key={o.id}><td><strong>{o.name}</strong>{o.default && <span className="muted"> · default</span>}{o.description && <div className="muted small">{o.description}</div>}</td>
+        <td>{o.masks ? <>{o.masks.map((m) => <div key={m.table + m.column} className="mono small">{m.table}.{m.column}: {m.method}</div>)}
+            {(o.filters ?? []).map((f) => <div key={f.table} className="mono small">{f.table}: rows where {f.expression}</div>)}{!o.masks.length && !(o.filters ?? []).length && <span className="muted">everything, unmasked</span>}</>
+          : <span className="muted">{o.masked_columns ? `${o.masked_columns} masked column${o.masked_columns === 1 ? "" : "s"}` : "no masked columns"}{o.filtered_tables ? ` · rows filtered on ${o.filtered_tables} table${o.filtered_tables === 1 ? "" : "s"}` : ""}</span>}</td>
+        <td><span className="product-chip">{words(o.classification)}</span></td>
+        {detail.can_manage && <td>{consumers.filter((c) => c.option_id === o.id).map((c) => <div key={c.group_id} className="row" style={{ gap: 6 }}>{c.group}
+          <select aria-label={`Option of ${c.group}`} value={o.id} onChange={(e) => act(api.products.setConsumer(detail.id, c.group_id, e.target.value))}>
+            {(detail.options ?? []).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+          <button className="text-button" onClick={() => act(api.products.removeConsumer(detail.id, c.group_id))}>Remove</button></div>)}
+          {!consumers.some((c) => c.option_id === o.id) && <span className="muted">—</span>}</td>}
+      </tr>)}</tbody></table></div>
+    {detail.can_manage && <form className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }} onSubmit={(e) => { e.preventDefault(); act(api.products.setConsumer(detail.id, group, option || undefined)); }}>
+      <select aria-label="Group to give access" value={group} onChange={(e) => setGroup(e.target.value)}><option value="">Give a group access…</option>
+        {groups.filter((g) => !consumers.some((c) => c.group_id === g.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+      <select aria-label="With option" value={option} onChange={(e) => setOption(e.target.value)}><option value="">Default option</option>{(detail.options ?? []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>
+      <button className="btn secondary" disabled={!group}>Give access</button></form>}
+    {error && <p className="error" role="alert">{error}</p>}
+  </>;
+}
+
+/** Owners shape the options: per option masks on table columns and a row filter per table. */
+function OptionsEditor({ detail, options, onChange }: { detail: ProductDetail; options: OptionInput[]; onChange: (o: OptionInput[]) => void }) {
+  const tables = detail.members.filter((m) => ["table", "view", "materialized_view"].includes(m.kind));
+  const set = (i: number, patch: Partial<OptionInput>) => onChange(options.map((o, j) => j === i ? { ...o, ...patch } : patch.default ? { ...o, default: false } : o));
+  return <fieldset className="publish-members options-editor"><legend>Access options</legend>
+    <p className="hint">The default option is what a request gets unless another is chosen. Masks and filters apply to people who reach these tables only through this product.</p>
+    {options.map((o, i) => <div key={i} className="option-editor" aria-label={`Option ${o.name || i + 1}`} role="group">
+      <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        <input aria-label="Option name" value={o.name} onChange={(e) => set(i, { name: e.target.value })} placeholder="Masked" />
+        <input aria-label="Option description" value={o.description} onChange={(e) => set(i, { description: e.target.value })} placeholder="What consumers see" style={{ flex: 1, minWidth: 200 }} />
+        <label className="row"><input type="radio" name="default-option" checked={o.default} onChange={() => set(i, { default: true })} />Default</label>
+        <button type="button" className="text-button" disabled={options.length === 1} onClick={() => onChange(options.filter((_, j) => j !== i))}>Remove option</button></div>
+      {o.masks.map((m, k) => <div key={k} className="row" style={{ gap: 6, marginTop: 4 }}>
+        <select aria-label="Masked table" value={m.asset_id} onChange={(e) => set(i, { masks: o.masks.map((x, y) => y === k ? { ...x, asset_id: e.target.value } : x) })}>
+          {tables.map((t) => <option key={t.asset_id} value={t.asset_id}>{t.name}</option>)}</select>
+        <input aria-label="Masked column" value={m.column} placeholder="email" onChange={(e) => set(i, { masks: o.masks.map((x, y) => y === k ? { ...x, column: e.target.value } : x) })} />
+        <select aria-label="Mask method" value={m.method} onChange={(e) => set(i, { masks: o.masks.map((x, y) => y === k ? { ...x, method: e.target.value } : x) })}>
+          {["hash", "redact", "partial", "null", "expression"].map((v) => <option key={v}>{v}</option>)}</select>
+        {m.method === "expression" && <input aria-label="Mask expression" value={m.expression} onChange={(e) => set(i, { masks: o.masks.map((x, y) => y === k ? { ...x, expression: e.target.value } : x) })} />}
+        <button type="button" className="text-button" onClick={() => set(i, { masks: o.masks.filter((_, y) => y !== k) })}>Remove</button></div>)}
+      {o.filters.map((f, k) => <div key={"f" + k} className="row" style={{ gap: 6, marginTop: 4 }}>
+        <select aria-label="Filtered table" value={f.asset_id} onChange={(e) => set(i, { filters: o.filters.map((x, y) => y === k ? { ...x, asset_id: e.target.value } : x) })}>
+          {tables.map((t) => <option key={t.asset_id} value={t.asset_id}>{t.name}</option>)}</select>
+        <input aria-label="Row filter" value={f.expression} placeholder="region = 'EU'" style={{ flex: 1 }} onChange={(e) => set(i, { filters: o.filters.map((x, y) => y === k ? { ...x, expression: e.target.value } : x) })} />
+        <button type="button" className="text-button" onClick={() => set(i, { filters: o.filters.filter((_, y) => y !== k) })}>Remove</button></div>)}
+      {!!tables.length && <div className="row" style={{ gap: 8, marginTop: 4 }}>
+        <button type="button" className="text-button" onClick={() => set(i, { masks: [...o.masks, { asset_id: tables[0].asset_id, column: "", method: "hash", expression: "" }] })}>+ Mask a column</button>
+        <button type="button" className="text-button" onClick={() => set(i, { filters: [...o.filters, { asset_id: tables[0].asset_id, expression: "" }] })}>+ Filter rows</button></div>}
+    </div>)}
+    <button type="button" className="text-button" onClick={() => onChange([...options, { name: "", description: "", default: false, masks: [], filters: [] }])}>+ Add option</button>
+  </fieldset>;
 }
 
 /** Owners approve or decline requests; everyone sees their own. */
@@ -326,7 +399,7 @@ export function AccessRequestsView({ hub, openTab, tab }: { hub: Hub; openTab: O
           <td><button className="text-button" onClick={() => openTab({ kind: "product", ref: r.product_id, title: r.product })}>{r.product}</button>
             <div className="muted small">gives {grantsText(r.grants)}</div></td>
           <td>{box === "approve" ? r.requester : ""} <span className="muted" title={new Date(r.created_at).toLocaleString()}>{ago(r.created_at)}</span></td>
-          <td>{r.group}<div className="muted">{r.reason}</div></td>
+          <td>{r.group}{r.option && <span className="muted"> · {r.option}</span>}<div className="muted">{r.reason}</div></td>
           <td><span className="status"><span className={`dot ${r.status === "approved" ? "succeeded" : r.status === "pending" ? "queued" : r.status === "declined" ? "failed" : "stopped"}`} />{r.status}</span>
             {r.decided_by && <div className="muted small">{r.decided_by}{r.decision_note && `: ${r.decision_note}`}</div>}</td>
           <td className="table-actions">{r.status === "pending" && (box === "approve" ? <div className="row">

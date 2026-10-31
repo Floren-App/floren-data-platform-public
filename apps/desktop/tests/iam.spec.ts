@@ -772,6 +772,77 @@ test("administrators edit app profiles in a grid of features", async ({ page }) 
   expect(state.errors).toEqual([]);
 });
 
+test("product access options: requesters choose one, owners see masks and move groups", async ({ page }) => {
+  const state = await setup(page);
+  const sent: { url: string; body: unknown }[] = [];
+  const options = (owner: boolean) => [
+    { id: "o-masked", name: "Masked", description: "Email hashed", default: true, classification: "internal",
+      ...(owner ? { masks: [{ asset_id: "a-sales", table: "sales", column: "email", method: "hash", expression: "" }], filters: [] } : { masked_columns: 1, filtered_tables: 0 }) },
+    { id: "o-full", name: "Full", description: "Everything", default: false, classification: "restricted", ...(owner ? { masks: [], filters: [] } : { masked_columns: 0, filtered_tables: 0 }) }];
+  let owner = false;
+  const product = () => ({ id: "p1", asset_id: "a-sales", title: "Sales", summary: "Orders.", kind: "table", runtime: null, name: "sales", layer_id: "1a0000000002",
+    layer_name: "Non-Prod", domain: "Finance", classification: "restricted", status: "draft", steward: "", owner_group_name: "Finance", updated_at: null, sla_status: "",
+    published_at: "2026-10-31T09:00:00Z", published_by: "ana", access: owner ? "granted" : "none", can_manage: owner,
+    members: [{ asset_id: "a-sales", name: "sales", kind: "table", runtime: null, access: owner ? "granted" : "none", updated_at: null, open: null }],
+    grants: [{ resource_id: "s", kind: "schema", name: "public", role: "Reader", object: "sales" }], open: null, options: options(owner),
+    lineage: [], lineage_edges: [], used_by: [], used_by_others: 0,
+    ...(owner ? { consumers: [{ group_id: "analysts", group: "Analysts", option_id: "o-masked", option: "Masked" }] } : {}) });
+  await page.route(/\/v1\/catalog\/products/, (route) => {
+    const url = new URL(route.request().url()), method = route.request().method();
+    if (method !== "GET") { sent.push({ url: url.pathname, body: route.request().postDataJSON() }); return route.fulfill({ status: 201, json: {} }); }
+    if (url.pathname.endsWith("/products")) return route.fulfill({ json: { items: [product()], domains: [], kinds: ["table"] } });
+    return route.fulfill({ json: product() });
+  });
+  const main = page.locator(".main");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await main.getByRole("article", { name: "Sales" }).getByRole("button", { name: "Request access", exact: true }).click();
+  // Requesters see the options and the level each leads to, not which columns.
+  await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Access options", exact: true }).click();
+  const table = main.getByRole("table", { name: "Access options" });
+  await expect(table.getByRole("row", { name: /Masked/ })).toContainText("1 masked column");
+  await expect(table.getByRole("row", { name: /Masked/ })).toContainText("internal");
+  await expect(table.getByRole("row", { name: /Full/ })).toContainText("restricted");
+  await expect(table).not.toContainText("sales.email");
+  await main.getByRole("radio", { name: /Full/ }).check();
+  await main.getByRole("textbox", { name: "Why you need it" }).fill("Fraud analysis needs real emails");
+  await main.getByRole("button", { name: "Send request", exact: true }).click();
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent[0]).toMatchObject({ url: "/api/v1/catalog/products/p1/requests", body: { option_id: "o-full", reason: "Fraud analysis needs real emails" } });
+  // Owners see the masks and which group has which option, and move a group.
+  owner = true;
+  await page.reload();
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await main.getByRole("button", { name: "Sales", exact: true }).click();
+  await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Access options", exact: true }).click();
+  await expect(table).toContainText("sales.email: hash");
+  await table.getByRole("combobox", { name: "Option of Analysts" }).selectOption("o-full");
+  await expect.poll(() => sent.length).toBe(2);
+  expect(sent[1]).toMatchObject({ url: "/api/v1/catalog/products/p1/consumers/analysts", body: { option_id: "o-full" } });
+  expect(state.errors).toEqual([]);
+});
+
+test("owners classify columns and the object follows the highest", async ({ page }) => {
+  const state = await setup(page);
+  const saved: unknown[] = [];
+  await page.route("https://iam.test/api/v1/catalog/classifications", (route) => route.fulfill({ json: { levels: [
+    { name: "public", masked_as: "public", description: "" }, { name: "internal", masked_as: "internal", description: "" },
+    { name: "restricted", masked_as: "internal", description: "" }, { name: "secret", masked_as: "restricted", description: "" }] } }));
+  await page.route(/\/v1\/catalog\/assets\/[^/]+\/columns$/, (route) => { saved.push(route.request().postDataJSON()); return route.fulfill({ json: {} }); });
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click();
+  const main = page.locator(".main");
+  await main.getByRole("button", { name: "Revenue", exact: true }).click();
+  const columns = main.getByRole("table", { name: "Catalog columns" });
+  const first = columns.getByRole("combobox").first();
+  await expect(first.locator("option")).toHaveText(["unclassified", "public", "internal", "restricted", "secret"]);  // the configured list
+  await first.selectOption("secret");
+  await columns.getByRole("textbox").first().fill("pii");
+  await main.getByRole("button", { name: "Save column classification", exact: true }).click();
+  await expect.poll(() => saved.length).toBe(1);
+  expect(Object.values((saved[0] as { columns: Record<string, unknown> }).columns)[0]).toEqual({ classification: "secret", tags: ["pii"] });
+  expect(state.errors).toEqual([]);
+});
+
 test("logs: a workload's Logs tab, the joint Workloads log and a run's log", async ({ page }) => {
   const state = await setup(page);
   const asked: URLSearchParams[] = [];

@@ -20,21 +20,59 @@ from .. import catalog as c, layers, rbac
 from ..auth import User
 from ..db import get_db
 from ..deps import get_actor
-from ..models import (AccessRequest, AppGroup, CatalogAsset, CatalogProduct, CatalogProductMember, LineageEdge, Resource,
-                      RoleAssignment, Workload, utcnow)
+from ..models import (AccessRequest, AppGroup, CatalogAsset, CatalogProduct, CatalogProductMember, LineageEdge, ProductOption,
+                      Resource, RoleAssignment, Workload, utcnow)
 from .common import audit
 
 router = APIRouter(prefix="/v1/catalog", tags=["catalog"])
 
 PUBLISHABLE = {"table", "view", "materialized_view", "app", "api", "topic"}
+TABLE_KINDS = {"table", "view", "materialized_view"}
 READER_ROLE = rbac.READER_ROLE
 DATA_RELATIONS = ("reads", "writes", "depends_on", "uses")
 PATH_DEPTH, PATH_LIMIT, MAX_MEMBERS = 6, 40, 20
 
 
+class MemberRef(BaseModel):
+    """An object by its RBAC resource, and for a table its name in the schema (Terraform refers to objects this way)."""
+    model_config = ConfigDict(extra="forbid")
+    resource_id: str = Field(min_length=1, max_length=12)
+    object_path: Optional[str] = Field(default=None, max_length=1024, description="A table or view in a schema resource")
+
+
+class MaskIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    asset_id: Optional[str] = None
+    resource_id: Optional[str] = None
+    table: Optional[str] = Field(default=None, max_length=1024)
+    column: str = Field(min_length=1, max_length=256)
+    method: Literal["null", "redact", "hash", "partial", "expression"] = "hash"
+    expression: str = Field(default="", max_length=4000)
+
+
+class FilterIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    asset_id: Optional[str] = None
+    resource_id: Optional[str] = None
+    table: Optional[str] = Field(default=None, max_length=1024)
+    expression: str = Field(min_length=1, max_length=4000)
+
+
+class OptionIn(BaseModel):
+    """A way to use the product: masks and row filters on its tables for the groups that get this option."""
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=80)
+    description: str = Field(default="", max_length=500)
+    default: bool = False
+    masks: List[MaskIn] = Field(default_factory=list, max_length=200)
+    filters: List[FilterIn] = Field(default_factory=list, max_length=50)
+
+
 class PublishIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    asset_ids: List[str] = Field(min_length=1, max_length=MAX_MEMBERS, description="Objects in the product; the first leads (its icon)")
+    asset_ids: List[str] = Field(default_factory=list, max_length=MAX_MEMBERS, description="Objects in the product; the first leads (its icon)")
+    members: List[MemberRef] = Field(default_factory=list, max_length=MAX_MEMBERS, description="Objects by resource (after asset_ids)")
+    options: List[OptionIn] = Field(default_factory=list, max_length=10, description="Access options; none: one Standard option without masks")
     title: str = Field(min_length=1, max_length=200)
     summary: str = Field(default="", max_length=600)
     domain: str = Field(default="", max_length=80)
@@ -45,14 +83,22 @@ class ProductPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: Optional[str] = Field(default=None, min_length=1, max_length=200)
     summary: Optional[str] = Field(default=None, max_length=600)
-    asset_ids: Optional[List[str]] = Field(default=None, min_length=1, max_length=MAX_MEMBERS,
+    asset_ids: Optional[List[str]] = Field(default=None, max_length=MAX_MEMBERS,
                                            description="Replace the objects in the product; the first leads")
+    members: Optional[List[MemberRef]] = Field(default=None, max_length=MAX_MEMBERS, description="Replace the objects, by resource")
+    options: Optional[List[OptionIn]] = Field(default=None, max_length=10, description="Replace the access options")
 
 
 class RequestIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     app_group_id: str = Field(min_length=1, max_length=12)
     reason: str = Field(min_length=3, max_length=1000)
+    option_id: Optional[str] = Field(default=None, max_length=12, description="The access option asked for; default: the default option")
+
+
+class ConsumerIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    option_id: Optional[str] = Field(default=None, max_length=12, description="Default: the default option")
 
 
 class DecisionIn(BaseModel):
@@ -157,12 +203,25 @@ def card(db: Session, product: CatalogProduct, viewer: _Viewer) -> dict:
     for asset, resource in parts:
         can = viewer.can(resource.id, "read")
         member_out.append({"asset_id": asset.id, "name": asset.name, "kind": asset.kind, "runtime": _runtime(db, resource),
+                           "resource_id": resource.id, "object_path": (asset.attributes or {}).get("object_path") if asset.kind in TABLE_KINDS else None,
                            "access": "granted" if can else "none", "updated_at": _freshness(db, asset, resource),
                            "open": _open(asset, resource) if can else None})
+    from .. import classification as levels, product_options
+    manager = bool(product.access_resource_id) and viewer.can(product.access_resource_id, "assign")
+    option_out = []
+    for option in product_options.options(db, product.id):
+        item = product_options.out(db, parts, option)
+        if not manager:  # column names and filters are details: for owners
+            item = {k: item[k] for k in ("id", "name", "description", "default", "classification")} | {
+                "masked_columns": len(option.masks or []), "filtered_tables": len(option.filters or [])}
+        option_out.append(item)
     return {"id": product.id, "asset_id": lead_asset.id, "title": product.title, "summary": product.summary,
             "kind": lead_asset.kind, "runtime": _runtime(db, lead_resource), "name": lead_asset.name,
             **layers.info(db, lead_resource),
-            "domain": governance.get("domain") or "", "classification": governance.get("classification", "unclassified"),
+            "domain": governance.get("domain") or "",
+            # The level of what is in it, unmasked; each option says what its consumers see.
+            "classification": levels.highest(db, (levels.effective(db, a) for a, _ in parts)),
+            "options": option_out,
             "status": governance.get("status", "draft"), "steward": governance.get("steward") or "",
             "owner_group_name": _owner(db, lead_asset, lead_resource),
             "updated_at": max(fresh) if fresh else None, "sla_status": level.get("status"),
@@ -284,6 +343,46 @@ def _checked_members(db, viewer, asset_ids) -> List[tuple]:
     return parts
 
 
+def _resolve(db, viewer, asset_ids, members) -> List[str]:
+    """Asset ids of the objects named by asset id or by resource (and table); unknown tables are indexed."""
+    ids = list(asset_ids or [])
+    if members:
+        c.sync_registry(db)
+    for ref in members or []:
+        resource = db.get(Resource, ref.resource_id)
+        if resource is None or not viewer.can(resource.id, "read"):
+            raise HTTPException(404, "catalog object not available")
+        if ref.object_path:
+            if resource.kind != "schema":
+                raise HTTPException(422, "object_path names a table or view in a schema")
+            path = ref.object_path.strip()
+            ident = c.asset_id(resource.id, "object:" + path)
+            if db.get(CatalogAsset, ident) is None and viewer.can(resource.id, "assign"):
+                c.upsert(db, resource, "object:" + path, kind="table", name=path,
+                         attributes={"object_path": path, "schema": resource.name, "origin": "data_product"})
+                db.flush()
+            ids.append(ident)
+        else:
+            ids.append(c.asset_id(resource.id))
+    if not ids:
+        raise HTTPException(422, "a product needs at least one object")
+    return ids
+
+
+def _options_for(db, product, parts, given) -> None:
+    """Save given options, or re-check the current ones against changed contents (masks on removed tables go)."""
+    from .. import product_options
+    if given is not None:
+        product_options.save(db, product, product_options.validate(parts, [o.model_dump() for o in given]))
+        return
+    current = product_options.options(db, product.id)
+    tables = {a.id for a, _ in parts}
+    kept = [{"name": o.name, "description": o.description, "default": o.default,
+             "masks": [m for m in o.masks or [] if m["asset_id"] in tables],
+             "filters": [f for f in o.filters or [] if f["asset_id"] in tables]} for o in current]
+    product_options.save(db, product, product_options.validate(parts, kept))
+
+
 def _set_members(db, product, parts):
     db.execute(delete(CatalogProductMember).where(CatalogProductMember.product_id == product.id))
     db.flush()
@@ -300,7 +399,7 @@ def _set_members(db, product, parts):
 def publish(body: PublishIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Publish one or more objects you own as a data product."""
     viewer = _Viewer(db, user)
-    parts = _checked_members(db, viewer, body.asset_ids)
+    parts = _checked_members(db, viewer, _resolve(db, viewer, body.asset_ids, body.members))
     lead = parts[0][0]
     if db.scalar(select(CatalogProduct).where(CatalogProduct.asset_id == lead.id)):
         raise HTTPException(409, f"{lead.name} already leads a product: add to that one, or lead with another object")
@@ -323,6 +422,7 @@ def publish(body: PublishIn, db: Session = Depends(get_db), user: User = Depends
     product.access_resource_id = access.id
     rbac.own(db, viewer.user, access)
     _set_members(db, product, parts)
+    _options_for(db, product, parts, body.options)
     audit(db, viewer.user.username, "catalog.publish", product.resource_id, product=product.id, title=product.title,
           objects=[a.id for a, _ in parts])
     db.commit()
@@ -354,12 +454,15 @@ def update_product(product_id: str, body: ProductPatch, db: Session = Depends(ge
             access.name = product.title
     if body.summary is not None:
         product.summary = body.summary.strip()
-    if body.asset_ids is not None:
-        parts = _checked_members(db, viewer, body.asset_ids)
+    if body.asset_ids is not None or body.members is not None:
+        parts = _checked_members(db, viewer, _resolve(db, viewer, body.asset_ids, body.members))
         other = db.scalar(select(CatalogProduct).where(CatalogProduct.asset_id == parts[0][0].id, CatalogProduct.id != product.id))
         if other:
             raise HTTPException(409, f"{parts[0][0].name} already leads another product")
         _set_members(db, product, parts)
+        _options_for(db, product, parts, body.options)
+    elif body.options is not None:
+        _options_for(db, product, members(db, product), body.options)
     product.updated_at = utcnow()
     audit(db, viewer.user.username, "catalog.product_update", product.resource_id, product=product.id)
     db.commit()
@@ -376,6 +479,9 @@ def unpublish(product_id: str, db: Session = Depends(get_db), user: User = Depen
         request.decision_note = "The product was unpublished."
     audit(db, viewer.user.username, "catalog.unpublish", product.resource_id, product=product.id)
     db.execute(delete(CatalogProductMember).where(CatalogProductMember.product_id == product.id))
+    from ..models import ProductAccess, ProductOption
+    db.execute(delete(ProductAccess).where(ProductAccess.product_id == product.id))
+    db.execute(delete(ProductOption).where(ProductOption.product_id == product.id))
     if product.access_resource_id:  # access given through the product ends with it
         from ..models import ServiceRoleAssignment
         db.execute(delete(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id))
@@ -464,7 +570,14 @@ def product_detail(product_id: str, db: Session = Depends(get_db), user: User = 
     access = db.get(Resource, product.access_resource_id) if product.access_resource_id else None
     if access is not None and out["can_manage"]:  # owners manage who has access on the product page
         from .rbac import resource_out
+        from .. import product_options
         out["access_resource"] = resource_out(db, access, viewer.user)
+        consumers = []
+        for a in db.scalars(select(RoleAssignment).where(RoleAssignment.resource_id == access.id, RoleAssignment.role == "Consumer")):
+            group, option = db.get(AppGroup, a.app_group_id), product_options.option_for_group(db, product.id, a.app_group_id)
+            consumers.append({"group_id": a.app_group_id, "group": group.name if group else a.app_group_id,
+                              "option_id": option.id if option else None, "option": option.name if option else None})
+        out["consumers"] = sorted(consumers, key=lambda x: x["group"].casefold())
     db.commit()
     return out
 
@@ -478,6 +591,7 @@ def request_out(db, r: AccessRequest) -> dict:
             "app_group_id": r.app_group_id, "group": group.name if group else r.app_group_id, "reason": r.reason,
             "status": r.status, "decided_by": r.decided_by, "decision_note": r.decision_note,
             "created_at": r.created_at, "decided_at": r.decided_at,
+            "option_id": r.option_id, "option": (lambda o: o.name if o else None)(db.get(ProductOption, r.option_id) if r.option_id else None),
             "grants": _grants(members(db, product)) if product else []}
 
 
@@ -509,9 +623,12 @@ def request_access(product_id: str, body: RequestIn, db: Session = Depends(get_d
     if db.scalar(select(AccessRequest).where(AccessRequest.product_id == product.id, AccessRequest.app_group_id == body.app_group_id,
                                              AccessRequest.status == "pending")):
         raise HTTPException(409, "a request for that group is already waiting")
+    from .. import product_options
+    option = db.get(ProductOption, body.option_id) if body.option_id else product_options.default_option(db, product.id)
+    if option is None or option.product_id != product.id:
+        raise HTTPException(422, "choose one of the product's access options")
     r = AccessRequest(product_id=product.id, requester=viewer.user.username, requester_principal_id=viewer.user.principal_id or "",
-                      app_group_id=body.app_group_id, reason=body.reason.strip(),
-                      role="Consumer")
+                      app_group_id=body.app_group_id, reason=body.reason.strip(), role="Consumer", option_id=option.id)
     db.add(r)
     db.flush()
     audit(db, viewer.user.username, "catalog.access_request", product.resource_id, product=product.id, group=body.app_group_id, request=r.id)
@@ -560,6 +677,11 @@ def decide(request_id: str, body: DecisionIn, db: Session = Depends(get_db), use
         if current is None:
             db.add(RoleAssignment(resource_id=product.access_resource_id, app_group_id=r.app_group_id, role="Consumer"))
             audit(db, viewer.user.username, "role.assign", product.access_resource_id, group=r.app_group_id, role="Consumer", request=r.id)
+        from .. import product_options
+        option = db.get(ProductOption, r.option_id) if r.option_id else None
+        option = option if option is not None and option.product_id == product.id else product_options.default_option(db, product.id)
+        if option is not None:
+            product_options.set_option(db, product.id, r.app_group_id, option.id)
     r.status = "approved" if body.approve else "declined"
     r.decided_by, r.decided_at, r.decision_note = viewer.user.username, utcnow(), body.note.strip()
     audit(db, viewer.user.username, "catalog.access_" + r.status, product.resource_id, product=product.id, request=r.id, group=r.app_group_id)
@@ -577,3 +699,39 @@ def withdraw(request_id: str, db: Session = Depends(get_db), user: User = Depend
         r.status, r.decided_at = "withdrawn", utcnow()
         audit(db, viewer.user.username, "catalog.access_withdrawn", r.product_id, request=r.id)
         db.commit()
+
+
+@router.put("/products/{product_id}/consumers/{group_id}")
+def put_consumer(product_id: str, group_id: str, body: ConsumerIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Make a group a consumer of the product with an option, or change its option (product owners)."""
+    from .. import product_options
+    viewer = _Viewer(db, user)
+    product = _product(db, product_id, viewer)
+    _require_manager(db, product, viewer, "give access")
+    if not db.get(AppGroup, group_id):
+        raise HTTPException(422, "choose an existing app group")
+    option = db.get(ProductOption, body.option_id) if body.option_id else product_options.default_option(db, product.id)
+    if option is None or option.product_id != product.id:
+        raise HTTPException(422, "choose one of the product's access options")
+    current = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id,
+                                                     RoleAssignment.app_group_id == group_id))
+    if current is None:
+        db.add(RoleAssignment(resource_id=product.access_resource_id, app_group_id=group_id, role="Consumer"))
+    product_options.set_option(db, product.id, group_id, option.id)
+    audit(db, viewer.user.username, "catalog.consumer", product.access_resource_id, product=product.id, group=group_id, option=option.name)
+    db.commit()
+    return {"group_id": group_id, "option_id": option.id, "option": option.name}
+
+
+@router.delete("/products/{product_id}/consumers/{group_id}", status_code=204)
+def delete_consumer(product_id: str, group_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Take a group's access through the product away (product owners)."""
+    from ..models import ProductAccess
+    viewer = _Viewer(db, user)
+    product = _product(db, product_id, viewer)
+    _require_manager(db, product, viewer, "take access away")
+    db.execute(delete(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id,
+                                            RoleAssignment.app_group_id == group_id, RoleAssignment.role == "Consumer"))
+    db.execute(delete(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == group_id))
+    audit(db, viewer.user.username, "catalog.consumer_removed", product.access_resource_id, product=product.id, group=group_id)
+    db.commit()

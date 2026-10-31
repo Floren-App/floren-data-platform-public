@@ -30,6 +30,25 @@ object: it shows up in a product's lineage, but is not offered on its own.
   and, for owners, **Permissions**. Columns, previews and SQL stay on each object's own page,
   for people with access.
 
+### Access options
+
+A product can offer several ways to use it, each with its own **masks** (on table columns:
+`hash`, `redact`, `partial`, `null` or an expression) and **row filters** (per table), for
+example *Masked* (email hashed), *Own region* (rows of your region) and *Full*. One option is
+the default. A request asks for an option; owners can move a consuming group to another option
+or give a group access directly on the **Access options** tab.
+
+The options' masks and filters apply to people who reach a table only through data products.
+Someone who can read the table's schema directly is not limited by a product option. Reaching a
+table through several options gives the least restrictive view: a column is masked only if every
+option masks it, and rows are filtered only if every option filters them. The table's own masks
+and filters (Masks and filters on the schema) always apply as well.
+
+Each option shows the classification its consumers really see (see below): masked columns count
+as their level's masked level, so a *Masked* option of personal data can be *internal* while
+*Full* is *restricted*. Requesters see the options and their levels; which columns are masked is
+shown to owners.
+
 ### Access through the product
 
 Access is a role on the product itself. Groups with **Consumer** on a product may use
@@ -49,6 +68,22 @@ roles on the product's **Permissions** tab, also without a request.
 answer under **Access requests** (the sidebar counts what waits) and may add a note; approving
 makes the group a Consumer. Requests, decisions and role changes are in the audit trail.
 Requesters see the outcome under **My requests** and may withdraw a waiting request.
+
+## Classification
+
+Classifications are configurable under **Administration → Classifications** (or
+`fdp_classifications` in Terraform): an ordered list from least to most sensitive, starting with
+public, internal, confidential and restricted. Each level says what **masked** data of that level
+counts as (itself or a lower level).
+
+- **Columns** are classified and tagged (for example `pii`) on a table's Overview by its owners,
+  or with `fdp_column_classification`.
+- A **table or view** inherits the highest level of its columns. Owners can classify the object
+  itself higher (Governance, or `fdp_catalog_governance` with `object_path`), never lower than its
+  columns. A schema is the highest of its tables.
+- For **access**, a column the group will see masked counts as its masked level; a level set on
+  the object itself always counts. Access policies (forms and reviews per classification and
+  layer) build on this.
 
 ## All objects
 

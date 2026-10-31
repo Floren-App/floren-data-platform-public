@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
-| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
+| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -106,10 +106,13 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/catalog/assets/{ident}` | Detail |
+| `PUT` | `/v1/catalog/assets/{ident}/columns` | Put Columns |
 | `PUT` | `/v1/catalog/assets/{ident}/governance` | Governance |
 | `GET` | `/v1/catalog/assets/{ident}/lineage` | Lineage |
 | `GET` | `/v1/catalog/assets/{ident}/product` | Asset Product |
 | `PUT` | `/v1/catalog/assets/{ident}/sla` | Sla |
+| `GET` | `/v1/catalog/classifications` | List Classifications |
+| `PUT` | `/v1/catalog/classifications` | Put Classifications |
 | `POST` | `/v1/catalog/ingest/airflow` | Ingest Airflow |
 | `POST` | `/v1/catalog/ingest/dbt` | Ingest Dbt |
 | `POST` | `/v1/catalog/ingest/program` | Ingest Program |
@@ -119,11 +122,14 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PATCH` | `/v1/catalog/products/{product_id}` | Update Product |
 | `DELETE` | `/v1/catalog/products/{product_id}` | Unpublish |
 | `GET` | `/v1/catalog/products/{product_id}` | Product Detail |
+| `PUT` | `/v1/catalog/products/{product_id}/consumers/{group_id}` | Put Consumer |
+| `DELETE` | `/v1/catalog/products/{product_id}/consumers/{group_id}` | Delete Consumer |
 | `POST` | `/v1/catalog/products/{product_id}/requests` | Request Access |
 | `GET` | `/v1/catalog/requests` | List Requests |
 | `DELETE` | `/v1/catalog/requests/{request_id}` | Withdraw |
 | `POST` | `/v1/catalog/requests/{request_id}/decision` | Decide |
 | `GET` | `/v1/catalog/resources/{resource_id}/asset` | Resource Asset |
+| `POST` | `/v1/catalog/resources/{resource_id}/asset` | Ensure Asset |
 | `POST` | `/v1/catalog/resources/{resource_id}/import/airflow` | Import Airflow |
 | `POST` | `/v1/catalog/resources/{resource_id}/import/dbt` | Import Dbt |
 | `GET` | `/v1/catalog/search` | Search |
@@ -312,8 +318,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `GET` | `/v1/sql/pages/{token}` | Page |
 | `DELETE` | `/v1/sql/pages/{token}` | Page |
+| `GET` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

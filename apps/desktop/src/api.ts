@@ -534,7 +534,14 @@ export function ago(iso?: string | null): string {
 
 export interface ProductOpen { resource_kind: string; resource_id: string; object_id: string | null; object_path: string | null }
 /** An object in a data product (the first one leads: it sets the card's icon). */
-export interface ProductMember { asset_id: string; name: string; kind: string; runtime: string | null; access: "granted" | "none"; updated_at: string | null; open: ProductOpen | null }
+export interface ProductMember { asset_id: string; name: string; kind: string; runtime: string | null; access: "granted" | "none"; updated_at: string | null; open: ProductOpen | null;
+  resource_id?: string; object_path?: string | null }
+export interface OptionMask { asset_id: string; table: string; column: string; method: "null" | "redact" | "hash" | "partial" | "expression"; expression: string; resource_id?: string }
+export interface OptionFilter { asset_id: string; table: string; expression: string; resource_id?: string }
+/** A way to use a product: masks and row filters for the groups that get it. Details (masks, filters) only for owners. */
+export interface ProductOptionOut { id: string; name: string; description: string; default: boolean; classification: string;
+  masks?: OptionMask[]; filters?: OptionFilter[]; masked_columns?: number; filtered_tables?: number }
+export interface OptionInput { name: string; description: string; default: boolean; masks: { asset_id: string; column: string; method: string; expression: string }[]; filters: { asset_id: string; expression: string }[] }
 /** What Consumer on a product gives on each object: one role per distinct resource (tables share their schema's). */
 export interface ProductGrant { resource_id: string; kind: string; name: string; role: string; object: string }
 /** A published data product: one or more objects; its card is visible to everyone in its layer, with or without access. */
@@ -543,17 +550,18 @@ export interface Product {
   layer_id: string | null; layer_name: string | null; domain: string; classification: string; status: string; steward: string;
   owner_group_name: string | null; updated_at: string | null; sla_status: string; published_at: string; published_by: string;
   access: "granted" | "partial" | "requested" | "none"; can_manage: boolean; members: ProductMember[]; grants: ProductGrant[];
-  open: ProductOpen | null;
+  open: ProductOpen | null; options: ProductOptionOut[];
 }
 /** A step in a product's lineage. Steps you may not open carry only name, kind and owner. */
 export interface ProductStep { key: string; asset_id: string | null; name: string; kind: string; depth: number; owner_group_name: string | null; visible: boolean; product_id: string | null; runtime?: string | null }
-export interface ProductDetail extends Product { lineage: ProductStep[]; lineage_edges: { source: string; target: string }[]; used_by: Product[]; used_by_others: number; access_resource?: AccessResource }
+export interface ProductDetail extends Product { lineage: ProductStep[]; lineage_edges: { source: string; target: string }[]; used_by: Product[]; used_by_others: number; access_resource?: AccessResource;
+  consumers?: { group_id: string; group: string; option_id: string | null; option: string | null }[] }
 export interface ProductCandidate { asset_id: string; name: string; kind: string; path: string; layer_id: string | null; layer_name: string | null }
 export interface AssetProduct { publishable: boolean; can_publish: boolean; products: Product[]; uses: { asset_id: string; name: string; kind: string }[]; name: string; kind: string; domain: string; classification: string }
 export interface AccessRequestItem {
   id: string; product_id: string; product: string; requester: string; app_group_id: string; group: string; reason: string;
   status: "pending" | "approved" | "declined" | "withdrawn"; decided_by: string; decision_note: string;
-  created_at: string; decided_at: string | null; grants: ProductGrant[];
+  created_at: string; decided_at: string | null; grants: ProductGrant[]; option_id?: string | null; option?: string | null;
 }
 export interface PublishInput { asset_ids: string[]; title: string; summary?: string; domain?: string; classification?: string }
 
@@ -722,7 +730,12 @@ export interface CatalogAsset {
   service_level: { status: string; checks: { name: string; status: string; target: number | string; value: number | null; unit: string; samples?: number; compliance_percent?: number | null; next_deadline_at?: string | null }[]; last_success_at?: string | null };
   observed_at: string; can_edit: boolean; can_govern: boolean;
   imports?: { origin: string; scope: string; revision: string; nodes: number; edges: number; observed_at: string }[];
+  /** Explicit (set on the object), inherited (highest column) and effective (the higher of the two); per column. */
+  classification?: { explicit: string; inherited: string; effective: string; columns: Record<string, ColumnClassification> };
 }
+export interface ColumnClassification { classification: string; tags: string[] }
+/** A configured classification, from least to most sensitive; masked data of it counts as masked_as. */
+export interface ClassificationLevel { name: string; masked_as: string; description: string }
 export interface CatalogSuggestion { id: string; name: string; kind: string; path: string; approximate?: boolean }
 export interface CatalogSearch { items: CatalogAsset[]; total: number; offset: number; limit: number; approximate?: boolean; facets: { kind: string[]; domain: string[]; branch: string[]; layer?: string[]; tag?: string[]; owner?: string[]; platform?: string[] } }
 export interface CatalogGraph { nodes: (CatalogAsset & { distance: number; lineage_parent_id?: string; lineage_child_count?: number; upstream_count?: number; downstream_count?: number })[]; edges: { id: string; source: string; target: string; relation: string; origin: string; revision: string; observed_at: string; control?: boolean; category?: "data" | "operational" | "schema"; collapsed_count?: number; connections?: { id: string; source: string; target: string; source_name: string; target_name: string; relation: string; origin: string; revision: string; observed_at: string }[]; evidence?: { id: string; origin: string; revision: string; observed_at: string }[] }[]; truncated: boolean }
@@ -773,6 +786,9 @@ export const api = {
     search: (filters: Record<string, string> = {}) => request<CatalogSearch>("GET", `/v1/catalog/search?${new URLSearchParams(filters)}`),
     asset: (id: string) => request<CatalogAsset>("GET", `/v1/catalog/assets/${id}`),
     governance: (id: string, body: CatalogGovernance) => request<CatalogAsset>("PUT", `/v1/catalog/assets/${id}/governance`, body),
+    columns: (id: string, columns: Record<string, ColumnClassification>) => request<CatalogAsset>("PUT", `/v1/catalog/assets/${id}/columns`, { columns }),
+    classifications: () => request<{ levels: ClassificationLevel[] }>("GET", "/v1/catalog/classifications"),
+    putClassifications: (levels: { name: string; masked_as: string; description: string }[]) => request<{ levels: ClassificationLevel[] }>("PUT", "/v1/catalog/classifications", { levels }),
     sla: (id: string, body: CatalogSLA) => request<CatalogAsset>("PUT", `/v1/catalog/assets/${id}/sla`, body),
     lineage: (id: string, filters: Record<string, string> = {}) => request<CatalogGraph>("GET", `/v1/catalog/assets/${id}/lineage?${new URLSearchParams(filters)}`),
     import: (id: string, kind: "dbt" | "airflow", body: unknown) => request<{ ok: boolean; asset_id: string }>("POST", `/v1/catalog/resources/${id}/import/${kind}`, body),
@@ -855,9 +871,11 @@ export const api = {
     candidates: (layerId: string, q = "") => request<ProductCandidate[]>("GET", `/v1/catalog/products/candidates?${new URLSearchParams({ layer_id: layerId, q })}`),
     forAsset: (assetId: string) => request<AssetProduct>("GET", `/v1/catalog/assets/${assetId}/product`),
     publish: (body: PublishInput) => request<Product>("POST", "/v1/catalog/products", body),
-    update: (id: string, body: { title?: string; summary?: string; asset_ids?: string[] }) => request<Product>("PATCH", `/v1/catalog/products/${id}`, body),
+    update: (id: string, body: { title?: string; summary?: string; asset_ids?: string[]; options?: OptionInput[] }) => request<Product>("PATCH", `/v1/catalog/products/${id}`, body),
     unpublish: (id: string) => request<void>("DELETE", `/v1/catalog/products/${id}`),
-    requestAccess: (id: string, app_group_id: string, reason: string) => request<AccessRequestItem>("POST", `/v1/catalog/products/${id}/requests`, { app_group_id, reason }),
+    requestAccess: (id: string, app_group_id: string, reason: string, option_id?: string) => request<AccessRequestItem>("POST", `/v1/catalog/products/${id}/requests`, { app_group_id, reason, option_id }),
+    setConsumer: (id: string, group_id: string, option_id?: string) => request<{ group_id: string; option_id: string; option: string }>("PUT", `/v1/catalog/products/${id}/consumers/${group_id}`, { option_id }),
+    removeConsumer: (id: string, group_id: string) => request<void>("DELETE", `/v1/catalog/products/${id}/consumers/${group_id}`),
     requests: (box: "approve" | "mine") => request<AccessRequestItem[]>("GET", `/v1/catalog/requests?box=${box}`),
     decide: (id: string, approve: boolean, note: string) => request<AccessRequestItem>("POST", `/v1/catalog/requests/${id}/decision`, { approve, note }),
     withdraw: (id: string) => request<void>("DELETE", `/v1/catalog/requests/${id}`),
