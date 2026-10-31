@@ -1,6 +1,7 @@
 import { objectKindLabel } from "../objectKinds";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { api, AppGroup, CatalogAsset, CatalogGovernance, CatalogSearch, CatalogSuggestion, CatalogSLA } from "../api";
+import { api, AppGroup, CatalogAsset, CatalogGovernance, CatalogSearch, CatalogSuggestion, CatalogSLA, ClassificationLevel, ColumnClassification } from "../api";
+import { useCached } from "../cache";
 import { CatalogAlerts, MetricsPanel, SlaHistory } from '../components/Metrics';
 import type { Hub } from "../hub";
 import type { TabRef } from "./Tabs";
@@ -130,7 +131,7 @@ export function CatalogObject({ tab, hub, openTab }: { tab: TabRef; hub: Hub; op
     <PageHeader icon={<ProductIcon kind={icon(asset)} runtime={asset.attributes.runtime} size={22} />} title={asset.name}
       subtitle={<>{objectKindLabel(asset.kind, asset.attributes.source_kind)}{asset.attributes.branch && ` · ${asset.attributes.repo ? asset.attributes.repo + " · " : ""}${asset.attributes.branch}`}</>}
       actions={<button className="btn secondary" onClick={openObject}>Open object</button>}>
-      <div className="page-meta">{asset.layer_name && <span className="badge">{asset.layer_name}</span>}<Status value={asset.governance.status || "draft"} /><Status value={asset.governance.classification || "unclassified"} /><Status value={asset.service_level.status} /></div>
+      <div className="page-meta">{asset.layer_name && <span className="badge">{asset.layer_name}</span>}<Status value={asset.governance.status || "draft"} /><Status value={asset.classification?.effective || asset.governance.classification || "unclassified"} /><Status value={asset.service_level.status} /></div>
     </PageHeader>
     <nav className="object-tabs" aria-label="Catalog sections">{([['overview', 'Overview'], ['lineage', 'Lineage'], ['metrics', 'KPIs & quality'], ['governance', 'Governance'], ['sla', 'SLA'], ['access', 'Permissions']] as const).map(([id, label]) => <button key={id} className={section === id ? "active" : ""} aria-current={section === id ? "page" : undefined} onClick={() => openTab({ ...tab, catalogSection: id })}>{label}</button>)}</nav>
     {error && <p role="alert" className="error">{error}</p>}
@@ -139,8 +140,7 @@ export function CatalogObject({ tab, hub, openTab }: { tab: TabRef; hub: Hub; op
       <section className="card"><dl className="kv"><dt>Domain</dt><dd>{asset.governance.domain || <span className="muted">Unassigned</span>}</dd><dt>Steward</dt><dd>{asset.governance.steward || <span className="muted">Unassigned</span>}</dd>
         {!!asset.governance.tags?.length && <><dt>Tags</dt><dd className="row wrap" style={{ gap: 4 }}>{asset.governance.tags.map((tag) => <span className="chip" key={tag}>{tag}</span>)}</dd></>}
         <dt>IAM boundary</dt><dd>{asset.resource.name}</dd><dt>Metadata observed</dt><dd>{new Date(asset.observed_at).toLocaleString()}</dd></dl></section>
-      {!!asset.attributes.columns?.length && <><div className="section-heading" style={{ justifyContent: "flex-start", gap: 8 }}><h2>Columns</h2><span className="badge">{asset.attributes.columns.length}</span></div>
-        <table aria-label="Catalog columns"><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody>{asset.attributes.columns.map((column) => <tr key={column.name}><td className="mono">{column.name}</td><td className="mono muted">{column.data_type}</td><td>{column.description || <span className="muted">—</span>}</td></tr>)}</tbody></table></>}
+      <ColumnClassifier asset={asset} onSaved={setAsset} />
     </>}
     {section === "access" && <><p className="scope-note">{asset.resource.kind === "schema" ? "This object uses its schema's IAM. Grants cover every current and future object in that schema." : "Access uses the same roles and inherited grants as the deployed object. Owner permission is required to change assignments."}</p><PermissionsPanel resource={asset.resource} resources={hub.resources} openTab={openTab} onChanged={reload} /></>}
     {section === "governance" && <GovernanceEditor key={asset.id} asset={asset} onSaved={setAsset} />}
@@ -150,7 +150,47 @@ export function CatalogObject({ tab, hub, openTab }: { tab: TabRef; hub: Hub; op
   </>;
 }
 
+/** The configured classifications, from least to most sensitive. */
+export function useLevels(): ClassificationLevel[] {
+  const state = useCached("catalog:classifications", () => api.catalog.classifications());
+  return state.data?.levels ?? DEFAULT_LEVELS;  // the platform's defaults until the configured list arrives
+}
+const DEFAULT_LEVELS: ClassificationLevel[] = ["public", "internal", "confidential", "restricted"].map((name) =>
+  ({ name, masked_as: name === "confidential" || name === "restricted" ? "internal" : name, description: "" }));
+
+/** Columns with their classification and tags; owners classify them, and the object follows the highest. */
+function ColumnClassifier({ asset, onSaved }: { asset: CatalogAsset; onSaved: (asset: CatalogAsset) => void }) {
+  const levels = useLevels();
+  const known = asset.classification?.columns ?? {};
+  const names = [...new Set([...(asset.attributes.columns ?? []).map((c) => c.name.toLowerCase()), ...Object.keys(known)])];
+  const types = Object.fromEntries((asset.attributes.columns ?? []).map((c) => [c.name.toLowerCase(), c]));
+  const [draft, setDraft] = useState<Record<string, ColumnClassification>>(known), [error, setError] = useState(""), [busy, setBusy] = useState(false);
+  useEffect(() => setDraft(asset.classification?.columns ?? {}), [asset.id, JSON.stringify(asset.classification?.columns)]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!names.length) return null;
+  const get = (n: string) => draft[n] ?? { classification: "unclassified", tags: [] };
+  const changed = names.filter((n) => JSON.stringify(get(n)) !== JSON.stringify(known[n] ?? { classification: "unclassified", tags: [] }));
+  const save = async () => { setBusy(true); setError("");
+    try { onSaved(await api.catalog.columns(asset.id, Object.fromEntries(changed.map((n) => [n, get(n)])))); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } };
+  return <>
+    <div className="section-heading" style={{ justifyContent: "flex-start", gap: 8 }}><h2>Columns</h2><span className="badge">{names.length}</span>
+      {asset.classification && <span className="muted">The object is {words(asset.classification.effective)}{asset.classification.explicit !== "unclassified" && asset.classification.explicit === asset.classification.effective ? " (set on the object)" : asset.classification.inherited !== "unclassified" ? " (from its columns)" : ""}.</span>}</div>
+    <table aria-label="Catalog columns"><thead><tr><th>Column</th><th>Type</th><th>Classification</th><th>Tags</th><th>Description</th></tr></thead><tbody>
+      {names.map((n) => <tr key={n}><td className="mono">{types[n]?.name ?? n}</td><td className="mono muted">{types[n]?.data_type ?? ""}</td>
+        <td>{asset.can_govern ? <select aria-label={`Classification of ${n}`} value={get(n).classification} onChange={(e) => setDraft({ ...draft, [n]: { ...get(n), classification: e.target.value } })}>
+            {["unclassified", ...levels.map((l) => l.name)].map((v) => <option key={v} value={v}>{words(v)}</option>)}</select> : <Status value={get(n).classification} />}</td>
+        <td>{asset.can_govern ? <input aria-label={`Tags of ${n}`} placeholder="pii" value={get(n).tags.join(", ")}
+            onChange={(e) => setDraft({ ...draft, [n]: { ...get(n), tags: e.target.value.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean) } })} />
+          : get(n).tags.map((t) => <span className="chip" key={t}>{t}</span>)}</td>
+        <td className="muted">{types[n]?.description ?? ""}</td></tr>)}
+    </tbody></table>
+    {error && <p className="error" role="alert">{error}</p>}
+    {asset.can_govern && <div className="form-actions"><button className="btn" disabled={busy || !changed.length} onClick={() => void save()}>Save column classification</button>
+      <span className="hint">A masked column counts as its level's masked level when access is decided.</span></div>}
+  </>;
+}
+
 function GovernanceEditor({ asset, onSaved }: { asset: CatalogAsset; onSaved: (asset: CatalogAsset) => void }) {
+  const levels = useLevels();
   const [form, setForm] = useState<CatalogGovernance>({ description: asset.attributes.description || "", domain: "", owner_group_id: null, steward: "", classification: "unclassified", tags: [], status: "draft", lineage_role: "data", ...asset.governance });
   const [groups, setGroups] = useState<AppGroup[]>([]), [error, setError] = useState(""), [message, setMessage] = useState(""), [busy, setBusy] = useState(false);
   const [tags, setTags] = useState(form.tags?.join(", ") || "");
@@ -163,7 +203,8 @@ function GovernanceEditor({ asset, onSaved }: { asset: CatalogAsset; onSaved: (a
       <div className="field"><label htmlFor="gov-tags">Tags (comma separated)</label><input id="gov-tags" disabled={!edit} value={tags} onChange={(e) => setTags(e.target.value)} /></div>
       <div className="field"><label htmlFor="gov-owner">Accountable owner group</label><select id="gov-owner" disabled={!asset.can_govern} value={form.owner_group_id || ""} onChange={(e) => setForm({ ...form, owner_group_id: e.target.value || null })}><option value="">Unassigned</option>{form.owner_group_id && !groups.some((g) => g.id === form.owner_group_id) && <option value={form.owner_group_id}>{asset.owner_group_name || "Accountable group"}</option>}{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select><span className="hint">Accountability metadata does not grant IAM access.</span></div>
       <div className="field"><label htmlFor="gov-steward">Steward / contact</label><input id="gov-steward" disabled={!asset.can_govern} maxLength={256} value={form.steward} onChange={(e) => setForm({ ...form, steward: e.target.value })} /></div>
-      <div className="field"><label htmlFor="gov-classification">Classification</label><select id="gov-classification" disabled={!asset.can_govern} value={form.classification} onChange={(e) => setForm({ ...form, classification: e.target.value })}>{['unclassified', 'public', 'internal', 'confidential', 'restricted'].map((v) => <option key={v}>{v}</option>)}</select></div>
+      <div className="field"><label htmlFor="gov-classification">Classification</label><select id="gov-classification" disabled={!asset.can_govern} value={form.classification} onChange={(e) => setForm({ ...form, classification: e.target.value })}>{['unclassified', ...levels.map((l) => l.name)].map((value) => <option key={value} value={value}>{words(value)}</option>)}</select>
+        {asset.classification && asset.classification.inherited !== "unclassified" && <span className="hint">At least {words(asset.classification.inherited)} because of its columns; a higher level here overrides it.</span>}</div>
       <div className="field"><label htmlFor="gov-lineage-role">Lineage purpose</label><select id="gov-lineage-role" disabled={!asset.can_govern} value={form.lineage_role || "data"} onChange={(e) => setForm({ ...form, lineage_role: e.target.value as "data" | "operational" })}><option value="data">Data</option><option value="operational">Operational metadata</option></select><span className="hint">Checkpoints and process-history tables appear as operational dependencies, separate from the main data flow.</span></div>
       <div className="field"><label htmlFor="gov-status">Governance status</label><select id="gov-status" disabled={!asset.can_govern} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{['draft', 'reviewed', 'certified', 'deprecated'].map((v) => <option key={v}>{v}</option>)}</select></div></div>
     {error && <p role="alert" className="error">{error}</p>}{message && <p className="success-message" role="status">{message}</p>}{edit && <div className="form-actions"><button className="btn" disabled={busy}>Save governance</button></div>}

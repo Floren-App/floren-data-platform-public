@@ -287,6 +287,8 @@ def admit(db, who, catalog="", layer=""):
     # Column masks and row filters that apply to this caller, fixed for the query like its grants.
     from .data_policies import attach
     scope = attach(db, who.user, scope)
+    from .product_options import attach as attach_product_options
+    scope = attach_product_options(db, who.user, scope)
     run = db.get(Run, who.execution.run_id) if who.execution and who.execution.run_id else None
     query = SqlQuery(principal_id=who.user.principal_id, actor=who.user.username,
                      initiator_id=(run.initiator_id or "") if run else who.user.principal_id,

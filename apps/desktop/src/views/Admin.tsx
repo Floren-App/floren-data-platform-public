@@ -494,3 +494,36 @@ export function AdminAppProfiles() {
       <button className="btn secondary" disabled={!newName.trim()}>Add profile</button></form>
   </>;
 }
+
+/** The classifications, from least to most sensitive, with what masked data of each counts as. */
+export function AdminClassifications() {
+  const [rows, setRows] = useState<{ name: string; masked_as: string; description: string }[] | null>(null);
+  const [error, setError] = useState(""), [message, setMessage] = useState("");
+  const load = useCallback(() => api.catalog.classifications().then((r) => setRows(r.levels.map((l) => ({ ...l })))).catch((e: Error) => setError(e.message)), []);
+  useEffect(() => { void load(); }, [load]);
+  if (!rows) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  const set = (i: number, patch: Partial<(typeof rows)[number]>) => setRows(rows.map((r, j) => j === i ? { ...r, ...patch } : r));
+  const move = (i: number, by: number) => { const next = [...rows]; [next[i], next[i + by]] = [next[i + by], next[i]]; setRows(next); };
+  const save = () => { setError(""); setMessage("");
+    api.catalog.putClassifications(rows.map((r) => ({ ...r, name: r.name.trim(), masked_as: r.masked_as || r.name.trim() })))
+      .then((r) => { setRows(r.levels); setMessage("Saved classifications."); }).catch((e: Error) => setError(e.message)); };
+  return <>
+    <PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Classifications"
+      subtitle="From least to most sensitive. Stewards classify columns and objects with these; an object is never below its columns. Masked data of a level counts as its masked level when access is decided, so masked personal data can need less than the real values." />
+    {error && <p className="error" role="alert">{error}</p>}
+    {message && <p className="scope-note" role="status">{message}</p>}
+    <table aria-label="Classifications"><thead><tr><th>Order</th><th>Name</th><th>Masked data counts as</th><th>Description</th><th /></tr></thead><tbody>
+      {rows.map((r, i) => <tr key={i}>
+        <td><div className="row" style={{ gap: 2 }}><button className="icon-btn" aria-label={`Move ${r.name} up`} disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
+          <button className="icon-btn" aria-label={`Move ${r.name} down`} disabled={i === rows.length - 1} onClick={() => move(i, 1)}>↓</button></div></td>
+        <td><input aria-label={`Name of level ${i + 1}`} value={r.name} onChange={(e) => set(i, { name: e.target.value.toLowerCase() })} /></td>
+        <td><select aria-label={`Masked ${r.name} counts as`} value={r.masked_as || r.name} onChange={(e) => set(i, { masked_as: e.target.value })}>
+          {rows.slice(0, i + 1).map((l) => <option key={l.name} value={l.name}>{l.name === r.name ? `${l.name} (itself)` : l.name}</option>)}</select></td>
+        <td><input aria-label={`Description of ${r.name}`} value={r.description} onChange={(e) => set(i, { description: e.target.value })} /></td>
+        <td><button className="icon-btn" aria-label={`Remove ${r.name}`} disabled={rows.length === 1} onClick={() => setRows(rows.filter((_, j) => j !== i))}><IconTrash size={14} /></button></td>
+      </tr>)}</tbody></table>
+    <div className="form-actions"><button className="btn secondary" onClick={() => setRows([...rows, { name: "", masked_as: "", description: "" }])}><IconPlus size={14} />Add level</button>
+      <button className="btn" onClick={save}>Save classifications</button></div>
+    <p className="hint">A level still used by a column or object cannot be removed. Also configurable with Terraform (fdp_classifications).</p>
+  </>;
+}

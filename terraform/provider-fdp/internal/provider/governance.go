@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"net/url"
 	"strings"
 
 	"github.com/Floren-App/terraform-provider-fdp/internal/client"
@@ -25,6 +26,24 @@ func catalogAssetID(resourceID string) string {
 	return hex.EncodeToString(sum[:])[:32]
 }
 
+// catalogObjectID is the catalog entry of a table or view in a schema resource.
+func catalogObjectID(resourceID, objectPath string) string {
+	if objectPath == "" {
+		return catalogAssetID(resourceID)
+	}
+	sum := sha256.Sum256([]byte(resourceID + "\x00object:" + objectPath))
+	return hex.EncodeToString(sum[:])[:32]
+}
+
+// ensureAsset makes sure the platform has a catalog entry for the object (tables appear once declared or browsed).
+func ensureAsset(ctx context.Context, api *client.Client, resourceID, objectPath string) error {
+	target := "/v1/catalog/resources/" + resourceID + "/asset"
+	if objectPath != "" {
+		target += "?object_path=" + url.QueryEscape(objectPath)
+	}
+	return api.Do(ctx, "POST", target, nil, nil)
+}
+
 type assetOut struct {
 	ID         string         `json:"id"`
 	Governance map[string]any `json:"governance"`
@@ -43,6 +62,7 @@ type governanceResource struct{ api *client.Client }
 type governanceModel struct {
 	ID             types.String `tfsdk:"id"`
 	ResourceID     types.String `tfsdk:"resource_id"`
+	ObjectPath     types.String `tfsdk:"object_path"`
 	Description    types.String `tfsdk:"description"`
 	Domain         types.String `tfsdk:"domain"`
 	OwnerGroupID   types.String `tfsdk:"owner_group_id"`
@@ -63,14 +83,16 @@ func (r *governanceResource) Schema(_ context.Context, _ resource.SchemaRequest,
 		Description: "Catalog documentation and stewardship of one governed object (schema, workload, API...). " +
 			"Certification requires description, domain, owner group, steward and classification. Destroy resets it. Import by resource ID.",
 		Attributes: map[string]schema.Attribute{
-			"id":             schema.StringAttribute{Computed: true, PlanModifiers: keepComputed, Description: "Catalog asset ID."},
-			"resource_id":    schema.StringAttribute{Required: true, PlanModifiers: replaceString},
+			"id":          schema.StringAttribute{Computed: true, PlanModifiers: keepComputed, Description: "Catalog asset ID."},
+			"resource_id": schema.StringAttribute{Required: true, PlanModifiers: replaceString},
+			"object_path": schema.StringAttribute{Optional: true, PlanModifiers: replaceString,
+				Description: "A table or view in the schema named by resource_id; left out: the resource itself."},
 			"description":    schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("")},
 			"domain":         schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("")},
 			"owner_group_id": schema.StringAttribute{Optional: true, Description: "Accountable app group."},
 			"steward":        schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("")},
 			"classification": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("unclassified"),
-				Description: "unclassified, public, internal, confidential or restricted."},
+				Description: "unclassified or a configured classification (fdp_classifications). A table is never below its columns."},
 			"tags":   schema.SetAttribute{ElementType: types.StringType, Optional: true, Computed: true, Default: setdefault.StaticValue(setValue(nil))},
 			"status": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("draft"), Description: "draft, reviewed, certified or deprecated."},
 		},
@@ -92,7 +114,7 @@ func (m *governanceModel) apply(g map[string]any) {
 		}
 		return types.StringValue(def)
 	}
-	m.ID = types.StringValue(assetTarget(m.ResourceID))
+	m.ID = types.StringValue(m.target())
 	m.Description, m.Domain, m.Steward = str("description", ""), str("domain", ""), str("steward", "")
 	m.Classification, m.Status = str("classification", "unclassified"), str("status", "draft")
 	m.OwnerGroupID = types.StringNull()
@@ -110,7 +132,17 @@ func (m *governanceModel) apply(g map[string]any) {
 	m.Tags = setValue(tags)
 }
 
+func (m *governanceModel) target() string {
+	return catalogObjectID(m.ResourceID.ValueString(), m.ObjectPath.ValueString())
+}
+
 func (r *governanceResource) put(ctx context.Context, m *governanceModel, d *diagSink) {
+	if !m.ObjectPath.IsNull() && m.ObjectPath.ValueString() != "" {
+		if err := ensureAsset(ctx, r.api, m.ResourceID.ValueString(), m.ObjectPath.ValueString()); err != nil {
+			apiError(d.d, "declaring the table in the catalog", err)
+			return
+		}
+	}
 	body := map[string]any{"description": m.Description.ValueString(), "domain": m.Domain.ValueString(),
 		"steward": m.Steward.ValueString(), "classification": m.Classification.ValueString(),
 		"tags": stringSet(ctx, m.Tags, d.d), "status": m.Status.ValueString(), "owner_group_id": nil}
@@ -118,7 +150,7 @@ func (r *governanceResource) put(ctx context.Context, m *governanceModel, d *dia
 		body["owner_group_id"] = m.OwnerGroupID.ValueString()
 	}
 	var out assetOut
-	if err := r.api.Do(ctx, "PUT", "/v1/catalog/assets/"+assetTarget(m.ResourceID)+"/governance", body, &out); err != nil {
+	if err := r.api.Do(ctx, "PUT", "/v1/catalog/assets/"+m.target()+"/governance", body, &out); err != nil {
 		apiError(d.d, "saving catalog governance", err)
 		return
 	}
@@ -139,7 +171,7 @@ func (r *governanceResource) Read(ctx context.Context, req resource.ReadRequest,
 	var state governanceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	var out assetOut
-	if err := r.api.Do(ctx, "GET", "/v1/catalog/assets/"+assetTarget(state.ResourceID), nil, &out); err != nil {
+	if err := r.api.Do(ctx, "GET", "/v1/catalog/assets/"+state.target(), nil, &out); err != nil {
 		if !gone(ctx, err, resp) {
 			apiError(&resp.Diagnostics, "reading catalog governance", err)
 		}
@@ -159,7 +191,7 @@ func (r *governanceResource) Update(ctx context.Context, req resource.UpdateRequ
 func (r *governanceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state governanceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	err := r.api.Do(ctx, "PUT", "/v1/catalog/assets/"+assetTarget(state.ResourceID)+"/governance", map[string]any{}, nil)
+	err := r.api.Do(ctx, "PUT", "/v1/catalog/assets/"+state.target()+"/governance", map[string]any{}, nil)
 	if err != nil && !client.IsNotFound(err) {
 		apiError(&resp.Diagnostics, "resetting catalog governance", err)
 	}

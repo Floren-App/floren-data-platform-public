@@ -5,7 +5,7 @@ import type { Hub } from "../hub";
 import { IconRuns, IconCompute, IconOpen, IconPlay, IconStop, IconTrash, IconWorkspaces } from "../components/Icons";
 import { PageHeader } from "../components/Page";
 import { LoadMoreRuns, NewRunForm, openEditor, RUN_SCOPE_TITLE, runsIn } from "./Sidebar";
-import { AdminAppProfiles, AdminLayers, AdminAudit, AdminNetwork, AdminPools, AdminSources, AdminWorkspaceTemplates } from "./Admin";
+import { AdminAppProfiles, AdminClassifications, AdminLayers, AdminAudit, AdminNetwork, AdminPools, AdminSources, AdminWorkspaceTemplates } from "./Admin";
 import { ProgramRunner } from "./Programs";
 import { AdminRepos, WorkloadView, DeployWizard } from "./Deploy";
 import { AccessTab } from "./Access";
@@ -29,7 +29,7 @@ import { KafkaClustersView, KafkaView } from "./Kafka";
 
 export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
   | "products" | "product" | "access-requests"
-  | "admin-app-profiles" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
+  | "admin-app-profiles" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
 
 export interface TabRef {
   kind: TabKind;
@@ -41,7 +41,7 @@ export interface TabRef {
   intent?: "create-folder" | "create" | "publish" | "request";
   /** Data products: the catalog object to publish (intent "publish"). */
   assetId?: string;
-  productSection?: "overview" | "lineage" | "used-by" | "permissions";
+  productSection?: "overview" | "options" | "lineage" | "used-by" | "permissions";
   catalogSection?: "overview" | "lineage" | "governance" | "sla" | "access" | "metrics";
   apiSection?: "operations" | "settings" | "calls" | "permissions";
   /** An endpoint group or operation resource to select on the API page. */
@@ -90,6 +90,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "workload": return <WorkloadView tab={tab} id={tab.ref!} hub={hub} openTab={openTab} runTab={runTab} />;
     case "admin-layers": return <AdminLayers hub={hub} />;
     case "admin-app-profiles": return <AdminAppProfiles />;
+    case "admin-classifications": return <AdminClassifications />;
     case "admin-sources": return <AdminSources hub={hub} openTab={openTab} />;
     case "admin-repos": return <AdminRepos />;
     case "admin-runtimes": return <AdminRuntimes withR={rEnabled(hub.me)} />;

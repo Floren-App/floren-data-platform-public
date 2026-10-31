@@ -732,6 +732,32 @@ class CatalogProductMember(Base):
     position: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class ProductOption(Base):
+    """A way to use a data product: the masks and row filters its consumers get on the product's tables.
+    For example Masked (personal data hashed) and Full. One option is the default."""
+    __tablename__ = "catalog_product_options"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    description: Mapped[str] = mapped_column(String(500), default="")
+    default: Mapped[bool] = mapped_column(default=False)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    masks: Mapped[list] = mapped_column(JSON, default=list)     # [{asset_id, column, method, expression}]
+    filters: Mapped[list] = mapped_column(JSON, default=list)   # [{asset_id, expression}]
+
+
+class ProductAccess(Base):
+    """Which option a consuming group has (its Consumer role on the product is an ordinary role assignment)."""
+    __tablename__ = "catalog_product_access"
+    __table_args__ = (UniqueConstraint("product_id", "app_group_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("catalog_products.id", ondelete="CASCADE"), index=True)
+    app_group_id: Mapped[str] = mapped_column(String(12), index=True)
+    option_id: Mapped[str] = mapped_column(String(12))
+
+
 class AccessRequest(Base):
     """Someone asks the owners of a data product for access for one of their groups."""
     __tablename__ = "catalog_access_requests"
@@ -744,6 +770,7 @@ class AccessRequest(Base):
     reason: Mapped[str] = mapped_column(String(1000), default="")
     status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending | approved | declined | withdrawn
     role: Mapped[str] = mapped_column(String(32), default="")      # what approval grants
+    option_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)  # the product option asked for
     decided_by: Mapped[str] = mapped_column(String(256), default="")
     decision_note: Mapped[str] = mapped_column(String(1000), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

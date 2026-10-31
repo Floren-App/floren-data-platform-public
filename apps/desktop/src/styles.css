@@ -677,3 +677,5 @@ tr.log-error td { background: color-mix(in srgb, var(--err) 6%, transparent); }
 .publish-members .hint { margin: 0; }
 .profile-grid th, .profile-grid td { text-align: center; } .profile-grid th:first-child, .profile-grid td:first-child { text-align: left; }
 .profile-grid th input:not([type]) { width: 120px; } .profile-grid th label { justify-content: center; font-weight: 400; font-size: 12px; margin-top: 4px; }
+.option-editor { border-top: 1px solid var(--border); padding: 8px 0; }
+.request-options { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; display: grid; gap: 4px; }

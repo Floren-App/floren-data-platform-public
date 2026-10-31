@@ -2,7 +2,7 @@
 import json
 import re
 from datetime import datetime
-from typing import Optional, List, Literal
+from typing import Dict, Optional, List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -25,7 +25,7 @@ class Governance(BaseModel):
     domain: str = Field(default="", max_length=128)
     owner_group_id: Optional[str] = None
     steward: str = Field(default="", max_length=256)
-    classification: Literal["unclassified", "public", "internal", "confidential", "restricted"] = "unclassified"
+    classification: str = Field(default="unclassified", max_length=32, description="A configured classification, or unclassified")
     lineage_role: Literal["data", "operational"] = "data"
     tags: List[str] = Field(default_factory=list, max_length=50)
     status: Literal["draft", "reviewed", "certified", "deprecated"] = "draft"
@@ -235,6 +235,13 @@ def governance(ident: str, body: Governance, db: Session = Depends(get_db), user
     if not owner and not any(rbac.allowed(db, user, action, resource) for action in ("edit", "write", "ddl")):
         raise HTTPException(403, "Contributor or higher required to document this object")
     before, after = asset.governance or {}, body.model_dump()
+    from .. import classification as levels
+    levels.require_level(db, after["classification"])
+    if "columns" in before:
+        after["columns"] = before["columns"]  # column classifications are set on their own
+    inherited = levels.inherited(db, asset)
+    if after["classification"] != levels.UNCLASSIFIED and levels.ranks(db)[after["classification"]] < levels.ranks(db)[inherited]:
+        raise HTTPException(422, f"{asset.name} is at least {inherited} because of its columns: an object is never classified lower than its columns")
     protected = {"owner_group_id", "steward", "classification", "status", "lineage_role"}
     defaults = Governance().model_dump()
     if not owner and any(before.get(k, defaults[k]) != after[k] for k in protected):
@@ -245,7 +252,8 @@ def governance(ident: str, body: Governance, db: Session = Depends(get_db), user
     if before.get("status") == "certified" and changed:
         after["status"] = "reviewed"  # Material documentation edits require a fresh Owner certification.
     if after["status"] == "certified" and not (after["description"].strip() and after["domain"].strip()
-            and after["owner_group_id"] and after["steward"].strip() and after["classification"] != "unclassified"):
+            and after["owner_group_id"] and after["steward"].strip()
+            and levels.highest(db, [after["classification"], inherited]) != levels.UNCLASSIFIED):
         raise HTTPException(422, "certification requires description, domain, owner group, steward and classification")
     asset.governance = after
     c.reindex(asset)
@@ -373,3 +381,103 @@ def ingest_program(body: ProgramReport, db: Session = Depends(get_db), wl: Execu
                 if field == "outputs" and not db.scalar(select(CatalogRunOutput).where(CatalogRunOutput.run_id == run.id, CatalogRunOutput.asset_id == data.id)):
                     db.add(CatalogRunOutput(run_id=run.id, asset_id=data.id))
     return import_result(db, pub, wl.username, "program_runtime")
+
+
+class ColumnGovernance(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    classification: str = Field(default="unclassified", max_length=32)
+    tags: List[str] = Field(default_factory=list, max_length=20, description="For example pii")
+
+
+class ColumnsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    columns: Dict[str, ColumnGovernance] = Field(description="Per column name; unclassified without tags removes it. "
+                                                              "Columns left out keep what they have.")
+
+
+@router.get("/classifications")
+def list_classifications(db: Session = Depends(get_db), _: User = Depends(get_actor)):
+    """The configured classifications, from least to most sensitive, with what masked data counts as."""
+    from .. import classification as levels
+    return {"levels": levels.levels(db)}
+
+
+class LevelIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=32)
+    masked_as: str = Field(default="", max_length=32, description="What masked data of this level counts as; empty: itself")
+    description: str = Field(default="", max_length=300)
+
+
+class LevelsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    levels: List[LevelIn] = Field(min_length=1, max_length=20, description="From least to most sensitive")
+
+
+@router.put("/classifications")
+def put_classifications(body: LevelsIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Change the classifications (platform administrators). A level still in use cannot be removed."""
+    from .. import classification as levels
+    from ..models import PlatformSetting
+    if not rbac.resolve_user(db, user).is_admin:
+        raise HTTPException(403, "platform administrator required")
+    new = levels.validate_levels(db, [l.model_dump() for l in body.levels])
+    setting = db.get(PlatformSetting, levels.SETTING) or PlatformSetting(key=levels.SETTING, value={})
+    before = levels.levels(db)
+    setting.value = {"levels": new}
+    db.merge(setting)
+    audit(db, user.username, "catalog.classifications", "classifications", before=before, after=new)
+    db.commit()
+    return {"levels": new}
+
+
+@router.put("/assets/{ident}/columns")
+def put_columns(ident: str, body: ColumnsIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Classify and tag columns (object Owners). The object's level follows; it is never below its columns."""
+    from .. import classification as levels
+    asset, resource = c.require_asset(db, ident, user, action="assign")
+    governance = dict(asset.governance or {})
+    columns = dict(governance.get("columns") or {})
+    for name, item in body.columns.items():
+        key = name.strip().lower()
+        if not key or len(key) > 256:
+            raise HTTPException(422, "column names must have 1 to 256 characters")
+        levels.require_level(db, item.classification)
+        tags = sorted({t.strip().lower() for t in item.tags if t.strip()})
+        if any(len(t) > 64 for t in tags):
+            raise HTTPException(422, "tags have at most 64 characters")
+        if item.classification == levels.UNCLASSIFIED and not tags:
+            columns.pop(key, None)
+        else:
+            columns[key] = {"classification": item.classification, "tags": tags}
+    before = (asset.governance or {}).get("columns") or {}
+    governance["columns"] = columns
+    asset.governance = governance
+    c.reindex(asset)
+    audit(db, user.username, "catalog.columns", ident, before=before, after=columns)
+    db.commit()
+    return c.asset_out(db, asset, resource, user)
+
+
+@router.post("/resources/{resource_id}/asset")
+def ensure_asset(resource_id: str, object_path: Optional[str] = Query(default=None, max_length=1024),
+                 db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """The catalog entry of an object, created for a table or view not seen yet (object Owners; used by Terraform)."""
+    resource = db.get(Resource, resource_id)
+    if not resource or not rbac.allowed(db, user, "read", resource):
+        raise HTTPException(404, "catalog object not available")
+    rbac.require(db, user, "assign", resource)
+    c.sync_registry(db)
+    if object_path is not None:
+        if resource.kind != "schema":
+            raise HTTPException(422, "object paths require a schema resource")
+        path = object_path.strip()
+        if not path:
+            raise HTTPException(422, "name the table or view")
+        if db.get(CatalogAsset, c.asset_id(resource.id, "object:" + path)) is None:
+            c.upsert(db, resource, "object:" + path, kind="table", name=path,
+                     attributes={"object_path": path, "schema": resource.name, "origin": "declared"})
+            db.flush()
+    asset, boundary = c.require_asset(db, c.asset_id(resource.id, "object:" + object_path.strip() if object_path is not None else ""), user)
+    db.commit()
+    return c.asset_out(db, asset, boundary, user)

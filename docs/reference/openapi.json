@@ -371,6 +371,46 @@
         "title": "CertificatePolicy",
         "type": "object"
       },
+      "ColumnGovernance": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "default": "unclassified",
+            "maxLength": 32,
+            "title": "Classification",
+            "type": "string"
+          },
+          "tags": {
+            "description": "For example pii",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "title": "ColumnGovernance",
+        "type": "object"
+      },
+      "ColumnsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ColumnGovernance"
+            },
+            "description": "Per column name; unclassified without tags removes it. Columns left out keep what they have.",
+            "title": "Columns",
+            "type": "object"
+          }
+        },
+        "required": [
+          "columns"
+        ],
+        "title": "ColumnsIn",
+        "type": "object"
+      },
       "CommitOut": {
         "properties": {
           "author": {
@@ -484,6 +524,26 @@
           "credentials"
         ],
         "title": "ConnectOut",
+        "type": "object"
+      },
+      "ConsumerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "option_id": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default: the default option",
+            "title": "Option Id"
+          }
+        },
+        "title": "ConsumerIn",
         "type": "object"
       },
       "DataReference": {
@@ -1075,6 +1135,56 @@
         "title": "FileIn",
         "type": "object"
       },
+      "FilterIn": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "expression": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Expression",
+            "type": "string"
+          },
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          }
+        },
+        "required": [
+          "expression"
+        ],
+        "title": "FilterIn",
+        "type": "object"
+      },
       "GitCredentialIn": {
         "description": "People only (signed in): service accounts never get Git tokens, the platform only reads from Git.",
         "properties": {
@@ -1139,13 +1249,8 @@
         "properties": {
           "classification": {
             "default": "unclassified",
-            "enum": [
-              "unclassified",
-              "public",
-              "internal",
-              "confidential",
-              "restricted"
-            ],
+            "description": "A configured classification, or unclassified",
+            "maxLength": 32,
             "title": "Classification",
             "type": "string"
           },
@@ -1864,6 +1969,55 @@
         "title": "LayerUse",
         "type": "object"
       },
+      "LevelIn": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Description",
+            "type": "string"
+          },
+          "masked_as": {
+            "default": "",
+            "description": "What masked data of this level counts as; empty: itself",
+            "maxLength": 32,
+            "title": "Masked As",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "LevelIn",
+        "type": "object"
+      },
+      "LevelsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "levels": {
+            "description": "From least to most sensitive",
+            "items": {
+              "$ref": "#/components/schemas/LevelIn"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Levels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "levels"
+        ],
+        "title": "LevelsIn",
+        "type": "object"
+      },
       "LogBatchIn": {
         "additionalProperties": false,
         "properties": {
@@ -2080,6 +2234,74 @@
         "title": "LogPage",
         "type": "object"
       },
+      "MaskIn": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "column": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Column",
+            "type": "string"
+          },
+          "expression": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Expression",
+            "type": "string"
+          },
+          "method": {
+            "default": "hash",
+            "enum": [
+              "null",
+              "redact",
+              "hash",
+              "partial",
+              "expression"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          }
+        },
+        "required": [
+          "column"
+        ],
+        "title": "MaskIn",
+        "type": "object"
+      },
       "Me": {
         "properties": {
           "active_group_id": {
@@ -2183,6 +2405,36 @@
           "pools"
         ],
         "title": "Me",
+        "type": "object"
+      },
+      "MemberRef": {
+        "additionalProperties": false,
+        "description": "An object by its RBAC resource, and for a table its name in the schema (Terraform refers to objects this way).",
+        "properties": {
+          "object_path": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A table or view in a schema resource",
+            "title": "Object Path"
+          },
+          "resource_id": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "Resource Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_id"
+        ],
+        "title": "MemberRef",
         "type": "object"
       },
       "MetricIn": {
@@ -2561,6 +2813,50 @@
           "name"
         ],
         "title": "OperationIn",
+        "type": "object"
+      },
+      "OptionIn": {
+        "additionalProperties": false,
+        "description": "A way to use the product: masks and row filters on its tables for the groups that get this option.",
+        "properties": {
+          "default": {
+            "default": false,
+            "title": "Default",
+            "type": "boolean"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Description",
+            "type": "string"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterIn"
+            },
+            "maxItems": 50,
+            "title": "Filters",
+            "type": "array"
+          },
+          "masks": {
+            "items": {
+              "$ref": "#/components/schemas/MaskIn"
+            },
+            "maxItems": 200,
+            "title": "Masks",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "OptionIn",
         "type": "object"
       },
       "OptionalDatabase": {
@@ -3487,7 +3783,6 @@
                   "type": "string"
                 },
                 "maxItems": 20,
-                "minItems": 1,
                 "type": "array"
               },
               {
@@ -3496,6 +3791,38 @@
             ],
             "description": "Replace the objects in the product; the first leads",
             "title": "Asset Ids"
+          },
+          "members": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MemberRef"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replace the objects, by resource",
+            "title": "Members"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OptionIn"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replace the access options",
+            "title": "Options"
           },
           "summary": {
             "anyOf": [
@@ -3593,7 +3920,6 @@
               "type": "string"
             },
             "maxItems": 20,
-            "minItems": 1,
             "title": "Asset Ids",
             "type": "array"
           },
@@ -3620,6 +3946,24 @@
             "title": "Domain",
             "type": "string"
           },
+          "members": {
+            "description": "Objects by resource (after asset_ids)",
+            "items": {
+              "$ref": "#/components/schemas/MemberRef"
+            },
+            "maxItems": 20,
+            "title": "Members",
+            "type": "array"
+          },
+          "options": {
+            "description": "Access options; none: one Standard option without masks",
+            "items": {
+              "$ref": "#/components/schemas/OptionIn"
+            },
+            "maxItems": 10,
+            "title": "Options",
+            "type": "array"
+          },
           "summary": {
             "default": "",
             "maxLength": 600,
@@ -3634,7 +3978,6 @@
           }
         },
         "required": [
-          "asset_ids",
           "title"
         ],
         "title": "PublishIn",
@@ -3805,6 +4148,19 @@
             "minLength": 1,
             "title": "App Group Id",
             "type": "string"
+          },
+          "option_id": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The access option asked for; default: the default option",
+            "title": "Option Id"
           },
           "reason": {
             "maxLength": 1000,
@@ -11684,6 +12040,89 @@
         ]
       }
     },
+    "/v1/catalog/assets/{ident}/columns": {
+      "put": {
+        "description": "Classify and tag columns (object Owners). The object's level follows; it is never below its columns.",
+        "operationId": "put_v1_catalog_assets_ident_columns",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ColumnsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Columns",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/v1/catalog/assets/{ident}/evaluate-sla": {
       "post": {
         "operationId": "post_v1_catalog_assets_ident_evaluate-sla",
@@ -12849,6 +13288,142 @@
         ]
       }
     },
+    "/v1/catalog/classifications": {
+      "get": {
+        "description": "The configured classifications, from least to most sensitive, with what masked data counts as.",
+        "operationId": "get_v1_catalog_classifications",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Classifications",
+        "tags": [
+          "catalog"
+        ]
+      },
+      "put": {
+        "description": "Change the classifications (platform administrators). A level still in use cannot be removed.",
+        "operationId": "put_v1_catalog_classifications",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LevelsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Classifications",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/v1/catalog/ingest/airflow": {
       "post": {
         "operationId": "post_v1_catalog_ingest_airflow",
@@ -13568,6 +14143,173 @@
         ]
       }
     },
+    "/v1/catalog/products/{product_id}/consumers/{group_id}": {
+      "delete": {
+        "description": "Take a group's access through the product away (product owners).",
+        "operationId": "delete_v1_catalog_products_product_id_consumers_group_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "title": "Product Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Consumer",
+        "tags": [
+          "catalog"
+        ]
+      },
+      "put": {
+        "description": "Make a group a consumer of the product with an option, or change its option (product owners).",
+        "operationId": "put_v1_catalog_products_product_id_consumers_group_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "title": "Product Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsumerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Consumer",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/v1/catalog/products/{product_id}/requests": {
       "post": {
         "description": "Ask the owners for access to the whole product, for one of your groups.",
@@ -13972,6 +14714,94 @@
           }
         },
         "summary": "Resource Asset",
+        "tags": [
+          "catalog"
+        ]
+      },
+      "post": {
+        "description": "The catalog entry of an object, created for a table or view not seen yet (object Owners; used by Terraform).",
+        "operationId": "post_v1_catalog_resources_resource_id_asset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "title": "Resource Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "object_path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Object Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ensure Asset",
         "tags": [
           "catalog"
         ]
