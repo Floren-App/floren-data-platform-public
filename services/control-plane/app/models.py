@@ -1137,3 +1137,19 @@ class ApiCall(Base):
     caller: Mapped[str] = mapped_column(String(512), default="")
     status_code: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Notification(Base):
+    """An email in the outbox. A key sends a notice once (per recipient); emails only link to the app."""
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[Optional[str]] = mapped_column(String(300), nullable=True, unique=True)
+    recipient: Mapped[str] = mapped_column(String(254))
+    subject: Mapped[str] = mapped_column(String(300))
+    body: Mapped[str] = mapped_column(Text, default="")
+    case_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str] = mapped_column(String(500), default="")

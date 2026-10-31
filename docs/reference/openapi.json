@@ -17393,6 +17393,84 @@
         ]
       }
     },
+    "/v1/compliance/register": {
+      "get": {
+        "description": "The access register: compliance administrators see all of it, reviewers what is in their scope.",
+        "operationId": "get_v1_compliance_register",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Access Register",
+        "tags": [
+          "compliance"
+        ]
+      }
+    },
     "/v1/compliance/requirement": {
       "post": {
         "description": "Whether giving this access needs a compliance form, and which.",

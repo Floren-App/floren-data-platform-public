@@ -167,3 +167,95 @@ def test_compliance_admins_manage_forms_and_classifications_but_not_their_own_ro
     assert client.put("/v1/compliance/forms/Privacy impact", headers=as_("bob"), json={"name": "Privacy impact", "definition": FORM}).status_code == 200
     # Only platform administrators make compliance administrators.
     assert client.post("/v1/compliance/roles", headers=as_("bob"), json={"role": "compliance_admin", "app_group_id": privacy}).status_code == 403
+
+
+class FakeSMTP:
+    sent: list = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def send_message(self, message):
+        FakeSMTP.sent.append({"to": message["To"], "subject": message["Subject"], "body": message.get_content()})
+
+
+def set_email(username, address):
+    from app.models import DirectoryPrincipal
+    with SessionLocal() as db:
+        p = db.get(DirectoryPrincipal, rbac.resolve_user(db, USERS[username]).principal_id)
+        p.attributes = {**(p.attributes or {}), "email": address}
+        db.commit()
+
+
+def test_reviews_notify_by_email_and_land_in_the_register(client, repo, monkeypatch):  # noqa: F811
+    from app import notify
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "smtp_host", "smtp.test")
+    monkeypatch.setattr(notify, "_connect", lambda s: FakeSMTP())
+    FakeSMTP.sent = []
+    ids = setup_products(client, repo)
+    classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
+    layer, _ = set_up_policy(client, ids["public"])
+    marketing = grant_group(client, "workloads", "=Marketing", "Executor")
+    privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_reviewer", "app_group_id": privacy,
+                                                                    "scope": {"layers": [layer]}}).raise_for_status()
+    set_email("ana", "ana@example.test")
+    set_email("bob", "bob@example.test")
+    target = {"kind": "role", "resource_id": ids["public"], "role": "Reader", "app_group_id": marketing}
+    case = client.post("/v1/compliance/cases", headers=as_("ana"), json={**target, "answers": ANSWERS}).json()
+    notify.tick(SessionLocal)
+    # Reviewers are told what waits and where; the answers never go out by email.
+    assert [(m["to"], m["subject"]) for m in FakeSMTP.sent] == [("bob@example.test", "Review needed: Reader on public for =Marketing")]
+    assert f"/#case={case['id']}" in FakeSMTP.sent[0]["body"] and "Monthly report" not in FakeSMTP.sent[0]["body"]
+    client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "changes", "note": "Which report?"})
+    client.post(f"/v1/compliance/cases/{case['id']}/submit", headers=as_("ana")).raise_for_status()
+    client.post(f"/v1/compliance/cases/{case['id']}/comments", headers=as_("ana"), json={"text": "It is the finance one"}).raise_for_status()
+    client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "approve"}).raise_for_status()
+    notify.tick(SessionLocal)
+    assert [(m["to"], m["subject"].split(":")[0]) for m in FakeSMTP.sent[1:]] == [
+        ("ana@example.test", "Changes asked"), ("bob@example.test", "Review needed"), ("bob@example.test", "New comment"),
+        ("ana@example.test", "Approved")]
+    assert "Which report?" in FakeSMTP.sent[1]["body"]
+    # Membership approvers hear once about someone joining.
+    grant_group(client, "workloads", "=Marketing", "Executor", users=["bob"])
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "membership_approver", "app_group_id": privacy}).raise_for_status()
+    grant_group(client, "workloads", "Approvers", "Executor", users=["ana"])
+    approvers = client.get("/v1/rbac/groups", headers=as_("admin")).json()
+    approvers = next(g["id"] for g in approvers if g["name"] == "Approvers")
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "membership_approver", "app_group_id": approvers}).raise_for_status()
+    notify.tick(SessionLocal)
+    notify.tick(SessionLocal)
+    assert [(m["to"], m["subject"]) for m in FakeSMTP.sent[5:]] == [("ana@example.test", "Membership to approve: =Marketing")]
+    # The register: what was given through a form, by whom and until when; CSV for the auditors.
+    assert client.get("/v1/compliance/register", headers=as_("ana")).status_code == 403
+    rows = client.get("/v1/compliance/register", headers=as_("bob")).json()
+    assert [(r["group"], r["access"], r["approved_by"], r["case_id"]) for r in rows] == [("=Marketing", "Reader on public", "bob", case["id"])]
+    csv = client.get("/v1/compliance/register", headers=as_("admin"), params={"format": "csv"})
+    assert csv.headers["content-type"].startswith("text/csv")
+    lines = csv.text.splitlines()
+    assert lines[0].startswith("group,access,kind") and lines[1].startswith("'=Marketing,Reader on public,role,restricted")
+
+
+def test_email_failures_are_retried_and_kept(client, monkeypatch):
+    from app import notify
+    from app.config import get_settings
+    from app.models import Notification
+    monkeypatch.setattr(get_settings(), "smtp_host", "smtp.test")
+
+    def refuse(s):
+        raise OSError("connection refused")
+    monkeypatch.setattr(notify, "_connect", refuse)
+    set_email("bob", "bob@example.test")
+    with SessionLocal() as db:
+        bob = rbac.resolve_user(db, USERS["bob"]).principal_id
+        assert notify.queue(db, [bob], "Hello", "Body", key="hello") == 1
+        assert notify.queue(db, [bob], "Hello", "Body", key="hello") == 0   # once per key
+        db.commit()
+    notify.tick(SessionLocal)
+    with SessionLocal() as db:
+        item = db.scalar(select(Notification))
+        assert item.sent_at is None and item.attempts == 1 and "refused" in item.error

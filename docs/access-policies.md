@@ -82,9 +82,9 @@ scope means everything.
 | Compliance administrator | Sets up forms, policies, classifications and compliance roles | — |
 
 Platform administrators can do everything and are the only ones who make compliance
-administrators. Give a privacy team's group a role together with a small
-[app profile](app-profiles.md) (for example only `products.browse`), so they see their part of
-the app and not the engineering tools.
+administrators. Give a privacy team's group a role together with the **Privacy**
+[app profile](app-profiles.md) (only `products.browse`), so they see their part of the app and not
+the engineering tools.
 
 ## New group members
 
@@ -96,12 +96,68 @@ membership approver approves them. Everything else the group can do, they get st
 
 People with a compliance role get **Privacy** in the activity bar:
 
+- **Reviews**: the cases waiting for your decision, the earliest deadline first; overdue ones are
+  marked. *All cases* shows every case you may see, by status.
+- **Memberships**: people who joined a group with access given through a form, waiting for a
+  membership approver.
+- **Access register**: what was given through a form, to which group, approved by whom and until
+  when, with the number of people in the group. **Export CSV** downloads it for audits. Compliance
+  administrators see all of it; reviewers what is in their scope.
 - **Access policies**: the grid of layers and classifications; open a cell to set its form,
   review steps and durations. Reviewers see the grid read-only.
 - **Compliance forms**: the forms, their versions, and the builder: add, remove and reorder pages
   and questions, set conditions, preview, save a draft and publish.
 - **Compliance roles**: which groups have which compliance role, and for what.
 - **Classifications**: the levels and what masked data counts as.
+
+## Reviewing a case
+
+A case page shows what the access gives (the product and option, or the role and object), the
+data's classification and layer, the people in the group, the review steps, and the answers as they
+were given (questions that were hidden are left out; attached files download). The history lists
+when it was sent, every decision and every comment.
+
+Reviewers of the current step decide:
+
+- **Approve**, optionally until an earlier date than asked. The last step's approval gives the
+  access, at most for the policy's longest time.
+- **Ask for changes**, with a note: the requester changes the answers and sends it again; it comes
+  back to the same step.
+- **Decline**, with a note.
+
+Anyone who can see the case can comment, for example to ask a question. Requesters find their cases
+under **Catalog → My requests**; owners find role grants waiting for another owner under **Access
+requests**.
+
+## Email
+
+With email set up, the platform tells people what waits for them:
+
+| When | Who |
+|---|---|
+| A case waits for a step | The reviewers of that step (data owners, or compliance reviewers in scope; compliance administrators when nobody is in scope) |
+| Approved, declined or changes asked | The requester |
+| A comment | The requester, or the reviewers of the current step when the requester comments |
+| Someone joins a group with justified access | The membership approvers for that group (once) |
+
+Emails say what waits and link to it in the app; nothing is decided by email, and the answers never
+leave the platform in an email. Addresses come from SCIM, or from the `email` claim of the sign-in
+token.
+
+Set the SMTP server in the Helm values; the password goes in the control plane's secret as
+`FDP_SMTP_PASSWORD`:
+
+```yaml
+email:
+  smtp:
+    host: smtp.example.com
+    port: 587
+    security: starttls          # starttls | tls | none
+    username: fdp@example.com
+    from: "Floren Data Platform <fdp@example.com>"
+```
+
+Sending failures are retried a few times and kept with their error.
 
 ## Terraform
 
