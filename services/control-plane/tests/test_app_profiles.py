@@ -47,8 +47,15 @@ def test_no_profiles_until_configured_and_profiles_follow_the_active_group(clien
     body = next(g for g in client.get("/v1/rbac/groups", headers=as_("admin")).json() if g["id"] == gid)
     kept = client.put(f"/v1/rbac/groups/{gid}", headers=as_("admin"), json={"name": body["name"], "description": "x", "owners": body["owners"]})
     assert kept.json()["app_profile"] == "Viewer"
-    # Administrators always have everything.
+    # Administrators have everything with Global Admin active; with another group active they see its profile.
     assert set(me(client, "admin")["app_features"]) >= {"workspaces", "security", "workloads.manage"}
+    client.post(f"/v1/rbac/groups/{gid}/bindings", headers=as_("admin"), json={"principal_id": me(client, "admin")["principal_id"]}).raise_for_status()
+    assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": gid}).status_code == 200
+    acting = me(client, "admin")
+    assert acting["app_profile"] == "Viewer" and acting["app_features"] == ["products.browse"]
+    assert client.get("/v1/workspaces", headers=as_("admin")).status_code == 200   # the API still lets administrators do everything
+    assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": "000000000001"}).status_code == 200
+    assert me(client, "admin")["app_profile"] == "Full access (administrator)"
 
 
 def test_only_administrators_configure_profiles_and_features_bring_what_they_need(client):

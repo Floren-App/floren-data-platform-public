@@ -5,9 +5,14 @@ a group gets at all: its pages, its navigation and the actions behind them. The 
 enforces profiles: a feature that is off is refused by the API too, not only hidden.
 
 People get the profile of their **active group**, chosen at the bottom of the sidebar.
-Switching group switches the app, just as it switches what the lists show. Global Admin always
-has everything. Running programs, workspaces and service identities are not limited by app
-profiles; their object permissions apply as before.
+Switching group switches the app, just as it switches what the lists show. Running programs,
+workspaces and service identities are not limited by app profiles; their object permissions apply
+as before.
+
+Platform administrators get the whole app with **Global Admin** as their active group. With
+another group active they see the app as that group's profile, for example to work as the privacy
+office or to check what viewers get; Administration stays in reach, and the API still lets them do
+everything.
 
 ## Features
 
