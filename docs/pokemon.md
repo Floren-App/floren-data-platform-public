@@ -59,7 +59,7 @@ do not commit them. Pin remote module source to a reviewed platform commit.
 | Orchestrator identity | Execute only its own environment's pipeline steps |
 | Analyst dashboard identity | Read reporting output only |
 | Engineering dashboard identity | Read raw/history/process evidence |
-| Analysts | Published explorer and reporting data; no raw/history access |
+| Analysts | The *Pokemon cards* data product with its Standard option (illustrators masked); no raw/history access |
 | Engineers | Development and monitoring permissions as explicitly assigned |
 
 Use each workload's built-in identity and `managed_identity_grants`. Test/Prod
@@ -75,6 +75,27 @@ dashboard see prices rounded to whole euros, only the last four characters of th
 illustrator and no rare cards. Data engineers and the `bootstrap` and `models`
 identities that build the product are exempt, so the pipeline keeps processing real
 data. Compare the explorer dashboard with the same query run by an engineer.
+
+### Classification, the data product and access policies
+
+The module classifies the columns that matter (levels from the platform's
+`fdp_classifications`, see the `levels` variable): the illustrator is personal data
+(`confidential`, tag `pii`) in `cards_current`, `dim_cards_history` and the raw
+`records` payload; the market price is `internal`. Tables follow their most
+sensitive column.
+
+It publishes the **Pokemon cards** [data product](catalog.md#data-products)
+(`cards_current`, `set_summary` and the explorer dashboard), owned by the data
+engineers, with two access options:
+
+- **Standard** (default) hides most of the illustrator's name, so it counts as
+  `internal`. Analysts use the product with this option.
+- **With illustrators** shows everything and counts as `confidential`.
+
+With an [access policy](access-policies.md) on confidential data in Prod, a group
+that asks for *With illustrators* there fills in the compliance form; the data
+engineers (the product's owners) and then the privacy reviewers decide. The data
+engineers own the lakes, so their own access needs no form.
 
 ## Apply and run
 

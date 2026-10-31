@@ -156,8 +156,11 @@ The object's owners and the group's owners are told. The group's row on the obje
 **Permissions** (or on the product's **Access options**) says *Needs a form by …* with **Justify**,
 which opens the form for exactly that access. An approved case clears the deadline; at the
 deadline, the access is removed. The privacy area's **Access register** lists everything waiting
-for a form. Groups whose role lets them give access (the data's owners) do not justify their own
-data.
+for a form.
+
+The data's owners need no form for their own use of it: a group with a role that may give access
+(such as Owner) on the object, or on anything above it, also gets roles below that without a form,
+and never gets a deadline. Making a group an owner of covered data does need a form.
 
 Reviews that come due remind their reviewers; overdue reviews go to the compliance administrators
 too.

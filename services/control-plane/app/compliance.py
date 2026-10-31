@@ -187,8 +187,21 @@ def product_requirement(db, product: CatalogProduct, option: Optional[ProductOpt
     return {"layer_id": product.layer_id, "classification": level, "policy": policy_for(db, product.layer_id, level)}
 
 
+def owns(db, resource: Resource, group_id: Optional[str]) -> bool:
+    """Whether the group may give access to the object: a role with "assign" on it or above it (the data's owners)."""
+    from .models import RoleAssignment
+    if not group_id:
+        return False
+    for item in rbac.ancestors(db, resource):
+        assignment = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == item.id, RoleAssignment.app_group_id == group_id))
+        if assignment is not None and "assign" in rbac.roles_for(item).get(assignment.role, set()):
+            return True
+    return False
+
+
 def role_requirement(db, resource: Resource, role: str, group_id: Optional[str]) -> dict:
-    if "read" not in rbac.roles_for(resource).get(role, set()):
+    # The data's owners do not justify their own use of it; becoming an owner does need a form.
+    if "read" not in rbac.roles_for(resource).get(role, set()) or owns(db, resource, group_id):
         return {"layer_id": None, "classification": classification.UNCLASSIFIED, "policy": None}
     layer_id = layers.info(db, resource)["layer_id"]
     level = role_level(db, resource, group_id)

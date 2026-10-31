@@ -55,11 +55,6 @@ resource "fdp_role_assignment" "engineers_data" {
   app_group_id = var.engineers_group_id
   role         = "Admin"
 }
-resource "fdp_role_assignment" "analysts_product" {
-  resource_id  = var.product_schema_id
-  app_group_id = var.analysts_group_id
-  role         = "Reader"
-}
 
 resource "fdp_api" "tcgdex" {
   name        = "TCGdex ${var.environment}"
@@ -152,7 +147,7 @@ resource "fdp_catalog_governance" "this" {
   owner_group_id = var.engineers_group_id
   description    = "Pokemon ${var.environment}: ${each.key}. Trace stable record IDs through immutable files, raw observations, SCD2 and products."
   domain         = "Pokemon"
-  classification = "internal"
+  classification = var.levels.internal
   steward        = "Data engineers"
   tags           = ["Pokemon", var.environment, each.key == "explorer" || each.key == "product" ? "Data product" : "Process flow"]
   status         = "reviewed"
@@ -203,3 +198,63 @@ resource "fdp_data_policy" "demo" {
   exempt_groups     = [var.engineers_group_id]
   exempt_principals = [for name in ["bootstrap", "models"] : fdp_workload.job[name].service_principal_id]
 }
+
+# Classification: illustrators are named people (personal data); market prices are commercially internal.
+# The tables follow their most sensitive column. Levels come from the platform's fdp_classifications.
+resource "fdp_column_classification" "cards_current" {
+  resource_id = var.product_schema_id
+  object_path = "cards_current"
+  columns = {
+    illustrator     = { classification = var.levels.personal, tags = ["pii"] }
+    price_trend_eur = { classification = var.levels.internal, tags = ["commercial"] }
+  }
+}
+resource "fdp_column_classification" "cards_history" {
+  resource_id = fdp_schema.history.id
+  object_path = "dim_cards_history"
+  columns = {
+    illustrator = { classification = var.levels.personal, tags = ["pii"] }
+  }
+}
+resource "fdp_column_classification" "raw_records" {
+  resource_id = fdp_schema.raw.id
+  object_path = "records"
+  columns = {
+    payload = { classification = var.levels.personal, tags = ["pii"] }
+  }
+}
+
+# The data product: current cards and set totals, with the explorer dashboard. Its Standard option masks the
+# illustrator, so it counts as internal and needs no form; With illustrators shows them and counts as personal
+# data, so where an access policy covers that level, getting it needs an approved compliance form.
+resource "fdp_data_product" "cards" {
+  title   = "Pokemon cards (${title(var.environment)})"
+  summary = "Every current English Pokemon card with its set, rarity and market price trend, the set totals, and the explorer dashboard."
+  members = [
+    { resource_id = var.product_schema_id, object_path = "cards_current" },
+    { resource_id = var.product_schema_id, object_path = "set_summary" },
+    { resource_id = fdp_workload.job["explorer"].resource_id },
+  ]
+  options = jsonencode([
+    { name = "Standard", description = "Illustrator names partly hidden.", default = true,
+      masks = [{ resource_id = var.product_schema_id, table = "cards_current", column = "illustrator", method = "partial", expression = "" }],
+    filters = [] },
+    { name = "With illustrators", description = "Everything, including the illustrators' names (personal data).", default = false,
+    masks = [], filters = [] },
+  ])
+  depends_on = [fdp_column_classification.cards_current, fdp_catalog_governance.this]
+}
+# Data engineers own the product: they change it and are its data owners in reviews.
+resource "fdp_role_assignment" "engineers_product" {
+  resource_id  = fdp_data_product.cards.access_resource_id
+  app_group_id = var.engineers_group_id
+  role         = "Owner"
+}
+# Analysts use the product with the Standard option: masked illustrators, so no form is needed.
+resource "fdp_data_product_consumer" "analysts" {
+  product_id   = fdp_data_product.cards.id
+  app_group_id = var.analysts_group_id
+  option       = "Standard"
+}
+
+output "data_product" { value = fdp_data_product.cards.id }

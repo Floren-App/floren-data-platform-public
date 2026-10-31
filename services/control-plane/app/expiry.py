@@ -179,8 +179,6 @@ def uncovered(db) -> dict:
         resource = db.get(Resource, assignment.resource_id)
         if group == GLOBAL_ADMIN or resource is None:
             continue
-        if "assign" in rbac.roles_for(resource).get(assignment.role, set()):
-            continue  # the data's owners: they decide who gets it
         if resource.kind == "product":
             product = _product_of(db, resource.id)
             if product is None or assignment.role != "Consumer":
@@ -193,7 +191,7 @@ def uncovered(db) -> dict:
         else:
             continue
         policy = req["policy"]
-        if policy is None or group in _owning_groups(db, resource):
+        if policy is None or group in _owning_groups(db, resource):   # owners with a role: see compliance.owns
             continue
         grant = db.scalar(select(JustifiedGrant).where(JustifiedGrant.resource_id == resource.id, JustifiedGrant.app_group_id == group))
         case = db.get(AccessCase, grant.case_id) if grant else None

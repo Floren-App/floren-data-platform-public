@@ -380,3 +380,25 @@ def test_justifying_existing_access_clears_its_deadline_and_overdue_reviews_esca
     with SessionLocal() as db:
         assert db.scalar(select(JustificationDeadline)) is None
         assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == legacy)).role == "Reader"
+
+
+def test_the_datas_owners_need_no_form_below_what_they_own(client, repo):  # noqa: F811
+    from app import expiry
+    from app.models import JustificationDeadline, utcnow
+    ids = setup_products(client, repo)
+    classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
+    with SessionLocal() as db:
+        source = db.get(Resource, ids["public"]).parent_id
+    owners = grant_group(client, "workloads", "Lake owners", "Executor")
+    client.put(f"/v1/rbac/resources/{source}/assignments", headers=as_("admin"), json={"app_group_id": owners, "role": "Owner"}).raise_for_status()
+    set_up_policy(client, ids["public"])
+    # A role below what they own needs no form, and gets no deadline.
+    assert client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("admin"),
+                      json={"app_group_id": owners, "role": "Admin"}).status_code == 200
+    expiry.tick(SessionLocal, utcnow())
+    with SessionLocal() as db:
+        assert db.scalar(select(JustificationDeadline).where(JustificationDeadline.app_group_id == owners)) is None
+    # Becoming an owner of covered data does need one.
+    others = grant_group(client, "workloads", "Others", "Executor")
+    refused = client.put(f"/v1/rbac/resources/{source}/assignments", headers=as_("admin"), json={"app_group_id": others, "role": "Owner"})
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "justification_required"

@@ -39,3 +39,8 @@ variable "demo_data_policies" {
   default     = false
   description = "Demonstrate column masks and a row filter on the product: analysts and the explorer dashboard see prices rounded, illustrators partly hidden and no rare cards; data engineers and the pipeline identities that build the product are exempt."
 }
+variable "levels" {
+  type        = object({ internal = string, personal = string })
+  default     = { internal = "internal", personal = "confidential" }
+  description = "Names of the platform's classification levels (fdp_classifications) for internal data and for personal data."
+}
