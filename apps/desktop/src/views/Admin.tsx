@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, AppGroup, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput, WORKLOAD_KINDS, WorkloadKind, usablePools } from "../api";
+import { api, ApiError, AppFeature, AppGroup, AppProfile, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput, WORKLOAD_KINDS, WorkloadKind, usablePools } from "../api";
 import type { Hub } from "../hub";
 import { OpenTab, resourceTab } from "../components/Permissions";
 import { PageHeader } from "../components/Page";
@@ -451,5 +451,46 @@ export function AdminNetwork() {
     </tbody></table>}
     {draft && <div className="form-actions"><button className="btn" disabled={busy} onClick={() => void save()}>Save allowlist</button>
       <button className="btn secondary" onClick={() => { setDraft(null); setError(null); }}>Cancel</button></div>}
+  </>;
+}
+
+/** App profiles: which parts of the app each group gets. A grid of features against profiles. */
+export function AdminAppProfiles() {
+  const [data, setData] = useState<{ profiles: AppProfile[]; features: { key: AppFeature; label: string }[] } | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, AppProfile>>({}), [error, setError] = useState(""), [message, setMessage] = useState("");
+  const [newName, setNewName] = useState("");
+  const load = useCallback(() => api.appProfiles.list().then((d) => { setData(d); setDrafts(Object.fromEntries(d.profiles.map((p) => [p.id, p]))); })
+    .catch((e: Error) => setError(e.message)), []);
+  useEffect(() => { void load(); }, [load]);
+  if (!data) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  const profiles = data.profiles;
+  const changed = (p: AppProfile) => JSON.stringify(drafts[p.id]) !== JSON.stringify(p);
+  const toggle = (p: AppProfile, f: AppFeature) => { const d = drafts[p.id];
+    setDrafts({ ...drafts, [p.id]: { ...d, features: d.features.includes(f) ? d.features.filter((x) => x !== f) : [...d.features, f] } }); };
+  const save = (p: AppProfile) => { const d = drafts[p.id]; setError(""); setMessage("");
+    api.appProfiles.put(p.name, { name: d.name.trim(), description: d.description, features: d.features, default: d.default })
+      .then(() => { setMessage(`Saved ${d.name}.`); return load(); }).catch((e: Error) => setError(e.message)); };
+  return <>
+    <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="App profiles"
+      subtitle="Which parts of the app a group gets: pages, navigation and the actions behind them, enforced by the platform. People get the profile of their active group; object permissions still decide what they may open. Global Admin always has everything." />
+    {error && <p className="error" role="alert">{error}</p>}
+    {message && <p className="scope-note" role="status">{message}</p>}
+    <div className="table-scroll"><table className="profile-grid" aria-label="App profiles">
+      <thead><tr><th>Feature</th>{profiles.map((p) => <th key={p.id}>
+        <input aria-label={`Name of ${p.name}`} value={drafts[p.id]?.name ?? p.name} onChange={(e) => setDrafts({ ...drafts, [p.id]: { ...drafts[p.id], name: e.target.value } })} />
+        <label className="row muted"><input type="radio" name="default-profile" checked={drafts[p.id]?.default ?? p.default}
+          onChange={() => setDrafts(Object.fromEntries(Object.entries(drafts).map(([id, d]) => [id, { ...d, default: id === p.id }])))} />Default</label></th>)}</tr></thead>
+      <tbody>{data.features.map((f) => <tr key={f.key}><td>{f.label}</td>{profiles.map((p) => <td key={p.id}>
+        <input type="checkbox" aria-label={`${f.label} in ${p.name}`} checked={drafts[p.id]?.features.includes(f.key) ?? false} onChange={() => toggle(p, f.key)} /></td>)}</tr>)}
+        <tr><td className="muted">Groups</td>{profiles.map((p) => <td key={p.id} className="muted small">{p.groups.join(", ") || "—"}</td>)}</tr>
+        <tr><td /> {profiles.map((p) => <td key={p.id}><div className="row" style={{ gap: 4 }}>
+          <button className="btn sm" disabled={!changed(p)} onClick={() => save(p)}>Save</button>
+          {!p.default && !p.groups.length && <button className="btn sm ghost danger" onClick={() => void api.appProfiles.remove(p.name).then(load).catch((e: Error) => setError(e.message))}>Remove</button>}</div></td>)}</tr>
+      </tbody></table></div>
+    <p className="hint">A feature brings what it needs: requesting access brings browsing products, deploying workloads brings viewing them. Changing the default changes every group without a profile. Give groups a profile on their page under Security → App groups.</p>
+    <form className="row" style={{ gap: 8, marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); setError("");
+      api.appProfiles.put(newName.trim(), { name: newName.trim(), description: "", features: ["products.browse"], default: false }).then(() => { setNewName(""); return load(); }).catch((err: Error) => setError(err.message)); }}>
+      <input aria-label="New profile name" placeholder="New profile name" value={newName} onChange={(e) => setNewName(e.target.value)} />
+      <button className="btn secondary" disabled={!newName.trim()}>Add profile</button></form>
   </>;
 }

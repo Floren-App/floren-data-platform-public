@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, EDITOR_NAME, inGroup, inLayer, isActive, openInWindow, workloadDot, workloadStatus, type OrchestratorHistory, type OrchestratorRun, type Workload, type Run } from "../api";
+import { api, type Product, EDITOR_NAME, inGroup, inLayer, isActive, openInWindow, workloadDot, workloadStatus, type OrchestratorHistory, type OrchestratorRun, type Workload, type Run } from "../api";
 import { getServer } from "../auth";
 import type { Hub } from "../hub";
 import type { TabRef } from "./Tabs";
@@ -7,6 +7,7 @@ import { PageHeader } from "../components/Page";
 import { IconHome, IconOpen, IconPlus, IconDeployed, IconRefresh, IconRuns, IconWorkspaces } from "../components/Icons";
 import { ProductIcon } from "../components/ProductIcon";
 import { CatalogSearchBox } from "./Catalog";
+import { ProductCard } from "./Products";
 import { openEditor } from "./Sidebar";
 import { WorkspaceSections } from "./WorkspaceSections";
 
@@ -36,7 +37,30 @@ function ActivityList({ runs, hub, openTab, updated = false }: { runs: Run[]; hu
   })}</ul> : <p className="home-empty">No runs yet. Run a program from a workspace or a workload.</p>;
 }
 
+/** Home for people whose app profile has no workspaces or workloads: the products and dashboards they can use. */
+function ViewerHome({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
+  const [products, setProducts] = useState<Product[] | null>(null), [error, setError] = useState("");
+  useEffect(() => {
+    if (!hub.has("products.browse")) { setProducts([]); return; }
+    api.products.list({ layer_id: hub.layerId, accessible: true }).then((d) => setProducts(d.items)).catch((e: Error) => setError(e.message));
+  }, [hub.layerId]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <div className="home-dashboard">
+    <div className="home-intro"><PageHeader icon={<IconHome size={22} />} title={hub.me ? `Welcome back, ${hub.me.username}` : "Welcome to Floren Data Platform"}
+      subtitle="The data products and dashboards you can use."
+      actions={hub.has("products.browse") && <button className="btn" onClick={() => openTab({ kind: "products", title: "Data products" })}>Find data products</button>} /></div>
+    {error && <p className="error" role="alert">{error}</p>}
+    {!products ? <p className="muted" role="status">Loading…</p> : products.length
+      ? <div className="product-grid" aria-label="Your data products">{products.map((p) => <ProductCard key={p.id} p={p} hub={hub} openTab={openTab} />)}</div>
+      : <p className="home-empty">{hub.has("products.browse") ? "Nothing shared with your group yet. Find data products and ask for access." : "Your group's app profile gives no access to data yet. Ask an administrator."}</p>}
+  </div>;
+}
+
 export function Home({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
+  if (hub.me && !hub.has("workspaces") && !hub.has("workloads.view")) return <ViewerHome hub={hub} openTab={openTab} />;
+  return <FullHome hub={hub} openTab={openTab} />;
+}
+
+function FullHome({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const [query, setQuery] = useState("");
   const workspaces = myWorkspaces(hub).sort((a, b) => stamp(b.last_activity_at) - stamp(a.last_activity_at));
   const runs = hub.runs.filter((r) => inLayer(hub.layerId, r.layer_id));
@@ -45,34 +69,35 @@ export function Home({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const products = [...workloads].sort((a, b) => stamp(b.deployed_at || b.created_at) - stamp(a.deployed_at || a.created_at));
   const search = () => openTab({ kind: "catalog", title: "Catalog", search: query.trim() });
   const newWorkspace = () => openTab({ kind: "workspaces", title: "Workspaces", intent: "create" });
+  const W = hub.has("workspaces"), L = hub.has("workloads.view");  // the app profile decides which cards show
   return <div className="home-dashboard">
     <div className="home-intro"><PageHeader icon={<IconHome size={22} />} title={hub.me ? `Welcome back, ${hub.me.username}` : "Welcome to Floren Data Platform"}
       subtitle="Pick up your work, follow your pipelines, and find what you need."
-      actions={<><button className="btn secondary" onClick={() => void hub.refresh()}><IconRefresh size={14} />Refresh</button><button className="btn" onClick={newWorkspace}><IconPlus size={14} />New workspace</button></>} />
-      <div className="home-search"><CatalogSearchBox id="home-search" label="Search across Floren Data Platform" autoFocus={false} value={query} onChange={setQuery} openTab={openTab} onSubmit={search} /><button className="btn secondary" onClick={search}>Search</button></div>
-      <p className="hint">Find workloads, datasets, APIs, columns, owners, and tags in the catalog.</p>
+      actions={<><button className="btn secondary" onClick={() => void hub.refresh()}><IconRefresh size={14} />Refresh</button>{W && <button className="btn" onClick={newWorkspace}><IconPlus size={14} />New workspace</button>}</>} />
+      {hub.has("catalog.objects") && <><div className="home-search"><CatalogSearchBox id="home-search" label="Search across Floren Data Platform" autoFocus={false} value={query} onChange={setQuery} openTab={openTab} onSubmit={search} /><button className="btn secondary" onClick={search}>Search</button></div>
+      <p className="hint">Find workloads, datasets, APIs, columns, owners, and tags in the catalog.</p></>}
     </div>
     <div className="home-stats" aria-label="Your activity at a glance">
-      <button onClick={() => openTab({ kind: "workspaces", title: "Workspaces" })}><IconWorkspaces size={18} /><strong>{workspaces.filter((w) => w.status === "running").length}</strong><span>Workspaces running</span></button>
+      {W && <button onClick={() => openTab({ kind: "workspaces", title: "Workspaces" })}><IconWorkspaces size={18} /><strong>{workspaces.filter((w) => w.status === "running").length}</strong><span>Workspaces running</span></button>}
       <button onClick={() => openTab(historyTab)}><IconRuns size={18} /><strong>{runs.filter(isActive).length}</strong><span>Active in recent runs</span></button>
-      <button onClick={() => openTab(workloadsTab)}><IconDeployed size={18} /><strong>{workloads.length}</strong><span>Available workloads</span></button>
+      {L && <button onClick={() => openTab(workloadsTab)}><IconDeployed size={18} /><strong>{workloads.length}</strong><span>Available workloads</span></button>}
       <button onClick={() => openTab(historyTab)}><span className="dot failed" /><strong>{runs.filter((r) => r.status === "failed").length}</strong><span>Failures in recent runs</span></button>
     </div>
     <div className="home-grid">
-      <section className="home-card" aria-labelledby="home-workspaces"><div className="home-card-heading"><h2 id="home-workspaces"><IconWorkspaces size={18} />Your workspaces</h2><button className="text-button" onClick={() => openTab({ kind: "workspaces", title: "Workspaces" })}>View all</button></div>
+      {W && <section className="home-card" aria-labelledby="home-workspaces"><div className="home-card-heading"><h2 id="home-workspaces"><IconWorkspaces size={18} />Your workspaces</h2><button className="text-button" onClick={() => openTab({ kind: "workspaces", title: "Workspaces" })}>View all</button></div>
         {workspaces.length ? <ul className="home-list">{workspaces.slice(0, 4).map((ws) => <li key={ws.id}>
           <button className="home-list-link" onClick={() => openTab({ kind: "workspace", ref: ws.id, title: ws.name })}><IconWorkspaces size={18} /><span className="home-item-text"><strong>{ws.name}</strong><small>{ws.owner} · {EDITOR_NAME[ws.editor]}{ws.environment_id ? ` · ${hub.layers.find((r) => r.id === (ws.layer_id || ws.environment_id))?.name || "Scoped"}` : ""}</small></span><Status value={ws.status} /></button>
           {ws.status === "running" && <button className="icon-btn" aria-label={`Open editor for ${ws.name}`} title="Open editor" onClick={() => void openEditor(hub, ws.id, ws.name)}><IconOpen size={16} /></button>}
         </li>)}</ul> : <div className="home-empty"><p>Your workspace is where you edit and explore.</p><button className="btn secondary" onClick={newWorkspace}>Create a workspace</button></div>}
-      </section>
+      </section>}
       <section className="home-card" aria-labelledby="home-recent"><div className="home-card-heading"><h2 id="home-recent"><IconRuns size={18} />Recent runs</h2><button className="text-button" onClick={() => openTab(historyTab)}>View all</button></div><ActivityList runs={recent.slice(0, 4)} hub={hub} openTab={openTab} /></section>
-      {hub.me && <OrchestratorWatch key={`${getServer()}:${hub.me.username}`} hub={hub} openTab={openTab} />}
+      {hub.me && L && <OrchestratorWatch key={`${getServer()}:${hub.me.username}`} hub={hub} openTab={openTab} />}
       <RecentUpdates hub={hub} openTab={openTab} />
-      <section className="home-card" aria-labelledby="home-workloads"><div className="home-card-heading"><h2 id="home-workloads"><IconDeployed size={18} />Recently deployed</h2><button className="text-button" onClick={() => openTab(workloadsTab)}>View all</button></div>
+      {L && <section className="home-card" aria-labelledby="home-workloads"><div className="home-card-heading"><h2 id="home-workloads"><IconDeployed size={18} />Recently deployed</h2><button className="text-button" onClick={() => openTab(workloadsTab)}>View all</button></div>
         {products.length ? <ul className="home-list">{products.slice(0, 4).map((pub) => <li key={pub.id}><button className="home-list-link" onClick={() => openTab({ kind: "workload", ref: pub.id, title: pub.title })}>
           <ProductIcon kind={pub.kind} runtime={pub.runtime} size={18} /><span className="home-item-text"><strong>{pub.title}</strong><small>{pub.branch} · {time(pub.deployed_at || pub.created_at)}</small></span><span className={`status ${pub.sync_error ? "error" : "muted"}`}><span className={`dot ${pub.sync_error ? "failed" : workloadDot(pub)}`} />{pub.sync_error ? "Needs attention" : workloadStatus(pub)}</span>
         </button></li>)}</ul> : <p className="home-empty">Apps and programs will appear here when deployed.</p>}
-      </section>
+      </section>}
     </div>
   </div>;
 }

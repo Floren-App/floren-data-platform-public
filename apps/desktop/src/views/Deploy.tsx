@@ -371,7 +371,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
               && act(() => api.undeploy(pub.id))}><IconTrash size={14} />Undeploy</button>
             <span className="divider" />
           </>}
-          {pub.kind === "app" && <PublishButton resourceId={pub.resource_id} openTab={openTab} />}
+          {pub.kind === "app" && <PublishButton resourceId={pub.resource_id} openTab={openTab} hub={hub} />}
           {pub.can_manage && <button className="btn secondary" disabled={busy} title="Check the branch for new commits now"
                   onClick={() => act(() => api.syncWorkload(pub.id))}><IconRefresh size={14} />Check for updates</button>}
           {(pub.kind === "app" || pub.kind === "airflow" || pub.kind === "dbt") && pub.status === "live" && (

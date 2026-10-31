@@ -14,6 +14,12 @@ export const modeLayerId = (me: { active_layer_id?: string | null } | null | und
   me?.active_layer_id && layers.some((l) => l.id === me.active_layer_id) ? me.active_layer_id : defaultLayerId(layers);
 /** Whether an item belongs to the layer mode. Items without a layer belong to every layer. */
 export const inLayer = (mode: string, itemLayer: string | null | undefined) => !mode || !itemLayer || itemLayer === mode;
+/** App features an app profile can switch on (pages, navigation and the actions behind them). */
+export type AppFeature = "products.browse" | "products.request" | "products.publish" | "catalog.objects" | "workspaces" | "workloads.view"
+  | "workloads.manage" | "storage" | "packages" | "kafka" | "apis" | "usage" | "security";
+export const ALL_FEATURES: AppFeature[] = ["products.browse", "products.request", "products.publish", "catalog.objects", "workspaces",
+  "workloads.view", "workloads.manage", "storage", "packages", "kafka", "apis", "usage", "security"];
+export interface AppProfile { id: string; name: string; description: string; features: AppFeature[]; default: boolean; groups: string[] }
 /** The Global Admin group: in that group mode, every group's objects are shown. */
 export const GLOBAL_ADMIN_GROUP = "000000000001";
 /** Whether an item belongs to the group mode. Items without an owner group belong to every group. */
@@ -52,6 +58,8 @@ export interface AppGroup {
   protected_bindings?: string[];
   id: string; name: string; description: string; owners: string[]; bindings: string[]; can_manage: boolean; can_inspect?: boolean;
   origin?: "app";
+  /** The app profile the group gets (null: the default profile). */
+  app_profile?: string | null;
 }
 export interface DataPolicy {
   id: string; schema_id: string; table: string; kind: "column_mask" | "row_filter"; column: string;
@@ -238,8 +246,11 @@ export function inLine(position?: number | null): string {
 export interface Me {
   principal_id?: string;
   active_group_id?: string | null;
-  /** The layer mode chosen in the top bar; GET /v1/me falls back to the default layer. */
+  /** The layer mode chosen in the sidebar; GET /v1/me falls back to the default layer. */
   active_layer_id?: string | null;
+  /** The active group's app profile and the features it gives (administrators: everything). */
+  app_profile?: string | null;
+  app_features?: AppFeature[];
   available_groups?: { id: string; name: string; system?: boolean }[];
   username: string;
   groups: string[];
@@ -732,6 +743,12 @@ export const api = {
   },
   warehouses: () => request<WarehouseOverview[]>("GET", "/v1/compute/warehouses"),
   selectActiveLayer: (layer_id: string) => request<{active_layer_id: string}>("PUT","/v1/me/active-layer",{layer_id}),
+  appProfiles: {
+    list: () => request<{ profiles: AppProfile[]; features: { key: AppFeature; label: string }[] }>("GET", "/v1/app-profiles"),
+    put: (current: string, body: { name: string; description: string; features: AppFeature[]; default: boolean }) =>
+      request<AppProfile>("PUT", `/v1/admin/app-profiles/${encodeURIComponent(current)}`, body),
+    remove: (name: string) => request<void>("DELETE", `/v1/admin/app-profiles/${encodeURIComponent(name)}`),
+  },
   selectActiveGroup: (group_id: string) => request<{active_group_id: string; name: string}>("PUT","/v1/me/active-group",{group_id}),
   layers: {
     list: () => request<Layer[]>("GET", "/v1/layers"),
@@ -775,7 +792,7 @@ export const api = {
     directory: () => request<DirectoryPrincipal[]>("GET", "/v1/rbac/directory"),
     groups: () => request<AppGroup[]>("GET", "/v1/rbac/groups"),
     createGroup: (body: { name: string; description: string; owners: string[] }) => request<AppGroup>("POST", "/v1/rbac/groups", body),
-    updateGroup: (id: string, body: { name: string; description: string; owners: string[] }) => request<AppGroup>("PUT", `/v1/rbac/groups/${id}`, body),
+    updateGroup: (id: string, body: { name: string; description: string; owners: string[]; app_profile?: string }) => request<AppGroup>("PUT", `/v1/rbac/groups/${id}`, body),
     deleteGroup: (id: string) => request<void>("DELETE", `/v1/rbac/groups/${id}`),
     bind: (id: string, principal_id: string) => request<AppGroup>("POST", `/v1/rbac/groups/${id}/bindings`, { principal_id }),
     unbind: (id: string, pid: string) => request<void>("DELETE", `/v1/rbac/groups/${id}/bindings/${pid}`),

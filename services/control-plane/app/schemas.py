@@ -338,6 +338,8 @@ class Me(BaseModel):
     principal_id: str = ""
     active_group_id: Optional[str] = None
     active_layer_id: Optional[str] = None
+    app_profile: Optional[str] = Field(default=None, description="The active group's app profile")
+    app_features: List[str] = Field(default_factory=list, description="App features this person has in the active group")
     available_groups: List[Dict[str, Any]] = Field(default_factory=list)
     username: str
     groups: List[str]

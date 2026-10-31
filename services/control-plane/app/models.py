@@ -590,6 +590,19 @@ class AppGroup(Base):
     name: Mapped[str] = mapped_column(String(128), unique=True)
     description: Mapped[str] = mapped_column(String(500), default="")
     owners: Mapped[list] = mapped_column(JSON, default=list)  # stable principal IDs
+    # Which parts of the app the group gets (see app_profiles); None: the default profile.
+    profile_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+
+
+class AppProfile(Base):
+    """A set of app features (pages, navigation and the actions behind them) that groups are given."""
+    __tablename__ = "app_profiles"
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    description: Mapped[str] = mapped_column(String(500), default="")
+    features: Mapped[list] = mapped_column(JSON, default=list)
+    # The profile of groups without one (exactly one profile is the default).
+    default: Mapped[bool] = mapped_column(default=False)
 
 
 class UserPreference(Base):

@@ -10,7 +10,7 @@ import { MenuButton } from "./components/Menu";
 import { Sidebar, View } from "./views/Sidebar";
 import { TabContent, TabRef } from "./views/Tabs";
 import { GitChoiceHost } from "./views/GitCredentials";
-import { openInWindow } from "./api";
+import { openInWindow, type AppFeature } from "./api";
 import { documentationUrl } from "./documentation";
 
 const HOME: TabRef = { kind: "home", title: "Home" };
@@ -101,6 +101,8 @@ function Shell({ user }: { user: User }) {
   };
 
   const openSearch = () => {
+    // Without All objects in the app profile, search goes to the data products.
+    if (!hub.has("catalog.objects")) { if (hub.has("products.browse")) openTab({ kind: "products", title: "Data products" }); return; }
     setView("catalog"); openTab({ kind: "catalog", title: "Catalog" });
     requestAnimationFrame(() => document.getElementById("catalog-search")?.focus());
   };
@@ -135,26 +137,28 @@ function Shell({ user }: { user: User }) {
     return () => window.removeEventListener("keydown", search);
   });
 
-  type Activity = { id: View; label: string; icon: JSX.Element };
+  type Activity = { id: View; label: string; icon: JSX.Element; feature?: AppFeature };
   // Overview (look) → Build (make) → Integration (connect); access and administration sit at the bottom.
-  const groups: { label: string; items: Activity[] }[] = [
+  // The active group's app profile decides which of them someone gets.
+  const allGroups: { label: string; items: Activity[] }[] = [
     { label: "Overview", items: [
       { id: "home", label: "Home", icon: <IconHome /> },
-      { id: "catalog", label: "Catalog", icon: <IconCatalog /> },
-      { id: "compute", label: "Usage", icon: <IconCompute /> },
+      { id: "catalog", label: "Catalog", icon: <IconCatalog />, feature: "products.browse" },
+      { id: "compute", label: "Usage", icon: <IconCompute />, feature: "usage" },
     ] },
     { label: "Build", items: [
-      { id: "workspaces", label: "Workspaces", icon: <IconWorkspaces /> },
-      { id: "workloads", label: "Workloads", icon: <IconDeployed /> },
-      { id: "data", label: "Storage", icon: <IconData /> },
-      { id: "packages", label: "Packages", icon: <IconPackage /> },
+      { id: "workspaces", label: "Workspaces", icon: <IconWorkspaces />, feature: "workspaces" },
+      { id: "workloads", label: "Workloads", icon: <IconDeployed />, feature: "workloads.view" },
+      { id: "data", label: "Storage", icon: <IconData />, feature: "storage" },
+      { id: "packages", label: "Packages", icon: <IconPackage />, feature: "packages" },
     ] },
     { label: "Integration", items: [
       // Kafka is optional per layer: shown once a cluster is visible, or to admins who register one.
-      ...(hub.me?.is_admin || hub.resources.some((r) => r.kind === "kafka") ? [{ id: "kafka" as View, label: "Kafka", icon: <IconStream /> }] : []),
-      { id: "apis", label: "APIs", icon: <IconApi /> },
+      ...(hub.me?.is_admin || hub.resources.some((r) => r.kind === "kafka") ? [{ id: "kafka" as View, label: "Kafka", icon: <IconStream />, feature: "kafka" as AppFeature }] : []),
+      { id: "apis", label: "APIs", icon: <IconApi />, feature: "apis" },
     ] },
   ];
+  const groups = allGroups.map((g) => ({ ...g, items: g.items.filter((a) => !a.feature || hub.has(a.feature)) }));
   const layer = hub.layers.find((l) => l.id === hub.layerId);
   const activityButton = (a: Activity) => (
     <button key={a.id} aria-label={a.label} aria-current={view === a.id ? "page" : undefined}
@@ -189,7 +193,7 @@ function Shell({ user }: { user: User }) {
         {groups.filter((g) => g.items.length).map((g, i) => <div key={g.label} className="activity-group" role="group" aria-label={g.label}>
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />
-        {activityButton({ id: "access", label: "Security", icon: <IconAdmin /> })}
+        {(hub.has("security") || hub.has("workspaces")) && activityButton({ id: "access", label: "Security", icon: <IconAdmin /> })}
         {hub.me?.is_admin && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}
         <button aria-label="Documentation" onClick={() => {
           void hub.act(() => openInWindow(documentationUrl(view), "FDP documentation", `fdp-help-${view}`));

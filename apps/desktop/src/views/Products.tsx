@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AccessRequestItem, ago, api, AssetProduct, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
+import { AccessRequestItem, ago, api, openInWindow, AssetProduct, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
@@ -43,6 +43,15 @@ function BigIcon({ p, size = 30 }: { p: Pick<Product, "kind" | "runtime">; size?
   return <span className={`product-mark kind-${p.kind}`} aria-hidden="true"><ProductIcon kind={p.kind} runtime={p.runtime ?? undefined} size={size} /></span>;
 }
 
+/** Opens a dashboard: its workload page for people with Workloads, otherwise the app itself. */
+function OpenDashboard({ p, hub, openTab, small = false }: { p: Product; hub: Hub; openTab: OpenTab; small?: boolean }) {
+  const target = openTarget(p.open, p.name, p.kind);
+  const id = p.open?.object_id;
+  if (!target || !id) return null;
+  return <button className={`btn ${small ? "sm" : "secondary"}`} onClick={() => hub.has("workloads.view") ? openTab(target)
+    : void hub.act(() => openInWindow(api.openWorkload(id).then((r) => r.url), p.title, `pub-${id}`))}>Open dashboard</button>;
+}
+
 function AccessState({ p }: { p: Product }) {
   return p.access === "granted" ? <span className="product-chip ok">You have access</span>
     : p.access === "requested" ? <span className="product-chip wait">Requested</span>
@@ -50,7 +59,7 @@ function AccessState({ p }: { p: Product }) {
     : <span className="product-chip">No access yet</span>;
 }
 
-export function ProductCard({ p, openTab }: { p: Product; openTab: OpenTab }) {
+export function ProductCard({ p, openTab, hub }: { p: Product; openTab: OpenTab; hub: Hub }) {
   return <article className="product-card" aria-label={p.title}>
     <BigIcon p={p} />
     <div className="product-card-head">
@@ -64,7 +73,8 @@ export function ProductCard({ p, openTab }: { p: Product; openTab: OpenTab }) {
       {p.status === "certified" && <span className="product-chip cert">Certified</span>}
       {p.updated_at && <span className="product-chip" title={new Date(p.updated_at).toLocaleString()}>Updated {ago(p.updated_at)}</span>}
       <span className="grow" />
-      {p.access === "none" || p.access === "partial" ? <button className="btn sm" onClick={() => openTab(productTab(p, { intent: "request" }))}>Request access</button> : <AccessState p={p} />}
+      {(p.access === "none" || p.access === "partial") && hub.has("products.request") ? <button className="btn sm" onClick={() => openTab(productTab(p, { intent: "request" }))}>Request access</button>
+        : p.access === "granted" && p.kind === "app" && p.open ? <OpenDashboard p={p} hub={hub} openTab={openTab} small /> : <AccessState p={p} />}
     </div>
   </article>;
 }
@@ -88,7 +98,7 @@ export function ProductsView({ hub, openTab, tab }: { hub: Hub; openTab: OpenTab
     <PageHeader icon={<IconCatalog size={22} />} title={mine ? "My products" : "Data products"}
       subtitle={mine ? "Products you own. Change what is in them, who has access, or unpublish them."
         : `Data products shared in ${layer ?? "this layer"}. Open one to see where it comes from and what uses it; request access to the ones you need.`}
-      actions={<button className="btn" aria-expanded={publishing} onClick={() => setPublishing(!publishing)}><IconPlus size={14} />Publish a product</button>} />
+      actions={hub.has("products.publish") && <button className="btn" aria-expanded={publishing} onClick={() => setPublishing(!publishing)}><IconPlus size={14} />Publish a product</button>} />
     {publishing && <PublishPanel hub={hub} assetId={tab.assetId} onClose={() => setPublishing(false)}
       onPublished={(p) => { setPublishing(false); setVersion((v) => v + 1); openTab(productTab(p)); }} />}
     <div className="object-toolbar product-filters">
@@ -101,7 +111,7 @@ export function ProductsView({ hub, openTab, tab }: { hub: Hub; openTab: OpenTab
     {!data ? <p className="muted" role="status">Loading data products…</p>
       : !data.items.length ? <div className="empty-state"><p>{q || domain || kind || accessible ? "No products match." : mine ? "You do not own a product in this layer yet."
           : "Nothing is published in this layer yet."}</p><p className="muted">A product bundles what you share: for example a dashboard with the tables it uses. Publish from an object's page, or with Publish a product.</p></div>
-      : <div className="product-grid">{data.items.map((p) => <ProductCard key={p.id} p={p} openTab={openTab} />)}</div>}
+      : <div className="product-grid">{data.items.map((p) => <ProductCard key={p.id} p={p} openTab={openTab} hub={hub} />)}</div>}
   </>;
 }
 
@@ -254,14 +264,14 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
         <p className="muted">{contents(detail.members)} · {detail.owner_group_name ?? "No owner group"}{detail.layer_name && ` · ${detail.layer_name}`}</p></div>
       <div className="row product-actions">
         {detail.status === "certified" && <span className="product-chip cert">Certified</span>}
-        {(detail.access === "none" || detail.access === "partial") && !requesting && <button className="btn" onClick={() => setRequesting(true)}>Request access</button>}
+        {(detail.access === "none" || detail.access === "partial") && !requesting && hub.has("products.request") && <button className="btn" onClick={() => setRequesting(true)}>Request access</button>}
         {detail.access !== "none" && <AccessState p={detail} />}
-        {target && detail.kind === "app" && <button className="btn secondary" onClick={() => openTab(target)}>Open dashboard</button>}
+        {target && detail.kind === "app" && <OpenDashboard p={detail} hub={hub} openTab={openTab} />}
         {detail.can_manage && <button className="btn secondary" aria-expanded={editing} onClick={() => setEditing(!editing)}>Edit</button>}
       </div>
     </div>
     {sent && <p className="scope-note" role="status">Request sent. You will see the decision here and under Access requests → My requests.</p>}
-    {requesting && <RequestForm p={detail} hub={hub} onCancel={() => setRequesting(false)} onDone={() => { setRequesting(false); setSent(true); void load(); }} />}
+    {requesting && hub.has("products.request") && <RequestForm p={detail} hub={hub} onCancel={() => setRequesting(false)} onDone={() => { setRequesting(false); setSent(true); void load(); }} />}
     {editing && <EditForm detail={detail} hub={hub} openTab={openTab} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); }} />}
     {error && <p className="error" role="alert">{error}</p>}
     <nav className="object-tabs" aria-label="Product sections">
@@ -287,9 +297,9 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
       {detail.access !== "granted" && <p className="hint">Columns, previews and SQL are shown on each object's own page once you have access.</p>}
     </>}
     {section === "lineage" && <><Lineage detail={detail} openTab={openTab} />
-      <p className="hint">Dashed steps are ones you cannot open: you see their name, kind and owner. {detail.members.some((m) => m.access === "granted") &&
+      <p className="hint">Dashed steps are ones you cannot open: you see their name, kind and owner. {hub.has("catalog.objects") && detail.members.some((m) => m.access === "granted") &&
         <button className="text-button" onClick={() => { const m = detail.members.find((x) => x.access === "granted")!; openTab({ kind: "catalog-object", ref: m.asset_id, title: m.name, catalogSection: "lineage" }); }}>Open the full lineage graph</button>}</p></>}
-    {section === "used-by" && <>{detail.used_by.length ? <div className="product-grid">{detail.used_by.map((p) => <ProductCard key={p.id} p={p} openTab={openTab} />)}</div>
+    {section === "used-by" && <>{detail.used_by.length ? <div className="product-grid">{detail.used_by.map((p) => <ProductCard key={p.id} p={p} openTab={openTab} hub={hub} />)}</div>
       : <p className="muted">No other published products are built on this one.</p>}
       {detail.used_by_others > 0 && <p className="hint">{detail.used_by_others} other object{detail.used_by_others === 1 ? " uses" : "s use"} it (not published).</p>}</>}
     {section === "permissions" && detail.access_resource && <PermissionsPanel resource={detail.access_resource} resources={[detail.access_resource]} openTab={openTab} onChanged={async () => { await load(); }} />}
@@ -328,16 +338,17 @@ export function AccessRequestsView({ hub, openTab, tab }: { hub: Hub; openTab: O
 }
 
 /** On an object's own page: publish it (with what it uses), or open the product it is in. */
-export function PublishButton({ resourceId, objectPath, openTab }: { resourceId?: string | null; objectPath?: string; openTab: OpenTab }) {
+export function PublishButton({ resourceId, objectPath, openTab, hub }: { resourceId?: string | null; objectPath?: string; openTab: OpenTab; hub?: Hub }) {
   const [state, setState] = useState<{ assetId: string; info: AssetProduct } | null>(null);
+  const allowed = !hub || hub.has("products.publish");
   useEffect(() => {
-    if (!resourceId) return;
+    if (!resourceId || !allowed) return;
     let alive = true;
     api.catalog.resourceAsset(resourceId, objectPath).then((asset) => api.products.forAsset(asset.id).then((info) => alive && setState({ assetId: asset.id, info })))
       .catch(() => alive && setState(null));
     return () => { alive = false; };
-  }, [resourceId, objectPath]);
-  if (!state || !state.info.publishable) return null;
+  }, [resourceId, objectPath, allowed]);
+  if (!allowed || !state || !state.info.publishable) return null;
   const product = state.info.products[0];
   if (product) return <button className="btn secondary" title={state.info.products.map((p) => p.title).join(", ")} onClick={() => openTab(productTab(product))}>
     In {state.info.products.length === 1 ? product.title : `${state.info.products.length} products`}</button>;

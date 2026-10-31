@@ -122,7 +122,7 @@ export function DataObjectView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; o
     <ObjectBreadcrumbs resource={schema} resources={hub.resources} openTab={openTab} trailing={parts} />
     <PageHeader icon={<ProductIcon kind={location.item?.kind === "folder" ? "directory" : location.item?.kind ?? "table"} size={22} />} title={location.item?.name ?? tab.title}
       subtitle={<>{location.item ? kindLabel(location.item) : "Data object"} · {schema.name}</>}
-      actions={location.table !== undefined && <PublishButton resourceId={schema.id} objectPath={location.table} openTab={openTab} />} />
+      actions={location.table !== undefined && <PublishButton resourceId={schema.id} objectPath={location.table} openTab={openTab} hub={hub} />} />
     {schema.layer_name && <p className="hint">Layer · <strong>{schema.layer_name}</strong></p>}
     <ObjectTabs active={section} lineage preview={location.table !== undefined} onChange={(s) => openTab({ ...tab, section: s })} />
     {section === "permissions" ? <><p className="scope-note">This object uses its schema's permissions. Grants apply to every current and future object in <strong>{schema.name}</strong>.</p>

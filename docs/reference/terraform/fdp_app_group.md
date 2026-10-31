@@ -6,6 +6,7 @@ A Floren Data Platform app group: the unit that receives roles. Members are dire
 
 | Attribute | Type | Behavior | Description |
 |---|---|---|---|
+| `app_profile` | `basetypes.StringType` | Optional, Computed | Name of the fdp_app_profile the group gets (which parts of the app its members use when it is their active group). Empty string: the default profile. Left out: whatever is set in the app. |
 | `description` | `basetypes.StringType` | Optional, Computed |  |
 | `id` | `basetypes.StringType` | Computed |  |
 | `name` | `basetypes.StringType` | Required |  |

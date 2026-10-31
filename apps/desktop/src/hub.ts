@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, AccessResource, Layer, Me, modeLayerId, Workload, Run, Workspace } from "./api";
+import { api, AccessResource, ALL_FEATURES, AppFeature, Layer, Me, modeLayerId, Workload, Run, Workspace } from "./api";
 import { useObjectCache } from "./cache";
 import { SessionExpiredError } from "./auth";
 
@@ -22,6 +22,8 @@ export interface Hub {
   /** Usage shows every layer instead of the layer mode (sidebar and page share it; not remembered). */
   usageAllLayers: boolean;
   setUsageAllLayers: (all: boolean) => void;
+  /** Whether the active group's app profile includes a feature (pages, navigation and the actions behind them). */
+  has: (feature: AppFeature) => boolean;
   /** Runs an action, surfaces its error, and refreshes state afterwards. Resolves true on success. */
   act: (fn: () => Promise<unknown>) => Promise<boolean>;
   dismissError: () => void;
@@ -53,6 +55,10 @@ export function useHub(enabled: boolean): Hub {
 
   const inFlight = useRef<{ revision: number; full: boolean; limit: number; promise: Promise<void> } | null>(null);
   const identityUpdated = useRef(0);
+  // The app profile decides which listings to load: features that are off are refused by the API.
+  const features = useRef<Set<string> | null>(null);
+  // A server without app profiles sends no list: then everything is on, as before.
+  const learn = (value: Me) => { features.current = value.app_features ? new Set(value.app_features) : new Set(ALL_FEATURES); };
 
   const update = useCallback(async function update(includeResources: boolean): Promise<void> {
     const revision = groupRevision.current;
@@ -68,17 +74,27 @@ export function useHub(enabled: boolean): Hub {
     const publish = <T,>(promise: Promise<T>, apply: (value: T) => void) => promise.then((value) => {
       if (current()) apply(value);
     });
+    let identityLoaded = false;
+    if (!features.current) {  // first load: learn the profile before asking for listings
+      try {
+        const value = await api.me();
+        learn(value); identityUpdated.current = Date.now(); identityLoaded = true;
+        if (current()) setMe((prev) => stable(prev, value));
+      } catch { /* reported below by the identity task */ }
+    }
+    const has = (f: string) => !features.current || features.current.has(f);
     const tasks = [
-      publish(api.workspaces(), (value) => setWorkspaces((prev) => stable(prev, value))),
-      publish(api.runs(Math.min(limit + 1, MAX_RUNS)), (value) => {
+      has("workspaces") ? publish(api.workspaces(), (value) => setWorkspaces((prev) => stable(prev, value))) : Promise.resolve(setWorkspaces([])),
+      has("workspaces") || has("workloads.view") ? publish(api.runs(Math.min(limit + 1, MAX_RUNS)), (value) => {
         setRuns((prev) => stable(prev, value.slice(0, limit)));
         setHasMoreRuns(value.length > limit && limit < MAX_RUNS);
-      }),
-      publish(api.workloads(), (value) => setWorkloads((prev) => stable(prev, value))),
+      }) : Promise.resolve(setRuns([])),
+      has("workloads.view") ? publish(api.workloads(), (value) => setWorkloads((prev) => stable(prev, value))) : Promise.resolve(setWorkloads([])),
     ];
-    if (includeResources || Date.now() - identityUpdated.current >= IDENTITY_POLL_MS) {
+    if (!identityLoaded && (includeResources || Date.now() - identityUpdated.current >= IDENTITY_POLL_MS)) {
       tasks.push(publish(api.me(), (value) => {
         identityUpdated.current = Date.now();
+        learn(value);
         setMe((prev) => stable(prev, value));
       }));
     }
@@ -137,6 +153,7 @@ export function useHub(enabled: boolean): Hub {
       const current = await api.me();
       // Discard older polls and update the selector without waiting for runtime listings.
       identityUpdated.current = Date.now();
+      learn(current);  // the new active group may bring another app profile
       setMe(current);
       setWorkloads([]);
       setResources([]);
@@ -183,5 +200,6 @@ export function useHub(enabled: boolean): Hub {
     };
   }, [enabled, refresh, update]);
 
-  return { me, workspaces, runs, hasMoreRuns, loadMoreRuns, workloads, resources, layers, error, refresh, selectActiveGroup, layerId, selectActiveLayer, usageAllLayers, setUsageAllLayers, act, dismissError };
+  return { me, workspaces, runs, hasMoreRuns, loadMoreRuns, workloads, resources, layers, error, refresh, selectActiveGroup, layerId, selectActiveLayer, usageAllLayers, setUsageAllLayers, act, dismissError,
+    has: (feature: AppFeature) => !me?.app_features || me.app_features.includes(feature) };
 }
