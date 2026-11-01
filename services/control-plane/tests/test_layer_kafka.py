@@ -1,3 +1,4 @@
+from sqlalchemy import select
 """Broker manifests against the pinned operator schema and retained-storage boundary."""
 from pathlib import Path
 import tarfile
@@ -182,3 +183,75 @@ def test_topic_reconciliation_waits_for_current_generation_and_finalized_deletio
         item=db.get(Resource,topic['id']);item.config={**item.config,'deleted':True};db.commit()
     assert reconcile()=='Deleting'
     assert reconcile()=='Deleted'
+
+
+def test_kafka_capability_is_builtin_and_legacy_flags_only_control_compute():
+    empty = InfrastructureSpec().kafka
+    assert empty.enabled is True and empty.running is False
+    stopped = InfrastructureSpec.model_validate({'kafka': {'enabled': False}}).kafka
+    assert stopped.enabled is True and stopped.running is False
+    assert spec().kafka.running is True
+    assert spec().model_dump()['kafka']['enabled'] is True
+
+
+def test_new_layer_has_kafka_identity_without_running_brokers(client):
+    from .conftest import as_
+    response = client.post('/v1/admin/layers', headers=as_('admin'), json={'name': 'Dormant Kafka layer'})
+    assert response.status_code == 201, response.text
+    layer_id = response.json()['id']
+    with SessionLocal() as db:
+        item = db.scalar(select(Resource).where(Resource.kind == 'kafka', Resource.object_id == layer_id))
+        assert item is not None
+        ident = item.id
+    out = client.get('/v1/kafka/clusters/'+ident, headers=as_('admin')).json()
+    assert out['config']['running'] is False and out['config']['configured'] is False
+    assert client.put('/v1/kafka/clusters/'+ident+'/running', headers=as_('ana'), json={'running': True}).status_code == 403
+    assert client.put('/v1/kafka/clusters/'+ident+'/running', headers=as_('admin'), json={'running': True}).status_code == 422
+    assert client.delete('/v1/kafka/clusters/'+ident, headers=as_('admin')).status_code == 409
+
+
+def test_stopping_and_starting_kafka_preserves_topics_and_permissions(client, topic):
+    from .conftest import as_
+    from app.models import RoleAssignment
+    with SessionLocal() as db:
+        parent = db.get(Resource, topic['id']).parent_id
+        before = [(row.resource_id, row.app_group_id, row.role) for row in db.scalars(select(RoleAssignment))]
+    assert client.put('/v1/kafka/clusters/'+parent+'/running', headers=as_('admin'), json={'running': False}).status_code == 202
+    with SessionLocal() as db:
+        assert db.get(Resource, topic['id']) is not None
+        assert before == [(row.resource_id, row.app_group_id, row.role) for row in db.scalars(select(RoleAssignment))]
+    assert client.post('/v1/kafka/topics/'+topic['id']+'/session', headers=as_('admin'), json={'mode':'consume','group':'stopped-check'}).status_code == 409
+    result = client.put('/v1/kafka/clusters/'+parent+'/running', headers=as_('admin'), json={'running': True})
+    assert result.status_code == 409  # stop must finish before a restart is queued
+    from app.models import LayerOperation
+    with SessionLocal() as db:
+        for operation in db.scalars(select(LayerOperation).where(LayerOperation.layer_id == layers.NON_PROD)):
+            operation.phase = 'Ready'
+        db.commit()
+    result = client.put('/v1/kafka/clusters/'+parent+'/running', headers=as_('admin'), json={'running': True})
+    assert result.status_code == 202, result.text
+    assert result.json()['spec']['kafka']['running'] is True
+
+
+def test_kafka_stop_waits_for_pause_without_touching_quorum_or_storage():
+    from app.layer_manifests import ProvisioningError
+    class Api:
+        changes = []
+        def call_api(self, path, method, **kwargs):
+            self.changes.append((path, method, kwargs))
+    class Resources:
+        api = Api()
+        def request(self, *args):
+            return {'metadata': {'resourceVersion':'17', 'labels':{
+                OWNER:'installation', LAYER:ID, COMPONENT:'kafka'}}, 'status':{'conditions':[]}}
+    resources = Resources()
+    claim = type('Claim', (), {'layer_id':ID})()
+    assert controller.stop_kafka(claim, resources, 'ns', CONFIG) is False
+    assert len(resources.api.changes) == 1
+    _, method, arguments = resources.api.changes[0]
+    assert method == 'PATCH'
+    assert all(item['path'].startswith('/metadata/') for item in arguments['body'])
+    assert arguments['body'][-1]['value'] == 'true'
+    docs = manifests(ID, 'ns', spec(), CONFIG, PLAN)
+    assert next(item for item in docs if item['kind'] == 'KafkaNodePool')['spec']['replicas'] == 3
+    assert next(item for item in docs if item['kind'] == 'Kafka')['metadata']['annotations']['strimzi.io/pause-reconciliation'] == 'false'

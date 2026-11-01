@@ -2,7 +2,7 @@
 
 Generated from the current provider schema.
 
-Register a layer's managed Kafka for topic IAM. Enable infrastructure.kafka on fdp_layer first. Destroy unregisters metadata only; brokers and storage are retained. Import by ID.
+Manage the built-in layer Kafka registration. Broker compute is controlled by infrastructure.kafka.running on fdp_layer. Destroy removes it from state only; the layer capability, permissions and storage remain. Import by ID.
 
 | Attribute | Type | Behavior | Description |
 |---|---|---|---|

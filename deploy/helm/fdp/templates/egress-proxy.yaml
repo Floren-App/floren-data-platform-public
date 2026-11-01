@@ -26,6 +26,9 @@ spec:
           ports: [{ containerPort: 3128, name: proxy }]
           env:
             - { name: FDP_EGRESS_ALLOWLIST_URL, value: "http://fdp-control-plane.{{ .Release.Namespace }}.svc:8000/internal/egress/allowlist" }
+            - name: FDP_EGRESS_PROXY_TOKEN
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.existingSecret }}, key: FDP_EGRESS_PROXY_TOKEN }
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

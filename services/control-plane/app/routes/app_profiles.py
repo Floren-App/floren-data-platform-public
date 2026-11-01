@@ -43,16 +43,19 @@ def list_profiles(db: Session = Depends(get_db), _: User = Depends(get_actor)):
 
 
 @router.put("/v1/admin/app-profiles/{name}")
-def put_profile(name: str, body: ProfileIn, db: Session = Depends(get_db), user: User = Depends(settings_access.needs("set-profiles", "manage"))):
+def put_profile(name: str, body: ProfileIn, db: Session = Depends(get_db), user: User = Depends(settings_access.needs("set-profiles", "profiles.apply"))):
     """Create or change a profile by name (a different body name renames it)."""
     profile = db.scalar(select(AppProfile).where(AppProfile.name == name))
     if body.name != name and db.scalar(select(AppProfile).where(AppProfile.name == body.name)):
         raise HTTPException(409, f"an app profile named {body.name} already exists")
     if profile is None:
+        settings_access.require(db, user, "set-profiles", "profiles.create")
         profile = AppProfile(name=body.name)
         db.add(profile)
     before = list(profile.features or [])
     profile.name, profile.description, profile.features = body.name, body.description, app_profiles.normalize(body.features)
+    if bool(body.default) != bool(profile.default):
+        settings_access.require(db, user, "set-profiles", "profiles.default.set")
     if body.default and not profile.default:
         db.execute(update(AppProfile).values(default=False))
     profile.default = body.default
@@ -64,7 +67,7 @@ def put_profile(name: str, body: ProfileIn, db: Session = Depends(get_db), user:
 
 
 @router.delete("/v1/admin/app-profiles/{name}", status_code=204)
-def delete_profile(name: str, db: Session = Depends(get_db), user: User = Depends(settings_access.needs("set-profiles", "manage"))):
+def delete_profile(name: str, db: Session = Depends(get_db), user: User = Depends(settings_access.needs("set-profiles", "profiles.delete"))):
     profile = db.scalar(select(AppProfile).where(AppProfile.name == name))
     if profile is None:
         raise HTTPException(404, "app profile not found")

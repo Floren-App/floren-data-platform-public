@@ -16,6 +16,16 @@ _STATES = {"created": "pending", "restarting": "pending", "running": "running", 
 
 
 class DockerOrchestrator:
+    def execution_addresses(self, ref: str) -> List[str]:
+        try:
+            container = self.client.containers.get(ref)
+        except NotFound:
+            return []
+        if container.status != "running":
+            return []
+        return [value for network in container.attrs.get("NetworkSettings", {}).get("Networks", {}).values()
+                for value in (network.get("IPAddress"), network.get("GlobalIPv6Address")) if value]
+
     def inventory(self) -> List[dict]:
         return [{"ref": (c.attrs.get("Names") or [c.name or c.id])[0].lstrip("/"), "state": _STATES.get(c.attrs.get("State"), "finished"),
                  "labels": c.attrs.get("Labels") or {}}

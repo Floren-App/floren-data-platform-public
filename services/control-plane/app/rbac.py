@@ -91,7 +91,10 @@ def resolve_user(db: Session, user: User, refresh: bool = False) -> User:
                        roles=[] if user.execution_context else resolved.roles,
                        global_admin=False if user.execution_context else resolved.global_admin)
     from .ownership import selected_group_id
-    return replace(resolved, active_group_id=user.active_group_id if user.active_group_id is not None else selected_group_id(db, resolved))
+    selected = user.active_group_id if user.active_group_id is not None else selected_group_id(db, resolved)
+    if selected != "000000000001" and not user.execution_context:
+        resolved = replace(resolved, roles=[role for role in resolved.roles if role != resolved.admin_role], global_admin=False)
+    return replace(resolved, active_group_id=selected)
 
 
 def _resolve_user(db: Session, user: User, refresh: bool = False) -> User:
@@ -279,11 +282,16 @@ def _role_grants(db, user):
 
 
 def delete_resource_assignments(db: Session, resource_id: str):
+    from .models import PermissionGrant
+    db.execute(delete(PermissionGrant).where(PermissionGrant.target_id == resource_id))
     for model in (RoleAssignment, ServiceRoleAssignment):
         db.execute(delete(model).where(model.resource_id == resource_id))
 
 
 def has_resource_assignments(db: Session, resource_id: str) -> bool:
+    from .models import PermissionGrant
+    if db.scalar(select(PermissionGrant.id).where(PermissionGrant.target_id == resource_id).limit(1)):
+        return True
     return any(db.scalar(select(model.id).where(model.resource_id == resource_id).limit(1))
                for model in (RoleAssignment, ServiceRoleAssignment))
 

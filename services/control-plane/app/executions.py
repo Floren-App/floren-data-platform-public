@@ -95,10 +95,17 @@ def package_env(s: Settings, token: str, key: str) -> Dict[str, str]:
     return env
 
 
-def proxy_env(s: Settings) -> Dict[str, str]:
+def proxy_env(s: Settings, workspace_id: str = "") -> Dict[str, str]:
     """Standard proxy variables (git, pip, R, the VS Code marketplace); platform addresses bypass it."""
     bypass = "localhost,127.0.0.1,.svc,.cluster.local"
-    env = {"HTTPS_PROXY": s.egress_proxy_url, "HTTP_PROXY": s.egress_proxy_url, "NO_PROXY": bypass}
+    proxy = s.egress_proxy_url
+    if workspace_id:
+        from urllib.parse import urlsplit, urlunsplit
+        from .auth import mint_token
+        parts = urlsplit(proxy)
+        ticket = mint_token("egress", workspace_id, 30 * 86400)
+        proxy = urlunsplit((parts.scheme, "fdp:" + ticket + "@" + parts.netloc, parts.path, parts.query, parts.fragment))
+    env = {"HTTPS_PROXY": proxy, "HTTP_PROXY": proxy, "NO_PROXY": bypass}
     return {**env, **{name.lower(): value for name, value in env.items()}}
 
 
@@ -133,7 +140,7 @@ def workspace_spec(s: Settings, ws: Workspace, groups: List[str], sources: List[
               **({"fdp.floren.app/environment": ws.environment_id, "fdp.floren.app/layer": ws.environment_id} if ws.environment_id else {})}
     if s.egress_proxy_url and ws.editor in ("vscode", "rstudio"):
         # The internet only through the allowlist proxy; the network lets these pods reach nothing else outside.
-        env.update(proxy_env(s))
+        env.update(proxy_env(s, ws.id))
         labels["fdp.floren.app/egress"] = "proxy"
     if clone and ws.editor in ("vscode", "rstudio"):
         env["FDP_GIT_CLONE"] = "\n".join("\t".join(repo) for repo in clone)

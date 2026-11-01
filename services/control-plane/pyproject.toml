@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["jsonschema>=4.23", "pytest>=8.0", "pytest-xdist>=3.6", "moto[secretsmanager]>=5.0"]   # xdist: parallel tests (MIT); moto: in-process AWS API (Apache-2.0)
+dev = ["jinja2>=3.1", "jsonschema>=4.23", "pytest>=8.0", "pytest-xdist>=3.6", "moto[secretsmanager]>=5.0"]   # xdist: parallel tests (MIT); moto: in-process AWS API (Apache-2.0)
 
 [build-system]
 requires = ["setuptools>=69"]
@@ -37,6 +37,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["permission_registry.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

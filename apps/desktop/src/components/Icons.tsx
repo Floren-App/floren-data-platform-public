@@ -62,3 +62,6 @@ export const IconApi = ({ size = 24 }: P) =>
   svg(size, <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z" /></>);
 export const IconLog = ({ size = 24 }: P) =>
   svg(size, <><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></>);
+
+export const IconPencil = ({ size = 24 }: P) =>
+  svg(size, <><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15z" /></>);

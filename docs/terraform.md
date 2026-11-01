@@ -79,6 +79,13 @@ The directory must recognize the automation identity. Select the owner group wit
 `owner_group_id` or `FDP_OWNER_GROUP_ID` when appropriate. See the
 [generated provider schema](reference/terraform/index.md).
 
+For scoped page gates, named actions and custom roles, use
+[`fdp_permission_assignment`](reference/terraform/fdp_permission_assignment.md) and
+[`fdp_custom_role`](reference/terraform/fdp_custom_role.md). See the
+[Dev network delegation example and migration limits](scoped-permissions.md).
+The [full permission matrix](permission-matrix.md) and [CSV](permission-matrix.csv)
+show the six common role bundles and which actions already have named checks.
+
 ## Separate configuration roots
 
 ```text

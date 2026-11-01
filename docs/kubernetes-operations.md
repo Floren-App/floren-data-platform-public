@@ -68,7 +68,7 @@ remove them. Edit the platform Secret (`fdp-control-plane`):
 
 | Key | New value in | Former value in | Remove the former value after |
 |---|---|---|---|
-| Session/execution token key | `FDP_SESSION_SIGNING_KEY` | `FDP_SESSION_SIGNING_PREVIOUS_KEYS` (comma-separated) | Tokens it signed expired: deployed apps hold tokens for up to 30 days, so redeploy them or wait |
+| Session/execution token key | `FDP_SESSION_SIGNING_KEY` | `FDP_SESSION_SIGNING_PREVIOUS_KEYS` (comma-separated) | Tokens it signed expired: deployed apps and editor proxy tickets can last 30 days; redeploy apps/restart editors or retain the old verification key until expiry |
 | Layer Trino token key (EC, PEM) | `FDP_TRINO_JWT_PRIVATE_KEY` | `FDP_TRINO_JWT_PREVIOUS_KEYS` (PEMs concatenated) | One hour (query tokens are short-lived) |
 
 ```sh

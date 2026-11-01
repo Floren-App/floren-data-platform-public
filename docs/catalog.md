@@ -22,12 +22,14 @@ object: it shows up in a product's lineage, but is not offered on its own.
   name, summary, owner group, domain, what is in it ("Dashboard · 2 tables"), certification,
   when it was last updated, and where you stand: *You have access*, *Partly* (some of it),
   *Request access*, *Requested*. **Only what I can use** narrows it to products you can fully
-  use. **My products** lists the ones your groups own.
+  use. **My products** is the owner workspace for the products your active group owns.
+  Publishing and management controls live there; browsing **Data products** stays focused
+  on discovery, available access options and requests, even for a product owner.
 - A **product page** has **Overview** (what it is, owner and steward, domain and
   classification, freshness and SLA, and what is in it with your access to each), **Lineage**
-  (from the sources, left, to the objects in the product, right; steps you cannot open are
-  dashed and show only their name, kind and owner), **Used by** (other products built on it)
-  and, for owners, **Permissions**. Columns, previews and SQL stay on each object's own page,
+  (links to the canonical lineage explorer for each object you can access), and **Used by**
+  (other products built on it). **Permissions**, alerts and product editing appear only
+  when owners open a product through **My products**. Columns, previews and SQL stay on each object's own page,
   for people with access.
 
 ### Access options
@@ -36,7 +38,11 @@ A product can offer several ways to use it, each with its own **masks** (on tabl
 `hash`, `redact`, `partial`, `null` or an expression) and **row filters** (per table), for
 example *Masked* (email hashed), *Own region* (rows of your region) and *Full*. One option is
 the default. A request asks for an option; owners can move a consuming group to another option
-or give a group access directly on the **Access options** tab.
+or give a group access in **My products → Access options**. Each row lists its groups
+separated by commas. The pencil at the end of the row opens **Manage product access**:
+all consuming groups, their option dropdowns, removal buttons and the add-group form.
+Changes take effect immediately; policy-protected changes still require an approved form.
+Catalog browsing shows the available options without these management controls.
 
 The options' masks and filters apply to people who reach a table only through data products.
 Someone who can read the table's schema directly is not limited by a product option. Reaching a

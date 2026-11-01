@@ -179,3 +179,16 @@ python3 examples/pokemon/validate.py  # copied files, temporary provider, backen
 
 The tests execute the SCD2 window SQL against an isolated SQLite fixture and parse every model/test
 as Trino SQL; they do not substitute for a real Trino/dbt deployment run.
+
+## Streaming prices and separated demo groups
+
+See [the full demo walkthrough and access matrices](../../docs/pokemon-demo.md).
+The optional Kafka publisher emits labelled **synthetic** EUR card quotes. A
+continuous managed consumer lands them in `pokemon_prices.price_events`; dbt
+materializes `pokemon_market.card_prices_current`, keeping price-only consumers
+away from the personal card schema. Run price bootstrap before enabling the sink.
+Airflow publishes, waits for durable rows and builds/tests the price product every
+two minutes. The explorer passes the viewer token with every query and does not
+cache results across viewers. Test engineers, production releases, product owners,
+stream operators, analysts, viewers, privacy and network operators have distinct
+grants; page visibility is configured with explicit Terraform page permissions.

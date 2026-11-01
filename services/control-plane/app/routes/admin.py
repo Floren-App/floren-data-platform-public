@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ..auth import User, require_admin
 from .. import settings_access
 from ..db import get_db
-from ..deps import get_orchestrator, get_secret_store
+from ..deps import get_actor, get_orchestrator, get_secret_store
 from ..models import AuditEvent, ComputePool, DataSource, Resource, CredentialLease, SqlQuery, Run, utcnow
 from ..orchestrator import Orchestrator
 from ..schemas import DataSourceIn, DataSourceOut, GrantIn, PoolIn, PoolOut
@@ -208,14 +208,14 @@ class WorkspaceSettingsIn(BaseModel):
 
 
 @router.get("/settings/workspaces")
-def workspace_settings(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-pools", "view"))):
+def workspace_settings(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-pools", "compute.defaults.read"))):
     from .. import capacity
     return {**capacity.workspace_settings(db), "running": capacity.workspaces_running(db),
             "queued": len(capacity.workspace_queue(db))}
 
 
 @router.put("/settings/workspaces")
-def set_workspace_settings(body: WorkspaceSettingsIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "manage"))):
+def set_workspace_settings(body: WorkspaceSettingsIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "compute.defaults.limits.set"))):
     from ..models import PlatformSetting
     from .. import capacity
     chosen = db.scalar(select(ComputePool).where(ComputePool.name == body.warehouse)) if body.warehouse else None
@@ -234,7 +234,7 @@ def set_workspace_settings(body: WorkspaceSettingsIn, db: Session = Depends(get_
 
 
 @router.delete("/settings/workspaces", status_code=204)
-def reset_workspace_settings(db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "manage"))):
+def reset_workspace_settings(db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "compute.defaults.limits.reset"))):
     """Back to the installation defaults: no workspace warehouse, no total limit, the Helm per-person limit."""
     from ..models import PlatformSetting
     from .. import capacity
@@ -260,7 +260,7 @@ def _scoped_out(db: Session, entry: dict) -> dict:
 
 @router.get("/settings/default-warehouse")
 def default_warehouse_setting(layer_id: Optional[str] = None, workload_kind: Optional[str] = None,
-                              db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-pools", "view"))):
+                              db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-pools", "compute.defaults.read"))):
     """Where work without a warehouse runs, and what warehouse choices start with. With layer_id and/or
     workload_kind: that scoped default only (null when none is set). Without: the installation default and
     every scoped default."""
@@ -277,7 +277,7 @@ def default_warehouse_setting(layer_id: Optional[str] = None, workload_kind: Opt
 
 
 @router.put("/settings/default-warehouse")
-def set_default_warehouse(body: DefaultWarehouseIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "manage"))):
+def set_default_warehouse(body: DefaultWarehouseIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "compute.defaults.warehouse.set"))):
     from ..models import PlatformSetting
     from .. import capacity
     pool = db.scalar(select(ComputePool).where(ComputePool.name == body.name))
@@ -313,7 +313,7 @@ def set_default_warehouse(body: DefaultWarehouseIn, db: Session = Depends(get_db
 
 @router.delete("/settings/default-warehouse", status_code=204)
 def clear_default_warehouse(layer_id: Optional[str] = None, workload_kind: Optional[str] = None,
-                            db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "manage"))):
+                            db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "compute.defaults.warehouse.reset"))):
     """Clear the installation default, or with layer_id and/or workload_kind only that scoped default."""
     from ..models import PlatformSetting
     from .. import capacity
@@ -343,21 +343,30 @@ class EgressAllowlistIn(BaseModel):
     hosts: List[EgressHostIn] = Field(default_factory=list, max_length=500)
 
 
-def _egress_out(db: Session) -> dict:
+def _egress_out(db: Session, layer_id=None) -> dict:
     from .. import egress
     from ..config import get_settings
-    return {"hosts": egress.hosts(db), "proxy": bool(get_settings().egress_proxy_url)}
+    return {"hosts": egress.hosts(db, layer_id), "proxy": bool(get_settings().egress_proxy_url), "layer_id": layer_id}
 
 
 @router.get("/settings/egress")
-def egress_allowlist(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-network", "view"))):
+def egress_allowlist(layer_id: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Host names VS Code and RStudio may reach over HTTPS; proxy says whether the installation runs the proxy."""
-    return _egress_out(db)
+    if layer_id:
+        from ..layers import require_layer
+        layer_id = require_layer(db, layer_id).id
+    settings_access.require(db, user, "set-network", "network.editor_allowlist.read", layer_id)
+    return _egress_out(db, layer_id)
 
 
 @router.put("/settings/egress")
-def set_egress_allowlist(body: EgressAllowlistIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-network", "manage"))):
+def set_egress_allowlist(body: EgressAllowlistIn, layer_id: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     from .. import egress
+    if layer_id:
+        from ..layers import require_layer
+        layer_id = require_layer(db, layer_id).id
+    action = "network.editor_allowlist.apply" if layer_id else "network.editor_allowlist.ceiling.change"
+    admin = settings_access.require(db, user, "set-network", action, layer_id)
     entries, seen = [], set()
     for item in body.hosts:
         host = item.host.strip().lower().rstrip(".")
@@ -369,12 +378,16 @@ def set_egress_allowlist(body: EgressAllowlistIn, db: Session = Depends(get_db),
                                      "package repository (Packages), where Publishers import what is needed")
         if host in seen:
             raise HTTPException(422, f"{host} is listed twice")
+        if layer_id and not egress.within_ceiling(db, host):
+            raise HTTPException(422, "layer host rules cannot exceed the platform network ceiling")
         seen.add(host)
         entries.append({"host": host, "description": item.description.strip()})
-    egress.set_hosts(db, entries)
-    audit(db, admin.username, "settings.egress", egress.KEY, hosts=[e["host"] for e in entries])
+    if layer_id and {h["host"] for h in egress.hosts(db, layer_id)} - seen:
+        settings_access.require(db, user, "set-network", "network.editor_allowlist.delete", layer_id)
+    egress.set_hosts(db, entries, layer_id)
+    audit(db, admin.username, "settings.egress", egress.KEY, layer_id=layer_id, hosts=[e["host"] for e in entries])
     db.commit()
-    return _egress_out(db)
+    return _egress_out(db, layer_id)
 
 
 def _scope(db: Session, name: str, body: PoolIn, engines: List[str]):
@@ -415,16 +428,20 @@ def _scope(db: Session, name: str, body: PoolIn, engines: List[str]):
 
 
 @router.get("/pools", response_model=List[PoolOut])
-def list_pools(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-pools", "view"))):
+def list_pools(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-pools", "compute.pools.list"))):
     from .common import describe_pools
     return describe_pools(db, db.scalars(select(ComputePool).order_by(ComputePool.cpu)))
 
 
 @router.put("/pools/{name}", response_model=PoolOut)
-def upsert_pool(name: str, body: PoolIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "manage"))):
+def upsert_pool(name: str, body: PoolIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "compute.pools.capacity.set"))):
     if body.name != name:
         raise HTTPException(422, "name in path and body differ")
     pool = db.scalar(select(ComputePool).where(ComputePool.name == name)) or ComputePool()
+    if not pool.id:
+        settings_access.require(db, admin, "set-pools", "compute.pools.create")
+    if pool.id and set(body.allowed_groups) != set(pool.allowed_groups or []):
+        settings_access.require(db, admin, "set-pools", "compute.pools.roles.assign")
     from ..layer_infrastructure import MIN_WORKER_MEMORY_GB, trino_workers
     engines = [layer.name for layer, warehouse, _ in trino_workers(db) if warehouse == name]
     if engines and body.memory_gb < MIN_WORKER_MEMORY_GB:
@@ -442,8 +459,8 @@ def upsert_pool(name: str, body: PoolIn, db: Session = Depends(get_db), admin: U
     values = body.model_dump()
     values["layer_ids"], values["workload_kinds"] = _scope(db, name, body, engines)
     if not pool.id:
-        from ..ownership import require_create
-        pool.owner_group_id = require_create(db,admin).id
+        from ..ownership import owner_group
+        pool.owner_group_id = owner_group(db,admin).id
     for field, value in values.items():
         setattr(pool, field, value)
     db.add(pool)
@@ -453,7 +470,7 @@ def upsert_pool(name: str, body: PoolIn, db: Session = Depends(get_db), admin: U
 
 
 @router.delete("/pools/{name}", status_code=204)
-def delete_pool(name: str, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "manage"))):
+def delete_pool(name: str, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-pools", "compute.pools.delete"))):
     pool = db.scalar(select(ComputePool).where(ComputePool.name == name))
     if not pool:
         raise HTTPException(404, "pool not found")
@@ -478,7 +495,7 @@ def delete_pool(name: str, db: Session = Depends(get_db), admin: User = Depends(
 
 @router.get("/audit")
 def audit_log(limit: int = 200, actor: str = "", action: str = "", target: str = "",
-              db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-auditlog", "view"))):
+              db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-auditlog", "audit.read"))):
     """The newest events first; filter by who (part of the name), action (prefix) and object (its ID)."""
     query = select(AuditEvent).order_by(AuditEvent.id.desc())
     if actor:

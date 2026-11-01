@@ -38,6 +38,9 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
     from ..runtimes import r_enabled
     from ..app_profiles import acting_as_admin, features_for, profile_for, FEATURES
     from ..settings_access import granted as settings_granted
+    from .. import page_access, permissions
+    selected_layer = active_layer(db, user)
+    pages = page_access.granted(db, user, selected_layer)
     profile = profile_for(db, user)
     app_features = [f for f in FEATURES if f in features_for(db, user)]
     db.commit()
@@ -47,7 +50,10 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
         app_features=app_features,
         compliance_roles=compliance_roles(db, user),
         acting_admin=acting_as_admin(user),
-        settings=settings_granted(db, user),
+        settings=settings_granted(db, user, selected_layer),
+        pages=pages,
+        permission_grants=[{"target_id": g.target_id, "namespace": g.namespace, "layer_id": g.layer_id,
+                            "actions": sorted(permissions.grant_actions(db, g))} for g in permissions.grants(db, user)],
         principal_id=user.principal_id, active_group_id=user.active_group_id or None,
         active_layer_id=active_layer(db, user),
         available_groups=[{"id":g.id,"name":g.name,"system":g.id == GLOBAL_ADMIN}

@@ -1,0 +1,23 @@
+version: 2
+sources:
+  - name: pokemon_prices
+    database: "{{ target.database }}"
+    schema: "{{ env_var('POKEMON_PRICE_SCHEMA', 'pokemon_prices') }}"
+    tables:
+      - name: price_events
+models:
+  - name: card_prices_current
+    description: Latest synthetic demo quote per card; transport and producer retries collapse.
+    columns:
+      - name: card_id
+        tests: [unique, not_null]
+      - name: event_id
+        tests: [unique, not_null]
+      - name: price_source
+        tests:
+          - accepted_values:
+              values: [synthetic_demo]
+      - name: currency
+        tests:
+          - accepted_values:
+              values: [EUR]

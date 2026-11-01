@@ -1446,19 +1446,6 @@
         "title": "Governance",
         "type": "object"
       },
-      "GrantIn": {
-        "properties": {
-          "group": {
-            "title": "Group",
-            "type": "string"
-          }
-        },
-        "required": [
-          "group"
-        ],
-        "title": "GrantIn",
-        "type": "object"
-      },
       "GroupIn": {
         "additionalProperties": false,
         "properties": {
@@ -1773,10 +1760,11 @@
       },
       "KafkaInfrastructure": {
         "additionalProperties": false,
-        "description": "Opt-in Strimzi/KRaft cluster. The image must contain FDP's policy authorizer.",
+        "description": "Built-in layer capability; running controls broker compute, never availability.",
         "properties": {
           "enabled": {
-            "default": false,
+            "const": true,
+            "default": true,
             "title": "Enabled",
             "type": "boolean"
           },
@@ -1802,6 +1790,11 @@
             ],
             "title": "Replicas",
             "type": "integer"
+          },
+          "running": {
+            "default": false,
+            "title": "Running",
+            "type": "boolean"
           },
           "size": {
             "default": "20Gi",
@@ -1853,6 +1846,19 @@
           }
         },
         "title": "KafkaInfrastructure",
+        "type": "object"
+      },
+      "KafkaRunning": {
+        "properties": {
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "running"
+        ],
+        "title": "KafkaRunning",
         "type": "object"
       },
       "KindUse": {
@@ -2524,6 +2530,23 @@
           "is_admin": {
             "title": "Is Admin",
             "type": "boolean"
+          },
+          "pages": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "description": "Explicit Viewer gates for every desktop page",
+            "title": "Pages",
+            "type": "object"
+          },
+          "permission_grants": {
+            "description": "Effective named capabilities and their target/layer scopes",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Permission Grants",
+            "type": "array"
           },
           "pools": {
             "items": {
@@ -4350,35 +4373,6 @@
           "name"
         ],
         "title": "ResourceIn",
-        "type": "object"
-      },
-      "RoleIn": {
-        "additionalProperties": false,
-        "properties": {
-          "app_group_id": {
-            "maxLength": 12,
-            "minLength": 1,
-            "title": "App Group Id",
-            "type": "string"
-          },
-          "role": {
-            "enum": [
-              "compliance_reviewer",
-              "membership_approver",
-              "compliance_admin"
-            ],
-            "title": "Role",
-            "type": "string"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/ScopeIn"
-          }
-        },
-        "required": [
-          "role",
-          "app_group_id"
-        ],
-        "title": "RoleIn",
         "type": "object"
       },
       "RuleIn": {
@@ -7167,6 +7161,35 @@
         "title": "PolicyIn",
         "type": "object"
       },
+      "app__routes__compliance__RoleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "app_group_id": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "App Group Id",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "compliance_reviewer",
+              "membership_approver",
+              "compliance_admin"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ScopeIn"
+          }
+        },
+        "required": [
+          "role",
+          "app_group_id"
+        ],
+        "title": "RoleIn",
+        "type": "object"
+      },
       "app__routes__data_policies__PolicyIn": {
         "properties": {
           "column": {
@@ -7310,6 +7333,117 @@
         "title": "QueryIn",
         "type": "object"
       },
+      "app__routes__permissions__GrantIn": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "app_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Group Id"
+          },
+          "custom_role_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Role Id"
+          },
+          "layer_id": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layer Id"
+          },
+          "namespace": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Namespace",
+            "type": "string"
+          },
+          "principal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Principal Id"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "target_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Target Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_id",
+          "namespace"
+        ],
+        "title": "GrantIn",
+        "type": "object"
+      },
+      "app__routes__permissions__RoleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Actions",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "actions"
+        ],
+        "title": "RoleIn",
+        "type": "object"
+      },
       "app__routes__products__DecisionIn": {
         "additionalProperties": false,
         "properties": {
@@ -7361,6 +7495,19 @@
           "sql"
         ],
         "title": "QueryIn",
+        "type": "object"
+      },
+      "app__schemas__GrantIn": {
+        "properties": {
+          "group": {
+            "title": "Group",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group"
+        ],
+        "title": "GrantIn",
         "type": "object"
       }
     }
@@ -8779,7 +8926,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GrantIn"
+                "$ref": "#/components/schemas/app__schemas__GrantIn"
               }
             }
           },
@@ -10787,6 +10934,22 @@
         "operationId": "get_v1_admin_settings_egress",
         "parameters": [
           {
+            "in": "query",
+            "name": "layer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Layer Id"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -10847,6 +11010,22 @@
       "put": {
         "operationId": "put_v1_admin_settings_egress",
         "parameters": [
+          {
+            "in": "query",
+            "name": "layer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Layer Id"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
@@ -18278,7 +18457,6 @@
     },
     "/v1/compliance/policies": {
       "get": {
-        "description": "The grid: layers \u00d7 classifications, with the policy of each filled cell.",
         "operationId": "get_v1_compliance_policies",
         "parameters": [
           {
@@ -18760,7 +18938,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RoleIn"
+                "$ref": "#/components/schemas/app__routes__compliance__RoleIn"
               }
             }
           },
@@ -20749,6 +20927,88 @@
           }
         },
         "summary": "Get Cluster",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/clusters/{ident}/running": {
+      "put": {
+        "operationId": "put_v1_kafka_clusters_ident_running",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KafkaRunning"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Running",
         "tags": [
           "kafka"
         ]
@@ -23310,6 +23570,737 @@
         "summary": "Yank",
         "tags": [
           "packages"
+        ]
+      }
+    },
+    "/v1/permissions/assignments": {
+      "post": {
+        "operationId": "post_v1_permissions_assignments",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routes__permissions__GrantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/v1/permissions/assignments/{ident}": {
+      "delete": {
+        "operationId": "delete_v1_permissions_assignments_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove",
+        "tags": [
+          "permissions"
+        ]
+      },
+      "get": {
+        "operationId": "get_v1_permissions_assignments_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read",
+        "tags": [
+          "permissions"
+        ]
+      },
+      "put": {
+        "operationId": "put_v1_permissions_assignments_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routes__permissions__GrantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update",
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/v1/permissions/capabilities": {
+      "get": {
+        "operationId": "get_v1_permissions_capabilities",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "title": "Target Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "layer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Layer Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Capabilities",
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/v1/permissions/registry": {
+      "get": {
+        "operationId": "get_v1_permissions_registry",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Registry",
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/v1/permissions/roles": {
+      "post": {
+        "operationId": "post_v1_permissions_roles",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routes__permissions__RoleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Role",
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/v1/permissions/roles/{ident}": {
+      "delete": {
+        "operationId": "delete_v1_permissions_roles_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Role",
+        "tags": [
+          "permissions"
+        ]
+      },
+      "get": {
+        "operationId": "get_v1_permissions_roles_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Role",
+        "tags": [
+          "permissions"
+        ]
+      },
+      "put": {
+        "operationId": "put_v1_permissions_roles_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routes__permissions__RoleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Role",
+        "tags": [
+          "permissions"
         ]
       }
     },

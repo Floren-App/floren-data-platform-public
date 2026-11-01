@@ -54,7 +54,7 @@ def test_each_access_and_administration_page_is_granted_on_its_own(client):
     # Manager on compliance forms is not Manager on classifications.
     levels = client.get("/v1/catalog/classifications", headers=as_("bob")).json()["levels"]
     refused = client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels})
-    assert refused.status_code == 403 and "Manager on Classifications" in refused.text
+    assert refused.status_code == 403 and "classification.dictionary.publish" in refused.text
     # Viewer on the audit log reads it and changes nothing.
     grant_group(client, "set-auditlog", "Auditors", "Viewer", users=["ana"])
     assert client.get("/v1/admin/audit", headers=as_("ana")).status_code == 200
@@ -126,8 +126,7 @@ def test_an_administrator_sees_the_pages_of_the_group_they_act_as(client):
     assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": office}).status_code == 200
     acting = client.get("/v1/me", headers=as_("admin")).json()
     assert not acting["acting_admin"] and acting["compliance_roles"] == ["compliance_admin"]
-    assert set(acting["settings"]) == {"set-classes", "set-policies", "set-forms", "set-duties"}
-    # The API still lets administrators do everything.
-    assert client.get("/v1/admin/audit", headers=as_("admin")).status_code == 200
+    assert acting["settings"] == {}  # legacy compliance_admin is not a page grant
+    assert client.get("/v1/admin/audit", headers=as_("admin")).status_code == 403
     assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": "000000000001"}).status_code == 200
     assert len(client.get("/v1/me", headers=as_("admin")).json()["settings"]) == 16

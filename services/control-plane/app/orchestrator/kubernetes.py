@@ -38,6 +38,17 @@ def _scheduling(message: str) -> str:
 
 
 class KubernetesOrchestrator:
+    def execution_addresses(self, ref: str) -> List[str]:
+        try:
+            pod = self.core.read_namespaced_pod(*reversed(self._split(ref)))
+        except ApiException as exc:
+            if exc.status == 404:
+                return []
+            raise
+        if not pod.status or pod.status.phase != "Running":
+            return []
+        return [ip.ip for ip in (pod.status.pod_ips or []) if ip.ip] or ([pod.status.pod_ip] if pod.status.pod_ip else [])
+
     def inventory(self) -> List[dict]:
         items = []
         for namespace in [self.ns, *self.layer_namespaces()]:

@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
+| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
-| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -248,6 +248,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `GET` | `/v1/kafka/clusters` | Clusters |
 | `GET` | `/v1/kafka/clusters/{ident}` | Get Cluster |
 | `DELETE` | `/v1/kafka/clusters/{ident}` | Unregister Cluster |
+| `PUT` | `/v1/kafka/clusters/{ident}/running` | Set Running |
 | `POST` | `/v1/kafka/clusters/{layer_id}` | Register Cluster |
 | `GET` | `/v1/kafka/resolve` | Resolve Topic |
 | `GET` | `/v1/kafka/topics` | Topics |
@@ -351,6 +352,21 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/packages/{kind}/{name}/versions/{version}/yank` | Yank |
 | `DELETE` | `/v1/packages/{kind}/{name}/versions/{version}/yank` | Unyank |
 
+## permissions
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/permissions/assignments` | Create |
+| `GET` | `/v1/permissions/assignments/{ident}` | Read |
+| `PUT` | `/v1/permissions/assignments/{ident}` | Update |
+| `DELETE` | `/v1/permissions/assignments/{ident}` | Remove |
+| `GET` | `/v1/permissions/capabilities` | Capabilities |
+| `GET` | `/v1/permissions/registry` | Registry |
+| `POST` | `/v1/permissions/roles` | Create Role |
+| `GET` | `/v1/permissions/roles/{ident}` | Read Role |
+| `PUT` | `/v1/permissions/roles/{ident}` | Update Role |
+| `DELETE` | `/v1/permissions/roles/{ident}` | Remove Role |
+
 ## runs
 
 | Method | Path | Purpose |
@@ -369,8 +385,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `GET` | `/v1/sql/pages/{token}` | Page |
 | `DELETE` | `/v1/sql/pages/{token}` | Page |
+| `GET` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

@@ -1,5 +1,10 @@
 # RBAC
 
+For named actions, page gates, layer-scoped grants and migration status, see
+[Scoped permissions and Terraform](scoped-permissions.md) and the
+[full role/action matrix](permission-matrix.md). The common-role migration is in progress;
+the resource roles below still describe the workload/data/API model in use.
+
 See [active groups and ownership](active-groups.md) for primary-group creation,
 secondary-group access and the protected Global Admin group.
 
@@ -74,8 +79,10 @@ resource "fdp_role_assignment" "privacy_forms" {
 
 The whole of Administration is `admin-root`. The app shows the pages you hold a role on; the API
 checks the same roles. A platform administrator with another group than Global Admin active sees
-what their groups were given, like the app profile: as the privacy office, only the Privacy pages. The earlier **compliance administrator** role still counts as Manager on the
-Privacy pages. Group owners still manage their own groups, and review duties stay scoped duties.
+what their groups were explicitly given; backend administrator privileges are reduced in that
+context too. The earlier **compliance administrator** role no longer grants page visibility or
+Privacy administration rights. Assign explicit page and capability grants. Group owners still
+manage their own groups, and review duties stay scoped duties.
 IdP identities and memberships carry **IdP · SCIM/OIDC** labels and are read-only here;
 application groups and managed service identities carry **App-managed** labels.
 

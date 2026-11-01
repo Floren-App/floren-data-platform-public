@@ -154,7 +154,9 @@
         "POKEMON_SETS": "base1,base2",
         "POKEMON_RAW_SCHEMA": "pokemon_raw",
         "POKEMON_HISTORY_SCHEMA": "pokemon_history",
-        "POKEMON_PRODUCT_SCHEMA": "reporting"
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_PRODUCT_SCHEMA": "pokemon_market"
       },
       "kind": "app",
       "entrypoint": "dashboards/cards.py",
@@ -194,7 +196,8 @@
         "POKEMON_SETS": "base1,base2",
         "POKEMON_RAW_SCHEMA": "pokemon_raw",
         "POKEMON_HISTORY_SCHEMA": "pokemon_history",
-        "POKEMON_PRODUCT_SCHEMA": "reporting"
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_STREAMING_ENABLED": "false"
       },
       "kind": "airflow",
       "entrypoint": "airflow",
@@ -355,7 +358,9 @@
         "POKEMON_SETS": "base1,base2",
         "POKEMON_RAW_SCHEMA": "pokemon_raw",
         "POKEMON_HISTORY_SCHEMA": "pokemon_history",
-        "POKEMON_PRODUCT_SCHEMA": "reporting"
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_PRODUCT_SCHEMA": "pokemon_market"
       },
       "kind": "app",
       "entrypoint": "dashboards/cards.py",
@@ -395,7 +400,8 @@
         "POKEMON_SETS": "base1,base2",
         "POKEMON_RAW_SCHEMA": "pokemon_raw",
         "POKEMON_HISTORY_SCHEMA": "pokemon_history",
-        "POKEMON_PRODUCT_SCHEMA": "reporting"
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_STREAMING_ENABLED": "false"
       },
       "kind": "airflow",
       "entrypoint": "airflow",
@@ -403,6 +409,314 @@
         "mode": "standalone"
       },
       "description": "API \u2192 S3 \u2192 raw \u2192 dbt build/tests \u2192 process history; one active run"
+    },
+    "price-bootstrap-test": {
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-test",
+        "POKEMON_PRICE_PRODUCT_SCHEMA": "pokemon_market"
+      },
+      "entrypoint": "streaming/bootstrap.py",
+      "data_sources": [
+        "lake"
+      ],
+      "description": "Synthetic demo EUR quote price-bootstrap"
+    },
+    "price-publish-test": {
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-test"
+      },
+      "entrypoint": "streaming/publish.py",
+      "data_sources": [],
+      "description": "Synthetic demo EUR quote price-publish",
+      "requirements": "streaming/requirements.txt",
+      "args": [
+        {
+          "name": "run_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "observed_at",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "price-sink-test": {
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-test"
+      },
+      "entrypoint": "streaming/land.py",
+      "data_sources": [
+        "lake"
+      ],
+      "description": "Synthetic demo EUR quote price-sink",
+      "requirements": "streaming/requirements.txt",
+      "kind": "stream"
+    },
+    "price-models-test": {
+      "warehouse": "small",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-test",
+        "POKEMON_PRICE_PRODUCT_SCHEMA": "pokemon_market"
+      },
+      "kind": "dbt",
+      "entrypoint": "dbt/prices",
+      "dbt": {
+        "data_source": "lake",
+        "schema": "pokemon_market",
+        "dev_schema": "dbt_{user}",
+        "threads": 2
+      },
+      "description": "Full observed SCD2, nested records, file evidence and tested analyst products"
+    },
+    "price-bootstrap-prod": {
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-prod",
+        "POKEMON_PRICE_PRODUCT_SCHEMA": "pokemon_market"
+      },
+      "entrypoint": "streaming/bootstrap.py",
+      "data_sources": [
+        "lake-prod"
+      ],
+      "description": "Synthetic demo EUR quote price-bootstrap"
+    },
+    "price-publish-prod": {
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-prod"
+      },
+      "entrypoint": "streaming/publish.py",
+      "data_sources": [],
+      "description": "Synthetic demo EUR quote price-publish",
+      "requirements": "streaming/requirements.txt",
+      "args": [
+        {
+          "name": "run_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "observed_at",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "price-sink-prod": {
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-prod"
+      },
+      "entrypoint": "streaming/land.py",
+      "data_sources": [
+        "lake-prod"
+      ],
+      "description": "Synthetic demo EUR quote price-sink",
+      "requirements": "streaming/requirements.txt",
+      "kind": "stream"
+    },
+    "price-models-prod": {
+      "warehouse": "small",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-prod",
+        "POKEMON_PRICE_PRODUCT_SCHEMA": "pokemon_market"
+      },
+      "kind": "dbt",
+      "entrypoint": "dbt/prices",
+      "dbt": {
+        "data_source": "lake-prod",
+        "schema": "pokemon_market",
+        "dev_schema": "dbt_{user}",
+        "threads": 2
+      },
+      "description": "Full observed SCD2, nested records, file evidence and tested analyst products"
+    },
+    "price-await-test": {
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-test"
+      },
+      "entrypoint": "streaming/await_quotes.py",
+      "data_sources": [
+        "lake"
+      ],
+      "description": "Wait for this run to land durably before publishing its price table",
+      "args": [
+        {
+          "name": "run_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "observed_at",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "price-await-prod": {
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-prod"
+      },
+      "entrypoint": "streaming/await_quotes.py",
+      "data_sources": [
+        "lake-prod"
+      ],
+      "description": "Wait for this run to land durably before publishing its price table",
+      "args": [
+        {
+          "name": "run_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "observed_at",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "price-monitor-test": {
+      "kind": "app",
+      "entrypoint": "dashboards/prices.py",
+      "layer": "Non-Prod",
+      "env": {
+        "POKEMON_ENV": "test",
+        "POKEMON_SOURCE": "lake",
+        "POKEMON_LANDING": "pokemon-landing-test",
+        "POKEMON_API": "tcgdex-test",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-test",
+        "POKEMON_PRICE_PRODUCT_SCHEMA": "pokemon_market"
+      },
+      "data_sources": [
+        "lake"
+      ],
+      "description": "Operator-only synthetic quote history, landed offsets and replay evidence"
+    },
+    "price-monitor-prod": {
+      "kind": "app",
+      "entrypoint": "dashboards/prices.py",
+      "layer": "Prod",
+      "env": {
+        "POKEMON_ENV": "prod",
+        "POKEMON_SOURCE": "lake-prod",
+        "POKEMON_LANDING": "pokemon-landing-prod",
+        "POKEMON_API": "tcgdex-prod",
+        "POKEMON_SETS": "base1,base2",
+        "POKEMON_RAW_SCHEMA": "pokemon_raw",
+        "POKEMON_HISTORY_SCHEMA": "pokemon_history",
+        "POKEMON_PRODUCT_SCHEMA": "reporting",
+        "POKEMON_PRICE_SCHEMA": "pokemon_prices",
+        "POKEMON_PRICE_TOPIC": "pokemon-card-prices-prod",
+        "POKEMON_PRICE_PRODUCT_SCHEMA": "pokemon_market"
+      },
+      "data_sources": [
+        "lake-prod"
+      ],
+      "description": "Operator-only synthetic quote history, landed offsets and replay evidence"
     }
   }
 }

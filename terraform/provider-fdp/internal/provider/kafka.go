@@ -45,7 +45,7 @@ func (r *kafkaResource) Metadata(_ context.Context, req resource.MetadataRequest
 }
 func (r *kafkaResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	if r.cluster {
-		resp.Schema = schema.Schema{Description: "Register a layer's managed Kafka for topic IAM. Enable infrastructure.kafka on fdp_layer first. Destroy unregisters metadata only; brokers and storage are retained. Import by ID.", Attributes: map[string]schema.Attribute{
+		resp.Schema = schema.Schema{Description: "Manage the built-in layer Kafka registration. Broker compute is controlled by infrastructure.kafka.running on fdp_layer. Destroy removes it from state only; the layer capability, permissions and storage remain. Import by ID.", Attributes: map[string]schema.Attribute{
 			"id":       schema.StringAttribute{Computed: true, PlanModifiers: keepComputed},
 			"layer_id": schema.StringAttribute{Required: true, PlanModifiers: replaceString},
 		}}
@@ -205,6 +205,9 @@ func (r *kafkaResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 func (r *kafkaResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	if r.cluster {
+		return
+	} // Built-in layer capability; never unregister or destroy storage.
 	var id string
 	root := "/v1/kafka/topics/"
 	if r.cluster {

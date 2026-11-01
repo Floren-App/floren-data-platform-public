@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, AccessResource, inLayer } from "../api";
+import { can } from "../permissions";
 import type { Hub } from "../hub";
 import type { TabRef } from "./Tabs";
 import { ObjectTabs, PermissionsPanel, resourceTab } from "../components/Permissions";
@@ -10,23 +11,9 @@ import { ObjectLineage } from "../components/ObjectLineage";
 
 export function KafkaClustersView({ hub, openTab }: { hub: Hub; openTab: (t: TabRef) => void }) {
   const clusters = hub.resources.filter((r) => r.kind === "kafka");
-  const [registering, setRegistering] = useState(false);
-  const [chosen, setLayer] = useState("");
-  const free = hub.layers.filter((l) => !clusters.some((r) => r.layer_id === l.id));
-  const layer = chosen || (free.some((l) => l.id === hub.layerId) ? hub.layerId : "");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  return <><PageHeader icon={<ProductIcon kind="kafka" size={22} />} title="Kafka" subtitle="Managed Kafka per layer. Open a cluster to browse its topics; grants on a cluster apply to all of its topics."
-      actions={hub.me?.is_admin && <button className="btn secondary" onClick={() => setRegistering(!registering)}>Register Kafka</button>} />
-    {registering && <form className="card" onSubmit={async (e) => {
-      e.preventDefault(); setBusy(true); setError("");
-      try { const result = await api.kafka.register(layer); await hub.refresh(); setRegistering(false); openTab(resourceTab(result)); }
-      catch (e) { setError((e as Error).message); } finally { setBusy(false); }
-    }}><h2>Register managed Kafka</h2><p className="muted">Enable Kafka in this layer’s infrastructure with OpenTofu first. Registration makes its topics available for IAM and browsing.</p>
-      <label>Layer<select required value={layer} onChange={(e) => setLayer(e.target.value)}><option value="">Choose a layer</option>{free.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-      {error && <p className="error" role="alert">{error}</p>}<button className="btn" disabled={busy || !layer}>{busy ? "Registering…" : "Register"}</button></form>}
-    <table><thead><tr><th>Kafka cluster</th><th>Layer</th></tr></thead><tbody>{clusters.filter((r) => inLayer(hub.layerId, r.layer_id)).map((r) => <tr key={r.id}>
-      <td><button className="text-button object-name" onClick={() => openTab(resourceTab(r))}><ProductIcon kind="kafka" size={16} />{r.name}</button></td><td>{r.layer_name || "—"}</td>
+  return <><PageHeader icon={<ProductIcon kind="kafka" size={22} />} title="Kafka" subtitle="Kafka is built into every layer. Open a cluster to browse its topics; broker compute can be running or stopped." />
+    <table><thead><tr><th>Kafka cluster</th><th>Layer</th></tr></thead><tbody>{clusters.filter((resource) => inLayer(hub.layerId, resource.layer_id)).map((resource) => <tr key={resource.id}>
+      <td><button className="text-button object-name" onClick={() => openTab(resourceTab(resource))}><ProductIcon kind="kafka" size={16} />{resource.name}</button></td><td>{resource.layer_name || "—"}</td>
     </tr>)}{!clusters.length && <tr><td colSpan={2} className="muted">No Kafka clusters you can access. Ask a cluster owner for access.</td></tr>}</tbody></table>
   </>;
 }
@@ -93,6 +80,11 @@ export function KafkaView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; openTa
         <button className="btn" disabled={busy}>Save settings</button>{" "}
         <button type="button" className="btn danger" disabled={busy} onClick={() => { if (confirm(`Delete topic ${resource.name} and its messages?`)) void change(async () => { await api.kafka.remove(resource.id); openTab({ kind: "kafka", ref: resource.parent_id!, title: "Kafka" }); }); }}>Delete topic</button>
       </form> : cluster ? <>
+        <p className="scope-note">Broker compute requested: <strong>{resource.config.running ? "Running" : "Stopped"}</strong>. Topics, permissions and storage remain when stopped.</p>
+        {can(hub.me, "layer_infrastructure.apply", "set-layers", resource.layer_id ?? String(resource.config.layer_id)) && <p>
+          <button className="btn secondary" disabled={busy || !resource.config.configured}
+            onClick={() => void change(() => api.kafka.setRunning(resource.id, !resource.config.running))}>{resource.config.running ? "Stop brokers" : "Start brokers"}</button>
+          {!resource.config.configured && <span className="hint">Configure the broker image and warehouse through layer infrastructure first.</span>}</p>}
         <div className="object-toolbar"><input type="search" placeholder="Find a topic…" aria-label="Find a topic" value={search} onChange={(e) => setSearch(e.target.value)} />
           <button className="btn secondary" disabled={busy} onClick={() => void change(async () => {})}>Refresh</button>
           {resource.actions.includes("ddl") && <button className="btn" onClick={() => setAdding(!adding)}>Create topic</button>}</div>

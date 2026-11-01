@@ -664,6 +664,27 @@ class ServiceRoleAssignment(Base):
     role: Mapped[str] = mapped_column(String(16))
 
 
+class PermissionGrant(Base):
+    """Explicit action grant; global, one layer, or explicitly all layers. No implicit wildcard."""
+    __tablename__ = "permission_grants"
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    target_id: Mapped[str] = mapped_column(String(256), index=True)
+    namespace: Mapped[str] = mapped_column(String(128), index=True)
+    layer_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    app_group_id: Mapped[Optional[str]] = mapped_column(ForeignKey("app_groups.id"), nullable=True, index=True)
+    principal_id: Mapped[Optional[str]] = mapped_column(ForeignKey("directory_principals.id"), nullable=True, index=True)
+    role: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    actions: Mapped[list] = mapped_column(JSON, default=list)
+    custom_role_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+
+
+class CustomPermissionRole(Base):
+    __tablename__ = "custom_permission_roles"
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    actions: Mapped[list] = mapped_column(JSON, default=list)
+
+
 class DataPolicy(Base):
     """A column mask or row filter on one table of a schema, enforced by the layer's Trino.
 

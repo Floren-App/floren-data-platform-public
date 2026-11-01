@@ -255,6 +255,8 @@ export interface Me {
   compliance_roles?: string[];
   /** Access and Administration pages this person may use: page id -> "view" or "manage". */
   settings?: Record<string, "view" | "manage">;
+  pages?: Record<string, boolean>;
+  permission_grants?: { target_id: string; namespace: string; layer_id: string | null; actions: string[] }[];
   /** A platform administrator with Global Admin active: the whole app. With another group active, the app is that group's. */
   acting_admin?: boolean;
   available_groups?: { id: string; name: string; system?: boolean }[];
@@ -820,6 +822,7 @@ export interface OrchestratorHistory { runs: OrchestratorRun[]; dags: string[] }
 
 export const api = {
   kafka: {
+    setRunning: (id: string, running: boolean) => request<unknown>("PUT", `/v1/kafka/clusters/${id}/running`, { running }),
     clusters: () => request<AccessResource[]>("GET", "/v1/kafka/clusters"),
     cluster: (id: string) => request<AccessResource>("GET", `/v1/kafka/clusters/${id}`),
     register: (layer: string) => request<AccessResource>("POST", `/v1/kafka/clusters/${layer}`),
@@ -1107,8 +1110,8 @@ export const api = {
     workspaceSettings: () => request<WorkspaceSettings>("GET", "/v1/admin/settings/workspaces"),
     saveWorkspaceSettings: (s: WorkspaceSettings) => request<WorkspaceSettings>("PUT", "/v1/admin/settings/workspaces",
       { warehouse: s.warehouse, max_running: s.max_running, max_running_per_user: s.max_running_per_user }),
-    egress: () => request<EgressAllowlist>("GET", "/v1/admin/settings/egress"),
-    saveEgress: (hosts: EgressHost[]) => request<EgressAllowlist>("PUT", "/v1/admin/settings/egress", { hosts }),
+    egress: (layer?: string) => request<EgressAllowlist>("GET", `/v1/admin/settings/egress${layer ? `?layer_id=${encodeURIComponent(layer)}` : ""}`),
+    saveEgress: (hosts: EgressHost[], layer?: string) => request<EgressAllowlist>("PUT", `/v1/admin/settings/egress${layer ? `?layer_id=${encodeURIComponent(layer)}` : ""}`, { hosts }),
     audit: (filters: { actor?: string; action?: string; target?: string } = {}) =>
       request<AuditEvent[]>("GET", `/v1/admin/audit?${new URLSearchParams({ limit: "200", ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) })}`),
   },

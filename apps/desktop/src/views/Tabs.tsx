@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { pageVisible, TAB_PAGES } from "../permissions";
 import { api, DataLocation, EDITOR_LABEL, inLayer, inLine, isActive, poolDot, poolInLayer, shortSha, openInWindow, OutputContent, OutputFile, Run, RunScope, runtimeLabel, WarehouseOccupant, WarehouseOverview } from "../api";
 import { DataObjectView } from "../components/DataBrowser";
 import type { Hub } from "../hub";
@@ -46,6 +47,8 @@ export interface TabRef {
   intent?: "create-folder" | "create" | "publish" | "request";
   /** Data products: the catalog object to publish (intent "publish"). */
   assetId?: string;
+  /** Owner workspace opened from My products, separate from catalog browsing. */
+  productManagement?: boolean;
   productSection?: "overview" | "options" | "lineage" | "used-by" | "permissions" | "alerts";
   catalogSection?: "overview" | "lineage" | "governance" | "sla" | "access" | "metrics";
   apiSection?: "operations" | "settings" | "calls" | "permissions";
@@ -67,12 +70,13 @@ interface Props {
 }
 
 export function TabContent({ tab, hub, openTab }: Props) {
+  if (!pageVisible(hub.me, TAB_PAGES[tab.kind])) return null;
   switch (tab.kind) {
     case "apis": return <ApisView direction={tab.ref === "external" ? "external" : "internal"} hub={hub} openTab={openTab} />;
     case "api": return <ApiView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
     case "catalog": return <CatalogView openTab={openTab} initialKind={tab.ref} initialQuery={tab.search} layerId={hub.layerId} />;
     case "products": return <ProductsView key={tab.ref ?? ""} tab={tab} hub={hub} openTab={openTab} />;
-    case "product": return <ProductView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
+    case "product": return <ProductView key={`${tab.ref}:${!!tab.productManagement}`} tab={tab} hub={hub} openTab={openTab} />;
     case "access-requests": return <AccessRequestsView key={tab.ref ?? ""} tab={tab} hub={hub} openTab={openTab} />;
     case "catalog-object": return <CatalogObject tab={tab} hub={hub} openTab={openTab} />;
     case "access": return <><AccessTab hub={hub} openTab={openTab} groupId={tab.ref} section={tab.groupSection ?? "members"} bindingPrincipalId={tab.bindingPrincipalId}
@@ -117,7 +121,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "docs": return <DocsTab runId={tab.ref!} />;
     case "admin-pools": return <><AdminPools hub={hub} /><SettingsPermissions page="set-pools" hub={hub} openTab={openTab} /></>;
     case "admin-workspace-templates": return <><AdminWorkspaceTemplates hub={hub} /><SettingsPermissions page="set-template" hub={hub} openTab={openTab} /></>;
-    case "admin-network": return <><AdminNetwork /><SettingsPermissions page="set-network" hub={hub} openTab={openTab} /></>;
+    case "admin-network": return <><AdminNetwork hub={hub} /><SettingsPermissions page="set-network" hub={hub} openTab={openTab} /></>;
     case "admin-query-log": return <><QueryLogView key={tab.search ?? ""} hub={hub} initialActor={tab.search} /><SettingsPermissions page="set-querylog" hub={hub} openTab={openTab} /></>;
     case "git-credentials": return <GitCredentialsTab sections={<WorkspaceSections active="git" openTab={openTab} />} />;
     case "packages": return <PackagesView key={tab.ref ?? "all"} hub={hub} openTab={openTab} kind={tab.ref as PackageKind | undefined} />;

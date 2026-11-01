@@ -420,7 +420,7 @@ def put_classifications(body: LevelsIn, db: Session = Depends(get_db), user: Use
     from .. import classification as levels
     from .. import settings_access
     from ..models import PlatformSetting
-    settings_access.require(db, user, "set-classes")
+    settings_access.require(db, user, "set-classes", "classification.dictionary.publish")
     new = levels.validate_levels(db, [l.model_dump() for l in body.levels])
     setting = db.get(PlatformSetting, levels.SETTING) or PlatformSetting(key=levels.SETTING, value={})
     before = levels.levels(db)

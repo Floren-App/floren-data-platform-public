@@ -196,3 +196,7 @@ artifacts or credentials. Before converting one:
 
 After new data writes begin, rolling back requires a coordinated restore. Reverting a
 Helm release alone cannot undo database migrations or data changes.
+
+Kafka is a built-in capability of every layer. Configure `kafka.running` to control
+broker compute without removing the cluster or its retained data. Legacy Kafka
+`enabled` input maps to running/stopped. See [Kafka operations](kafka-operations.md).

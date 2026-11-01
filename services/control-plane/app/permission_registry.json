@@ -1,0 +1,6133 @@
+{
+  "home.view": {
+    "description": "Open Home",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global page; scoped cards",
+    "target": "Home",
+    "area": "Navigation",
+    "constraint": "Cards, totals and notifications include authorized targets only."
+  },
+  "pages.view": {
+    "description": "Show navigation and open the named page",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One named page; optional layer restriction",
+    "target": "Every page and alias",
+    "area": "Navigation",
+    "constraint": "Page roles grant no permissions on objects inside the page."
+  },
+  "pages.roles.assign": {
+    "description": "Grant a role on this page",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One named page; optional layer restriction",
+    "target": "Every page and alias",
+    "area": "Navigation",
+    "constraint": "Page roles grant no permissions on objects inside the page."
+  },
+  "pages.roles.revoke": {
+    "description": "Revoke a role on this page",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One named page; optional layer restriction",
+    "target": "Every page and alias",
+    "area": "Navigation",
+    "constraint": "Page roles grant no permissions on objects inside the page."
+  },
+  "session.context.list": {
+    "description": "List eligible groups and layers",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Own session",
+    "target": "Active group and layer selector",
+    "area": "Navigation",
+    "constraint": "Only already authorized groups/layers can be selected; selection never grants rights."
+  },
+  "session.context.select": {
+    "description": "Select an eligible active group",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Own session",
+    "target": "Active group and layer selector",
+    "area": "Navigation",
+    "constraint": "Only already authorized groups/layers can be selected; selection never grants rights."
+  },
+  "session.context.select_layer": {
+    "description": "Select an eligible active layer",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Own session",
+    "target": "Active group and layer selector",
+    "area": "Navigation",
+    "constraint": "Only already authorized groups/layers can be selected; selection never grants rights."
+  },
+  "catalog.search": {
+    "description": "Search authorized catalog objects",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + authorized objects",
+    "target": "Catalog search and discovery",
+    "area": "Catalog",
+    "constraint": "Apply authorization before search, suggestions, pagination, counts and facets."
+  },
+  "catalog.suggest": {
+    "description": "Autocomplete authorized objects",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + authorized objects",
+    "target": "Catalog search and discovery",
+    "area": "Catalog",
+    "constraint": "Apply authorization before search, suggestions, pagination, counts and facets."
+  },
+  "catalog.view": {
+    "description": "Open authorized catalog object metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + authorized objects",
+    "target": "Catalog search and discovery",
+    "area": "Catalog",
+    "constraint": "Apply authorization before search, suggestions, pagination, counts and facets."
+  },
+  "lineage.read": {
+    "description": "View lineage and used-by graph",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + each node/edge",
+    "target": "Lineage and dependencies",
+    "area": "Catalog",
+    "constraint": "Prune hidden names and edges; imports require originating-workload authority."
+  },
+  "lineage.import_dbt": {
+    "description": "Import dbt lineage",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + each node/edge",
+    "target": "Lineage and dependencies",
+    "area": "Catalog",
+    "constraint": "Prune hidden names and edges; imports require originating-workload authority."
+  },
+  "lineage.import_airflow": {
+    "description": "Import Airflow lineage",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + each node/edge",
+    "target": "Lineage and dependencies",
+    "area": "Catalog",
+    "constraint": "Prune hidden names and edges; imports require originating-workload authority."
+  },
+  "governance.read": {
+    "description": "Read permitted descriptive metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset",
+    "target": "Governance metadata",
+    "area": "Catalog",
+    "constraint": "An informational owner/contact field is separate from authoritative ownership."
+  },
+  "governance.edit": {
+    "description": "Edit description, domain and contact labels",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset",
+    "target": "Governance metadata",
+    "area": "Catalog",
+    "constraint": "An informational owner/contact field is separate from authoritative ownership."
+  },
+  "governance.status.set": {
+    "description": "Change governance publication/status",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset",
+    "target": "Governance metadata",
+    "area": "Catalog",
+    "constraint": "An informational owner/contact field is separate from authoritative ownership."
+  },
+  "governance.owner.change": {
+    "description": "Change authoritative owner",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + asset",
+    "target": "Governance metadata",
+    "area": "Catalog",
+    "constraint": "An informational owner/contact field is separate from authoritative ownership."
+  },
+  "classification.binding.read": {
+    "description": "View permitted classification labels",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset/column",
+    "target": "Asset and column classification",
+    "area": "Catalog",
+    "constraint": "Draft/apply workflow is proposed; downgrade requires protected authority."
+  },
+  "classification.binding.propose": {
+    "description": "Draft or propose classification",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset/column",
+    "target": "Asset and column classification",
+    "area": "Catalog",
+    "constraint": "Draft/apply workflow is proposed; downgrade requires protected authority."
+  },
+  "classification.binding.apply": {
+    "description": "Apply classification without weakening protection",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset/column",
+    "target": "Asset and column classification",
+    "area": "Catalog",
+    "constraint": "Draft/apply workflow is proposed; downgrade requires protected authority."
+  },
+  "classification.binding.downgrade": {
+    "description": "Downgrade classification or approve an exemption",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + asset/column",
+    "target": "Asset and column classification",
+    "area": "Catalog",
+    "constraint": "Draft/apply workflow is proposed; downgrade requires protected authority."
+  },
+  "products.collection.list": {
+    "description": "List authorized product metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + collection",
+    "target": "Data products collection",
+    "area": "Products",
+    "constraint": "Creating a product does not grant access to all candidate assets."
+  },
+  "products.collection.create": {
+    "description": "Create product in collection",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + collection",
+    "target": "Data products collection",
+    "area": "Products",
+    "constraint": "Creating a product does not grant access to all candidate assets."
+  },
+  "products.object.read": {
+    "description": "View product description, status and permitted members",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + member objects",
+    "target": "Individual data product",
+    "area": "Products",
+    "constraint": "Use is limited to approved assets/actions; changes cannot bypass underlying policy."
+  },
+  "products.object.use": {
+    "description": "Use approved product contents",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + member objects",
+    "target": "Individual data product",
+    "area": "Products",
+    "constraint": "Use is limited to approved assets/actions; changes cannot bypass underlying policy."
+  },
+  "products.object.draft.edit": {
+    "description": "Edit draft description and member selection",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + member objects",
+    "target": "Individual data product",
+    "area": "Products",
+    "constraint": "Use is limited to approved assets/actions; changes cannot bypass underlying policy."
+  },
+  "products.object.publish": {
+    "description": "Publish a product",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + member objects",
+    "target": "Individual data product",
+    "area": "Products",
+    "constraint": "Use is limited to approved assets/actions; changes cannot bypass underlying policy."
+  },
+  "products.object.live.update": {
+    "description": "Apply changes to a published product",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + member objects",
+    "target": "Individual data product",
+    "area": "Products",
+    "constraint": "Use is limited to approved assets/actions; changes cannot bypass underlying policy."
+  },
+  "products.object.unpublish": {
+    "description": "Unpublish product",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + member objects",
+    "target": "Individual data product",
+    "area": "Products",
+    "constraint": "Use is limited to approved assets/actions; changes cannot bypass underlying policy."
+  },
+  "products.object.delete": {
+    "description": "Delete product",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + member objects",
+    "target": "Individual data product",
+    "area": "Products",
+    "constraint": "Use is limited to approved assets/actions; changes cannot bypass underlying policy."
+  },
+  "products.object.roles.assign": {
+    "description": "Assign product roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + product + member objects",
+    "target": "Individual data product",
+    "area": "Products",
+    "constraint": "Use is limited to approved assets/actions; changes cannot bypass underlying policy."
+  },
+  "products.object.roles.revoke": {
+    "description": "Revoke product roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + product + member objects",
+    "target": "Individual data product",
+    "area": "Products",
+    "constraint": "Use is limited to approved assets/actions; changes cannot bypass underlying policy."
+  },
+  "products.options.read": {
+    "description": "Inspect permitted access options",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + affected asset",
+    "target": "Product access options",
+    "area": "Products",
+    "constraint": "Options cannot exceed delegated data permissions; widening protection needs Owner."
+  },
+  "products.options.draft.edit": {
+    "description": "Edit draft access option",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + affected asset",
+    "target": "Product access options",
+    "area": "Products",
+    "constraint": "Options cannot exceed delegated data permissions; widening protection needs Owner."
+  },
+  "products.options.activate": {
+    "description": "Activate option within approved protection",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + affected asset",
+    "target": "Product access options",
+    "area": "Products",
+    "constraint": "Options cannot exceed delegated data permissions; widening protection needs Owner."
+  },
+  "products.options.privileges.widen": {
+    "description": "Widen offered permissions or change exemptions",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + product + affected asset",
+    "target": "Product access options",
+    "area": "Products",
+    "constraint": "Options cannot exceed delegated data permissions; widening protection needs Owner."
+  },
+  "products.requests.own.read": {
+    "description": "View own requests",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Own request + layer + target group",
+    "target": "My product access requests",
+    "area": "Products",
+    "constraint": "Authority to act for the requested group is required."
+  },
+  "products.requests.own.create": {
+    "description": "Request product access",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Own request + layer + target group",
+    "target": "My product access requests",
+    "area": "Products",
+    "constraint": "Authority to act for the requested group is required."
+  },
+  "products.requests.own.draft.edit": {
+    "description": "Edit own draft request",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Own request + layer + target group",
+    "target": "My product access requests",
+    "area": "Products",
+    "constraint": "Authority to act for the requested group is required."
+  },
+  "products.requests.own.submit": {
+    "description": "Submit own request",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Own request + layer + target group",
+    "target": "My product access requests",
+    "area": "Products",
+    "constraint": "Authority to act for the requested group is required."
+  },
+  "products.requests.own.renew": {
+    "description": "Request renewal of own access",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Own request + layer + target group",
+    "target": "My product access requests",
+    "area": "Products",
+    "constraint": "Authority to act for the requested group is required."
+  },
+  "products.requests.own.withdraw": {
+    "description": "Withdraw own request",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Own request + layer + target group",
+    "target": "My product access requests",
+    "area": "Products",
+    "constraint": "Authority to act for the requested group is required."
+  },
+  "products.requests.review.read": {
+    "description": "View assigned request queue",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + assigned duty",
+    "target": "Product requests to decide",
+    "area": "Products",
+    "constraint": "Page role alone grants no decision authority; no self-approval."
+  },
+  "products.requests.review.approve": {
+    "description": "Approve assigned request",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + assigned duty",
+    "target": "Product requests to decide",
+    "area": "Products",
+    "constraint": "Page role alone grants no decision authority; no self-approval."
+  },
+  "products.requests.review.reject": {
+    "description": "Reject assigned request",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + product + assigned duty",
+    "target": "Product requests to decide",
+    "area": "Products",
+    "constraint": "Page role alone grants no decision authority; no self-approval."
+  },
+  "products.requests.review.consumer.grant": {
+    "description": "Grant consumer access directly under applicable policy",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + product + assigned duty",
+    "target": "Product requests to decide",
+    "area": "Products",
+    "constraint": "Page role alone grants no decision authority; no self-approval."
+  },
+  "products.requests.review.consumer.revoke": {
+    "description": "Revoke consumer access",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + product + assigned duty",
+    "target": "Product requests to decide",
+    "area": "Products",
+    "constraint": "Page role alone grants no decision authority; no self-approval."
+  },
+  "workspaces.collection.list": {
+    "description": "List own or explicitly shared workspace metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + collection",
+    "target": "Workspaces collection",
+    "area": "Workspaces",
+    "constraint": "Creation requires primary-group, runtime, pool and capacity authority."
+  },
+  "workspaces.collection.create": {
+    "description": "Create workspace",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + collection",
+    "target": "Workspaces collection",
+    "area": "Workspaces",
+    "constraint": "Creation requires primary-group, runtime, pool and capacity authority."
+  },
+  "workspaces.object.read": {
+    "description": "Read workspace metadata and redacted configuration",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace",
+    "target": "Individual workspace",
+    "area": "Workspaces",
+    "constraint": "Another person's workspace needs explicit sharing/support delegation."
+  },
+  "workspaces.object.start": {
+    "description": "Start workspace",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace",
+    "target": "Individual workspace",
+    "area": "Workspaces",
+    "constraint": "Another person's workspace needs explicit sharing/support delegation."
+  },
+  "workspaces.object.stop": {
+    "description": "Stop workspace",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace",
+    "target": "Individual workspace",
+    "area": "Workspaces",
+    "constraint": "Another person's workspace needs explicit sharing/support delegation."
+  },
+  "workspaces.object.editor.open": {
+    "description": "Open interactive editor with code execution",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace",
+    "target": "Individual workspace",
+    "area": "Workspaces",
+    "constraint": "Another person's workspace needs explicit sharing/support delegation.",
+    "requires_roles": [
+      "Contributor",
+      "Executor"
+    ]
+  },
+  "workspaces.object.settings.edit": {
+    "description": "Change ordinary workspace settings",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace",
+    "target": "Individual workspace",
+    "area": "Workspaces",
+    "constraint": "Another person's workspace needs explicit sharing/support delegation."
+  },
+  "workspaces.object.delete": {
+    "description": "Delete workspace",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace",
+    "target": "Individual workspace",
+    "area": "Workspaces",
+    "constraint": "Another person's workspace needs explicit sharing/support delegation."
+  },
+  "workspaces.object.share": {
+    "description": "Share workspace with another principal/group",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace",
+    "target": "Individual workspace",
+    "area": "Workspaces",
+    "constraint": "Another person's workspace needs explicit sharing/support delegation."
+  },
+  "workspaces.files.list": {
+    "description": "List permitted file metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace/files",
+    "target": "Workspace files and checkout",
+    "area": "Workspaces",
+    "constraint": "Editor/file authority exposes private code; remote Git authorization remains required."
+  },
+  "workspaces.files.read": {
+    "description": "Read file contents",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace/files",
+    "target": "Workspace files and checkout",
+    "area": "Workspaces",
+    "constraint": "Editor/file authority exposes private code; remote Git authorization remains required."
+  },
+  "workspaces.files.download": {
+    "description": "Download file",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace/files",
+    "target": "Workspace files and checkout",
+    "area": "Workspaces",
+    "constraint": "Editor/file authority exposes private code; remote Git authorization remains required."
+  },
+  "workspaces.files.write": {
+    "description": "Create or change file contents",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace/files",
+    "target": "Workspace files and checkout",
+    "area": "Workspaces",
+    "constraint": "Editor/file authority exposes private code; remote Git authorization remains required."
+  },
+  "workspaces.files.delete": {
+    "description": "Delete file",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace/files",
+    "target": "Workspace files and checkout",
+    "area": "Workspaces",
+    "constraint": "Editor/file authority exposes private code; remote Git authorization remains required."
+  },
+  "workspaces.files.checkout": {
+    "description": "Check out an authorized branch",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace/files",
+    "target": "Workspace files and checkout",
+    "area": "Workspaces",
+    "constraint": "Editor/file authority exposes private code; remote Git authorization remains required."
+  },
+  "workspaces.files.pull": {
+    "description": "Pull an authorized Git repository",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + personal workspace/files",
+    "target": "Workspace files and checkout",
+    "area": "Workspaces",
+    "constraint": "Editor/file authority exposes private code; remote Git authorization remains required."
+  },
+  "git.credentials.read": {
+    "description": "List own redacted credential metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal credential; layer-bound use",
+    "target": "Git credentials",
+    "area": "Workspaces",
+    "constraint": "Human values are write-only; metadata lists never expose another person's credentials."
+  },
+  "git.credentials.create": {
+    "description": "Create credential",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal credential; layer-bound use",
+    "target": "Git credentials",
+    "area": "Workspaces",
+    "constraint": "Human values are write-only; metadata lists never expose another person's credentials."
+  },
+  "git.credentials.update": {
+    "description": "Update credential value/configuration",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal credential; layer-bound use",
+    "target": "Git credentials",
+    "area": "Workspaces",
+    "constraint": "Human values are write-only; metadata lists never expose another person's credentials."
+  },
+  "git.credentials.delete": {
+    "description": "Delete credential",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal credential; layer-bound use",
+    "target": "Git credentials",
+    "area": "Workspaces",
+    "constraint": "Human values are write-only; metadata lists never expose another person's credentials."
+  },
+  "git.credentials.use": {
+    "description": "Use credential for an authorized repository",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal credential; layer-bound use",
+    "target": "Git credentials",
+    "area": "Workspaces",
+    "constraint": "Human values are write-only; metadata lists never expose another person's credentials."
+  },
+  "git.credentials.binding.change": {
+    "description": "Change shared credential/workspace binding",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Personal credential; layer-bound use",
+    "target": "Git credentials",
+    "area": "Workspaces",
+    "constraint": "Human values are write-only; metadata lists never expose another person's credentials."
+  },
+  "repositories.list": {
+    "description": "List authorized repository definitions",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.branches.read": {
+    "description": "List authorized branches",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.manifest.read": {
+    "description": "Read approved program manifest metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.refresh": {
+    "description": "Refresh repository metadata",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.pull": {
+    "description": "Pull repository using an authorized credential",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.draft.edit": {
+    "description": "Edit repository definition draft",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.register": {
+    "description": "Register repository",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.apply": {
+    "description": "Apply ordinary repository configuration",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.remove": {
+    "description": "Remove repository registration",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.credential.bind": {
+    "description": "Change credential binding",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "repositories.trust.change": {
+    "description": "Change repository trust policy",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global definition; explicit layer binding",
+    "target": "Repositories",
+    "area": "Workloads",
+    "constraint": "Repository discovery does not reveal source code or grant Git access."
+  },
+  "workloads.folders.list": {
+    "description": "List authorized children and folder metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/destination folder",
+    "target": "Workload folders",
+    "area": "Workloads",
+    "constraint": "Mixed-layer ancestry never bypasses layer filters; moves also check inherited grants."
+  },
+  "workloads.folders.create": {
+    "description": "Create child folder",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/destination folder",
+    "target": "Workload folders",
+    "area": "Workloads",
+    "constraint": "Mixed-layer ancestry never bypasses layer filters; moves also check inherited grants."
+  },
+  "workloads.folders.rename": {
+    "description": "Rename folder",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/destination folder",
+    "target": "Workload folders",
+    "area": "Workloads",
+    "constraint": "Mixed-layer ancestry never bypasses layer filters; moves also check inherited grants."
+  },
+  "workloads.folders.move": {
+    "description": "Move folder within permitted boundary",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/destination folder",
+    "target": "Workload folders",
+    "area": "Workloads",
+    "constraint": "Mixed-layer ancestry never bypasses layer filters; moves also check inherited grants."
+  },
+  "workloads.folders.delete": {
+    "description": "Delete folder",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/destination folder",
+    "target": "Workload folders",
+    "area": "Workloads",
+    "constraint": "Mixed-layer ancestry never bypasses layer filters; moves also check inherited grants."
+  },
+  "workloads.folders.roles.assign": {
+    "description": "Assign folder roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source/destination folder",
+    "target": "Workload folders",
+    "area": "Workloads",
+    "constraint": "Mixed-layer ancestry never bypasses layer filters; moves also check inherited grants."
+  },
+  "workloads.folders.roles.revoke": {
+    "description": "Revoke folder roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source/destination folder",
+    "target": "Workload folders",
+    "area": "Workloads",
+    "constraint": "Mixed-layer ancestry never bypasses layer filters; moves also check inherited grants."
+  },
+  "workloads.folders.inheritance.change": {
+    "description": "Authorize a move that changes inherited authority",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source/destination folder",
+    "target": "Workload folders",
+    "area": "Workloads",
+    "constraint": "Mixed-layer ancestry never bypasses layer filters; moves also check inherited grants."
+  },
+  "workloads.deployments.candidates.read": {
+    "description": "View authorized deploy candidates",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + destination collection",
+    "target": "Deployment collection and wizard",
+    "area": "Workloads",
+    "constraint": "All dependencies authorized independently; protected identity/secret fields require Owner."
+  },
+  "workloads.deployments.create": {
+    "description": "Create workload in destination",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + destination collection",
+    "target": "Deployment collection and wizard",
+    "area": "Workloads",
+    "constraint": "All dependencies authorized independently; protected identity/secret fields require Owner."
+  },
+  "workloads.deployments.deploy": {
+    "description": "Deploy a new workload",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + destination collection",
+    "target": "Deployment collection and wizard",
+    "area": "Workloads",
+    "constraint": "All dependencies authorized independently; protected identity/secret fields require Owner."
+  },
+  "workloads.code.versions.read": {
+    "description": "View version and deployment status metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload source and versions",
+    "area": "Workloads",
+    "constraint": "Source read is separate from version metadata; changes can exercise fixed-identity authority after deployment."
+  },
+  "workloads.code.source.read": {
+    "description": "Read source artifact",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload source and versions",
+    "area": "Workloads",
+    "constraint": "Source read is separate from version metadata; changes can exercise fixed-identity authority after deployment."
+  },
+  "workloads.code.edit": {
+    "description": "Edit workload code or draft definition",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload source and versions",
+    "area": "Workloads",
+    "constraint": "Source read is separate from version metadata; changes can exercise fixed-identity authority after deployment."
+  },
+  "workloads.code.deploy": {
+    "description": "Deploy code changes",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload source and versions",
+    "area": "Workloads",
+    "constraint": "Source read is separate from version metadata; changes can exercise fixed-identity authority after deployment."
+  },
+  "workloads.code.sync": {
+    "description": "Sync deployed workload with authorized Git source",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload source and versions",
+    "area": "Workloads",
+    "constraint": "Source read is separate from version metadata; changes can exercise fixed-identity authority after deployment."
+  },
+  "workloads.code.auto_update.set": {
+    "description": "Enable or disable automatic deployment",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload source and versions",
+    "area": "Workloads",
+    "constraint": "Source read is separate from version metadata; changes can exercise fixed-identity authority after deployment."
+  },
+  "workloads.settings.read": {
+    "description": "Read redacted workload settings",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload and selected identity",
+    "target": "Workload configuration",
+    "area": "Workloads",
+    "constraint": "Validate manifest, UI, API and reconciler paths identically."
+  },
+  "workloads.settings.edit": {
+    "description": "Change ordinary settings and runtime sizing",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload and selected identity",
+    "target": "Workload configuration",
+    "area": "Workloads",
+    "constraint": "Validate manifest, UI, API and reconciler paths identically."
+  },
+  "workloads.settings.identity.change": {
+    "description": "Change execution identity",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + workload and selected identity",
+    "target": "Workload configuration",
+    "area": "Workloads",
+    "constraint": "Validate manifest, UI, API and reconciler paths identically."
+  },
+  "workloads.settings.execution_mode.change": {
+    "description": "Change caller/fixed execution mode",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + workload and selected identity",
+    "target": "Workload configuration",
+    "area": "Workloads",
+    "constraint": "Validate manifest, UI, API and reconciler paths identically."
+  },
+  "workloads.settings.secret.bind": {
+    "description": "Change environment/secret bindings",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + workload and selected identity",
+    "target": "Workload configuration",
+    "area": "Workloads",
+    "constraint": "Validate manifest, UI, API and reconciler paths identically."
+  },
+  "workloads.settings.owner.change": {
+    "description": "Change workload owner",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + workload and selected identity",
+    "target": "Workload configuration",
+    "area": "Workloads",
+    "constraint": "Validate manifest, UI, API and reconciler paths identically."
+  },
+  "workloads.settings.roles.assign": {
+    "description": "Assign workload roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + workload and selected identity",
+    "target": "Workload configuration",
+    "area": "Workloads",
+    "constraint": "Validate manifest, UI, API and reconciler paths identically."
+  },
+  "workloads.settings.roles.revoke": {
+    "description": "Revoke workload roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + workload and selected identity",
+    "target": "Workload configuration",
+    "area": "Workloads",
+    "constraint": "Validate manifest, UI, API and reconciler paths identically."
+  },
+  "workloads.settings.undeploy": {
+    "description": "Undeploy or remove workload",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload and selected identity",
+    "target": "Workload configuration",
+    "area": "Workloads",
+    "constraint": "Validate manifest, UI, API and reconciler paths identically."
+  },
+  "workloads.execution.read": {
+    "description": "View workload execution status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload apps, programs and generated docs",
+    "area": "Workloads",
+    "constraint": "Viewer cannot run through a URL; generated artifacts and per-viewer data are reauthorized."
+  },
+  "workloads.execution.run": {
+    "description": "Run workload",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload apps, programs and generated docs",
+    "area": "Workloads",
+    "constraint": "Viewer cannot run through a URL; generated artifacts and per-viewer data are reauthorized."
+  },
+  "workloads.execution.app.open": {
+    "description": "Open shared app",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload apps, programs and generated docs",
+    "area": "Workloads",
+    "constraint": "Viewer cannot run through a URL; generated artifacts and per-viewer data are reauthorized."
+  },
+  "workloads.execution.docs.open": {
+    "description": "Open generated documentation",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload apps, programs and generated docs",
+    "area": "Workloads",
+    "constraint": "Viewer cannot run through a URL; generated artifacts and per-viewer data are reauthorized."
+  },
+  "workloads.execution.orchestrate": {
+    "description": "Invoke an authorized orchestration operation",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload apps, programs and generated docs",
+    "area": "Workloads",
+    "constraint": "Viewer cannot run through a URL; generated artifacts and per-viewer data are reauthorized."
+  },
+  "workloads.execution.stop_own": {
+    "description": "Stop own workload invocation",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload apps, programs and generated docs",
+    "area": "Workloads",
+    "constraint": "Viewer cannot run through a URL; generated artifacts and per-viewer data are reauthorized."
+  },
+  "workloads.execution.stop_others": {
+    "description": "Stop another user's invocation",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload apps, programs and generated docs",
+    "area": "Workloads",
+    "constraint": "Viewer cannot run through a URL; generated artifacts and per-viewer data are reauthorized."
+  },
+  "workloads.execution.restart_service": {
+    "description": "Restart persistent workload service",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload",
+    "target": "Workload apps, programs and generated docs",
+    "area": "Workloads",
+    "constraint": "Viewer cannot run through a URL; generated artifacts and per-viewer data are reauthorized."
+  },
+  "runs.list": {
+    "description": "List authorized runs and queue metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run and parent workload/workspace",
+    "target": "Run history, queue and orchestration",
+    "area": "Workloads",
+    "constraint": "Retry is a new admission; workspace ownership and parent permissions still apply."
+  },
+  "runs.read": {
+    "description": "Read authorized run metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run and parent workload/workspace",
+    "target": "Run history, queue and orchestration",
+    "area": "Workloads",
+    "constraint": "Retry is a new admission; workspace ownership and parent permissions still apply."
+  },
+  "runs.create": {
+    "description": "Start a run",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run and parent workload/workspace",
+    "target": "Run history, queue and orchestration",
+    "area": "Workloads",
+    "constraint": "Retry is a new admission; workspace ownership and parent permissions still apply."
+  },
+  "runs.retry": {
+    "description": "Retry a run under current policy",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run and parent workload/workspace",
+    "target": "Run history, queue and orchestration",
+    "area": "Workloads",
+    "constraint": "Retry is a new admission; workspace ownership and parent permissions still apply."
+  },
+  "runs.cancel_own": {
+    "description": "Cancel own run",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run and parent workload/workspace",
+    "target": "Run history, queue and orchestration",
+    "area": "Workloads",
+    "constraint": "Retry is a new admission; workspace ownership and parent permissions still apply."
+  },
+  "runs.cancel_others": {
+    "description": "Cancel another user's run",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run and parent workload/workspace",
+    "target": "Run history, queue and orchestration",
+    "area": "Workloads",
+    "constraint": "Retry is a new admission; workspace ownership and parent permissions still apply."
+  },
+  "runs.queue.manage": {
+    "description": "Manage authorized execution queue",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run and parent workload/workspace",
+    "target": "Run history, queue and orchestration",
+    "area": "Workloads",
+    "constraint": "Retry is a new admission; workspace ownership and parent permissions still apply."
+  },
+  "logs.metadata.read": {
+    "description": "List authorized log stream metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + stream/run/workload",
+    "target": "Logs",
+    "area": "Workloads",
+    "constraint": "Logs can contain sensitive content; writing is limited to the authenticated producer."
+  },
+  "logs.read": {
+    "description": "Read log content",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + stream/run/workload",
+    "target": "Logs",
+    "area": "Workloads",
+    "constraint": "Logs can contain sensitive content; writing is limited to the authenticated producer."
+  },
+  "logs.export": {
+    "description": "Export log content",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + stream/run/workload",
+    "target": "Logs",
+    "area": "Workloads",
+    "constraint": "Logs can contain sensitive content; writing is limited to the authenticated producer."
+  },
+  "artifacts.list": {
+    "description": "List permitted artifact metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run/artifact",
+    "target": "Outputs and artifacts",
+    "area": "Workloads",
+    "constraint": "An artifact URL is not permanent authorization."
+  },
+  "artifacts.read": {
+    "description": "Read artifact contents",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run/artifact",
+    "target": "Outputs and artifacts",
+    "area": "Workloads",
+    "constraint": "An artifact URL is not permanent authorization."
+  },
+  "artifacts.download": {
+    "description": "Download artifact",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run/artifact",
+    "target": "Outputs and artifacts",
+    "area": "Workloads",
+    "constraint": "An artifact URL is not permanent authorization."
+  },
+  "artifacts.open": {
+    "description": "Open rendered artifact or generated documentation",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run/artifact",
+    "target": "Outputs and artifacts",
+    "area": "Workloads",
+    "constraint": "An artifact URL is not permanent authorization."
+  },
+  "artifacts.delete": {
+    "description": "Delete retained artifact",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + run/artifact",
+    "target": "Outputs and artifacts",
+    "area": "Workloads",
+    "constraint": "An artifact URL is not permanent authorization."
+  },
+  "usage.read": {
+    "description": "View authorized usage summaries",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + pool and referenced workload",
+    "target": "Usage and occupancy",
+    "area": "Compute",
+    "constraint": "Detailed identities and workload names need underlying visibility."
+  },
+  "usage.occupants.read": {
+    "description": "View detailed authorized occupants and queue entries",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + pool and referenced workload",
+    "target": "Usage and occupancy",
+    "area": "Compute",
+    "constraint": "Detailed identities and workload names need underlying visibility."
+  },
+  "usage.export": {
+    "description": "Export authorized usage",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + pool and referenced workload",
+    "target": "Usage and occupancy",
+    "area": "Compute",
+    "constraint": "Detailed identities and workload names need underlying visibility."
+  },
+  "storage.sources.list": {
+    "description": "List authorized source metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source collection",
+    "target": "Storage source collection",
+    "area": "Storage",
+    "constraint": "Registering a connection does not grant data access."
+  },
+  "storage.sources.register": {
+    "description": "Register a storage integration",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source collection",
+    "target": "Storage source collection",
+    "area": "Storage",
+    "constraint": "Registering a connection does not grant data access."
+  },
+  "storage.sources.deregister": {
+    "description": "Deregister storage integration",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source collection",
+    "target": "Storage source collection",
+    "area": "Storage",
+    "constraint": "Registering a connection does not grant data access."
+  },
+  "storage.connection.read": {
+    "description": "Read redacted connection settings",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source",
+    "target": "Source connection",
+    "area": "Storage",
+    "constraint": "Destinations, credentials and trust are protected security settings."
+  },
+  "storage.connection.edit": {
+    "description": "Edit ordinary connection configuration",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source",
+    "target": "Source connection",
+    "area": "Storage",
+    "constraint": "Destinations, credentials and trust are protected security settings."
+  },
+  "storage.connection.credentials.change": {
+    "description": "Change connection/provisioning credentials",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source",
+    "target": "Source connection",
+    "area": "Storage",
+    "constraint": "Destinations, credentials and trust are protected security settings."
+  },
+  "storage.connection.destination.change": {
+    "description": "Change network destination",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source",
+    "target": "Source connection",
+    "area": "Storage",
+    "constraint": "Destinations, credentials and trust are protected security settings."
+  },
+  "storage.connection.trust.change": {
+    "description": "Change connection trust",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source",
+    "target": "Source connection",
+    "area": "Storage",
+    "constraint": "Destinations, credentials and trust are protected security settings."
+  },
+  "storage.connection.secret.bind": {
+    "description": "Change connection secret binding",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source",
+    "target": "Source connection",
+    "area": "Storage",
+    "constraint": "Destinations, credentials and trust are protected security settings."
+  },
+  "storage.access.effective.read": {
+    "description": "Read permitted effective-access summary",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/schema",
+    "target": "Source and schema access",
+    "area": "Storage",
+    "constraint": "Legacy group-grant shortcuts must call the same evaluator."
+  },
+  "storage.access.provision": {
+    "description": "Provision managed namespace privileges",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/schema",
+    "target": "Source and schema access",
+    "area": "Storage",
+    "constraint": "Legacy group-grant shortcuts must call the same evaluator."
+  },
+  "storage.access.reconcile": {
+    "description": "Reconcile managed namespace privileges",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/schema",
+    "target": "Source and schema access",
+    "area": "Storage",
+    "constraint": "Legacy group-grant shortcuts must call the same evaluator."
+  },
+  "storage.access.roles.assign": {
+    "description": "Assign source/schema roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source/schema",
+    "target": "Source and schema access",
+    "area": "Storage",
+    "constraint": "Legacy group-grant shortcuts must call the same evaluator."
+  },
+  "storage.access.roles.revoke": {
+    "description": "Revoke source/schema roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source/schema",
+    "target": "Source and schema access",
+    "area": "Storage",
+    "constraint": "Legacy group-grant shortcuts must call the same evaluator."
+  },
+  "storage.schemas.list": {
+    "description": "List authorized schemas/namespaces",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/schema collection",
+    "target": "Schema and namespace collection",
+    "area": "Storage",
+    "constraint": "Logical registration, native creation and native destruction are distinct."
+  },
+  "storage.schemas.register": {
+    "description": "Register logical schema/namespace",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/schema collection",
+    "target": "Schema and namespace collection",
+    "area": "Storage",
+    "constraint": "Logical registration, native creation and native destruction are distinct."
+  },
+  "storage.schemas.deregister": {
+    "description": "Deregister logical schema/namespace",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/schema collection",
+    "target": "Schema and namespace collection",
+    "area": "Storage",
+    "constraint": "Logical registration, native creation and native destruction are distinct."
+  },
+  "storage.schemas.create_native": {
+    "description": "Create native schema/namespace",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/schema collection",
+    "target": "Schema and namespace collection",
+    "area": "Storage",
+    "constraint": "Logical registration, native creation and native destruction are distinct."
+  },
+  "storage.schemas.drop_native": {
+    "description": "Drop native schema/namespace",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/schema collection",
+    "target": "Schema and namespace collection",
+    "area": "Storage",
+    "constraint": "Logical registration, native creation and native destruction are distinct."
+  },
+  "storage.schemas.owner.change": {
+    "description": "Change schema/namespace owner",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source/schema collection",
+    "target": "Schema and namespace collection",
+    "area": "Storage",
+    "constraint": "Logical registration, native creation and native destruction are distinct."
+  },
+  "storage.objects.list": {
+    "description": "List authorized table/view/column metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/view/column",
+    "target": "Tables, views and columns",
+    "area": "Storage",
+    "constraint": "Individual object grants are new work; inherited schema grants remain additive."
+  },
+  "storage.objects.describe": {
+    "description": "Describe authorized object structure",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/view/column",
+    "target": "Tables, views and columns",
+    "area": "Storage",
+    "constraint": "Individual object grants are new work; inherited schema grants remain additive."
+  },
+  "storage.objects.metadata.edit": {
+    "description": "Edit descriptive object metadata",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/view/column",
+    "target": "Tables, views and columns",
+    "area": "Storage",
+    "constraint": "Individual object grants are new work; inherited schema grants remain additive."
+  },
+  "storage.objects.create": {
+    "description": "Create native table/view",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/view/column",
+    "target": "Tables, views and columns",
+    "area": "Storage",
+    "constraint": "Individual object grants are new work; inherited schema grants remain additive."
+  },
+  "storage.objects.alter": {
+    "description": "Alter native table/view",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/view/column",
+    "target": "Tables, views and columns",
+    "area": "Storage",
+    "constraint": "Individual object grants are new work; inherited schema grants remain additive."
+  },
+  "storage.objects.drop": {
+    "description": "Drop native table/view",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/view/column",
+    "target": "Tables, views and columns",
+    "area": "Storage",
+    "constraint": "Individual object grants are new work; inherited schema grants remain additive."
+  },
+  "storage.objects.roles.assign": {
+    "description": "Assign object roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/view/column",
+    "target": "Tables, views and columns",
+    "area": "Storage",
+    "constraint": "Individual object grants are new work; inherited schema grants remain additive."
+  },
+  "storage.objects.roles.revoke": {
+    "description": "Revoke object roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/view/column",
+    "target": "Tables, views and columns",
+    "area": "Storage",
+    "constraint": "Individual object grants are new work; inherited schema grants remain additive."
+  },
+  "data.sql.select": {
+    "description": "Read table/view data with SELECT",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + every referenced object",
+    "target": "SQL, preview and query results",
+    "area": "Storage",
+    "constraint": "Enforce at SQL engine; joins/views/functions and result access need dependency checks."
+  },
+  "data.sql.preview": {
+    "description": "Read data preview",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + every referenced object",
+    "target": "SQL, preview and query results",
+    "area": "Storage",
+    "constraint": "Enforce at SQL engine; joins/views/functions and result access need dependency checks."
+  },
+  "data.sql.insert": {
+    "description": "Insert rows",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + every referenced object",
+    "target": "SQL, preview and query results",
+    "area": "Storage",
+    "constraint": "Enforce at SQL engine; joins/views/functions and result access need dependency checks."
+  },
+  "data.sql.update": {
+    "description": "Update rows",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + every referenced object",
+    "target": "SQL, preview and query results",
+    "area": "Storage",
+    "constraint": "Enforce at SQL engine; joins/views/functions and result access need dependency checks."
+  },
+  "data.sql.delete": {
+    "description": "Delete rows",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + every referenced object",
+    "target": "SQL, preview and query results",
+    "area": "Storage",
+    "constraint": "Enforce at SQL engine; joins/views/functions and result access need dependency checks."
+  },
+  "data.sql.ddl": {
+    "description": "Execute authorized native DDL",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + every referenced object",
+    "target": "SQL, preview and query results",
+    "area": "Storage",
+    "constraint": "Enforce at SQL engine; joins/views/functions and result access need dependency checks."
+  },
+  "data.sql.truncate": {
+    "description": "Truncate table",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + every referenced object",
+    "target": "SQL, preview and query results",
+    "area": "Storage",
+    "constraint": "Enforce at SQL engine; joins/views/functions and result access need dependency checks."
+  },
+  "data.sql.results.export": {
+    "description": "Export query results",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + every referenced object",
+    "target": "SQL, preview and query results",
+    "area": "Storage",
+    "constraint": "Enforce at SQL engine; joins/views/functions and result access need dependency checks."
+  },
+  "data.queries.status.read": {
+    "description": "Read permitted query status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query and referenced source",
+    "target": "SQL query lifecycle",
+    "area": "Storage",
+    "constraint": "Query IDs never substitute for authorization; SQL text/results are separate from safe status."
+  },
+  "data.queries.text.read": {
+    "description": "Read authorized SQL text",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query and referenced source",
+    "target": "SQL query lifecycle",
+    "area": "Storage",
+    "constraint": "Query IDs never substitute for authorization; SQL text/results are separate from safe status."
+  },
+  "data.queries.results.read": {
+    "description": "Read authorized query results",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query and referenced source",
+    "target": "SQL query lifecycle",
+    "area": "Storage",
+    "constraint": "Query IDs never substitute for authorization; SQL text/results are separate from safe status."
+  },
+  "data.queries.cancel_own": {
+    "description": "Cancel own query",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query and referenced source",
+    "target": "SQL query lifecycle",
+    "area": "Storage",
+    "constraint": "Query IDs never substitute for authorization; SQL text/results are separate from safe status."
+  },
+  "data.queries.cancel_others": {
+    "description": "Cancel another user's query",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query and referenced source",
+    "target": "SQL query lifecycle",
+    "area": "Storage",
+    "constraint": "Query IDs never substitute for authorization; SQL text/results are separate from safe status."
+  },
+  "data.routines.read": {
+    "description": "Discover permitted routine/sequence metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + executable object",
+    "target": "Functions, procedures and sequences",
+    "area": "Storage",
+    "constraint": "Supported invoker/definer semantics need backend conformance tests."
+  },
+  "data.routines.execute": {
+    "description": "Execute authorized function/procedure",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + executable object",
+    "target": "Functions, procedures and sequences",
+    "area": "Storage",
+    "constraint": "Supported invoker/definer semantics need backend conformance tests."
+  },
+  "data.routines.sequence.use": {
+    "description": "Use authorized sequence",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + executable object",
+    "target": "Functions, procedures and sequences",
+    "area": "Storage",
+    "constraint": "Supported invoker/definer semantics need backend conformance tests."
+  },
+  "data.routines.create": {
+    "description": "Create routine/sequence",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + executable object",
+    "target": "Functions, procedures and sequences",
+    "area": "Storage",
+    "constraint": "Supported invoker/definer semantics need backend conformance tests."
+  },
+  "data.routines.alter": {
+    "description": "Alter routine/sequence",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + executable object",
+    "target": "Functions, procedures and sequences",
+    "area": "Storage",
+    "constraint": "Supported invoker/definer semantics need backend conformance tests."
+  },
+  "data.routines.drop": {
+    "description": "Drop routine/sequence",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + executable object",
+    "target": "Functions, procedures and sequences",
+    "area": "Storage",
+    "constraint": "Supported invoker/definer semantics need backend conformance tests."
+  },
+  "data.files.list": {
+    "description": "List permitted file/prefix metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.files.read": {
+    "description": "Read file content",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.files.download": {
+    "description": "Download file",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.files.create": {
+    "description": "Write new file",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.files.overwrite": {
+    "description": "Overwrite file",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.files.delete": {
+    "description": "Delete file",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.files.namespace.create": {
+    "description": "Create managed namespace",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.files.namespace.delete": {
+    "description": "Delete managed namespace",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.files.roles.assign": {
+    "description": "Assign prefix/file roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.files.roles.revoke": {
+    "description": "Revoke prefix/file roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + source/prefix/file",
+    "target": "S3 files and prefixes",
+    "area": "Storage",
+    "constraint": "Scoped credentials must enforce the same paths; no backing-store bypass."
+  },
+  "data.iceberg.metadata.read": {
+    "description": "View authorized snapshot/table metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + namespace/table",
+    "target": "Iceberg tables and snapshots",
+    "area": "Storage",
+    "constraint": "No raw storage credential may bypass table policy."
+  },
+  "data.iceberg.read": {
+    "description": "Read table data",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + namespace/table",
+    "target": "Iceberg tables and snapshots",
+    "area": "Storage",
+    "constraint": "No raw storage credential may bypass table policy."
+  },
+  "data.iceberg.commit": {
+    "description": "Commit authorized data changes",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + namespace/table",
+    "target": "Iceberg tables and snapshots",
+    "area": "Storage",
+    "constraint": "No raw storage credential may bypass table policy."
+  },
+  "data.iceberg.schema.change": {
+    "description": "Change table schema",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + namespace/table",
+    "target": "Iceberg tables and snapshots",
+    "area": "Storage",
+    "constraint": "No raw storage credential may bypass table policy."
+  },
+  "data.iceberg.drop": {
+    "description": "Drop table",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + namespace/table",
+    "target": "Iceberg tables and snapshots",
+    "area": "Storage",
+    "constraint": "No raw storage credential may bypass table policy."
+  },
+  "data.iceberg.maintain": {
+    "description": "Perform authorized table maintenance",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + namespace/table",
+    "target": "Iceberg tables and snapshots",
+    "area": "Storage",
+    "constraint": "No raw storage credential may bypass table policy."
+  },
+  "data.policies.read": {
+    "description": "Read authorized redacted policy",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/column policy",
+    "target": "Masks and row filters",
+    "area": "Storage",
+    "constraint": "No role may bypass mandatory policies through alternate SQL or object lifecycle paths."
+  },
+  "data.policies.draft.edit": {
+    "description": "Draft policy",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/column policy",
+    "target": "Masks and row filters",
+    "area": "Storage",
+    "constraint": "No role may bypass mandatory policies through alternate SQL or object lifecycle paths."
+  },
+  "data.policies.normalize": {
+    "description": "Validate/normalize authorized policy expression",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/column policy",
+    "target": "Masks and row filters",
+    "area": "Storage",
+    "constraint": "No role may bypass mandatory policies through alternate SQL or object lifecycle paths."
+  },
+  "data.policies.apply_restrictive": {
+    "description": "Apply demonstrably restrictive policy change",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/column policy",
+    "target": "Masks and row filters",
+    "area": "Storage",
+    "constraint": "No role may bypass mandatory policies through alternate SQL or object lifecycle paths."
+  },
+  "data.policies.weaken": {
+    "description": "Weaken or remove data protection",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/column policy",
+    "target": "Masks and row filters",
+    "area": "Storage",
+    "constraint": "No role may bypass mandatory policies through alternate SQL or object lifecycle paths."
+  },
+  "data.policies.exemptions.change": {
+    "description": "Change exempt groups/principals",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/column policy",
+    "target": "Masks and row filters",
+    "area": "Storage",
+    "constraint": "No role may bypass mandatory policies through alternate SQL or object lifecycle paths."
+  },
+  "data.policies.roles.assign": {
+    "description": "Delegate policy authority",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + schema/table/column policy",
+    "target": "Masks and row filters",
+    "area": "Storage",
+    "constraint": "No role may bypass mandatory policies through alternate SQL or object lifecycle paths."
+  },
+  "kafka.clusters.list": {
+    "description": "List authorized clusters/status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster",
+    "target": "Kafka cluster collection and cluster",
+    "area": "Kafka",
+    "constraint": "Registration is delegable within the layer."
+  },
+  "kafka.clusters.read": {
+    "description": "Read authorized cluster metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster",
+    "target": "Kafka cluster collection and cluster",
+    "area": "Kafka",
+    "constraint": "Registration is delegable within the layer."
+  },
+  "kafka.clusters.register": {
+    "description": "Register cluster",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster",
+    "target": "Kafka cluster collection and cluster",
+    "area": "Kafka",
+    "constraint": "Registration is delegable within the layer."
+  },
+  "kafka.clusters.configure": {
+    "description": "Configure cluster",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster",
+    "target": "Kafka cluster collection and cluster",
+    "area": "Kafka",
+    "constraint": "Registration is delegable within the layer."
+  },
+  "kafka.clusters.unregister": {
+    "description": "Unregister cluster",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster",
+    "target": "Kafka cluster collection and cluster",
+    "area": "Kafka",
+    "constraint": "Registration is delegable within the layer."
+  },
+  "kafka.clusters.identity.change": {
+    "description": "Change cluster identity/trust",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + cluster",
+    "target": "Kafka cluster collection and cluster",
+    "area": "Kafka",
+    "constraint": "Registration is delegable within the layer."
+  },
+  "kafka.clusters.roles.assign": {
+    "description": "Assign cluster roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + cluster",
+    "target": "Kafka cluster collection and cluster",
+    "area": "Kafka",
+    "constraint": "Registration is delegable within the layer."
+  },
+  "kafka.clusters.roles.revoke": {
+    "description": "Revoke cluster roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + cluster",
+    "target": "Kafka cluster collection and cluster",
+    "area": "Kafka",
+    "constraint": "Registration is delegable within the layer."
+  },
+  "kafka.topics.list": {
+    "description": "List authorized topics",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.topics.read": {
+    "description": "Read topic configuration/status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.topics.deletion.read": {
+    "description": "Read deletion status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.topics.create": {
+    "description": "Create topic",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.topics.retention.change": {
+    "description": "Change topic retention",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.topics.partitions.change": {
+    "description": "Change topic partitions",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.topics.configure": {
+    "description": "Change other topic settings",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.topics.delete": {
+    "description": "Delete topic",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.topics.roles.assign": {
+    "description": "Assign topic roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.topics.roles.revoke": {
+    "description": "Revoke topic roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + cluster/topic",
+    "target": "Kafka topics",
+    "area": "Kafka",
+    "constraint": "Retention, partitions, deletion and consumer groups are separate capabilities."
+  },
+  "kafka.data.session.create": {
+    "description": "Create consume session within granted scope",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + topic + consumer group",
+    "target": "Kafka data and consumer groups",
+    "area": "Kafka",
+    "constraint": "Session requests name required actions; broker policy enforces the same scope."
+  },
+  "kafka.data.consume": {
+    "description": "Consume records",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + topic + consumer group",
+    "target": "Kafka data and consumer groups",
+    "area": "Kafka",
+    "constraint": "Session requests name required actions; broker policy enforces the same scope."
+  },
+  "kafka.data.offsets.commit_own": {
+    "description": "Commit own authorized consumer offsets",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + topic + consumer group",
+    "target": "Kafka data and consumer groups",
+    "area": "Kafka",
+    "constraint": "Session requests name required actions; broker policy enforces the same scope."
+  },
+  "kafka.data.produce": {
+    "description": "Produce records",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + topic + consumer group",
+    "target": "Kafka data and consumer groups",
+    "area": "Kafka",
+    "constraint": "Session requests name required actions; broker policy enforces the same scope."
+  },
+  "kafka.data.offsets.reset_others": {
+    "description": "Reset another consumer group's offsets",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + topic + consumer group",
+    "target": "Kafka data and consumer groups",
+    "area": "Kafka",
+    "constraint": "Session requests name required actions; broker policy enforces the same scope."
+  },
+  "apis.collection.list": {
+    "description": "List authorized APIs",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + collection",
+    "target": "API collection",
+    "area": "APIs",
+    "constraint": "Both internal and external APIs use the same scope model."
+  },
+  "apis.collection.register": {
+    "description": "Register API",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + collection",
+    "target": "API collection",
+    "area": "APIs",
+    "constraint": "Both internal and external APIs use the same scope model."
+  },
+  "apis.object.read": {
+    "description": "Read redacted API definition",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API",
+    "target": "API definition and trust",
+    "area": "APIs",
+    "constraint": "API call permission does not grant edit authority or access to backing credentials."
+  },
+  "apis.object.draft.edit": {
+    "description": "Edit draft API definition",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API",
+    "target": "API definition and trust",
+    "area": "APIs",
+    "constraint": "API call permission does not grant edit authority or access to backing credentials."
+  },
+  "apis.object.apply": {
+    "description": "Apply ordinary API definition",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API",
+    "target": "API definition and trust",
+    "area": "APIs",
+    "constraint": "API call permission does not grant edit authority or access to backing credentials."
+  },
+  "apis.object.delete": {
+    "description": "Delete API",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API",
+    "target": "API definition and trust",
+    "area": "APIs",
+    "constraint": "API call permission does not grant edit authority or access to backing credentials."
+  },
+  "apis.object.credentials.change": {
+    "description": "Change credentials",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + API",
+    "target": "API definition and trust",
+    "area": "APIs",
+    "constraint": "API call permission does not grant edit authority or access to backing credentials."
+  },
+  "apis.object.trust.change": {
+    "description": "Change caller/destination trust",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + API",
+    "target": "API definition and trust",
+    "area": "APIs",
+    "constraint": "API call permission does not grant edit authority or access to backing credentials."
+  },
+  "apis.object.identity.change": {
+    "description": "Change API execution identity",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + API",
+    "target": "API definition and trust",
+    "area": "APIs",
+    "constraint": "API call permission does not grant edit authority or access to backing credentials."
+  },
+  "apis.object.roles.assign": {
+    "description": "Assign API roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + API",
+    "target": "API definition and trust",
+    "area": "APIs",
+    "constraint": "API call permission does not grant edit authority or access to backing credentials."
+  },
+  "apis.object.roles.revoke": {
+    "description": "Revoke API roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + API",
+    "target": "API definition and trust",
+    "area": "APIs",
+    "constraint": "API call permission does not grant edit authority or access to backing credentials."
+  },
+  "apis.operations.read": {
+    "description": "View authorized operation definition",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API/group/operation",
+    "target": "Endpoint groups and operations",
+    "area": "APIs",
+    "constraint": "REST and SOAP; group moves check both source and destination."
+  },
+  "apis.operations.draft.edit": {
+    "description": "Edit draft operation",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API/group/operation",
+    "target": "Endpoint groups and operations",
+    "area": "APIs",
+    "constraint": "REST and SOAP; group moves check both source and destination."
+  },
+  "apis.operations.create": {
+    "description": "Create operation/group",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API/group/operation",
+    "target": "Endpoint groups and operations",
+    "area": "APIs",
+    "constraint": "REST and SOAP; group moves check both source and destination."
+  },
+  "apis.operations.apply": {
+    "description": "Apply operation changes",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API/group/operation",
+    "target": "Endpoint groups and operations",
+    "area": "APIs",
+    "constraint": "REST and SOAP; group moves check both source and destination."
+  },
+  "apis.operations.move": {
+    "description": "Move operation to another group",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API/group/operation",
+    "target": "Endpoint groups and operations",
+    "area": "APIs",
+    "constraint": "REST and SOAP; group moves check both source and destination."
+  },
+  "apis.operations.delete": {
+    "description": "Delete operation/group",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + API/group/operation",
+    "target": "Endpoint groups and operations",
+    "area": "APIs",
+    "constraint": "REST and SOAP; group moves check both source and destination."
+  },
+  "apis.operations.roles.assign": {
+    "description": "Assign operation/group roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + API/group/operation",
+    "target": "Endpoint groups and operations",
+    "area": "APIs",
+    "constraint": "REST and SOAP; group moves check both source and destination."
+  },
+  "apis.operations.roles.revoke": {
+    "description": "Revoke operation/group roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + API/group/operation",
+    "target": "Endpoint groups and operations",
+    "area": "APIs",
+    "constraint": "REST and SOAP; group moves check both source and destination."
+  },
+  "apis.calls.invoke": {
+    "description": "Call an authorized operation",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + operation + execution context",
+    "target": "API inbound and outbound gateway",
+    "area": "APIs",
+    "constraint": "Validate method/path and original caller on every request."
+  },
+  "apis.calls.status.read": {
+    "description": "Read permitted call status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + operation + execution context",
+    "target": "API inbound and outbound gateway",
+    "area": "APIs",
+    "constraint": "Validate method/path and original caller on every request."
+  },
+  "apis.calls.details.read": {
+    "description": "Read authorized redacted call payload/error",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + operation + execution context",
+    "target": "API inbound and outbound gateway",
+    "area": "APIs",
+    "constraint": "Validate method/path and original caller on every request."
+  },
+  "apis.calls.export": {
+    "description": "Export authorized call history",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + operation + execution context",
+    "target": "API inbound and outbound gateway",
+    "area": "APIs",
+    "constraint": "Validate method/path and original caller on every request."
+  },
+  "apis.calls.retention.set": {
+    "description": "Set call-history retention",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + operation + execution context",
+    "target": "API inbound and outbound gateway",
+    "area": "APIs",
+    "constraint": "Validate method/path and original caller on every request."
+  },
+  "directory.people.list": {
+    "description": "List authorized people",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global directory or own person; filtered referenced resources",
+    "target": "Directory and person detail",
+    "area": "Access",
+    "constraint": "SCIM facts are read-only in app; sensitive access explanations need explicit permission."
+  },
+  "directory.people.read": {
+    "description": "View authorized person metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global directory or own person; filtered referenced resources",
+    "target": "Directory and person detail",
+    "area": "Access",
+    "constraint": "SCIM facts are read-only in app; sensitive access explanations need explicit permission."
+  },
+  "directory.people.access.read": {
+    "description": "Inspect authorized person's effective access",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global directory or own person; filtered referenced resources",
+    "target": "Directory and person detail",
+    "area": "Access",
+    "constraint": "SCIM facts are read-only in app; sensitive access explanations need explicit permission."
+  },
+  "directory.people.access.export": {
+    "description": "Export authorized person's effective access",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global directory or own person; filtered referenced resources",
+    "target": "Directory and person detail",
+    "area": "Access",
+    "constraint": "SCIM facts are read-only in app; sensitive access explanations need explicit permission."
+  },
+  "groups.list": {
+    "description": "List authorized groups",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.read": {
+    "description": "View authorized group metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.create": {
+    "description": "Create app group",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.metadata.edit": {
+    "description": "Edit ordinary group metadata",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.delete": {
+    "description": "Delete group",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.owners.change": {
+    "description": "Change designated group owners",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.members.add": {
+    "description": "Add member to group",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.members.remove": {
+    "description": "Remove member from group",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.idp.bind": {
+    "description": "Bind IdP group/role/user",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.idp.unbind": {
+    "description": "Remove IdP binding",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.profile.assign": {
+    "description": "Assign app profile to group",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global collection + individual group",
+    "target": "App-group collection and group",
+    "area": "Access",
+    "constraint": "Membership changes delegate every existing privilege of the group."
+  },
+  "groups.access.read": {
+    "description": "View authorized grant summaries",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Group + each referenced resource/layer",
+    "target": "Group has-access and grants",
+    "area": "Access",
+    "constraint": "Group ownership cannot issue new roles on unrelated resources."
+  },
+  "groups.access.details.read": {
+    "description": "Inspect sensitive grant explanations",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Group + each referenced resource/layer",
+    "target": "Group has-access and grants",
+    "area": "Access",
+    "constraint": "Group ownership cannot issue new roles on unrelated resources."
+  },
+  "groups.access.export": {
+    "description": "Export authorized group access",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Group + each referenced resource/layer",
+    "target": "Group has-access and grants",
+    "area": "Access",
+    "constraint": "Group ownership cannot issue new roles on unrelated resources."
+  },
+  "permissions.effective.read": {
+    "description": "View safe effective-role summary",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + actual target",
+    "target": "Permissions panels and identity pickers",
+    "area": "Access",
+    "constraint": "Filter principal picker; grants cannot exceed delegation authority."
+  },
+  "permissions.bindings.read": {
+    "description": "Inspect sensitive grant bindings",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + actual target",
+    "target": "Permissions panels and identity pickers",
+    "area": "Access",
+    "constraint": "Filter principal picker; grants cannot exceed delegation authority."
+  },
+  "permissions.principals.select": {
+    "description": "Select eligible grantee identity",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + actual target",
+    "target": "Permissions panels and identity pickers",
+    "area": "Access",
+    "constraint": "Filter principal picker; grants cannot exceed delegation authority."
+  },
+  "permissions.roles.assign": {
+    "description": "Assign role on target",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + actual target",
+    "target": "Permissions panels and identity pickers",
+    "area": "Access",
+    "constraint": "Filter principal picker; grants cannot exceed delegation authority."
+  },
+  "permissions.roles.revoke": {
+    "description": "Revoke role on target",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + actual target",
+    "target": "Permissions panels and identity pickers",
+    "area": "Access",
+    "constraint": "Filter principal picker; grants cannot exceed delegation authority."
+  },
+  "permissions.actions.assign": {
+    "description": "Assign individual action on target",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + actual target",
+    "target": "Permissions panels and identity pickers",
+    "area": "Access",
+    "constraint": "Filter principal picker; grants cannot exceed delegation authority."
+  },
+  "permissions.actions.revoke": {
+    "description": "Revoke individual action on target",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + actual target",
+    "target": "Permissions panels and identity pickers",
+    "area": "Access",
+    "constraint": "Filter principal picker; grants cannot exceed delegation authority."
+  },
+  "roles.custom.read": {
+    "description": "Inspect authorized role definition",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition + delegated action/scope ceiling",
+    "target": "Custom role definitions",
+    "area": "Access",
+    "constraint": "Editing a role changes all its recipients; show impact and forbid escalation."
+  },
+  "roles.custom.draft.edit": {
+    "description": "Draft a custom role",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition + delegated action/scope ceiling",
+    "target": "Custom role definitions",
+    "area": "Access",
+    "constraint": "Editing a role changes all its recipients; show impact and forbid escalation."
+  },
+  "roles.custom.create": {
+    "description": "Create role within delegation authority",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global definition + delegated action/scope ceiling",
+    "target": "Custom role definitions",
+    "area": "Access",
+    "constraint": "Editing a role changes all its recipients; show impact and forbid escalation."
+  },
+  "roles.custom.update": {
+    "description": "Change effective role definition",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global definition + delegated action/scope ceiling",
+    "target": "Custom role definitions",
+    "area": "Access",
+    "constraint": "Editing a role changes all its recipients; show impact and forbid escalation."
+  },
+  "roles.custom.delete": {
+    "description": "Delete custom role",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global definition + delegated action/scope ceiling",
+    "target": "Custom role definitions",
+    "area": "Access",
+    "constraint": "Editing a role changes all its recipients; show impact and forbid escalation."
+  },
+  "identities.list": {
+    "description": "List authorized service identity metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + identity",
+    "target": "Service identities and service accounts",
+    "area": "Access",
+    "constraint": "Permissions on identity are different from permissions held by it."
+  },
+  "identities.read": {
+    "description": "Read identity status and redacted configuration",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + identity",
+    "target": "Service identities and service accounts",
+    "area": "Access",
+    "constraint": "Permissions on identity are different from permissions held by it."
+  },
+  "identities.create": {
+    "description": "Create service account",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + identity",
+    "target": "Service identities and service accounts",
+    "area": "Access",
+    "constraint": "Permissions on identity are different from permissions held by it."
+  },
+  "identities.metadata.edit": {
+    "description": "Edit ordinary identity metadata",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + identity",
+    "target": "Service identities and service accounts",
+    "area": "Access",
+    "constraint": "Permissions on identity are different from permissions held by it."
+  },
+  "identities.disable": {
+    "description": "Disable service account",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + identity",
+    "target": "Service identities and service accounts",
+    "area": "Access",
+    "constraint": "Permissions on identity are different from permissions held by it."
+  },
+  "identities.delete": {
+    "description": "Delete service account",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + identity",
+    "target": "Service identities and service accounts",
+    "area": "Access",
+    "constraint": "Permissions on identity are different from permissions held by it."
+  },
+  "identities.bindings.change": {
+    "description": "Change identity/group bindings",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + identity",
+    "target": "Service identities and service accounts",
+    "area": "Access",
+    "constraint": "Permissions on identity are different from permissions held by it."
+  },
+  "identities.roles.assign": {
+    "description": "Assign roles on/to identity within delegation authority",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + identity",
+    "target": "Service identities and service accounts",
+    "area": "Access",
+    "constraint": "Permissions on identity are different from permissions held by it."
+  },
+  "identities.roles.revoke": {
+    "description": "Revoke identity role assignments",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + identity",
+    "target": "Service identities and service accounts",
+    "area": "Access",
+    "constraint": "Permissions on identity are different from permissions held by it."
+  },
+  "identities.execution.use": {
+    "description": "Execute through specifically authorized identity",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + identity + workload",
+    "target": "Run-as and impersonation binding",
+    "area": "Access",
+    "constraint": "Use does not permit minting tokens or reading secrets."
+  },
+  "identities.execution.binding.change": {
+    "description": "Configure fixed execution identity",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + identity + workload",
+    "target": "Run-as and impersonation binding",
+    "area": "Access",
+    "constraint": "Use does not permit minting tokens or reading secrets."
+  },
+  "identities.tokens.list": {
+    "description": "View redacted token metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + identity/token",
+    "target": "Service-account tokens",
+    "area": "Access",
+    "constraint": "Plaintext returned once; never in list/read APIs."
+  },
+  "identities.tokens.create": {
+    "description": "Mint service-account token",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + identity/token",
+    "target": "Service-account tokens",
+    "area": "Access",
+    "constraint": "Plaintext returned once; never in list/read APIs."
+  },
+  "identities.tokens.revoke": {
+    "description": "Revoke service-account token",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + identity/token",
+    "target": "Service-account tokens",
+    "area": "Access",
+    "constraint": "Plaintext returned once; never in list/read APIs."
+  },
+  "identities.tokens.rotate": {
+    "description": "Rotate service-account token",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + identity/token",
+    "target": "Service-account tokens",
+    "area": "Access",
+    "constraint": "Plaintext returned once; never in list/read APIs."
+  },
+  "secrets.list": {
+    "description": "List authorized redacted secret metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "secrets.read": {
+    "description": "Read redacted secret metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "secrets.create": {
+    "description": "Store new secret value",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "secrets.update": {
+    "description": "Replace secret value",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "secrets.rotate": {
+    "description": "Rotate secret through configured workflow",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "secrets.delete": {
+    "description": "Delete secret",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "secrets.use": {
+    "description": "Use secret through authorized execution",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "secrets.binding.change": {
+    "description": "Change secret/runtime binding",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "secrets.roles.assign": {
+    "description": "Assign secret roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "secrets.roles.revoke": {
+    "description": "Revoke secret roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Personal/global object; explicit layer-bound use",
+    "target": "Secrets",
+    "area": "Access",
+    "constraint": "Human secret values remain write-only; production personal/group restrictions remain mandatory."
+  },
+  "profiles.read": {
+    "description": "Inspect authorized app profile",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition + profile object",
+    "target": "App profiles",
+    "area": "Access",
+    "constraint": "Presentation settings cannot grant page/object actions or fall back to full access."
+  },
+  "profiles.draft.edit": {
+    "description": "Edit profile draft",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition + profile object",
+    "target": "App profiles",
+    "area": "Access",
+    "constraint": "Presentation settings cannot grant page/object actions or fall back to full access."
+  },
+  "profiles.create": {
+    "description": "Create profile",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition + profile object",
+    "target": "App profiles",
+    "area": "Access",
+    "constraint": "Presentation settings cannot grant page/object actions or fall back to full access."
+  },
+  "profiles.apply": {
+    "description": "Apply profile",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition + profile object",
+    "target": "App profiles",
+    "area": "Access",
+    "constraint": "Presentation settings cannot grant page/object actions or fall back to full access."
+  },
+  "profiles.default.set": {
+    "description": "Set default profile",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition + profile object",
+    "target": "App profiles",
+    "area": "Access",
+    "constraint": "Presentation settings cannot grant page/object actions or fall back to full access."
+  },
+  "profiles.delete": {
+    "description": "Delete profile",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global definition + profile object",
+    "target": "App profiles",
+    "area": "Access",
+    "constraint": "Presentation settings cannot grant page/object actions or fall back to full access."
+  },
+  "classification.dictionary.read": {
+    "description": "Read permitted dictionary labels",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global dictionary",
+    "target": "Classification dictionary",
+    "area": "Privacy",
+    "constraint": "Published runtime labels are separate from complete administration inventory."
+  },
+  "classification.dictionary.draft.edit": {
+    "description": "Edit draft dictionary",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global dictionary",
+    "target": "Classification dictionary",
+    "area": "Privacy",
+    "constraint": "Published runtime labels are separate from complete administration inventory."
+  },
+  "classification.dictionary.publish": {
+    "description": "Publish dictionary",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global dictionary",
+    "target": "Classification dictionary",
+    "area": "Privacy",
+    "constraint": "Published runtime labels are separate from complete administration inventory."
+  },
+  "classification.dictionary.delete_unused": {
+    "description": "Remove unused classification label",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global dictionary",
+    "target": "Classification dictionary",
+    "area": "Privacy",
+    "constraint": "Published runtime labels are separate from complete administration inventory."
+  },
+  "compliance.forms.list": {
+    "description": "List authorized forms",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global form object; optional layer-use binding",
+    "target": "Compliance forms and versions",
+    "area": "Privacy",
+    "constraint": "Case rendering does not grant draft/admin inventory access."
+  },
+  "compliance.forms.read": {
+    "description": "Read authorized form and permitted versions",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global form object; optional layer-use binding",
+    "target": "Compliance forms and versions",
+    "area": "Privacy",
+    "constraint": "Case rendering does not grant draft/admin inventory access."
+  },
+  "compliance.forms.create": {
+    "description": "Create draft form",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global form object; optional layer-use binding",
+    "target": "Compliance forms and versions",
+    "area": "Privacy",
+    "constraint": "Case rendering does not grant draft/admin inventory access."
+  },
+  "compliance.forms.draft.edit": {
+    "description": "Edit form draft",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global form object; optional layer-use binding",
+    "target": "Compliance forms and versions",
+    "area": "Privacy",
+    "constraint": "Case rendering does not grant draft/admin inventory access."
+  },
+  "compliance.forms.publish": {
+    "description": "Publish form version",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global form object; optional layer-use binding",
+    "target": "Compliance forms and versions",
+    "area": "Privacy",
+    "constraint": "Case rendering does not grant draft/admin inventory access."
+  },
+  "compliance.forms.delete": {
+    "description": "Delete form",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global form object; optional layer-use binding",
+    "target": "Compliance forms and versions",
+    "area": "Privacy",
+    "constraint": "Case rendering does not grant draft/admin inventory access."
+  },
+  "compliance.forms.roles.assign": {
+    "description": "Assign form roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global form object; optional layer-use binding",
+    "target": "Compliance forms and versions",
+    "area": "Privacy",
+    "constraint": "Case rendering does not grant draft/admin inventory access."
+  },
+  "compliance.forms.roles.revoke": {
+    "description": "Revoke form roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global form object; optional layer-use binding",
+    "target": "Compliance forms and versions",
+    "area": "Privacy",
+    "constraint": "Case rendering does not grant draft/admin inventory access."
+  },
+  "compliance.policies.read": {
+    "description": "Read authorized policy grid entries",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + classification/target policy",
+    "target": "Access policies",
+    "area": "Privacy",
+    "constraint": "No compliance-admin name-based bypass; weakening policy is protected."
+  },
+  "compliance.policies.draft.edit": {
+    "description": "Edit draft policy",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + classification/target policy",
+    "target": "Access policies",
+    "area": "Privacy",
+    "constraint": "No compliance-admin name-based bypass; weakening policy is protected."
+  },
+  "compliance.policies.apply": {
+    "description": "Apply policy without weakening protection",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + classification/target policy",
+    "target": "Access policies",
+    "area": "Privacy",
+    "constraint": "No compliance-admin name-based bypass; weakening policy is protected."
+  },
+  "compliance.policies.weaken": {
+    "description": "Weaken access policy",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + classification/target policy",
+    "target": "Access policies",
+    "area": "Privacy",
+    "constraint": "No compliance-admin name-based bypass; weakening policy is protected."
+  },
+  "compliance.policies.remove": {
+    "description": "Remove access policy protection",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + classification/target policy",
+    "target": "Access policies",
+    "area": "Privacy",
+    "constraint": "No compliance-admin name-based bypass; weakening policy is protected."
+  },
+  "compliance.policies.roles.assign": {
+    "description": "Delegate scoped policy authority",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + classification/target policy",
+    "target": "Access policies",
+    "area": "Privacy",
+    "constraint": "No compliance-admin name-based bypass; weakening policy is protected."
+  },
+  "compliance.duties.read": {
+    "description": "Inspect authorized review duties",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + target + classification/group",
+    "target": "Review duties",
+    "area": "Privacy",
+    "constraint": "A duty grants decision authority and is an access delegation."
+  },
+  "compliance.duties.appoint": {
+    "description": "Appoint reviewer or membership approver",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + target + classification/group",
+    "target": "Review duties",
+    "area": "Privacy",
+    "constraint": "A duty grants decision authority and is an access delegation."
+  },
+  "compliance.duties.revoke": {
+    "description": "Revoke review duty",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + target + classification/group",
+    "target": "Review duties",
+    "area": "Privacy",
+    "constraint": "A duty grants decision authority and is an access delegation."
+  },
+  "compliance.cases.list": {
+    "description": "List own or assigned cases",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.read": {
+    "description": "Read authorized case details",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.attachment.read": {
+    "description": "Read permitted attachment",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.create": {
+    "description": "Create own case draft",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.answers.edit": {
+    "description": "Edit own case answers",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.comment": {
+    "description": "Comment on authorized case",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.attachment.add": {
+    "description": "Attach file to authorized case",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.submit": {
+    "description": "Submit own case",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.withdraw": {
+    "description": "Withdraw own case",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.renew": {
+    "description": "Renew own case/access",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.approve": {
+    "description": "Approve assigned case step",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.reject": {
+    "description": "Reject assigned case step",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.cases.changes.request": {
+    "description": "Request changes on assigned case",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case + requester/assigned duty",
+    "target": "Compliance cases, reviews and attachments",
+    "area": "Privacy",
+    "constraint": "No self-approval; page access alone never grants all cases."
+  },
+  "compliance.memberships.list": {
+    "description": "View assigned membership queue",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Group + assigned approval duty; layer when bound",
+    "target": "Membership approvals",
+    "area": "Privacy",
+    "constraint": "Show all privileges membership confers, including other layers."
+  },
+  "compliance.memberships.approve": {
+    "description": "Approve assigned membership",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Group + assigned approval duty; layer when bound",
+    "target": "Membership approvals",
+    "area": "Privacy",
+    "constraint": "Show all privileges membership confers, including other layers."
+  },
+  "compliance.memberships.reject": {
+    "description": "Reject assigned membership",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Group + assigned approval duty; layer when bound",
+    "target": "Membership approvals",
+    "area": "Privacy",
+    "constraint": "Show all privileges membership confers, including other layers."
+  },
+  "compliance.register.read": {
+    "description": "Read authorized register entries",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + grants/cases",
+    "target": "Access register",
+    "area": "Privacy",
+    "constraint": "Review duty never implies global register access."
+  },
+  "compliance.register.export": {
+    "description": "Export authorized register entries",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + grants/cases",
+    "target": "Access register",
+    "area": "Privacy",
+    "constraint": "Review duty never implies global register access."
+  },
+  "compliance.deadlines.read": {
+    "description": "Read authorized deadlines",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case/access",
+    "target": "Deadlines",
+    "area": "Privacy",
+    "constraint": "Notifications and deep links recheck the same target permissions."
+  },
+  "compliance.deadlines.renew": {
+    "description": "Submit renewal request",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case/access",
+    "target": "Deadlines",
+    "area": "Privacy",
+    "constraint": "Notifications and deep links recheck the same target permissions."
+  },
+  "compliance.deadlines.decide": {
+    "description": "Decide assigned renewal",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + case/access",
+    "target": "Deadlines",
+    "area": "Privacy",
+    "constraint": "Notifications and deep links recheck the same target permissions."
+  },
+  "audit.read": {
+    "description": "Read permitted redacted audit events",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Explicit global events or layer + target",
+    "target": "Audit log",
+    "area": "Reporting",
+    "constraint": "Events are immutable; no role can edit history."
+  },
+  "audit.details.read": {
+    "description": "Read permitted sensitive audit details",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Explicit global events or layer + target",
+    "target": "Audit log",
+    "area": "Reporting",
+    "constraint": "Events are immutable; no role can edit history."
+  },
+  "audit.export": {
+    "description": "Export authorized audit events",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Explicit global events or layer + target",
+    "target": "Audit log",
+    "area": "Reporting",
+    "constraint": "Events are immutable; no role can edit history."
+  },
+  "audit.retention.set": {
+    "description": "Configure audit retention within mandatory minimum",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Explicit global events or layer + target",
+    "target": "Audit log",
+    "area": "Reporting",
+    "constraint": "Events are immutable; no role can edit history."
+  },
+  "audit.export_policy.set": {
+    "description": "Configure scoped audit export policy",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Explicit global events or layer + target",
+    "target": "Audit log",
+    "area": "Reporting",
+    "constraint": "Events are immutable; no role can edit history."
+  },
+  "query_log.read": {
+    "description": "Read authorized safe query metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query/source; explicit global defaults",
+    "target": "Query log",
+    "area": "Reporting",
+    "constraint": "Text and results can contain sensitive information."
+  },
+  "query_log.text.read": {
+    "description": "Read authorized SQL text",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query/source; explicit global defaults",
+    "target": "Query log",
+    "area": "Reporting",
+    "constraint": "Text and results can contain sensitive information."
+  },
+  "query_log.details.read": {
+    "description": "Read authorized query details",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query/source; explicit global defaults",
+    "target": "Query log",
+    "area": "Reporting",
+    "constraint": "Text and results can contain sensitive information."
+  },
+  "query_log.export": {
+    "description": "Export authorized query log",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query/source; explicit global defaults",
+    "target": "Query log",
+    "area": "Reporting",
+    "constraint": "Text and results can contain sensitive information."
+  },
+  "query_log.retention.set": {
+    "description": "Set scoped query-log retention",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query/source; explicit global defaults",
+    "target": "Query log",
+    "area": "Reporting",
+    "constraint": "Text and results can contain sensitive information."
+  },
+  "query_log.recording.set": {
+    "description": "Configure scoped SQL recording",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query/source; explicit global defaults",
+    "target": "Query log",
+    "area": "Reporting",
+    "constraint": "Text and results can contain sensitive information."
+  },
+  "query_log.reset": {
+    "description": "Reset scoped query-log configuration",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + query/source; explicit global defaults",
+    "target": "Query log",
+    "area": "Reporting",
+    "constraint": "Text and results can contain sensitive information."
+  },
+  "siem.status.read": {
+    "description": "Read redacted SIEM status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global integration; layer export filters",
+    "target": "SIEM",
+    "area": "Reporting",
+    "constraint": "Changing export destination can exfiltrate sensitive audit data."
+  },
+  "siem.export.configure": {
+    "description": "Configure allowed export settings",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global integration; layer export filters",
+    "target": "SIEM",
+    "area": "Reporting",
+    "constraint": "Changing export destination can exfiltrate sensitive audit data."
+  },
+  "siem.endpoint.change": {
+    "description": "Change export endpoint",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global integration; layer export filters",
+    "target": "SIEM",
+    "area": "Reporting",
+    "constraint": "Changing export destination can exfiltrate sensitive audit data."
+  },
+  "siem.credentials.change": {
+    "description": "Change export credential/trust",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global integration; layer export filters",
+    "target": "SIEM",
+    "area": "Reporting",
+    "constraint": "Changing export destination can exfiltrate sensitive audit data."
+  },
+  "layers.collection.list": {
+    "description": "List authorized layer metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global collection",
+    "target": "Layers collection",
+    "area": "Platform",
+    "constraint": "Ordinary layer creation is explicitly delegable without Global Admin."
+  },
+  "layers.collection.create": {
+    "description": "Create layer",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global collection",
+    "target": "Layers collection",
+    "area": "Platform",
+    "constraint": "Ordinary layer creation is explicitly delegable without Global Admin."
+  },
+  "layers.object.read": {
+    "description": "Read layer metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer",
+    "target": "Individual layer",
+    "area": "Platform",
+    "constraint": "Layer authority alone grants no data, network-policy or workload rights."
+  },
+  "layers.object.settings.edit": {
+    "description": "Change ordinary layer settings",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer",
+    "target": "Individual layer",
+    "area": "Platform",
+    "constraint": "Layer authority alone grants no data, network-policy or workload rights."
+  },
+  "layers.object.quota.set": {
+    "description": "Change delegated layer quota",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer",
+    "target": "Individual layer",
+    "area": "Platform",
+    "constraint": "Layer authority alone grants no data, network-policy or workload rights."
+  },
+  "layers.object.workspaces.set": {
+    "description": "Enable or disable workspaces in layer",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer",
+    "target": "Individual layer",
+    "area": "Platform",
+    "constraint": "Layer authority alone grants no data, network-policy or workload rights."
+  },
+  "layers.object.delete_unused": {
+    "description": "Delete unused layer",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer",
+    "target": "Individual layer",
+    "area": "Platform",
+    "constraint": "Layer authority alone grants no data, network-policy or workload rights."
+  },
+  "layers.object.production.set": {
+    "description": "Change production designation",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer",
+    "target": "Individual layer",
+    "area": "Platform",
+    "constraint": "Layer authority alone grants no data, network-policy or workload rights."
+  },
+  "layers.object.trust.change": {
+    "description": "Change layer trust boundary",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer",
+    "target": "Individual layer",
+    "area": "Platform",
+    "constraint": "Layer authority alone grants no data, network-policy or workload rights."
+  },
+  "layers.object.roles.assign": {
+    "description": "Assign layer roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer",
+    "target": "Individual layer",
+    "area": "Platform",
+    "constraint": "Layer authority alone grants no data, network-policy or workload rights."
+  },
+  "layers.object.roles.revoke": {
+    "description": "Revoke layer roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer",
+    "target": "Individual layer",
+    "area": "Platform",
+    "constraint": "Layer authority alone grants no data, network-policy or workload rights."
+  },
+  "platform.defaults.read": {
+    "description": "Inspect global defaults",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Dedicated global configuration",
+    "target": "Global defaults",
+    "area": "Platform",
+    "constraint": "A Dev-only Manager cannot modify shared global defaults."
+  },
+  "platform.defaults.default_layer.set": {
+    "description": "Set global default layer",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Dedicated global configuration",
+    "target": "Global defaults",
+    "area": "Platform",
+    "constraint": "A Dev-only Manager cannot modify shared global defaults."
+  },
+  "platform.defaults.default_layer.reset": {
+    "description": "Reset global default layer",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Dedicated global configuration",
+    "target": "Global defaults",
+    "area": "Platform",
+    "constraint": "A Dev-only Manager cannot modify shared global defaults."
+  },
+  "layer_infrastructure.read": {
+    "description": "Read infrastructure status/specification",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + infrastructure resource",
+    "target": "Layer infrastructure",
+    "area": "Platform",
+    "constraint": "Fields must be checked individually; infrastructure editing cannot bypass network/IAM grants."
+  },
+  "layer_infrastructure.history.read": {
+    "description": "Read infrastructure operation history",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + infrastructure resource",
+    "target": "Layer infrastructure",
+    "area": "Platform",
+    "constraint": "Fields must be checked individually; infrastructure editing cannot bypass network/IAM grants."
+  },
+  "layer_infrastructure.draft.edit": {
+    "description": "Edit draft infrastructure specification",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + infrastructure resource",
+    "target": "Layer infrastructure",
+    "area": "Platform",
+    "constraint": "Fields must be checked individually; infrastructure editing cannot bypass network/IAM grants."
+  },
+  "layer_infrastructure.apply": {
+    "description": "Apply authorized infrastructure configuration",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + infrastructure resource",
+    "target": "Layer infrastructure",
+    "area": "Platform",
+    "constraint": "Fields must be checked individually; infrastructure editing cannot bypass network/IAM grants."
+  },
+  "layer_infrastructure.retry": {
+    "description": "Retry authorized infrastructure operation",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + infrastructure resource",
+    "target": "Layer infrastructure",
+    "area": "Platform",
+    "constraint": "Fields must be checked individually; infrastructure editing cannot bypass network/IAM grants."
+  },
+  "layer_infrastructure.retire": {
+    "description": "Retire infrastructure",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + infrastructure resource",
+    "target": "Layer infrastructure",
+    "area": "Platform",
+    "constraint": "Fields must be checked individually; infrastructure editing cannot bypass network/IAM grants."
+  },
+  "layer_infrastructure.destroy": {
+    "description": "Destroy infrastructure",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + infrastructure resource",
+    "target": "Layer infrastructure",
+    "area": "Platform",
+    "constraint": "Fields must be checked individually; infrastructure editing cannot bypass network/IAM grants."
+  },
+  "layer_infrastructure.trust.change": {
+    "description": "Change protected infrastructure trust",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer + infrastructure resource",
+    "target": "Layer infrastructure",
+    "area": "Platform",
+    "constraint": "Fields must be checked individually; infrastructure editing cannot bypass network/IAM grants."
+  },
+  "layer_infrastructure.identity.change": {
+    "description": "Change protected infrastructure identity",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer + infrastructure resource",
+    "target": "Layer infrastructure",
+    "area": "Platform",
+    "constraint": "Fields must be checked individually; infrastructure editing cannot bypass network/IAM grants."
+  },
+  "network.policies.list": {
+    "description": "List authorized policy metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.policies.read": {
+    "description": "Read authorized effective network rules",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.policies.draft.edit": {
+    "description": "Draft policy changes",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.policies.validate": {
+    "description": "Validate policy draft",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.policies.create": {
+    "description": "Create policy within layer ceiling",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.policies.apply": {
+    "description": "Apply ordinary policy changes",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.policies.remove": {
+    "description": "Remove ordinary policy within mandatory baseline",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.policies.baseline.change": {
+    "description": "Change explicitly owned platform baseline",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.policies.roles.assign": {
+    "description": "Assign network-policy roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.policies.roles.revoke": {
+    "description": "Revoke network-policy roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer + policy; explicit global baseline object",
+    "target": "Network policies",
+    "area": "Network",
+    "constraint": "Dev rules cannot target Prod; global baseline is a mandatory ceiling."
+  },
+  "network.editor_allowlist.read": {
+    "description": "Read authorized host rules",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + allowlist; separate global ceiling",
+    "target": "Editor HTTPS allowlist",
+    "area": "Network",
+    "constraint": "Layer rules cannot exceed platform ceiling; current global-only model needs migration."
+  },
+  "network.editor_allowlist.draft.edit": {
+    "description": "Draft host rule",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + allowlist; separate global ceiling",
+    "target": "Editor HTTPS allowlist",
+    "area": "Network",
+    "constraint": "Layer rules cannot exceed platform ceiling; current global-only model needs migration."
+  },
+  "network.editor_allowlist.apply": {
+    "description": "Apply host rule",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + allowlist; separate global ceiling",
+    "target": "Editor HTTPS allowlist",
+    "area": "Network",
+    "constraint": "Layer rules cannot exceed platform ceiling; current global-only model needs migration."
+  },
+  "network.editor_allowlist.delete": {
+    "description": "Delete host rule",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + allowlist; separate global ceiling",
+    "target": "Editor HTTPS allowlist",
+    "area": "Network",
+    "constraint": "Layer rules cannot exceed platform ceiling; current global-only model needs migration."
+  },
+  "network.editor_allowlist.ceiling.change": {
+    "description": "Change explicitly owned global host ceiling",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer + allowlist; separate global ceiling",
+    "target": "Editor HTTPS allowlist",
+    "area": "Network",
+    "constraint": "Layer rules cannot exceed platform ceiling; current global-only model needs migration."
+  },
+  "network.api_destinations.read": {
+    "description": "Read authorized destination rules",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + destination; separate global ceiling",
+    "target": "External API destination/trust allowlist",
+    "area": "Network",
+    "constraint": "Different path from pod policy and editor proxy; control-plane egress also constrained."
+  },
+  "network.api_destinations.draft.edit": {
+    "description": "Draft destination rule",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + destination; separate global ceiling",
+    "target": "External API destination/trust allowlist",
+    "area": "Network",
+    "constraint": "Different path from pod policy and editor proxy; control-plane egress also constrained."
+  },
+  "network.api_destinations.apply": {
+    "description": "Apply permitted destination rule",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + destination; separate global ceiling",
+    "target": "External API destination/trust allowlist",
+    "area": "Network",
+    "constraint": "Different path from pod policy and editor proxy; control-plane egress also constrained."
+  },
+  "network.api_destinations.delete": {
+    "description": "Delete destination rule",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "One layer + destination; separate global ceiling",
+    "target": "External API destination/trust allowlist",
+    "area": "Network",
+    "constraint": "Different path from pod policy and editor proxy; control-plane egress also constrained."
+  },
+  "network.api_destinations.ceiling.change": {
+    "description": "Change explicitly owned global destination/trust ceiling",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "One layer + destination; separate global ceiling",
+    "target": "External API destination/trust allowlist",
+    "area": "Network",
+    "constraint": "Different path from pod policy and editor proxy; control-plane egress also constrained."
+  },
+  "certificates.read": {
+    "description": "Read public expiry/status metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global or layer + certificate/binding",
+    "target": "Certificates and TLS trust",
+    "area": "Network",
+    "constraint": "Private keys never appear in inventory; use does not grant key export."
+  },
+  "certificates.use": {
+    "description": "Use certificate through authorized execution",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global or layer + certificate/binding",
+    "target": "Certificates and TLS trust",
+    "area": "Network",
+    "constraint": "Private keys never appear in inventory; use does not grant key export."
+  },
+  "certificates.chain.rotate": {
+    "description": "Rotate public certificate chain",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global or layer + certificate/binding",
+    "target": "Certificates and TLS trust",
+    "area": "Network",
+    "constraint": "Private keys never appear in inventory; use does not grant key export."
+  },
+  "certificates.anchors.change": {
+    "description": "Change trusted anchors",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global or layer + certificate/binding",
+    "target": "Certificates and TLS trust",
+    "area": "Network",
+    "constraint": "Private keys never appear in inventory; use does not grant key export."
+  },
+  "certificates.private_key.bind": {
+    "description": "Change private-key binding",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global or layer + certificate/binding",
+    "target": "Certificates and TLS trust",
+    "area": "Network",
+    "constraint": "Private keys never appear in inventory; use does not grant key export."
+  },
+  "certificates.roles.assign": {
+    "description": "Assign certificate roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global or layer + certificate/binding",
+    "target": "Certificates and TLS trust",
+    "area": "Network",
+    "constraint": "Private keys never appear in inventory; use does not grant key export."
+  },
+  "certificates.roles.revoke": {
+    "description": "Revoke certificate roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global or layer + certificate/binding",
+    "target": "Certificates and TLS trust",
+    "area": "Network",
+    "constraint": "Private keys never appear in inventory; use does not grant key export."
+  },
+  "compute.pools.list": {
+    "description": "List permitted pool specifications",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global size definition; explicit layer/pool binding",
+    "target": "Pools and warehouse sizes",
+    "area": "Compute",
+    "constraint": "Using a pool needs pool permission and layer quota; global definitions confer no layer use."
+  },
+  "compute.pools.use": {
+    "description": "Use pool in permitted layer",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global size definition; explicit layer/pool binding",
+    "target": "Pools and warehouse sizes",
+    "area": "Compute",
+    "constraint": "Using a pool needs pool permission and layer quota; global definitions confer no layer use."
+  },
+  "compute.pools.create": {
+    "description": "Create pool definition/binding",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global size definition; explicit layer/pool binding",
+    "target": "Pools and warehouse sizes",
+    "area": "Compute",
+    "constraint": "Using a pool needs pool permission and layer quota; global definitions confer no layer use."
+  },
+  "compute.pools.capacity.set": {
+    "description": "Change authorized pool capacity",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global size definition; explicit layer/pool binding",
+    "target": "Pools and warehouse sizes",
+    "area": "Compute",
+    "constraint": "Using a pool needs pool permission and layer quota; global definitions confer no layer use."
+  },
+  "compute.pools.engines.set": {
+    "description": "Change authorized supported engines",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global size definition; explicit layer/pool binding",
+    "target": "Pools and warehouse sizes",
+    "area": "Compute",
+    "constraint": "Using a pool needs pool permission and layer quota; global definitions confer no layer use."
+  },
+  "compute.pools.delete": {
+    "description": "Delete pool definition/binding",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global size definition; explicit layer/pool binding",
+    "target": "Pools and warehouse sizes",
+    "area": "Compute",
+    "constraint": "Using a pool needs pool permission and layer quota; global definitions confer no layer use."
+  },
+  "compute.pools.roles.assign": {
+    "description": "Assign pool usage/management roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global size definition; explicit layer/pool binding",
+    "target": "Pools and warehouse sizes",
+    "area": "Compute",
+    "constraint": "Using a pool needs pool permission and layer quota; global definitions confer no layer use."
+  },
+  "compute.pools.roles.revoke": {
+    "description": "Revoke pool roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global size definition; explicit layer/pool binding",
+    "target": "Pools and warehouse sizes",
+    "area": "Compute",
+    "constraint": "Using a pool needs pool permission and layer quota; global definitions confer no layer use."
+  },
+  "compute.defaults.read": {
+    "description": "Read scoped limits and defaults",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload kind; separate global fallback",
+    "target": "Workspace limits and default warehouses",
+    "area": "Compute",
+    "constraint": "Scoped managers cannot change another layer or global reservations."
+  },
+  "compute.defaults.consume": {
+    "description": "Consume capacity within authorized quota",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload kind; separate global fallback",
+    "target": "Workspace limits and default warehouses",
+    "area": "Compute",
+    "constraint": "Scoped managers cannot change another layer or global reservations."
+  },
+  "compute.defaults.limits.set": {
+    "description": "Set scoped capacity limits",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload kind; separate global fallback",
+    "target": "Workspace limits and default warehouses",
+    "area": "Compute",
+    "constraint": "Scoped managers cannot change another layer or global reservations."
+  },
+  "compute.defaults.limits.reset": {
+    "description": "Reset scoped capacity limits",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload kind; separate global fallback",
+    "target": "Workspace limits and default warehouses",
+    "area": "Compute",
+    "constraint": "Scoped managers cannot change another layer or global reservations."
+  },
+  "compute.defaults.warehouse.set": {
+    "description": "Set scoped default warehouse",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload kind; separate global fallback",
+    "target": "Workspace limits and default warehouses",
+    "area": "Compute",
+    "constraint": "Scoped managers cannot change another layer or global reservations."
+  },
+  "compute.defaults.warehouse.reset": {
+    "description": "Reset scoped default warehouse",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload kind; separate global fallback",
+    "target": "Workspace limits and default warehouses",
+    "area": "Compute",
+    "constraint": "Scoped managers cannot change another layer or global reservations."
+  },
+  "runtimes.list": {
+    "description": "List permitted runtime metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global image definition; explicit layer approval",
+    "target": "Runtimes",
+    "area": "Platform",
+    "constraint": "Installation-managed images remain deployment-controlled."
+  },
+  "runtimes.use": {
+    "description": "Use approved runtime in layer",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global image definition; explicit layer approval",
+    "target": "Runtimes",
+    "area": "Platform",
+    "constraint": "Installation-managed images remain deployment-controlled."
+  },
+  "runtimes.draft.edit": {
+    "description": "Draft runtime definition",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global image definition; explicit layer approval",
+    "target": "Runtimes",
+    "area": "Platform",
+    "constraint": "Installation-managed images remain deployment-controlled."
+  },
+  "runtimes.register": {
+    "description": "Register runtime",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global image definition; explicit layer approval",
+    "target": "Runtimes",
+    "area": "Platform",
+    "constraint": "Installation-managed images remain deployment-controlled."
+  },
+  "runtimes.enable": {
+    "description": "Enable or disable runtime",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global image definition; explicit layer approval",
+    "target": "Runtimes",
+    "area": "Platform",
+    "constraint": "Installation-managed images remain deployment-controlled."
+  },
+  "runtimes.default.set": {
+    "description": "Set authorized runtime default",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global image definition; explicit layer approval",
+    "target": "Runtimes",
+    "area": "Platform",
+    "constraint": "Installation-managed images remain deployment-controlled."
+  },
+  "runtimes.layer.approve": {
+    "description": "Approve runtime for an authorized layer",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global image definition; explicit layer approval",
+    "target": "Runtimes",
+    "area": "Platform",
+    "constraint": "Installation-managed images remain deployment-controlled."
+  },
+  "runtimes.remove": {
+    "description": "Remove runtime",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global image definition; explicit layer approval",
+    "target": "Runtimes",
+    "area": "Platform",
+    "constraint": "Installation-managed images remain deployment-controlled."
+  },
+  "workspace_templates.list": {
+    "description": "List authorized templates",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + template + target group",
+    "target": "Workspace templates",
+    "area": "Platform",
+    "constraint": "Applying/deleting template can affect members' workspaces; validate every dependency."
+  },
+  "workspace_templates.read": {
+    "description": "Read authorized template",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + template + target group",
+    "target": "Workspace templates",
+    "area": "Platform",
+    "constraint": "Applying/deleting template can affect members' workspaces; validate every dependency."
+  },
+  "workspace_templates.draft.edit": {
+    "description": "Edit template draft",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + template + target group",
+    "target": "Workspace templates",
+    "area": "Platform",
+    "constraint": "Applying/deleting template can affect members' workspaces; validate every dependency."
+  },
+  "workspace_templates.create": {
+    "description": "Create template",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + template + target group",
+    "target": "Workspace templates",
+    "area": "Platform",
+    "constraint": "Applying/deleting template can affect members' workspaces; validate every dependency."
+  },
+  "workspace_templates.apply": {
+    "description": "Apply/update template",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + template + target group",
+    "target": "Workspace templates",
+    "area": "Platform",
+    "constraint": "Applying/deleting template can affect members' workspaces; validate every dependency."
+  },
+  "workspace_templates.delete": {
+    "description": "Delete template and authorized managed copies",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + template + target group",
+    "target": "Workspace templates",
+    "area": "Platform",
+    "constraint": "Applying/deleting template can affect members' workspaces; validate every dependency."
+  },
+  "workspace_templates.group.bind": {
+    "description": "Change target-group binding",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + template + target group",
+    "target": "Workspace templates",
+    "area": "Platform",
+    "constraint": "Applying/deleting template can affect members' workspaces; validate every dependency."
+  },
+  "workspace_templates.identity.bind": {
+    "description": "Change identity binding",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + template + target group",
+    "target": "Workspace templates",
+    "area": "Platform",
+    "constraint": "Applying/deleting template can affect members' workspaces; validate every dependency."
+  },
+  "workspace_templates.secret.bind": {
+    "description": "Change secret binding",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + template + target group",
+    "target": "Workspace templates",
+    "area": "Platform",
+    "constraint": "Applying/deleting template can affect members' workspaces; validate every dependency."
+  },
+  "alerts.rules.read": {
+    "description": "Read authorized rules/events/channels",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + rule + monitored targets + destination",
+    "target": "Alert rules and channels",
+    "area": "Observability",
+    "constraint": "Target visibility is distinct from destination authority."
+  },
+  "alerts.rules.draft.edit": {
+    "description": "Draft rule",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + rule + monitored targets + destination",
+    "target": "Alert rules and channels",
+    "area": "Observability",
+    "constraint": "Target visibility is distinct from destination authority."
+  },
+  "alerts.rules.create": {
+    "description": "Create authorized rule",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + rule + monitored targets + destination",
+    "target": "Alert rules and channels",
+    "area": "Observability",
+    "constraint": "Target visibility is distinct from destination authority."
+  },
+  "alerts.rules.enable": {
+    "description": "Enable or disable rule",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + rule + monitored targets + destination",
+    "target": "Alert rules and channels",
+    "area": "Observability",
+    "constraint": "Target visibility is distinct from destination authority."
+  },
+  "alerts.rules.update": {
+    "description": "Update authorized rule",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + rule + monitored targets + destination",
+    "target": "Alert rules and channels",
+    "area": "Observability",
+    "constraint": "Target visibility is distinct from destination authority."
+  },
+  "alerts.rules.delete": {
+    "description": "Delete authorized rule",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + rule + monitored targets + destination",
+    "target": "Alert rules and channels",
+    "area": "Observability",
+    "constraint": "Target visibility is distinct from destination authority."
+  },
+  "alerts.rules.acknowledge": {
+    "description": "Acknowledge authorized incident",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + rule + monitored targets + destination",
+    "target": "Alert rules and channels",
+    "area": "Observability",
+    "constraint": "Target visibility is distinct from destination authority."
+  },
+  "webhooks.list": {
+    "description": "List authorized redacted channel metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global channel or explicit layer binding",
+    "target": "Webhooks and deliveries",
+    "area": "Observability",
+    "constraint": "Destination changes and credentials are protected; deliveries can contain sensitive data."
+  },
+  "webhooks.status.read": {
+    "description": "Read authorized delivery status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global channel or explicit layer binding",
+    "target": "Webhooks and deliveries",
+    "area": "Observability",
+    "constraint": "Destination changes and credentials are protected; deliveries can contain sensitive data."
+  },
+  "webhooks.test": {
+    "description": "Send test to authorized endpoint",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global channel or explicit layer binding",
+    "target": "Webhooks and deliveries",
+    "area": "Observability",
+    "constraint": "Destination changes and credentials are protected; deliveries can contain sensitive data."
+  },
+  "webhooks.delivery.read": {
+    "description": "Read authorized redacted delivery details",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global channel or explicit layer binding",
+    "target": "Webhooks and deliveries",
+    "area": "Observability",
+    "constraint": "Destination changes and credentials are protected; deliveries can contain sensitive data."
+  },
+  "webhooks.create": {
+    "description": "Create ordinary channel definition",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global channel or explicit layer binding",
+    "target": "Webhooks and deliveries",
+    "area": "Observability",
+    "constraint": "Destination changes and credentials are protected; deliveries can contain sensitive data."
+  },
+  "webhooks.update": {
+    "description": "Update ordinary channel configuration",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global channel or explicit layer binding",
+    "target": "Webhooks and deliveries",
+    "area": "Observability",
+    "constraint": "Destination changes and credentials are protected; deliveries can contain sensitive data."
+  },
+  "webhooks.delete": {
+    "description": "Delete channel",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global channel or explicit layer binding",
+    "target": "Webhooks and deliveries",
+    "area": "Observability",
+    "constraint": "Destination changes and credentials are protected; deliveries can contain sensitive data."
+  },
+  "webhooks.endpoint.change": {
+    "description": "Set/change endpoint or trust",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global channel or explicit layer binding",
+    "target": "Webhooks and deliveries",
+    "area": "Observability",
+    "constraint": "Destination changes and credentials are protected; deliveries can contain sensitive data."
+  },
+  "webhooks.credentials.change": {
+    "description": "Set/change credentials",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global channel or explicit layer binding",
+    "target": "Webhooks and deliveries",
+    "area": "Observability",
+    "constraint": "Destination changes and credentials are protected; deliveries can contain sensitive data."
+  },
+  "metrics.read": {
+    "description": "Read authorized metric metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + metric + all dependencies",
+    "target": "Metrics, KPIs and quality definitions",
+    "area": "Observability",
+    "constraint": "Measurement SQL rechecks data permissions; report authority bound to producer."
+  },
+  "metrics.history.read": {
+    "description": "Read authorized observations/history",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + metric + all dependencies",
+    "target": "Metrics, KPIs and quality definitions",
+    "area": "Observability",
+    "constraint": "Measurement SQL rechecks data permissions; report authority bound to producer."
+  },
+  "metrics.versions.read": {
+    "description": "Read authorized definition versions",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + metric + all dependencies",
+    "target": "Metrics, KPIs and quality definitions",
+    "area": "Observability",
+    "constraint": "Measurement SQL rechecks data permissions; report authority bound to producer."
+  },
+  "metrics.define": {
+    "description": "Create/version metric definition",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + metric + all dependencies",
+    "target": "Metrics, KPIs and quality definitions",
+    "area": "Observability",
+    "constraint": "Measurement SQL rechecks data permissions; report authority bound to producer."
+  },
+  "metrics.enable": {
+    "description": "Enable or disable metric",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + metric + all dependencies",
+    "target": "Metrics, KPIs and quality definitions",
+    "area": "Observability",
+    "constraint": "Measurement SQL rechecks data permissions; report authority bound to producer."
+  },
+  "metrics.schedule.set": {
+    "description": "Set measurement schedule",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + metric + all dependencies",
+    "target": "Metrics, KPIs and quality definitions",
+    "area": "Observability",
+    "constraint": "Measurement SQL rechecks data permissions; report authority bound to producer."
+  },
+  "metrics.measure": {
+    "description": "Run authorized SQL measurement",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + metric + all dependencies",
+    "target": "Metrics, KPIs and quality definitions",
+    "area": "Observability",
+    "constraint": "Measurement SQL rechecks data permissions; report authority bound to producer."
+  },
+  "metrics.report": {
+    "description": "Report observation for authorized producer/metric",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + metric + all dependencies",
+    "target": "Metrics, KPIs and quality definitions",
+    "area": "Observability",
+    "constraint": "Measurement SQL rechecks data permissions; report authority bound to producer."
+  },
+  "slas.read": {
+    "description": "Read authorized SLA/status/history",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset/incident",
+    "target": "SLAs and incidents",
+    "area": "Observability",
+    "constraint": "Do not expose hidden dependency values through history or incidents."
+  },
+  "slas.draft.edit": {
+    "description": "Draft SLA target",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset/incident",
+    "target": "SLAs and incidents",
+    "area": "Observability",
+    "constraint": "Do not expose hidden dependency values through history or incidents."
+  },
+  "slas.activate": {
+    "description": "Activate SLA target",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset/incident",
+    "target": "SLAs and incidents",
+    "area": "Observability",
+    "constraint": "Do not expose hidden dependency values through history or incidents."
+  },
+  "slas.evaluate": {
+    "description": "Evaluate authorized SLA",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset/incident",
+    "target": "SLAs and incidents",
+    "area": "Observability",
+    "constraint": "Do not expose hidden dependency values through history or incidents."
+  },
+  "slas.acknowledge": {
+    "description": "Acknowledge authorized SLA incident",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + asset/incident",
+    "target": "SLAs and incidents",
+    "area": "Observability",
+    "constraint": "Do not expose hidden dependency values through history or incidents."
+  },
+  "packages.list": {
+    "description": "List authorized package metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.read": {
+    "description": "Read package/version metadata",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.download": {
+    "description": "Download authorized package",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.install": {
+    "description": "Install authorized package in layer",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.upload": {
+    "description": "Upload draft package/version",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.publish": {
+    "description": "Publish package/version",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.yank": {
+    "description": "Yank version",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.unyank": {
+    "description": "Unyank version",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.version.delete": {
+    "description": "Delete package version",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.roles.assign": {
+    "description": "Assign package roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.roles.revoke": {
+    "description": "Revoke package roles",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global package object; explicit layer consumption binding",
+    "target": "Python/R packages",
+    "area": "Packages",
+    "constraint": "Installing is separate from discovery; executable publication never auto-approves Prod."
+  },
+  "packages.imports.list": {
+    "description": "List authorized import jobs",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global source trust; layer + policy/job/package",
+    "target": "Package imports and source policy",
+    "area": "Packages",
+    "constraint": "Import may publish shared executable code; importing Dev is distinct from approving Prod."
+  },
+  "packages.imports.read": {
+    "description": "Read authorized import job/status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global source trust; layer + policy/job/package",
+    "target": "Package imports and source policy",
+    "area": "Packages",
+    "constraint": "Import may publish shared executable code; importing Dev is distinct from approving Prod."
+  },
+  "packages.imports.request": {
+    "description": "Request approved import",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global source trust; layer + policy/job/package",
+    "target": "Package imports and source policy",
+    "area": "Packages",
+    "constraint": "Import may publish shared executable code; importing Dev is distinct from approving Prod."
+  },
+  "packages.imports.approve": {
+    "description": "Approve scoped import",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global source trust; layer + policy/job/package",
+    "target": "Package imports and source policy",
+    "area": "Packages",
+    "constraint": "Import may publish shared executable code; importing Dev is distinct from approving Prod."
+  },
+  "packages.imports.execute": {
+    "description": "Execute approved import",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global source trust; layer + policy/job/package",
+    "target": "Package imports and source policy",
+    "area": "Packages",
+    "constraint": "Import may publish shared executable code; importing Dev is distinct from approving Prod."
+  },
+  "packages.imports.allowlist.set": {
+    "description": "Set scoped package allowlist",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global source trust; layer + policy/job/package",
+    "target": "Package imports and source policy",
+    "area": "Packages",
+    "constraint": "Import may publish shared executable code; importing Dev is distinct from approving Prod."
+  },
+  "packages.imports.allowlist.reset": {
+    "description": "Reset scoped package allowlist",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Global source trust; layer + policy/job/package",
+    "target": "Package imports and source policy",
+    "area": "Packages",
+    "constraint": "Import may publish shared executable code; importing Dev is distinct from approving Prod."
+  },
+  "packages.imports.source_trust.change": {
+    "description": "Change explicitly owned global source trust ceiling",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Global source trust; layer + policy/job/package",
+    "target": "Package imports and source policy",
+    "area": "Packages",
+    "constraint": "Import may publish shared executable code; importing Dev is distinct from approving Prod."
+  },
+  "connections.discover": {
+    "description": "Discover authorized runtime connection metadata",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + data resource + execution identity",
+    "target": "Connection and scoped credentials",
+    "area": "Integration",
+    "constraint": "Requested operations cannot exceed exact data scope; machine use needs no desktop page grant."
+  },
+  "connections.read_lease": {
+    "description": "Acquire credential/lease limited to authorized read actions",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + data resource + execution identity",
+    "target": "Connection and scoped credentials",
+    "area": "Integration",
+    "constraint": "Requested operations cannot exceed exact data scope; machine use needs no desktop page grant."
+  },
+  "connections.write_lease": {
+    "description": "Acquire credential/lease limited to authorized data writes",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + data resource + execution identity",
+    "target": "Connection and scoped credentials",
+    "area": "Integration",
+    "constraint": "Requested operations cannot exceed exact data scope; machine use needs no desktop page grant."
+  },
+  "connections.admin_lease": {
+    "description": "Acquire credential/lease limited to authorized DDL",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + data resource + execution identity",
+    "target": "Connection and scoped credentials",
+    "area": "Integration",
+    "constraint": "Requested operations cannot exceed exact data scope; machine use needs no desktop page grant."
+  },
+  "connections.identity.bind": {
+    "description": "Bind protected execution identity",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Layer + data resource + execution identity",
+    "target": "Connection and scoped credentials",
+    "area": "Integration",
+    "constraint": "Requested operations cannot exceed exact data scope; machine use needs no desktop page grant."
+  },
+  "delegation.query": {
+    "description": "Execute viewer-authorized read query",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload + original viewer + data object",
+    "target": "Viewer-bound SQL/files",
+    "area": "Integration",
+    "constraint": "Reauthorize viewer on each request; no shared cache between viewers."
+  },
+  "delegation.files.read": {
+    "description": "Read viewer-authorized file",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload + original viewer + data object",
+    "target": "Viewer-bound SQL/files",
+    "area": "Integration",
+    "constraint": "Reauthorize viewer on each request; no shared cache between viewers."
+  },
+  "delegation.query.write": {
+    "description": "Execute viewer-authorized data write",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload + original viewer + data object",
+    "target": "Viewer-bound SQL/files",
+    "area": "Integration",
+    "constraint": "Reauthorize viewer on each request; no shared cache between viewers."
+  },
+  "delegation.files.write": {
+    "description": "Write viewer-authorized file",
+    "roles": [
+      "Contributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + workload + original viewer + data object",
+    "target": "Viewer-bound SQL/files",
+    "area": "Integration",
+    "constraint": "Reauthorize viewer on each request; no shared cache between viewers."
+  }
+}

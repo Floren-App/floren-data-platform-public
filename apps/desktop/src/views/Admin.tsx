@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, AppFeature, Webhook, WebhookDelivery, AppGroup, AppProfile, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput, WORKLOAD_KINDS, WorkloadKind, usablePools } from "../api";
 import type { Hub } from "../hub";
+import { can } from "../permissions";
 import { OpenTab } from "../components/Permissions";
 import { AlertRules } from "./Alerts";
 import { PageHeader } from "../components/Page";
@@ -19,6 +20,7 @@ const TYPE_ICON: Record<StorageType["kind"], string> = { postgres: "postgres", i
 const SSL_MODES = ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"];
 
 export function AdminLayers({ hub }: { hub: Hub }) {
+  const createAllowed = can(hub.me, "layers.collection.create", "set-layers");
   const [draft, setDraft] = useState<Layer | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); if (!draft) return; setBusy(true); setError("");
@@ -31,22 +33,22 @@ export function AdminLayers({ hub }: { hub: Hub }) {
     try { await api.layers.setDefault(layer.id); await hub.refresh(); } catch (e) { setError((e as Error).message); }
   };
   return <><PageHeader icon={<ProductIcon kind="layer" size={22} />} title="Layers" subtitle="Global boundaries for workspaces, storage, workloads, and APIs. A matching layer is required in addition to the user's object permissions. There are no built-in layers: create them here or with OpenTofu (fdp_layer)."
-    actions={<button className="btn" onClick={() => setDraft({ id: "", name: "", description: "", workspaces: true, production: false })}><IconPlus size={14} />Add layer</button>} />
+    actions={createAllowed && <button className="btn" onClick={() => setDraft({ id: "", name: "", description: "", workspaces: true, production: false })}><IconPlus size={14} />Add layer</button>} />
     {error && <p role="alert" className="error">{error}</p>}
     {draft && <form className="card" onSubmit={save}><h2>{draft.id ? `Edit ${draft.name}` : "New layer"}</h2><div className="arg-grid">
       <div className="field"><label htmlFor="layer-name">Layer name</label><input id="layer-name" required autoFocus maxLength={128} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></div>
       <div className="field"><label htmlFor="layer-description">Description</label><input id="layer-description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div></div>
       <label className="row"><input type="checkbox" checked={draft.workspaces} onChange={(e) => setDraft({ ...draft, workspaces: e.target.checked })} />Allow workspace creation and starting</label>
       <p className="hint">People can create private workspaces in enabled layers. This creates no security group and grants no access to data or programs. Existing object permissions still apply.</p>
-      <label className="row"><input type="checkbox" checked={!!draft.production} onChange={(e) => setDraft({ ...draft, production: e.target.checked })} />Production layer</label>
+      <label className="row"><input type="checkbox" checked={!!draft.production} disabled={!can(hub.me, "layers.object.production.set", "set-layers", draft.id || undefined)} onChange={(e) => setDraft({ ...draft, production: e.target.checked })} />Production layer</label>
       <p className="hint">Personal and group secrets cannot be used here; work in a production layer uses service account secrets.</p>
       <div className="form-actions"><button className="btn" disabled={busy || !draft.name.trim()}>Save layer</button><button type="button" className="btn secondary" onClick={() => setDraft(null)}>Cancel</button></div>
     </form>}
     {!hub.layers.length ? <p className="muted">No layers yet. Nothing can run until an administrator creates one, here or with OpenTofu (fdp_layer).</p>
     : <table aria-label="Layers"><thead><tr><th>Layer</th><th>Workspaces</th><th>Production</th><th>Default</th><th /></tr></thead><tbody>{hub.layers.map((layer) => <tr key={layer.id}>
       <td><strong>{layer.name}</strong><div className="muted">{layer.description}</div></td><td>{layer.workspaces ? "Allowed" : "Disabled"}</td><td>{layer.production ? "Yes" : "—"}</td>
-      <td>{layer.default ? <span className="badge" title="Work without a layer goes here">default</span> : <button className="btn sm secondary" onClick={() => void makeDefault(layer)}>Make default</button>}</td>
-      <td className="table-actions"><div className="row"><button className="btn sm secondary" onClick={() => setDraft(layer)}>Edit</button><button className="icon-btn" aria-label={`Delete layer ${layer.name}`} onClick={async () => { if (!confirm(`Delete the layer ${layer.name}? Only an unused, non-default layer can be deleted.`)) return; try { await api.layers.remove(layer.id); await hub.refresh(); } catch (e) { setError((e as Error).message); } }}><IconTrash size={14} /></button></div></td></tr>)}</tbody></table>}
+      <td>{layer.default ? <span className="badge" title="Work without a layer goes here">default</span> : can(hub.me, "platform.defaults.default_layer.set", "set-layers") && <button className="btn sm secondary" onClick={() => void makeDefault(layer)}>Make default</button>}</td>
+      <td className="table-actions"><div className="row">{can(hub.me, "layers.object.settings.edit", "set-layers", layer.id) && <button className="btn sm secondary" onClick={() => setDraft(layer)}>Edit</button>}{can(hub.me, "layers.object.delete_unused", "set-layers", layer.id) && <button className="icon-btn" aria-label={`Delete layer ${layer.name}`} onClick={async () => { if (!confirm(`Delete the layer ${layer.name}? Only an unused, non-default layer can be deleted.`)) return; try { await api.layers.remove(layer.id); await hub.refresh(); } catch (e) { setError((e as Error).message); } }}><IconTrash size={14} /></button>}</div></td></tr>)}</tbody></table>}
     <p className="scope-note">Layer assignments cannot be changed by moving an existing workload or data integration. Deploy a separate instance to promote between layers.</p>
   </>;
 }
@@ -404,28 +406,34 @@ export function AdminWorkspaceTemplates({ hub }: { hub: Hub }) {
   </>;
 }
 
-export function AdminNetwork() {
-  const { data, error, reload, setError } = useLoad(api.admin.egress, { hosts: [], proxy: true } as EgressAllowlist);
+export function AdminNetwork({ hub }: { hub: Hub }) {
+  const [global, setGlobal] = useState(false);
+  const layer = global ? undefined : hub.layerId || undefined;
+  const load = useCallback(() => api.admin.egress(layer), [layer]);
+  const { data, error, reload, setError } = useLoad(load, { hosts: [], proxy: true } as EgressAllowlist);
+  const editable = can(hub.me, global ? "network.editor_allowlist.ceiling.change" : "network.editor_allowlist.apply", "set-network", layer);
   const [draft, setDraft] = useState<EgressHost[] | null>(null), [busy, setBusy] = useState(false);
   const hosts = draft ?? data.hosts;
   const edit = (i: number, change: Partial<EgressHost>) => setDraft(hosts.map((h, n) => n === i ? { ...h, ...change } : h));
   const save = async () => {
     setBusy(true); setError(null);
-    try { await api.admin.saveEgress(hosts.filter((h) => h.host.trim())); setDraft(null); reload(); }
+    try { await api.admin.saveEgress(hosts.filter((h) => h.host.trim()), layer); setDraft(null); reload(); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
   return <>
     <PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Network allowlist"
       subtitle="Host names VS Code and RStudio workspaces may reach over HTTPS, for example github.com for Git, or *.githubusercontent.com for its subdomains. Nothing else on the internet is reachable, and names that resolve to private addresses are refused. Changes reach running workspaces within seconds. Also configurable with OpenTofu (fdp_egress_allowlist)."
-      actions={<button className="btn" onClick={() => setDraft([...hosts, { host: "", description: "" }])}><IconPlus size={14} />Add host</button>} />
+      actions={editable && <button className="btn" onClick={() => setDraft([...hosts, { host: "", description: "" }])}><IconPlus size={14} />Add host</button>} />
+    {can(hub.me, "network.editor_allowlist.ceiling.change", "set-network") && <label className="row"><input type="checkbox" checked={global} onChange={(e) => { setDraft(null); setGlobal(e.target.checked); }} />Platform host ceiling</label>}
+    <p className="scope-note">{global ? "Platform ceiling: layer rules must stay within these hosts." : `Layer: ${hub.layers.find((l) => l.id === layer)?.name ?? "Choose a layer"}`}</p>
     {error && <p className="error" role="alert">{error}</p>}
     {!data.proxy && <p className="error" role="alert">This installation does not run the egress proxy (Helm egressProxy.enabled), so workspaces have no internet access whatever this list says.</p>}
     {!hosts.length ? <p className="muted">No hosts allowed: workspaces reach only the platform.</p>
     : <table aria-label="Allowed hosts"><thead><tr><th>Host name</th><th>Description</th><th /></tr></thead><tbody>
       {hosts.map((h, i) => <tr key={i}>
-        <td><input aria-label={`Host ${i + 1}`} placeholder="github.com" value={h.host} onChange={(e) => edit(i, { host: e.target.value })} /></td>
-        <td><input aria-label={`Description ${i + 1}`} maxLength={200} value={h.description} onChange={(e) => edit(i, { description: e.target.value })} /></td>
-        <td className="table-actions"><button className="icon-btn" aria-label={`Remove ${h.host || "host"}`} onClick={() => setDraft(hosts.filter((_, n) => n !== i))}><IconTrash size={14} /></button></td>
+        <td><input disabled={!editable} aria-label={`Host ${i + 1}`} placeholder="github.com" value={h.host} onChange={(e) => edit(i, { host: e.target.value })} /></td>
+        <td><input disabled={!editable} aria-label={`Description ${i + 1}`} maxLength={200} value={h.description} onChange={(e) => edit(i, { description: e.target.value })} /></td>
+        <td className="table-actions">{editable && <button className="icon-btn" aria-label={`Remove ${h.host || "host"}`} onClick={() => setDraft(hosts.filter((_, n) => n !== i))}><IconTrash size={14} /></button>}</td>
       </tr>)}
     </tbody></table>}
     {draft && <div className="form-actions"><button className="btn" disabled={busy} onClick={() => void save()}>Save allowlist</button>

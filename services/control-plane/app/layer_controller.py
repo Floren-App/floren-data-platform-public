@@ -296,7 +296,7 @@ def monitor_certificates(claim, resources, namespace, issued, session_factory=Se
     endpoints = [('trino', 8443, False, claim.spec.trino.tls.mode != 'disabled'),
                  ('postgres', 5432, True, claim.spec.postgres.enabled and claim.spec.postgres.tls.mode != 'disabled'),
                  ('rustfs', 9000, False, claim.spec.rustfs.enabled and claim.spec.rustfs.tls.mode != 'disabled'),
-                 ('kafka-kafka-bootstrap', 9093, False, claim.spec.kafka.enabled)]
+                 ('kafka-kafka-bootstrap', 9093, False, claim.spec.kafka.running)]
     try:
         with session_factory() as db:
             keys = []
@@ -369,7 +369,7 @@ def retire(claim, resources, config, session_factory):
                 document['spec']['replicas'] = 0
             renew(claim, session_factory)
             resources.apply(document)
-        if claim.spec.kafka.enabled:
+        if claim.spec.kafka.running:
             if not retire_kafka(claim, resources, namespace, config):
                 finish(claim, 'Provisioning', 'WaitingForKafkaPause',
                        'Waiting for Strimzi to pause before stopping brokers; storage is retained', 10, session_factory)
@@ -397,7 +397,7 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
     try:
         documents = manifests(claim.layer_id, claim.generation, claim.spec, config, claim.source_catalogs, claim.workers,
                               claim.workspaces, claim.kafka_workers)
-        if claim.spec.kafka.enabled:
+        if claim.spec.kafka.running:
             try:
                 available = resources.request('GET', '/apis/kafka.strimzi.io/v1')
             except ApiException as exc:
@@ -433,7 +433,7 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
                           if not key.startswith('pod-security.')}
                 for name, values in generated_credentials(claim.spec):
                     resources.create_secret_once(namespace, name, labels, values())
-                if claim.spec.kafka.enabled:
+                if claim.spec.kafka.running:
                     from .kafka_access import broker_credential
                     from .layer_kafka import POLICY_SECRET
                     resources.create_secret_once(namespace, POLICY_SECRET, labels,
@@ -448,7 +448,12 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
                         raise ProvisioningError('StartupFailed', 'A layer deployment did not become ready before its startup deadline; check images, quota, volumes and pod events')
                 waiting = not deployment_ready(applied) or waiting
         monitor_certificates(claim, resources, namespace, issued, session_factory)
-        if claim.spec.kafka.enabled:
+        if not claim.spec.kafka.running and claim.spec.kafka.image:
+            if not stop_kafka(claim, resources, namespace, config):
+                finish(claim, 'Provisioning', 'WaitingForKafkaPause',
+                       'Waiting for Kafka brokers to stop; topics, permissions and storage are retained', 10, session_factory)
+                return
+        if claim.spec.kafka.running:
             reconcile_kafka_topics(claim, resources, namespace, config, session_factory)
         if egress_problems:
             reason = egress_problems[0]
@@ -468,7 +473,7 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
         elif claim.spec.trino.tls.mode != 'disabled' and not resources.verify_https('fdp-trino.%s.svc' % namespace):
             finish(claim, 'Provisioning', 'WaitingForVerifiedTLS',
                 'Trino HTTPS is not verified; check the platform CA bundle, layer certificate DNS/validity and endpoint connectivity', 10, session_factory)
-        elif claim.spec.kafka.enabled and not resources.verify_kafka('fdp-kafka-kafka-bootstrap.%s.svc' % namespace):
+        elif claim.spec.kafka.running and not resources.verify_kafka('fdp-kafka-kafka-bootstrap.%s.svc' % namespace):
             finish(claim, 'Provisioning', 'WaitingForVerifiedKafkaTLS',
                 'Kafka TLS is not verified; check trusted CA, broker certificate names and network policies', 10, session_factory)
         elif claim.spec.postgres.enabled and claim.spec.postgres.tls.mode != 'disabled' and not resources.verify_postgres('fdp-postgres.%s.svc' % namespace):
@@ -489,6 +494,30 @@ def reconcile(claim, resources, config, session_factory=SessionLocal):
             'KubernetesUnavailable' if transient else 'KubernetesRejected',
             'Kubernetes request failed; verify controller permissions, resource ownership, API availability and admission policies',
             30 if transient else 0, session_factory)
+
+
+def stop_kafka(claim, resources, namespace, config):
+    """Pause the operator before clearing owned compute; retain the Kafka CR and PVCs."""
+    path = '/apis/kafka.strimzi.io/v1/namespaces/'+namespace+'/kafkas/fdp-kafka'
+    try:
+        current = resources.request('GET', path)
+    except ApiException as exc:
+        if exc.status == 404:
+            return True
+        raise
+    meta = current['metadata']
+    if any(meta.get('labels', {}).get(key) != value for key, value in
+           ((OWNER, config.installation), (LAYER, claim.layer_id), (COMPONENT, 'kafka'))):
+        raise ProvisioningError('OwnershipConflict', 'Refusing to pause an unowned Kafka cluster')
+    if meta.get('annotations', {}).get('strimzi.io/pause-reconciliation') != 'true':
+        patch = [{'op':'test','path':'/metadata/resourceVersion','value':meta['resourceVersion']}]
+        if 'annotations' not in meta:
+            patch.append({'op':'add','path':'/metadata/annotations','value':{}})
+        patch.append({'op':'add','path':'/metadata/annotations/strimzi.io~1pause-reconciliation','value':'true'})
+        resources.api.call_api(path, 'PATCH', body=patch,
+            header_params={'Content-Type':'application/json-patch+json','Accept':'application/json'})
+        return False
+    return retire_kafka(claim, resources, namespace, config)
 
 
 def retire_kafka(claim, resources, namespace, config):

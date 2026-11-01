@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { pageVisible, TAB_PAGES } from "../permissions";
 import { accessibleSchemas, accessibleSources, ago, api, AccessResource, inGroup, shortSha, inLayer, poolDot, poolInLayer, rEnabled, EDITOR_LABEL, EDITOR_NAME, Editor, openInWindow, Run, RunKind, RunScope, startingPool, usablePools, workloadDot, workloadStatus } from "../api";
 import { ProductIcon } from "../components/ProductIcon";
 import { resourceTab } from "../components/Permissions";
@@ -24,6 +25,9 @@ interface Props {
 export function Sidebar(props: Props) {
   const { view, hub } = props;
   const cache = useObjectCache();
+  const gates: Partial<Record<View, string[]>> = { home: ["home"], apis: ["apis"], catalog: ["products", "catalog", "requests"],
+    workspaces: ["workspaces", "git-creds", "runs"], workloads: ["workloads", "repos"], data: ["storage"], kafka: ["kafka"], compute: ["usage"], packages: ["packages", "imports"] };
+  if (gates[view] && !gates[view]!.some((page) => pageVisible(hub.me, page))) return null;
   const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Access", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Usage", packages: "Packages", admin: "Administration" }[view];
   return (
     <>
@@ -42,7 +46,7 @@ export function Sidebar(props: Props) {
       {view === "home" && <><div className="section-title">Your platform</div><ul className="list">
         {([{ kind: "home", title: "Overview", icon: <IconHome size={16} /> }, { kind: "workspaces", title: "My workspaces", icon: <IconWorkspaces size={16} /> },
           { kind: "folder", ref: "workloads", title: "Browse workloads", icon: <IconDeployed size={16} /> }, { kind: "runs", title: "Recent runs", icon: <IconRuns size={16} /> },
-          { kind: "products", title: "Browse catalog", icon: <IconCatalog size={16} /> }] as (TabRef & { icon: JSX.Element })[]).map(({ icon, ...tab }) =>
+          { kind: "products", title: "Browse catalog", icon: <IconCatalog size={16} /> }] as (TabRef & { icon: JSX.Element })[]).filter((tab) => pageVisible(hub.me, TAB_PAGES[tab.kind])).map(({ icon, ...tab }) =>
           <li key={tab.kind} className={tab.kind === "home" ? "selected" : ""}><button className="nav-item" onClick={() => props.openTab({ ...tab, title: tab.kind === "home" ? "Home" : tab.kind === "folder" ? "Workloads" : tab.kind === "products" ? "Data products" : tab.kind === "workspaces" ? "Workspaces" : tab.title })}>{icon}{tab.title}</button></li>)}
       </ul><p className="sidebar-note muted">Your work, recent activity, and the pipelines you follow. Search the catalog with ⌘K / Ctrl+K.</p></>}
       {view === "workloads" && <DeployedPanel {...props} />}
@@ -63,7 +67,7 @@ function CatalogPanel({ hub, openTab, activeKey, activeRef }: Props) {
   const publisher = hub.has("products.publish");
   const requests = useCached("catalog:requests:approve", () => api.products.requests("approve"), publisher);
   const waiting = (requests.data ?? []).filter((r) => r.status === "pending").length;
-  const item = (key: string, tab: TabRef, label: string, icon: JSX.Element, badge?: number) =>
+  const item = (key: string, tab: TabRef, label: string, icon: JSX.Element, badge?: number) => !pageVisible(hub.me, TAB_PAGES[tab.kind]) ? null :
     <li key={key} className={activeKey === key ? "selected" : ""}><button className="nav-item" onClick={() => openTab(tab)}>{icon}<span className="grow">{label}</span>
       {!!badge && <span className="badge" aria-label={`${badge} waiting`}>{badge}</span>}</button></li>;
   return <>
@@ -174,8 +178,8 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
       <OtherLayers count={hub.workspaces.length - shown.length} groups />
       <div className="sidebar-section-divider" />
       <ul className="list">
-        <li className={activeKey === "runs:workspace" ? "selected" : ""}><button className="nav-item" onClick={() => openTab({ kind: "runs", ref: "workspace", title: "Workspace runs" })}><IconRuns size={16} />Workspace runs</button></li>
-        <li className={activeKey === "git-credentials:" ? "selected" : ""}><button className="nav-item" onClick={() => openTab({ kind: "git-credentials", title: "Git credentials" })}><IconKey size={16} />Git credentials</button></li>
+        {pageVisible(hub.me, "runs") && <li className={activeKey === "runs:workspace" ? "selected" : ""}><button className="nav-item" onClick={() => openTab({ kind: "runs", ref: "workspace", title: "Workspace runs" })}><IconRuns size={16} />Workspace runs</button></li>}
+        {pageVisible(hub.me, "git-creds") && <li className={activeKey === "git-credentials:" ? "selected" : ""}><button className="nav-item" onClick={() => openTab({ kind: "git-credentials", title: "Git credentials" })}><IconKey size={16} />Git credentials</button></li>}
       </ul>
     </>
   );
@@ -285,7 +289,7 @@ function DeployedPanel({ hub, openTab, activeKey }: Props) {
     <ul className="list"><li className={activeKey === "runs:" || activeKey === "runs:deployed" ? "selected" : ""}>
       <button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "runs" })}><IconRuns size={16} />Recent runs</button></li>
       <li><button className="nav-item" onClick={() => openTab({ kind: "folder", ref: "workloads", title: "Workloads", section: "logs" })}><IconLog size={16} />Logs</button></li>
-      {hub.me?.is_admin && <li className={activeKey === "repos:" ? "selected" : ""}><button className="nav-item" onClick={() => openTab({ kind: "repos", title: "Git repositories" })}><IconBranch size={16} />Git repositories</button></li>}</ul>
+      {pageVisible(hub.me, "repos") && <li className={activeKey === "repos:" ? "selected" : ""}><button className="nav-item" onClick={() => openTab({ kind: "repos", title: "Git repositories" })}><IconBranch size={16} />Git repositories</button></li>}</ul>
   </>;
 }
 
@@ -401,7 +405,7 @@ function PackagesPanel({ hub, openTab, activeKey, activeRef }: Props) {
   ];
   return <>
     <ul className="list">
-      {items.map(({ label, icon, ...t }) => <li key={label} className={activeKey === `${t.kind}:${t.ref ?? ""}` && (activeRef ?? "") === (t.ref ?? "") ? "selected" : ""}>
+      {items.filter((t) => pageVisible(hub.me, TAB_PAGES[t.kind])).map(({ label, icon, ...t }) => <li key={label} className={activeKey === `${t.kind}:${t.ref ?? ""}` && (activeRef ?? "") === (t.ref ?? "") ? "selected" : ""}>
         <button className="nav-item" onClick={() => openTab(t)}>{icon}{label}</button></li>)}
     </ul>
     <p className="sidebar-note muted">Workspaces and programs install packages only from here. pip, uv, install.packages and renv are already set up to use it.</p>
@@ -412,20 +416,18 @@ function PackagesPanel({ hub, openTab, activeKey, activeRef }: Props) {
  * and the work queues follow review duties and data ownership. */
 export function accessSections(hub: Hub) {
   // Administrators acting as another group see that group's part, like the app profile does.
-  const roles = hub.me?.compliance_roles ?? [], admin = hub.me?.acting_admin ?? !!hub.me?.is_admin, settings = hub.me?.settings ?? {};
-  const page = (id: string) => admin || !!settings[id];
-  const privacyAdmin = admin || roles.includes("compliance_admin");
+  const page = (id: string) => pageVisible(hub.me, id);
   return {
     page,
-    requests: hub.has("products.publish"),
-    reviews: privacyAdmin || roles.includes("compliance_reviewer"),
-    newMembers: privacyAdmin || roles.includes("membership_approver"),
-    deadlines: hub.has("products.publish") || privacyAdmin || roles.includes("compliance_reviewer"),
-    who: admin || hub.has("security") || page("set-groups"),
-    services: admin || hub.has("security") || page("set-services"),
-    register: privacyAdmin || roles.includes("compliance_reviewer") || page("set-register"),
+    requests: page("requests"),
+    reviews: page("reviews"),
+    newMembers: page("memberships"),
+    deadlines: page("deadlines"),
+    who: page("people") || page("set-groups"),
+    services: page("set-services"),
+    register: page("set-register"),
     audit: page("set-auditlog"), queries: page("set-querylog"),
-    secrets: admin || hub.has("workspaces") || hub.has("workloads.manage"),
+    secrets: page("secrets"),
     platform: ["set-layers", "set-pools", "set-runtimes", "set-template", "set-alerts"].some(page),
     security: ["set-profiles", "set-network"].some(page),
     privacy: ["set-classes", "set-policies", "set-forms", "set-duties"].some(page),
@@ -461,7 +463,7 @@ function AccessPanel({ hub, openTab, activeKey }: Props) {
       can.newMembers && { kind: "privacy-memberships", title: "New members" },
       can.deadlines && !!badges.deadlines && { kind: "deadlines", title: "Needs a form" }]} />
     <NavList label="Who" activeKey={activeKey} openTab={openTab} items={[
-      can.who && { kind: "users", title: "People" }, can.who && { kind: "access", title: "Groups" }, can.services && { kind: "services", title: "Service identities" }]} />
+      can.page("people") && { kind: "users", title: "People" }, can.page("set-groups") && { kind: "access", title: "Groups" }, can.services && { kind: "services", title: "Service identities" }]} />
     <NavList label="Records" activeKey={activeKey} openTab={openTab} items={[
       can.register && { kind: "privacy-register", title: "Access register" }, can.audit && { kind: "admin-audit", title: "Audit log" },
       can.queries && { kind: "admin-query-log", title: "Query log" }]} />

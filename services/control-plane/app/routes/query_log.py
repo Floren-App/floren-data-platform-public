@@ -22,7 +22,7 @@ router = APIRouter(tags=["observability"])
 
 
 @router.get("/v1/admin/siem", tags=["admin"])
-def siem_status(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-auditlog", "view"))):
+def siem_status(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-querylog", "siem.status.read"))):
     """SIEM destinations: configured or not, events sent, how far exported and the last (sanitized) error."""
     from .. import siem
     from ..config import get_settings
@@ -55,10 +55,21 @@ def row_out(r: QueryLog) -> dict:
 def list_queries(actor: str = "", layer_id: str = "", state: str = "", table: str = "", before: Optional[datetime] = None,
                  limit: int = 100, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Newest first. Administrators see every query; everyone else the queries they ran or started."""
+    from .. import permissions, page_access, layers
+    user = permissions.rbac.resolve_user(db, user)
+    global_read = settings_access.allowed(db, user, "set-querylog", "query_log.read")
+    own_read = page_access.allowed(db, user, "set-querylog") and permissions.allowed(
+        db, user, "query_log.read", user.principal_id)
+    visible = [l.id for l in layers.all_layers(db) if settings_access.allowed(
+        db, user, "set-querylog", "query_log.read", l.id)]
+    if not (global_read or own_read or visible):
+        raise HTTPException(403, "query_log.read and Viewer on Query log required")
     query = select(QueryLog).order_by(QueryLog.created_at.desc()).limit(max(1, min(limit, 500)))
-    if not ((user.is_admin and not user.execution_context) or settings_access.allowed(db, user, "set-querylog", "view")):
-        mine = user.principal_id or "-"
-        query = query.where(or_(QueryLog.principal_id == mine, QueryLog.initiator_id == mine))
+    if not global_read:
+        clauses = [QueryLog.layer_id.in_(visible)]
+        if own_read:
+            clauses.extend((QueryLog.principal_id == user.principal_id, QueryLog.initiator_id == user.principal_id))
+        query = query.where(or_(*clauses))
     if actor:
         query = query.where(QueryLog.actor.ilike(f"%{actor}%"))
     if layer_id:
@@ -70,7 +81,15 @@ def list_queries(actor: str = "", layer_id: str = "", state: str = "", table: st
     rows = list(db.scalars(query))
     if table:
         rows = [r for r in rows if any(table.lower() in t.lower() for t in (r.tables or []) + [r.output_table])]
-    return [row_out(r) for r in rows]
+    result = []
+    for row in rows:
+        item = row_out(row)
+        text_read = settings_access.allowed(db, user, "set-querylog", "query_log.text.read") or settings_access.allowed(
+            db, user, "set-querylog", "query_log.text.read", row.layer_id)
+        if not text_read and not (own_read and permissions.allowed(db, user, "query_log.text.read", user.principal_id)):
+            item["sql_text"] = None
+        result.append(item)
+    return result
 
 
 class QueryLogSettingsIn(BaseModel):
@@ -79,12 +98,12 @@ class QueryLogSettingsIn(BaseModel):
 
 
 @router.get("/v1/admin/settings/query-log")
-def query_log_settings(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-querylog", "view"))):
+def query_log_settings(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-querylog", "query_log.read"))):
     return query_log.settings(db)
 
 
 @router.put("/v1/admin/settings/query-log")
-def set_query_log_settings(body: QueryLogSettingsIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-querylog", "manage"))):
+def set_query_log_settings(body: QueryLogSettingsIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-querylog", "query_log.retention.set"))):
     result = query_log.save_settings(db, body.retention_days, body.record_sql)
     audit(db, admin.username, "settings.query_log", query_log.KEY, **body.model_dump())
     db.commit()
@@ -92,7 +111,7 @@ def set_query_log_settings(body: QueryLogSettingsIn, db: Session = Depends(get_d
 
 
 @router.delete("/v1/admin/settings/query-log", status_code=204)
-def reset_query_log_settings(db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-querylog", "manage"))):
+def reset_query_log_settings(db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-querylog", "query_log.reset"))):
     """Back to the defaults: 90 days, no SQL text."""
     from ..models import PlatformSetting
     row = db.get(PlatformSetting, query_log.KEY)

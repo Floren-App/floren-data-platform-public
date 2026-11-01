@@ -194,8 +194,19 @@ class LayerIceberg(Contract):
 
 
 class KafkaInfrastructure(Contract):
-    """Opt-in Strimzi/KRaft cluster. The image must contain FDP's policy authorizer."""
-    enabled: bool = False
+    """Built-in layer capability; running controls broker compute, never availability."""
+    enabled: Literal[True] = True
+    running: bool = False
+
+    @model_validator(mode='before')
+    @classmethod
+    def legacy_running(cls, value):
+        if isinstance(value, dict):
+            value = dict(value)
+            if 'running' not in value and 'enabled' in value:
+                value['running'] = value['enabled']
+            value['enabled'] = True
+        return value
     image: Optional[str] = Field(default=None, min_length=1, max_length=512)
     version: Literal['4.3.1'] = '4.3.1'
     warehouse: Optional[str] = Field(default=None, min_length=1, max_length=64)
@@ -207,7 +218,7 @@ class KafkaInfrastructure(Contract):
 
     @model_validator(mode='after')
     def secured(self):
-        if self.enabled:
+        if self.running:
             if not self.image or self.image.endswith(':latest') or (':' not in self.image.rsplit('/', 1)[-1] and '@sha256:' not in self.image):
                 raise ValueError('Kafka requires a pinned FDP Kafka image containing its authorizer')
             if not self.warehouse:
@@ -233,7 +244,7 @@ class InfrastructureSpec(Contract):
 
     @model_validator(mode='after')
     def managed_requirements(self):
-        if self.kafka.enabled and not self.enabled:
+        if self.kafka.running and not self.enabled:
             raise ValueError('Kafka requires managed layer infrastructure')
         if self.retired and not self.enabled:
             raise ValueError('only managed infrastructure can be retired')
@@ -318,7 +329,7 @@ def configure(db, layer_id, change, retry=False):
     current = InfrastructureSpec.model_validate(layer.config.get('infrastructure', {})).model_dump(mode='json')
     if change.spec.enabled and not change.spec.retired:
         require_worker_warehouse(db, change.spec, layer.id)
-        if change.spec.kafka.enabled:
+        if change.spec.kafka.running:
             from .kafka_access import broker_credential
             broker_credential(layer.id)  # refuse known/weak development keys before queuing infrastructure
             from .layer_kafka import broker_plan
@@ -329,9 +340,9 @@ def configure(db, layer_id, change, retry=False):
                 raise HTTPException(422, exc.message) from None
             if layer.config.get('production') and change.spec.kafka.replicas < 3:
                 raise HTTPException(422, 'Production Kafka requires at least three replicas')
-    if current.get('kafka', {}).get('enabled'):
-        if not desired['kafka']['enabled']:
-            raise HTTPException(409, 'Kafka storage cannot be disabled implicitly; retire it explicitly')
+    if current.get('kafka', {}).get('image'):
+        if any(current['kafka'].get(k) != desired['kafka'].get(k) for k in ('image', 'warehouse')) and not desired['kafka']['running']:
+            raise HTTPException(409, 'Stopping Kafka retains its image and warehouse configuration')
         if any(current['kafka'][k] != desired['kafka'][k] for k in ('storage_class','size','replicas')):
             raise HTTPException(409, 'Kafka storage and quorum changes require an explicit migration')
     if desired == current and not retry:

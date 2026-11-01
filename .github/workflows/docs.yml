@@ -2,10 +2,10 @@ name: documentation
 
 on:
   pull_request:
-    paths: ['docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'scripts/*docs*', 'scripts/docs_reference.py', 'services/control-plane/**', 'sdk/**', 'terraform/provider-fdp/**', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'scripts/*docs*', 'scripts/docs_reference.py', 'scripts/permission_reference.py', 'services/control-plane/**', 'sdk/**', 'terraform/provider-fdp/**', 'terraform/modules/pokemon/**', 'examples/pokemon/**', '.github/workflows/docs.yml']
   push:
     branches: [main]
-    paths: ['docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'scripts/*docs*', 'scripts/docs_reference.py', 'services/control-plane/**', 'sdk/**', 'terraform/provider-fdp/**', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'scripts/*docs*', 'scripts/docs_reference.py', 'scripts/permission_reference.py', 'services/control-plane/**', 'sdk/**', 'terraform/provider-fdp/**', 'terraform/modules/pokemon/**', 'examples/pokemon/**', '.github/workflows/docs.yml']
   workflow_dispatch:
 
 permissions:

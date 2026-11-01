@@ -35,8 +35,17 @@ PAGES: Dict[str, tuple] = {
 KINDS = ("settings-root", "settings-section", "setting")
 # Viewer and Manager are given to groups; Owner is Global Admin's protected access to every object, so platform
 # administrators see these pages in listings like any other object.
-ROLES = {"Viewer": {"read"}, "Manager": {"read", "manage"}, "Owner": {"read", "manage", "assign"}}
+ROLES = {"Viewer": {"read"}, "Executor": {"read"}, "Contributor": {"read"},
+         "Manager": {"read", "manage"}, "Admin": {"read", "manage"}, "Owner": {"read", "manage", "assign"}}
 ACTIONS = {"view": "read", "manage": "manage"}
+NAMESPACES = {
+    "set-layers": "layers.object", "set-pools": "compute.pools", "set-runtimes": "runtimes",
+    "set-template": "workspace_templates", "set-alerts": "alerts.rules", "set-profiles": "profiles",
+    "set-network": "network.editor_allowlist", "set-classes": "classification.dictionary",
+    "set-policies": "compliance.policies", "set-forms": "compliance.forms", "set-duties": "compliance.duties",
+    "set-groups": "groups", "set-services": "identities", "set-register": "compliance.register",
+    "set-auditlog": "audit", "set-querylog": "query_log",
+}
 
 
 def ensure(db) -> None:
@@ -52,15 +61,30 @@ def ensure(db) -> None:
     db.flush()
 
 
-def allowed(db, user, page: str, action: str = "manage") -> bool:
+def allowed(db, user, page: str, action: str = "manage", layer_id=None) -> bool:
     """action: view or manage."""
     resolved = rbac.resolve_user(db, user)
-    if resolved.is_admin and not resolved.execution_context:
+    from .app_profiles import acting_as_admin
+    from . import page_access, permissions
+    if acting_as_admin(resolved):
         return True
-    if PAGES.get(page, ("", ""))[1] == "adm-privacy":
-        from .compliance import has_role
-        if has_role(db, resolved, "compliance_admin"):
-            return True  # the earlier compliance administrator role keeps working
+    from .app_profiles import interactive
+    if interactive(resolved) and not page_access.allowed(db, resolved, page, layer_id):
+        return False
+    if action == "view":
+        return True
+    if action not in ACTIONS:
+        if permissions.allowed(db, resolved, action, page, layer_id):
+            return True
+        definition = permissions.REGISTRY.get(action)
+        if not definition:
+            return False
+        # Explicit legacy page roles remain broad until their assignments are migrated.
+        # Scoped grants never fall back to an unscoped legacy manager.
+        if layer_id is not None:
+            return False
+        legacy = "read" if "Viewer" in definition["roles"] else "assign" if definition["roles"] == ["Owner"] else "manage"
+        return rbac.allowed(db, resolved, legacy, db.get(Resource, page))
     resource = db.get(Resource, page)
     if resource is None:
         ensure(db)
@@ -68,9 +92,10 @@ def allowed(db, user, page: str, action: str = "manage") -> bool:
     return rbac.allowed(db, resolved, ACTIONS[action], resource)
 
 
-def require(db, user, page: str, action: str = "manage"):
-    if not allowed(db, user, page, action):
-        raise HTTPException(403, f"{'Manager' if action == 'manage' else 'Viewer'} on {PAGES[page][0]} required")
+def require(db, user, page: str, action: str = "manage", layer_id=None):
+    if not allowed(db, user, page, action, layer_id):
+        label = 'Manager' if action == 'manage' else 'Viewer' if action == 'view' else action
+        raise HTTPException(403, f"{label} on {PAGES[page][0]} required")
     return rbac.resolve_user(db, user)
 
 
@@ -81,34 +106,18 @@ def needs(page: str, action: str = "manage"):
     return check
 
 
-def granted(db, user) -> Dict[str, Optional[str]]:
+def granted(db, user, layer_id=None) -> Dict[str, Optional[str]]:
     """For the app: per page, "manage", "view" or nothing. Platform administrators with Global Admin active get every
-    page; with another group active they see what their groups were given, like everyone else (the API still lets
-    them do everything)."""
-    from sqlalchemy import select
+    page; with another group active they use explicit grants, including in backend authorization."""
     from .app_profiles import acting_as_admin
-    from .models import ComplianceRole
     resolved = rbac.resolve_user(db, user)
     if acting_as_admin(resolved):
         return {page: "manage" for page in PAGES}
-    groups = rbac.app_groups(db, resolved)
-    privacy_admin = bool(groups) and db.scalar(select(ComplianceRole.id).where(
-        ComplianceRole.role == "compliance_admin", ComplianceRole.app_group_id.in_(list(groups))).limit(1)) is not None
     out = {}
     for page, (_, section) in PAGES.items():
-        if privacy_admin and section == "adm-privacy":
-            out[page] = "manage"   # the earlier compliance administrator role
-            continue
-        resource = db.get(Resource, page)
-        if resource is None:
-            ensure(db)
-            resource = db.get(Resource, page)
-        actions = set()
-        for grant in rbac.access(db, resolved, resource):
-            if not grant.get("system"):   # not the administrator's built-in access
-                actions |= ROLES.get(grant["role"], set())
-        if "manage" in actions:
+        if allowed(db, resolved, page, "manage", layer_id):
             out[page] = "manage"
-        elif "read" in actions:
+            continue
+        if allowed(db, resolved, page, "view", layer_id):
             out[page] = "view"
     return out
