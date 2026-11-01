@@ -342,6 +342,7 @@ class Me(BaseModel):
     app_features: List[str] = Field(default_factory=list, description="App features this person has in the active group")
     compliance_roles: List[str] = Field(default_factory=list, description="Compliance roles this person holds (in any scope)")
     settings: Dict[str, str] = Field(default_factory=dict, description="Access and Administration pages this person may use: page -> view or manage")
+    acting_admin: bool = Field(default=False, description="A platform administrator with Global Admin (or no group) active: the whole app")
     available_groups: List[Dict[str, Any]] = Field(default_factory=list)
     username: str
     groups: List[str]

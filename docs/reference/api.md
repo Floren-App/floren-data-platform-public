@@ -19,10 +19,10 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
-| `GET` | `/v1/egress/{slug}/{path}` | Egress |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
-| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
+| `GET` | `/v1/egress/{slug}/{path}` | Egress |
+| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC

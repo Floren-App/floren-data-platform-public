@@ -3236,3 +3236,18 @@ test("a file opens on its preview, and its overview shows how to read it in code
   await expect(main.getByText('data = files.read_csv("landing/sales.csv")')).toBeVisible();
   expect(state.errors).toEqual([]);
 });
+
+test("an administrator acting as the privacy office sees only the privacy part of Administration", async ({ page }) => {
+  const state = await setup(page);
+  const sidebar = page.locator(".sidebar");
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "admin", is_admin: true, acting_admin: false,
+    active_group_id: "analysts", active_layer_id: null, available_groups: [{ id: "analysts", name: "Privacy office" }], groups: [], pools: [], data_sources: [],
+    app_features: ["products.browse"], compliance_roles: ["compliance_admin"],
+    settings: { "set-classes": "manage", "set-policies": "manage", "set-forms": "manage", "set-duties": "manage" } } }));
+  await page.reload();
+  await page.getByRole("button", { name: "Administration", exact: true }).click();
+  await expect(sidebar.getByRole("list", { name: "Privacy" }).getByRole("button")).toHaveText(["Classifications", "Access policies", "Compliance forms", "Review duties"]);
+  await expect(sidebar.getByRole("list", { name: "Platform" })).toHaveCount(0);
+  await expect(sidebar.getByRole("list", { name: "Security" })).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});

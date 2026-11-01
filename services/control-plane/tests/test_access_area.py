@@ -115,3 +115,19 @@ def test_platform_administrators_see_the_pages_in_listings_to_grant_them(client)
     listed = {r["id"]: r for r in client.get("/v1/rbac/resources", headers=as_("admin")).json()}
     assert {"admin-root", "adm-privacy", "set-forms"} <= set(listed) and "assign" in listed["set-forms"]["actions"]
     assert "set-forms" not in {r["id"] for r in client.get("/v1/rbac/resources", headers=as_("ana")).json()}
+
+
+def test_an_administrator_sees_the_pages_of_the_group_they_act_as(client):
+    from .rbac_helpers import grant_group
+    office = grant_group(client, "workloads", "Privacy office", "Executor", users=["admin"])
+    client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": office}).raise_for_status()
+    full = client.get("/v1/me", headers=as_("admin")).json()
+    assert full["acting_admin"] and len(full["settings"]) == 16
+    assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": office}).status_code == 200
+    acting = client.get("/v1/me", headers=as_("admin")).json()
+    assert not acting["acting_admin"] and acting["compliance_roles"] == ["compliance_admin"]
+    assert set(acting["settings"]) == {"set-classes", "set-policies", "set-forms", "set-duties"}
+    # The API still lets administrators do everything.
+    assert client.get("/v1/admin/audit", headers=as_("admin")).status_code == 200
+    assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": "000000000001"}).status_code == 200
+    assert len(client.get("/v1/me", headers=as_("admin")).json()["settings"]) == 16

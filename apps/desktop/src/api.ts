@@ -255,6 +255,8 @@ export interface Me {
   compliance_roles?: string[];
   /** Access and Administration pages this person may use: page id -> "view" or "manage". */
   settings?: Record<string, "view" | "manage">;
+  /** A platform administrator with Global Admin active: the whole app. With another group active, the app is that group's. */
+  acting_admin?: boolean;
   available_groups?: { id: string; name: string; system?: boolean }[];
   username: string;
   groups: string[];

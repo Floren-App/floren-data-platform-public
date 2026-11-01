@@ -46,6 +46,7 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
         app_profile="Full access (administrator)" if acting_as_admin(user) else profile.name if profile else None,
         app_features=app_features,
         compliance_roles=compliance_roles(db, user),
+        acting_admin=acting_as_admin(user),
         settings=settings_granted(db, user),
         principal_id=user.principal_id, active_group_id=user.active_group_id or None,
         active_layer_id=active_layer(db, user),
@@ -63,8 +64,9 @@ def compliance_roles(db, user):
     from ..compliance import ROLES
     from ..models import ComplianceRole
     from ..rbac import app_groups
-    if user.is_admin:
-        return list(ROLES)
+    from ..app_profiles import acting_as_admin
+    if acting_as_admin(user):
+        return list(ROLES)   # with another group active, an administrator holds what their groups hold
     groups = app_groups(db, user)
     held = set(db.scalars(select(ComplianceRole.role).where(ComplianceRole.app_group_id.in_(groups)))) if groups else set()
     return [r for r in ROLES if r in held]
