@@ -361,7 +361,8 @@ def test_dbt_invoked_inside_airflow_uses_the_pinned_program_and_preserves_airflo
 def test_empty_catalog_does_not_index_system_navigation_roots(client):
     resources = client.get('/v1/rbac/resources', headers=as_('admin'))
     assert resources.status_code == 200
-    assert {r['kind'] for r in resources.json()} == {'root', 'api-root', 'package-root'}
+    # The Access and Administration pages are objects too (granted like any other), never catalog entries.
+    assert {r['kind'] for r in resources.json()} == {'root', 'api-root', 'package-root', 'settings-root', 'settings-section', 'setting'}
     catalog = client.get('/v1/catalog/search', headers=as_('admin'))
     assert catalog.status_code == 200
     assert catalog.json()['items'] == [] and catalog.json()['total'] == 0

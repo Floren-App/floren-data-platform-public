@@ -33,7 +33,9 @@ PAGES: Dict[str, tuple] = {
     "set-querylog": ("Query log", "adm-access"),
 }
 KINDS = ("settings-root", "settings-section", "setting")
-ROLES = {"Viewer": {"read"}, "Manager": {"read", "manage"}}
+# Viewer and Manager are given to groups; Owner is Global Admin's protected access to every object, so platform
+# administrators see these pages in listings like any other object.
+ROLES = {"Viewer": {"read"}, "Manager": {"read", "manage"}, "Owner": {"read", "manage", "assign"}}
 ACTIONS = {"view": "read", "manage": "manage"}
 
 
