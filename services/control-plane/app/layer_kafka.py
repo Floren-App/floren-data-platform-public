@@ -104,7 +104,7 @@ def manifests(layer_id, namespace, spec, config, plan):
             document['metadata']['annotations'] = {'strimzi.io/pause-reconciliation':'true' if spec.retired else 'false'}
     clients = {'namespaceSelector':{'matchLabels':{'kubernetes.io/metadata.name':namespace}},
                'podSelector':{'matchExpressions':[{'key':'fdp.floren.app/role','operator':'In',
-                   'values':['workspace','job','app','stream','workload']}]}}
+                   'values':['workspace','job','compute','app','stream','workload']}]}}
     # Strimzi replaces app.kubernetes.io/* labels on its pods: select brokers by FDP's role label.
     brokers = {'podSelector':{'matchLabels':{OWNER:config.installation,LAYER:layer_id,'fdp.floren.app/role':'kafka'}}}
     operator = {'namespaceSelector':{'matchLabels':{'kubernetes.io/metadata.name':config.platform_namespace}},
