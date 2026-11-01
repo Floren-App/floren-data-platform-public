@@ -82,11 +82,33 @@ def needs(page: str, action: str = "manage"):
 
 
 def granted(db, user) -> Dict[str, Optional[str]]:
-    """For the app: per page, "manage", "view" or nothing."""
+    """For the app: per page, "manage", "view" or nothing. Platform administrators with Global Admin active get every
+    page; with another group active they see what their groups were given, like everyone else (the API still lets
+    them do everything)."""
+    from sqlalchemy import select
+    from .app_profiles import acting_as_admin
+    from .models import ComplianceRole
+    resolved = rbac.resolve_user(db, user)
+    if acting_as_admin(resolved):
+        return {page: "manage" for page in PAGES}
+    groups = rbac.app_groups(db, resolved)
+    privacy_admin = bool(groups) and db.scalar(select(ComplianceRole.id).where(
+        ComplianceRole.role == "compliance_admin", ComplianceRole.app_group_id.in_(list(groups))).limit(1)) is not None
     out = {}
-    for page in PAGES:
-        if allowed(db, user, page, "manage"):
+    for page, (_, section) in PAGES.items():
+        if privacy_admin and section == "adm-privacy":
+            out[page] = "manage"   # the earlier compliance administrator role
+            continue
+        resource = db.get(Resource, page)
+        if resource is None:
+            ensure(db)
+            resource = db.get(Resource, page)
+        actions = set()
+        for grant in rbac.access(db, resolved, resource):
+            if not grant.get("system"):   # not the administrator's built-in access
+                actions |= ROLES.get(grant["role"], set())
+        if "manage" in actions:
             out[page] = "manage"
-        elif allowed(db, user, page, "view"):
+        elif "read" in actions:
             out[page] = "view"
     return out

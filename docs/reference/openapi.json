@@ -2435,6 +2435,12 @@
       },
       "Me": {
         "properties": {
+          "acting_admin": {
+            "default": false,
+            "description": "A platform administrator with Global Admin (or no group) active: the whole app",
+            "title": "Acting Admin",
+            "type": "boolean"
+          },
           "active_group_id": {
             "anyOf": [
               {

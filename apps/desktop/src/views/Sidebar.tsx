@@ -411,7 +411,8 @@ function PackagesPanel({ hub, openTab, activeKey, activeRef }: Props) {
 /** Who may see which part of Access and Administration: each page is granted on its own (Viewer or Manager),
  * and the work queues follow review duties and data ownership. */
 export function accessSections(hub: Hub) {
-  const roles = hub.me?.compliance_roles ?? [], admin = !!hub.me?.is_admin, settings = hub.me?.settings ?? {};
+  // Administrators acting as another group see that group's part, like the app profile does.
+  const roles = hub.me?.compliance_roles ?? [], admin = hub.me?.acting_admin ?? !!hub.me?.is_admin, settings = hub.me?.settings ?? {};
   const page = (id: string) => admin || !!settings[id];
   const privacyAdmin = admin || roles.includes("compliance_admin");
   return {

@@ -73,7 +73,8 @@ resource "fdp_role_assignment" "privacy_forms" {
 | Access (`adm-access`) | Groups: create groups (`set-groups`), Service identities: create service accounts (`set-services`), Access register (`set-register`), Audit log (`set-auditlog`), Query log (`set-querylog`) |
 
 The whole of Administration is `admin-root`. The app shows the pages you hold a role on; the API
-checks the same roles. The earlier **compliance administrator** role still counts as Manager on the
+checks the same roles. A platform administrator with another group than Global Admin active sees
+what their groups were given, like the app profile: as the privacy office, only the Privacy pages. The earlier **compliance administrator** role still counts as Manager on the
 Privacy pages. Group owners still manage their own groups, and review duties stay scoped duties.
 IdP identities and memberships carry **IdP · SCIM/OIDC** labels and are read-only here;
 application groups and managed service identities carry **App-managed** labels.
