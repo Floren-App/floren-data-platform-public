@@ -51,28 +51,35 @@ def scope(db, resource_id, user):
     return source, schema
 
 
-def storage_children(db, source, schema, path, after, limit, store, reserved=frozenset()):
-    """reserved: Iceberg table buckets, which are never listed as plain files."""
+def storage_client(db, source, schema, store, reserved=frozenset()):
+    """An S3 client with temporary read-only credentials narrowed to this registered namespace, and the namespace's
+    root key. reserved: Iceberg table buckets, which are never read as plain files."""
     import boto3
     from botocore.config import Config
-    from botocore.exceptions import BotoCoreError, ClientError
     from .. import storage_access
-
     cfg = source.config
     if cfg.get("bucket") in reserved:
         raise HTTPException(409, "Iceberg buckets are accessible only through governed SQL")
-    relative = storage_access.prefix_path("", path)
     root = storage_access.prefix_path(cfg.get("prefix", ""), schema.config.get("prefix", schema.name))
-    prefix = storage_access.prefix_path(root, relative)
-    prefix = prefix + "/" if prefix else ""
-    # Temporary read-only credentials are narrowed to this registered namespace.
     cred, _ = storage_access.credentials(source, {schema.name: schema}, {schema.name: "Reader"}, store, db=db)
+    client = boto3.client("s3", endpoint_url=cfg.get("endpoint_url"), region_name=cfg.get("region", "us-east-1"),
+        aws_access_key_id=cred["access_key_id"], aws_secret_access_key=cred["secret_access_key"],
+        aws_session_token=cred["session_token"],
+        config=Config(connect_timeout=10, read_timeout=15, retries={"max_attempts": 1}, s3={"addressing_style": "path"}))
+    return client, cfg["bucket"], root
+
+
+def storage_children(db, source, schema, path, after, limit, store, reserved=frozenset()):
+    """reserved: Iceberg table buckets, which are never listed as plain files."""
+    from botocore.exceptions import BotoCoreError, ClientError
+    from .. import storage_access
+
+    relative = storage_access.prefix_path("", path)
     try:
-        client = boto3.client("s3", endpoint_url=cfg.get("endpoint_url"), region_name=cfg.get("region", "us-east-1"),
-            aws_access_key_id=cred["access_key_id"], aws_secret_access_key=cred["secret_access_key"],
-            aws_session_token=cred["session_token"],
-            config=Config(connect_timeout=10, read_timeout=15, retries={"max_attempts": 1}, s3={"addressing_style": "path"}))
-        result = client.list_objects_v2(Bucket=cfg["bucket"], Prefix=prefix, Delimiter="/", MaxKeys=limit,
+        client, bucket, root = storage_client(db, source, schema, store, reserved)
+        prefix = storage_access.prefix_path(root, relative)
+        prefix = prefix + "/" if prefix else ""
+        result = client.list_objects_v2(Bucket=bucket, Prefix=prefix, Delimiter="/", MaxKeys=limit,
                                        **({"ContinuationToken": after} if after else {}))
     except (BotoCoreError, ClientError, KeyError):
         raise HTTPException(502, "storage listing failed; check namespace setup and source connectivity") from None
@@ -176,3 +183,27 @@ async def children(resource_id: str, request: Request, response: Response,
     from ..catalog import index_children
     await run_in_threadpool(transaction_call, db, index_children, schema, items, table, path)
     return {"children": items, "next_cursor": cursor}
+
+
+
+@router.get("/schemas/{resource_id}/file")
+async def file_preview(resource_id: str, response: Response, path: str = Query(min_length=1, max_length=4096),
+                       db=Depends(get_db), user: User = Depends(get_current_user), store=Depends(get_secret_store)):
+    """The start of one file, read with your data permissions: the first rows of CSV, JSON lines and Parquet, formatted
+    JSON, text or an image. Size-capped and recorded in the audit log; files are never downloaded whole."""
+    from ..file_preview import preview
+    from ..storage_types import lake_buckets
+    from .common import audit
+    response.headers["Cache-Control"] = "no-store"
+    source, schema = await run_in_threadpool(transaction_call, db, scope, resource_id, user)
+    if source.kind != "s3":
+        raise HTTPException(409, "file preview is for S3 files namespaces")
+    reserved = await run_in_threadpool(transaction_call, db, lake_buckets)
+    client, bucket, root = await run_in_threadpool(transaction_call, db, storage_client, source, schema, store, reserved)
+    result = await run_in_threadpool(preview, client, bucket, root, path)
+    def record(db):
+        resolved = rbac.resolve_user(db, user)
+        audit(db, resolved.username, "storage.file_preview", schema.id, path=result["path"], bytes=result["read"], kind=result["kind"])
+        db.commit()
+    await run_in_threadpool(transaction_call, db, record)
+    return result

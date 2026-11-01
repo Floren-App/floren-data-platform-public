@@ -19674,6 +19674,90 @@
         ]
       }
     },
+    "/v1/data/schemas/{resource_id}/file": {
+      "get": {
+        "description": "The start of one file, read with your data permissions: the first rows of CSV, JSON lines and Parquet, formatted\nJSON, text or an image. Size-capped and recorded in the audit log; files are never downloaded whole.",
+        "operationId": "get_v1_data_schemas_resource_id_file",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "title": "Resource Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "File Preview",
+        "tags": [
+          "data browser"
+        ]
+      }
+    },
     "/v1/data/schemas/{resource_id}/preview": {
       "get": {
         "operationId": "get_v1_data_schemas_resource_id_preview",
