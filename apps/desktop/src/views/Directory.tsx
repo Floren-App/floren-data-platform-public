@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, DirectoryPrincipal } from "../api";
+import { api, AppGroup, DirectoryPrincipal } from "../api";
 import type { Hub } from "../hub";
 import { useCached } from "../cache";
 import type { OpenTab } from "../components/Permissions";
@@ -74,15 +74,26 @@ export function UsersTab({ hub, selectedId, openTab }: { hub: Hub; selectedId?: 
 /** A person's groups (and through what), what those give them, and their compliance roles. */
 function PersonAccess({ id, hub, openTab }: { id: string; hub: Hub; openTab: OpenTab }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof api.access.principalAccess>> | null>(null), [error, setError] = useState("");
-  useEffect(() => { setData(null); setError(""); api.access.principalAccess(id).then(setData).catch((e: Error) => setError(e.message)); }, [id]);
+  const [manageable, setManageable] = useState<AppGroup[]>([]), [adding, setAdding] = useState(""), [notice, setNotice] = useState(""), [version, setVersion] = useState(0);
+  useEffect(() => { setData(null); setError(""); api.access.principalAccess(id).then(setData).catch((e: Error) => setError(e.message)); }, [id, version]);
+  useEffect(() => { api.access.groups().then((g) => setManageable(g.filter((x) => x.can_manage && !x.system))).catch(() => setManageable([])); }, [version]);
+  const change = (p: Promise<unknown>, text: string) => { setError(""); p.then(() => { setNotice(text); setAdding(""); setVersion((v) => v + 1); }).catch((e: Error) => setError(e.message)); };
   if (error) return <p className="muted">{error.includes("administrators") ? "What someone can reach is visible to administrators and to the person." : error}</p>;
   if (!data) return <p className="muted" role="status">Loading…</p>;
   return <>
     <h3>Groups</h3>
+    {notice && <p className="success-message" role="status">{notice}</p>}
     <ul className="object-links">{data.groups.map((g) => <li key={g.id}><ProductIcon kind="groups" size={16} />
       <button className="text-button" onClick={() => openTab({ kind: "access", ref: g.id, title: g.name })}>{g.name}</button>
-      {g.via && <span className="muted"> · through {g.via}</span>}{g.system && <span className="badge">Owner on everything</span>}</li>)}</ul>
+      {g.via && <span className="muted"> · through {g.via}</span>}{g.system && <span className="badge">Owner on everything</span>}
+      {!g.via && manageable.some((m) => m.id === g.id) && <button className="text-button" aria-label={`Remove ${data.principal.name} from ${g.name}`}
+        onClick={() => change(api.access.unbind(g.id, id), `Removed ${data.principal.name} from ${g.name}.`)}>Remove</button>}</li>)}</ul>
     {!data.groups.length && <p className="muted">Not in any group.</p>}
+    {manageable.some((m) => !data.groups.some((g) => g.id === m.id)) && <form className="row" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault();
+      const target = manageable.find((m) => m.id === adding); if (target) change(api.access.bind(target.id, id), `Added ${data.principal.name} to ${target.name}.`); }}>
+      <select aria-label={`Add ${data.principal.name} to a group`} value={adding} onChange={(e) => setAdding(e.target.value)}>
+        <option value="">Add to group…</option>{manageable.filter((m) => !data.groups.some((g) => g.id === m.id)).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+      <button className="btn secondary" disabled={!adding}>Add to group</button></form>}
     <h3>Has access to</h3>
     <HasAccessTo rows={data.grants} hub={hub} openTab={openTab} showGroup label={`What ${data.principal.name} can reach`} />
     <ComplianceRolesHeld roles={data.compliance_roles} openTab={openTab} showGroup />

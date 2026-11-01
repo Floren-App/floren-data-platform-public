@@ -59,6 +59,18 @@ export function ObjectBreadcrumbs({ resource, resources, openTab, trailing = [] 
   </nav>;
 }
 
+/** The roles an object offers (with what each allows), and the one to suggest first. */
+export function rolesFor(resource: Pick<AccessResource, "kind">) {
+  const isKafka = resource.kind === "kafka" || resource.kind === "topic";
+  const isData = resource.kind === "source" || resource.kind === "schema" || isKafka;
+  const isApi = API_KINDS.includes(resource.kind);
+  const isPackage = PACKAGE_KINDS.includes(resource.kind);
+  const isProduct = resource.kind === "product";
+  const roles: Record<string, string> = isProduct ? PRODUCT_ROLES : isKafka ? { Reader: "Consume and commit offsets for own groups", Contributor: "Also produce messages", Admin: "Also create, alter and delete topics", Owner: "All topic permissions and role assignments" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
+  const initial = isProduct ? "Consumer" : isData ? "Reader" : isApi ? "Consumer" : isPackage ? (resource.kind === "package" ? "Maintainer" : "Publisher") : "Executor";
+  return { roles, initial, isData, isProduct, isApi, isPackage, isKafka };
+}
+
 export function ObjectTabs({ active, onChange, settings = false, overview = "Overview", preview = false, runs = false, sql = false, lineage = false, policies = false, versions = false, logs = false }: {
   active: ObjectSection; onChange: (section: ObjectSection) => void; settings?: boolean; overview?: string; preview?: boolean; runs?: boolean; sql?: boolean; lineage?: boolean; policies?: boolean; versions?: boolean; logs?: boolean;
 }) {
@@ -128,13 +140,8 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
   const [reloadVersion, setReloadVersion] = useState(0);
   const [groupId, setGroupId] = useState("");
   const [search, setSearch] = useState("");
-  const isKafka = resource.kind === "kafka" || resource.kind === "topic";
-  const isData = resource.kind === "source" || resource.kind === "schema" || isKafka;
-  const isApi = API_KINDS.includes(resource.kind);
-  const isPackage = PACKAGE_KINDS.includes(resource.kind);
-  const isProduct = resource.kind === "product";
-  const roles: Record<string, string> = isProduct ? PRODUCT_ROLES : isKafka ? { Reader: "Consume and commit offsets for own groups", Contributor: "Also produce messages", Admin: "Also create, alter and delete topics", Owner: "All topic permissions and role assignments" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
-  const [role, setRole] = useState(isProduct ? "Consumer" : isData ? "Reader" : isApi ? "Consumer" : isPackage ? (resource.kind === "package" ? "Maintainer" : "Publisher") : "Executor");
+  const { roles, initial } = rolesFor(resource);
+  const [role, setRole] = useState(initial);
   const canRead = resource.actions.includes("read");
   const canAssign = resource.actions.includes("assign");
 
