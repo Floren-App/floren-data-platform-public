@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, AppFeature, Webhook, WebhookDelivery, AppGroup, AppProfile, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput, WORKLOAD_KINDS, WorkloadKind, usablePools } from "../api";
 import type { Hub } from "../hub";
-import { OpenTab, resourceTab } from "../components/Permissions";
+import { OpenTab } from "../components/Permissions";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
 import { IconCompute, IconPlus, IconTrash, IconWorkspaces } from "../components/Icons";
@@ -51,13 +51,6 @@ export function AdminLayers({ hub }: { hub: Hub }) {
 }
 
 /** Where an integration points, in one line. */
-function location(ds: DataSource) {
-  const c = ds.config as Record<string, string | number | undefined>;
-  if (ds.kind === "postgres") return `${c.host ?? "?"}:${c.port ?? 5432}/${c.database ?? "?"} · catalog ${c.catalog ?? "?"}`;
-  if (ds.kind === "iceberg") return `${c.warehouse ?? "?"} · catalog ${c.catalog ?? "?"}`;
-  if (ds.kind === "s3") return `s3://${c.bucket ?? "?"}/${c.prefix ?? ""}${c.endpoint_url ? ` · ${c.endpoint_url}` : ""}`;
-  return "—";
-}
 
 type Draft = { name: string; description: string; config: Record<string, string>; secrets: Record<string, Record<string, string>>; egress: string };
 const emptyDraft: Draft = { name: "", description: "", config: {}, secrets: {}, egress: "" };
@@ -80,37 +73,27 @@ function SettingField({ id, f, value, error, onChange, keep }: {
 }
 
 /** Admin: the external databases and buckets Floren Data Platform governs. Nothing here hosts storage. */
-export function AdminSources({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
-  const { data: sources, error, reload, setError } = useLoad(api.admin.sources, [] as DataSource[]);
+/** Add or change a storage connection: its type, location and write-only credentials (platform administrators). */
+export function StorageConnectionForm({ hub, existing, onDone, onCancel }: { hub: Hub; existing?: DataSource; onDone: (name: string) => void; onCancel: () => void }) {
   const { data: types } = useLoad(api.admin.storageTypes, [] as StorageType[]);
-  const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<StorageType["kind"] | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [kind, setKind] = useState<StorageType["kind"] | null>(existing ? existing.kind as StorageType["kind"] : null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const spec = types.find((t) => t.kind === kind);
-
-  const close = () => { setOpen(false); setEditing(false); setKind(null); setFieldErrors({}); };
-  const start = () => { setDraft(emptyDraft); setEditing(false); setKind(null); setFieldErrors({}); setOpen(true); };
-  const choose = (t: StorageType) => {
-    setKind(t.kind);
-    setDraft((d) => ({ ...d, config: Object.fromEntries(t.config.map((f) => [f.name, f.default != null ? String(f.default) : ""])) }));
-    requestAnimationFrame(() => document.getElementById("si-name")?.focus());
-  };
-  const edit = (ds: DataSource) => {
-    const t = types.find((x) => x.kind === ds.kind);
-    if (!t) return;
-    setKind(t.kind); setEditing(true); setOpen(true); setFieldErrors({});
-    setDraft({ name: ds.name, description: ds.description, egress: ds.egress.join(", "), secrets: {},
-      config: { ...Object.fromEntries(t.config.map((f) => [f.name, ds.config[f.name] != null ? String(ds.config[f.name]) : ""])), layer_id: String(ds.config.layer_id || hub.layerId) } });
-    requestAnimationFrame(() => document.getElementById("si-description")?.focus());
-  };
+  const editing = !!existing;
+  useEffect(() => {  // fill the form once the type's fields are known
+    if (!spec) return;
+    setDraft(existing ? { name: existing.name, description: existing.description, egress: existing.egress.join(", "), secrets: {},
+      config: { ...Object.fromEntries(spec.config.map((f) => [f.name, existing.config[f.name] != null ? String(existing.config[f.name]) : ""])), layer_id: String(existing.config.layer_id || hub.layerId) } }
+      : { ...emptyDraft, config: Object.fromEntries(spec.config.map((f) => [f.name, f.default != null ? String(f.default) : ""])) });
+    requestAnimationFrame(() => document.getElementById(existing ? "si-description" : "si-name")?.focus());
+  }, [spec?.kind, existing?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!spec) return;
-    setBusy(true); setFieldErrors({}); setError(null);
+    setBusy(true); setFieldErrors({}); setError("");
     const config: Record<string, unknown> = {};
     config.layer_id = draft.config.layer_id || hub.layerId;
     for (const f of spec.config) {
@@ -123,90 +106,74 @@ export function AdminSources({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
     try {
       await api.admin.upsertSource({ name: draft.name.trim(), kind: spec.kind, description: draft.description, config,
         egress: spec.kind === "s3" ? draft.egress.split(",").map((x) => x.trim()).filter(Boolean) : [], ...secrets });
-      close(); await reload(); await hub.refresh();
+      await hub.refresh(); onDone(draft.name.trim());
     } catch (err) {
       setError((err as Error).message);
       if (err instanceof ApiError) setFieldErrors(err.fieldErrors);
     } finally { setBusy(false); }
   };
 
-  const run = (fn: () => Promise<unknown>) => fn().then(async () => { await reload(); await hub.refresh(); }).catch((e: Error) => setError(e.message));
+  if (!spec) return <section className="card" aria-label="Choose a storage type">
+    <h3>What kind of storage?</h3>
+    <div className="type-choices">{types.map((t) => <button key={t.kind} className="type-choice" onClick={() => setKind(t.kind)}>
+      <ProductIcon kind={TYPE_ICON[t.kind]} size={22} /><span><strong>{t.label}</strong><span className="muted">{t.summary}</span></span>
+    </button>)}</div>
+    <div className="form-actions"><button className="btn secondary" onClick={onCancel}>Cancel</button></div>
+  </section>;
+  return <form className="card" onSubmit={save} aria-label={editing ? `Settings of ${draft.name}` : `New ${spec.label} connection`}>
+    <div className="section-heading" style={{ marginTop: 0 }}>
+      <h3 className="row" style={{ margin: 0 }}><ProductIcon kind={TYPE_ICON[spec.kind]} size={18} />{editing ? "Connection settings" : `New ${spec.label} connection`}</h3>
+      {!editing && <button type="button" className="text-button" onClick={() => setKind(null)}>Change type</button>}
+    </div>
+    <p className="scope-note"><strong>Configure outside Floren Data Platform first.</strong> {spec.external}</p>
+    {error && <p className="error" role="alert">{error}</p>}
+    <div className="arg-grid">
+      <div className="field"><label htmlFor="si-name">Name *</label>
+        <input id="si-name" className="mono" required disabled={editing} pattern="[a-z][a-z0-9-]{1,62}" value={draft.name} placeholder="finance-dw"
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        <span className="hint">Lowercase and dashes. Programs connect with this name.</span></div>
+      <div className="field"><label htmlFor="si-description">Description</label>
+        <input id="si-description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
+    </div>
+    <div className="field"><label htmlFor="si-layer">Layer</label><select id="si-layer" required disabled={editing} value={draft.config.layer_id || hub.layerId} onChange={(e) => setDraft({ ...draft, config: { ...draft.config, layer_id: e.target.value } })}>{!(draft.config.layer_id || hub.layerId) && <option value="">Choose a layer</option>}{hub.layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.name}</option>)}</select><span className="hint">All schemas and data objects in this connection inherit its layer.</span></div>
+    <h3>Location</h3>
+    <div className="arg-grid">{spec.config.map((f) => <SettingField key={f.name} id={`si-${f.name}`} f={f} value={draft.config[f.name] ?? ""} error={fieldErrors[f.name]}
+      onChange={(v) => setDraft({ ...draft, config: { ...draft.config, [f.name]: v } })} />)}</div>
+    {spec.secrets.map((g) => <section key={g.name}>
+      <h3>{g.label}{!g.required && <span className="muted" style={{ fontWeight: 400 }}> · optional</span>}</h3>
+      <p className="hint" style={{ marginTop: -4 }}>{g.help}</p>
+      <div className="arg-grid">{g.fields.map((f) => <SettingField key={f.name} id={`si-${g.name}-${f.name}`} f={{ ...f, required: g.required }} keep={editing}
+        value={draft.secrets[g.name]?.[f.name] ?? ""} error={fieldErrors[`${g.name}.${f.name}`]}
+        onChange={(v) => setDraft({ ...draft, secrets: { ...draft.secrets, [g.name]: { ...draft.secrets[g.name], [f.name]: v } } })} />)}</div>
+    </section>)}
+    {spec.kind === "s3" && <details><summary className="muted">Network access for workloads</summary>
+      <div className="field" style={{ marginTop: 8, maxWidth: 720 }}><label htmlFor="si-egress">Direct file-source network (CIDRs)</label>
+        <input id="si-egress" className="mono" value={draft.egress} onChange={(e) => setDraft({ ...draft, egress: e.target.value })} placeholder="10.20.0.15/32" />
+        <span className="hint">Addresses workloads may reach for this bucket (enforced on Kubernetes).</span></div></details>}
+    <div className="form-actions">
+      <button className="btn" disabled={busy || !draft.name.trim()}>{busy ? "Saving…" : editing ? "Save changes" : "Create connection"}</button>
+      <button type="button" className="btn secondary" onClick={onCancel}>Cancel</button>
+    </div>
+  </form>;
+}
 
-  return (
-    <>
-      <PageHeader icon={<ProductIcon kind="data" size={22} />} title="Storage integrations"
-        subtitle="External databases and buckets that Floren Data Platform governs. Each one is operated and configured outside Floren Data Platform; registering it here lets owners register schemas and assign roles. Credentials are stored in OpenBao."
-        actions={<button className="btn" aria-expanded={open && !editing} onClick={() => open && !editing ? close() : start()}><IconPlus size={14} />Add integration</button>} />
-      {error && <p className="error" role="alert">{error}</p>}
-      {open && !spec && !editing && <section className="card" aria-label="Choose a storage type">
-        <h3>What kind of storage?</h3>
-        <div className="type-choices">{types.map((t) => <button key={t.kind} className="type-choice" onClick={() => choose(t)}>
-          <ProductIcon kind={TYPE_ICON[t.kind]} size={22} /><span><strong>{t.label}</strong><span className="muted">{t.summary}</span></span>
-        </button>)}</div>
-        <div className="form-actions"><button className="btn secondary" onClick={close}>Cancel</button></div>
-      </section>}
-      {open && spec && <form className="card" onSubmit={save} aria-label={editing ? `Edit ${draft.name}` : `New ${spec.label} integration`}>
-        <div className="section-heading" style={{ marginTop: 0 }}>
-          <h3 className="row" style={{ margin: 0 }}><ProductIcon kind={TYPE_ICON[spec.kind]} size={18} />{editing ? `Edit ${draft.name}` : `New ${spec.label} integration`}</h3>
-          {!editing && <button type="button" className="text-button" onClick={() => setKind(null)}>Change type</button>}
-        </div>
-        <p className="scope-note"><strong>Configure outside Floren Data Platform first.</strong> {spec.external}</p>
-        <div className="arg-grid">
-          <div className="field"><label htmlFor="si-name">Name *</label>
-            <input id="si-name" className="mono" required disabled={editing} pattern="[a-z][a-z0-9-]{1,62}" value={draft.name} placeholder="finance-dw"
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-            <span className="hint">Lowercase and dashes. Programs connect with this name.</span></div>
-          <div className="field"><label htmlFor="si-description">Description</label>
-            <input id="si-description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
-        </div>
-        <div className="field"><label htmlFor="si-layer">Layer</label><select id="si-layer" required disabled={editing} value={draft.config.layer_id || hub.layerId} onChange={(e) => setDraft({ ...draft, config: { ...draft.config, layer_id: e.target.value } })}>{!(draft.config.layer_id || hub.layerId) && <option value="">Choose a layer</option>}{hub.layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.name}</option>)}</select><span className="hint">All schemas and data objects in this integration inherit its layer.</span></div>
-        <h3>Location</h3>
-        <div className="arg-grid">{spec.config.map((f) => <SettingField key={f.name} id={`si-${f.name}`} f={f} value={draft.config[f.name] ?? ""} error={fieldErrors[f.name]}
-          onChange={(v) => setDraft({ ...draft, config: { ...draft.config, [f.name]: v } })} />)}</div>
-        {spec.secrets.map((g) => <section key={g.name}>
-          <h3>{g.label}{!g.required && <span className="muted" style={{ fontWeight: 400 }}> · optional</span>}</h3>
-          <p className="hint" style={{ marginTop: -4 }}>{g.help}</p>
-          <div className="arg-grid">{g.fields.map((f) => <SettingField key={f.name} id={`si-${g.name}-${f.name}`} f={{ ...f, required: g.required }} keep={editing}
-            value={draft.secrets[g.name]?.[f.name] ?? ""} error={fieldErrors[`${g.name}.${f.name}`]}
-            onChange={(v) => setDraft({ ...draft, secrets: { ...draft.secrets, [g.name]: { ...draft.secrets[g.name], [f.name]: v } } })} />)}</div>
-        </section>)}
-        {spec.kind === "s3" && <details><summary className="muted">Network access for workloads</summary>
-          <div className="field" style={{ marginTop: 8, maxWidth: 720 }}><label htmlFor="si-egress">Direct file-source network (CIDRs)</label>
-            <input id="si-egress" className="mono" value={draft.egress} onChange={(e) => setDraft({ ...draft, egress: e.target.value })} placeholder="10.20.0.15/32" />
-            <span className="hint">Addresses workloads may reach for this bucket (enforced on Kubernetes).</span></div></details>}
-        <div className="form-actions">
-          <button className="btn" disabled={busy || !draft.name.trim()}>{busy ? "Saving…" : editing ? "Save changes" : "Create integration"}</button>
-          <button type="button" className="btn secondary" onClick={close}>Cancel</button>
-        </div>
-      </form>}
-      <table>
-        <thead><tr><th>Name</th><th>Type</th><th>Layer</th><th>Location</th><th /></tr></thead>
-        <tbody>
-          {sources.map((ds) => {
-            const type = types.find((t) => t.kind === ds.kind);
-            return <tr key={ds.id}>
-              <td><button className="text-button object-name" onClick={() => openTab({ kind: "source", ref: ds.name, title: ds.name })}><ProductIcon kind={TYPE_ICON[ds.kind as StorageType["kind"]] ?? ds.kind} size={16} />{ds.name}</button><div className="muted">{ds.description}</div>
-                {ds.groups.length > 0 && <div className="muted">Legacy grants to review: {ds.groups.join(", ")}</div>}</td>
-              <td>{type?.label ?? <span className="badge warn" title="Not a supported integration type; recreate it">{ds.kind}</span>}</td>
-              <td>{ds.config.system_metadata ? "Platform" : hub.layers.find((l) => l.id === ds.config.layer_id)?.name || "—"}</td>
-              <td className="mono muted" style={{ overflowWrap: "anywhere" }}>{location(ds)}</td>
-              <td className="table-actions"><div className="row">
-                <button className="btn sm secondary" onClick={() => {
-                  const source = hub.resources.find((r) => r.kind === "source" && r.object_id === ds.id);
-                  if (source) openTab(resourceTab(source, "permissions"));
-                  else openTab({ kind: "source", ref: ds.name, title: ds.name, section: "permissions" });
-                }}>Permissions</button>
-                {ds.config.system_metadata ? <span className="badge">Deployment managed</span> : <><button className="btn sm secondary" disabled={!type} onClick={() => edit(ds)}>Edit</button>
-                <button className="icon-btn" aria-label={`Delete ${ds.name}`} title="Delete integration"
-                  onClick={() => confirm(`Delete the ${ds.name} integration and its stored credentials? The storage itself is not touched.`) && run(() => api.admin.deleteSource(ds.name))}><IconTrash /></button></>}
-              </div></td>
-            </tr>;
-          })}
-          {!sources.length && <tr><td colSpan={4}>No storage is connected yet. Add an integration for a PostgreSQL database, Iceberg tables on S3, or S3 files you operate elsewhere.</td></tr>}
-        </tbody>
-      </table>
-    </>
-  );
+/** A connection's Settings tab: its location and credentials, and removing it (platform administrators). */
+export function StorageConnectionSettings({ hub, name, openTab }: { hub: Hub; name: string; openTab: OpenTab }) {
+  const { data: sources, error, setError } = useLoad(api.admin.sources, [] as DataSource[]);
+  const [message, setMessage] = useState(""), [formKey, setFormKey] = useState(0);
+  const ds = sources.find((s) => s.name === name);
+  if (!ds) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  return <>
+    {message && <p className="success-message" role="status">{message}</p>}
+    {ds.groups.length > 0 && <p className="scope-note">Legacy grants to review: {ds.groups.join(", ")}</p>}
+    {ds.config.system_metadata ? <p className="scope-note">Managed by the deployment; change it in the Helm values.</p>
+      : <StorageConnectionForm key={formKey} hub={hub} existing={ds} onDone={() => { setMessage("Saved."); setFormKey((k) => k + 1); }} onCancel={() => setFormKey((k) => k + 1)} />}
+    {!ds.config.system_metadata && <section className="card danger-zone"><h3>Remove this connection</h3>
+      <p className="muted">Removes the connection, its schemas' registrations and its stored credentials. The storage itself is not touched.</p>
+      <button className="btn danger" onClick={() => confirm(`Remove the ${ds.name} connection and its stored credentials? The storage itself is not touched.`)
+        && api.admin.deleteSource(ds.name).then(async () => { await hub.refresh(); openTab({ kind: "data", title: "Storage" }); }).catch((e: Error) => setError(e.message))}>Remove connection</button>
+      {error && <p className="error" role="alert">{error}</p>}</section>}
+  </>;
 }
 
 export function AdminPools({ hub }: { hub: Hub }) {

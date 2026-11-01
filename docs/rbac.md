@@ -22,18 +22,29 @@ identity bindings. Resource Owners assign roles to groups or directly to service
 confer permission to assign resource roles. Permissions live on the objects they govern:
 open a data source, schema, deployed folder, program/app, or service account and choose
 **Permissions**. Direct and inherited grants are shown together; inherited grants link to
-the parent where they can be changed. **Security** manages app groups and identity
-bindings, and provides a searchable service directory.
+the parent where they can be changed. **Access** shows the other side: who someone is and
+what they can reach.
 
-The **Security** area has four pages: **App groups**, **Users**, **Services**, and **Secrets**. Its sidebar only switches between them; each page carries its own list and detail. App groups
-are app-managed security groups. They bind users, IdP groups/roles, or service principals
-to fixed resource roles. They are separate from the nested workload folders under
-Workloads. Group details show their roles on visible objects and link to those objects'
-permissions. Changing bindings and changing resource assignments remain separate powers.
+The **Access** area has **People**, **Groups** and **Service identities** (who), **App
+profiles** (what parts of the app groups see; administrators) and **Secrets** (credentials). Its
+sidebar only switches between them; each page carries its own list and detail.
+
+- **Groups** are app-managed security groups. Their members are people, IdP groups/roles and
+  service identities; they get fixed roles on objects. A group's page has **Members**, **Has
+  access to** (roles on objects, directly and through data products, with end dates and deadlines
+  from [access policies](access-policies.md), and its compliance roles) and **Settings** (name,
+  owners, app profile). Changing members and changing roles on objects remain separate powers.
+- **People** shows each person's groups (and the IdP group that put them there) and everything
+  those give them, for administrators and the person themselves.
+- **Service identities** lists every workload's built-in identity and the service accounts;
+  administrators create, disable and delete service accounts here, and a service account's page
+  shows its tokens and what it can reach.
+
+Workload folders under Workloads are separate from groups.
 IdP identities and memberships carry **IdP · SCIM/OIDC** labels and are read-only here;
 application groups and managed service identities carry **App-managed** labels.
 
-The Storage sidebar and pages list only sources and schemas you hold a data role on, directly or through the parent source; a source appears when you can use it or at least one of its schemas. Global Admin has protected Owner access across resources; ordinary users still need explicit data grants. Admins manage every connection under **Administration → Storage integrations** (see [storage integrations](storage-integrations.md)). Workload folders expose **Contents**,
+The Storage sidebar and pages list only sources and schemas you hold a data role on, directly or through the parent source; a source appears when you can use it or at least one of its schemas. Global Admin has protected Owner access across resources; ordinary users still need explicit data grants. Admins add connections on **Storage** and change each one on its **Settings** tab (see [storage integrations](storage-integrations.md)). Workload folders expose **Contents**,
 **Permissions**, and **Settings**; **New folder** and **Deploy here** preserve the current
 location. Workload settings separate execution identity changes from normal use.
 The Workloads sidebar's **+** menu offers **Folder** and **Deploy**, plus subfolder creation
@@ -131,7 +142,7 @@ available, and no native shared-secret fallback is issued.
    provisioning transfers managed ownership, reconciles PUBLIC privileges and gives
    the engine login authority over that schema. Iceberg reserves the namespace in
    policy; an authorized Admin/Owner then creates it through SQL.
-3. Create an app group under **Security → App groups**, designate owners and bind identities.
+3. Create a group under **Access → Groups**, designate owners and add its members.
    Open the schema's **Permissions** tab and assign the group a fixed data role. Source-level
    grants apply to all its registered schemas. Global Admin retains protected Owner access.
 4. Use `fdp.connect("finance-dw", schema="analytics")` or

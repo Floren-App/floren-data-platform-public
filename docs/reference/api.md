@@ -20,10 +20,10 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
 | `POST` | `/v1/egress/{slug}/{path}` | Egress |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -36,9 +36,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/rbac/groups` | Create Group |
 | `PUT` | `/v1/rbac/groups/{group_id}` | Update Group |
 | `DELETE` | `/v1/rbac/groups/{group_id}` | Delete Group |
+| `GET` | `/v1/rbac/groups/{group_id}/access` | Group Access |
 | `GET` | `/v1/rbac/groups/{group_id}/assignments` | Group Assignments |
 | `POST` | `/v1/rbac/groups/{group_id}/bindings` | Bind |
 | `DELETE` | `/v1/rbac/groups/{group_id}/bindings/{principal_id}` | Unbind |
+| `GET` | `/v1/rbac/principals/{principal_id}/access` | Principal Access |
 | `GET` | `/v1/rbac/resources` | Resources |
 | `PATCH` | `/v1/rbac/resources/{resource_id}` | Move Resource |
 | `GET` | `/v1/rbac/resources/{resource_id}` | Read Resource |

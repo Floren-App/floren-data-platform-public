@@ -24,7 +24,7 @@ export function AccessError({ error, issue, openTab }: {
         onClick={() => openTab({ kind: "schema", ref: schema.id, title: schema.name, section: "permissions", grantPrincipalId: serviceId })}>
         {source.name} / {schema.name} permissions{!schema.can_assign && " (view)"}
       </button>))}
-      {detail.can_manage_groups && <button className="btn secondary" onClick={() => openTab({ kind: "access", title: "App groups", bindingPrincipalId: detail.identity.principal_id ?? undefined })}>Manage identity bindings</button>}
+      {detail.can_manage_groups && <button className="btn secondary" onClick={() => openTab({ kind: "access", title: "Groups", bindingPrincipalId: detail.identity.principal_id ?? undefined })}>Manage identity bindings</button>}
     </div>
     {(!detail.sources.length || detail.sources.some((s) => !s.can_assign)) && <p className="hint">A data source or schema Owner must assign the data role. A designated group owner manages identity bindings.</p>}
   </section>;

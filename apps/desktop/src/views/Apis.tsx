@@ -292,7 +292,7 @@ export function ApiView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; openTab:
         <dl className="kv"><dt>Identity</dt><dd>{item.identity.name}</dd><dt>Principal</dt><dd className="mono">{item.identity.username}</dd></dl>
         <p className="hint">Programs behind this API run as this identity, never as the caller. Assign it Executor directly on the workloads it runs
           (and data roles if they run in caller mode), or use app-group grants.</p>
-        <div className="form-actions"><button className="btn secondary" onClick={() => openTab({ kind: "access", title: "App groups" })}>Bind to an app group</button></div>
+        <div className="form-actions"><button className="btn secondary" onClick={() => openTab({ kind: "access", title: "Groups" })}>Bind to an app group</button></div>
       </section>}
       {item.actions.includes("edit") ? <ApiSettingsForm layers={hub.layers} layerId={hub.layerId} key={item.id} creating={false} initial={toInput(item)} onSave={async (body) => { setItem(await api.apis.update(item.id, body)); await hub.refresh(); }} />
         : <p className="notice">You can view this API; changing its settings requires the Contributor role.</p>}

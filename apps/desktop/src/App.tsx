@@ -27,6 +27,11 @@ const viewForTab = (tab: TabRef): View => {
   if (["data", "source", "schema", "data-object"].includes(tab.kind)) return "data";
   if (tab.kind === "pool") return "compute";
   if (tab.kind.startsWith("package")) return "packages";
+  // Pages that moved to their subject's home; old links still land there.
+  if (tab.kind === "admin-sources") return "data";
+  if (["repos", "admin-repos"].includes(tab.kind)) return "workloads";
+  if (["app-profiles", "admin-app-profiles", "admin-service-accounts"].includes(tab.kind)) return "access";
+  if (tab.kind === "admin-classifications") return "privacy";
   if (tab.kind.startsWith("admin-")) return "admin";
   if (tab.kind.startsWith("privacy-")) return "privacy";
   return "access";
@@ -182,14 +187,14 @@ function Shell({ user }: { user: User }) {
     const defaults: Partial<Record<View, TabRef>> = {
       home: HOME,
       workspaces: { kind: "workspaces", title: "Workspaces" },
-      access: { kind: "access", title: "App groups" },
+      access: { kind: "users", title: "People" },
       workloads: { kind: "folder", ref: "workloads", title: "Workloads" },
       catalog: { kind: "products", title: "Data products" },
       apis: { kind: "apis", ref: "internal", title: "API management" },
       data: { kind: "data", title: "Storage" },
       kafka: { kind: "kafka-clusters", title: "Kafka" },
       compute: { kind: "pool", title: "Usage" },
-      admin: { kind: "admin-sources", title: "Storage integrations" },
+      admin: { kind: "admin-layers", title: "Layers" },
       privacy: hub.me?.compliance_roles?.some((r) => r !== "membership_approver") ? { kind: "privacy-reviews", title: "Reviews" } : { kind: "privacy-memberships", title: "Memberships" },
     };
     if (defaults[next]) openTab(defaults[next]!);
@@ -204,7 +209,7 @@ function Shell({ user }: { user: User }) {
         {groups.filter((g) => g.items.length).map((g, i) => <div key={g.label} className="activity-group" role="group" aria-label={g.label}>
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />
-        {(hub.has("security") || hub.has("workspaces")) && activityButton({ id: "access", label: "Security", icon: <IconAdmin /> })}
+        {(hub.has("security") || hub.has("workspaces")) && activityButton({ id: "access", label: "Access", icon: <IconAdmin /> })}
         {!!hub.me?.compliance_roles?.length && activityButton({ id: "privacy", label: "Privacy", icon: <IconPrivacy /> })}
         {hub.me?.is_admin && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}
         <button aria-label="Documentation" onClick={() => {

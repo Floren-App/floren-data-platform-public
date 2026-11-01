@@ -23424,6 +23424,79 @@
         ]
       }
     },
+    "/v1/rbac/groups/{group_id}/access": {
+      "get": {
+        "description": "What the group can reach: roles on objects (directly and through data products), compliance roles and its\napp profile. For members, owners and administrators.",
+        "operationId": "get_v1_rbac_groups_group_id_access",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Group Access",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
     "/v1/rbac/groups/{group_id}/assignments": {
       "get": {
         "operationId": "get_v1_rbac_groups_group_id_assignments",
@@ -23649,6 +23722,79 @@
           }
         },
         "summary": "Unbind",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/v1/rbac/principals/{principal_id}/access": {
+      "get": {
+        "description": "What a person or service identity can reach, and through which group. For administrators and the\nidentity itself.",
+        "operationId": "get_v1_rbac_principals_principal_id_access",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "principal_id",
+            "required": true,
+            "schema": {
+              "title": "Principal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Principal Access",
         "tags": [
           "RBAC"
         ]

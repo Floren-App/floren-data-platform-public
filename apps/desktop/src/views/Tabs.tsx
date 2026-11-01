@@ -5,7 +5,7 @@ import type { Hub } from "../hub";
 import { IconRuns, IconCompute, IconOpen, IconPlay, IconStop, IconTrash, IconWorkspaces } from "../components/Icons";
 import { PageHeader } from "../components/Page";
 import { LoadMoreRuns, NewRunForm, openEditor, RUN_SCOPE_TITLE, runsIn } from "./Sidebar";
-import { AdminAppProfiles, AdminNotifications, AdminClassifications, AdminLayers, AdminAudit, AdminNetwork, AdminPools, AdminSources, AdminWorkspaceTemplates } from "./Admin";
+import { AdminAppProfiles, AdminNotifications, AdminClassifications, AdminLayers, AdminAudit, AdminNetwork, AdminPools, AdminWorkspaceTemplates } from "./Admin";
 import { ProgramRunner } from "./Programs";
 import { AdminRepos, WorkloadView, DeployWizard } from "./Deploy";
 import { AccessTab } from "./Access";
@@ -13,7 +13,7 @@ import { UsersTab } from "./Directory";
 import { ProductIcon } from "../components/ProductIcon";
 import { DataSourcesView, FolderView, SchemaView, ServiceView, ServicesView, SourceView } from "./Objects";
 import type { ObjectSection } from "../components/Permissions";
-import { AdminRuntimes, AdminServiceAccounts, SecretsTab } from "./Identity";
+import { AdminRuntimes, SecretsTab } from "./Identity";
 import { CatalogObject, CatalogView } from "./Catalog";
 import { AccessRequestsView, ProductsView, ProductView } from "./Products";
 import { Home, WorkspacesView } from "./Home";
@@ -30,7 +30,7 @@ import { PrivacyForm, PrivacyForms, PrivacyMemberships, PrivacyPolicies, Privacy
 import { CaseView } from "./Cases";
 
 export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
-  | "products" | "product" | "access-requests"
+  | "products" | "product" | "access-requests" | "app-profiles" | "repos"
   | "privacy-reviews" | "privacy-case" | "case" | "privacy-memberships" | "privacy-register"
   | "privacy-policies" | "privacy-forms" | "privacy-form" | "privacy-roles" | "privacy-classifications"
   | "admin-app-profiles" | "admin-notifications" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
@@ -55,6 +55,8 @@ export interface TabRef {
   runScope?: RunScope;
   grantPrincipalId?: string;
   data?: DataLocation;
+  /** A group page's section in the Access area. */
+  groupSection?: "members" | "access" | "settings";
 }
 
 interface Props {
@@ -72,7 +74,8 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "product": return <ProductView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
     case "access-requests": return <AccessRequestsView key={tab.ref ?? ""} tab={tab} hub={hub} openTab={openTab} />;
     case "catalog-object": return <CatalogObject tab={tab} hub={hub} openTab={openTab} />;
-    case "access": return <AccessTab hub={hub} openTab={openTab} groupId={tab.ref} bindingPrincipalId={tab.bindingPrincipalId} onSelect={(id, name) => openTab({ kind: "access", ref: id, title: name, bindingPrincipalId: tab.bindingPrincipalId })} />;
+    case "access": return <AccessTab hub={hub} openTab={openTab} groupId={tab.ref} section={tab.groupSection ?? "members"} bindingPrincipalId={tab.bindingPrincipalId}
+      onSelect={(id, name, section) => openTab({ kind: "access", ref: id, title: name, bindingPrincipalId: tab.bindingPrincipalId, groupSection: section })} />;
     case "users": return <UsersTab hub={hub} selectedId={tab.ref} openTab={openTab} />;
     case "home": return <Home hub={hub} openTab={openTab} />;
     case "workspaces": return <WorkspacesView hub={hub} openTab={openTab} />;
@@ -89,11 +92,11 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "pool": return <PoolView name={tab.ref} hub={hub} openTab={openTab} />;
     case "folder": return <FolderView tab={tab} hub={hub} openTab={openTab} />;
     case "service": return <ServiceView tab={tab} hub={hub} openTab={openTab} />;
-    case "services": return <ServicesView hub={hub} openTab={openTab} />;
+    case "services": case "admin-service-accounts": return <ServicesView hub={hub} openTab={openTab} />;
     case "deploy": return <DeployWizard hub={hub} openTab={openTab} initialFolder={tab.ref} />;
     case "workload": return <WorkloadView tab={tab} id={tab.ref!} hub={hub} openTab={openTab} runTab={runTab} />;
     case "admin-layers": return <AdminLayers hub={hub} />;
-    case "admin-app-profiles": return <AdminAppProfiles />;
+    case "app-profiles": case "admin-app-profiles": return <AdminAppProfiles />;
     case "admin-notifications": return <AdminNotifications />;
     case "admin-classifications": case "privacy-classifications": return <AdminClassifications />;
     case "privacy-policies": return <PrivacyPolicies hub={hub} />;
@@ -105,10 +108,9 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "privacy-roles": return <PrivacyRoles hub={hub} />;
     case "privacy-form": return <PrivacyForm key={tab.ref} id={tab.ref ?? ""} hub={hub} onRenamed={(title) => openTab({ ...tab, title })}
       onDeleted={() => openTab({ kind: "privacy-forms", title: "Compliance forms" })} />;
-    case "admin-sources": return <AdminSources hub={hub} openTab={openTab} />;
-    case "admin-repos": return <AdminRepos />;
+    case "admin-sources": return <DataSourcesView hub={hub} openTab={openTab} adding />;
+    case "repos": case "admin-repos": return <AdminRepos />;
     case "admin-runtimes": return <AdminRuntimes withR={rEnabled(hub.me)} />;
-    case "admin-service-accounts": return <AdminServiceAccounts hub={hub} openTab={openTab} />;
     case "secrets": return <SecretsTab hub={hub} selectedRef={tab.ref} creating={tab.intent === "create"} openTab={openTab} />;
     case "docs": return <DocsTab runId={tab.ref!} />;
     case "admin-pools": return <AdminPools hub={hub} />;

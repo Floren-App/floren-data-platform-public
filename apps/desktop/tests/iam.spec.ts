@@ -169,6 +169,11 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     if (path === "/v1/catalog/requests") return respond([]);
     if (path === "/v1/compliance/requirement") return respond({ required: false, layer_id: null, classification: "internal" });
     if (path === "/v1/compliance/deadlines") return respond([]);
+    if (/^\/v1\/rbac\/groups\/[^/]+\/access$/.test(path)) return respond({ system: false, grants: [], compliance_roles: [], app_profile: null });
+    const principalAccess = path.match(/^\/v1\/rbac\/principals\/([^/]+)\/access$/);
+    if (principalAccess) return respond({ principal: { id: principalAccess[1], name: principalAccess[1], kind: "user", active: true },
+      groups: [{ id: "analysts", name: "Analysts", system: false, via: "idp-finance" }], compliance_roles: [],
+      grants: [{ resource: resources.find((r) => r.id === "pg-reporting"), role: "Reader", group: { id: "analysts", name: "Analysts" }, via: "direct", product: null, until: null, deadline: null, pending_membership: false }] });
     // The platform has no classifications of its own; these are what Terraform would configure.
     if (path === "/v1/catalog/classifications") return respond({ levels: ["public", "internal", "confidential", "restricted"].map((name) =>
       ({ name, masked_as: name === "confidential" || name === "restricted" ? "internal" : name, description: "" })) });
@@ -431,8 +436,8 @@ test("deployed folder readers have no folder creation shortcuts", async ({ page 
 
 test("service permissions and identity bindings have their own contextual pages", async ({ page }) => {
   const state = await setup(page);
-  await page.getByRole("button", { name: "Security", exact: true }).click();
-  await page.locator(".sidebar").getByRole("button", { name: "Services", exact: true }).click();
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Service identities", exact: true }).click();
   await page.getByRole("button", { name: "Service account: finance-etl", exact: true }).click();
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Permissions", exact: true }).click();
   await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
@@ -441,8 +446,8 @@ test("service permissions and identity bindings have their own contextual pages"
   await expect(page.getByRole("status")).toHaveText("Assigned Owner to Analysts.");
   expect(state.mutations.at(-1)?.path).toBe("/v1/rbac/resources/etl-service/assignments");
   await page.getByRole("cell", { name: "Analysts", exact: true }).getByRole("button").click();
-  await expect(page.getByRole("heading", { name: "Identity bindings", exact: true })).toBeVisible();
-  await expect(page.getByRole("table", { name: "Identity bindings", exact: true }).getByRole("cell", { name: /^Finance IdP/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Members", exact: true })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Members", exact: true }).getByRole("cell", { name: /^Finance IdP/ })).toBeVisible();
   await expect(page.getByLabel("Folder, service, or schema")).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath("group-bindings.png") });
   expect(state.errors).toEqual([]);
@@ -459,8 +464,8 @@ test("data access failures name the identity and link to permissions and presele
   const state = await setup(page);
   Object.assign(state.workloads[0], { status: "failed", execution_mode: "fixed", run_as: "finance-etl", sync_error: deniedData.message, access_issue: deniedData });
   await page.reload();
-  await page.getByRole("button", { name: "Security", exact: true }).click();
-  await page.locator(".sidebar").getByRole("button", { name: "Services", exact: true }).click();
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Service identities", exact: true }).click();
   const main = page.locator(".main");
   await main.getByRole("button", { name: "Sales app", exact: true }).click();
   const alert = main.getByRole("alert");
@@ -482,8 +487,8 @@ test("data access failures name the identity and link to permissions and presele
 test("blocked deployed runs render structured permission guidance", async ({ page }) => {
   const state = await setup(page);
   await page.route("https://iam.test/api/v1/workloads/script/runs", (route) => route.fulfill({ status: 403, json: { detail: deniedData } }));
-  await page.getByRole("button", { name: "Security", exact: true }).click();
-  await page.locator(".sidebar").getByRole("button", { name: "Services", exact: true }).click();
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Service identities", exact: true }).click();
   const main = page.locator(".main");
   await main.getByRole("button", { name: "Daily report", exact: true }).click();
   await main.getByRole("button", { name: "Run Daily report", exact: true }).click();
@@ -505,9 +510,9 @@ test("retired workload IAM records do not become broken Deployed or Services lin
   await expect(main.getByText('API verification program', { exact: true })).toHaveCount(0);
   await expect(main.getByText('Catalog deploy smoke', { exact: true })).toHaveCount(0);
   await expect(main.getByRole('button', { name: 'Finance', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Security', exact: true }).click();
-  await page.locator('.sidebar').getByRole('button', { name: 'Services', exact: true }).click();
-  await expect(main.getByRole('heading', { name: 'Services', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Access', exact: true }).click();
+  await page.locator('.sidebar').getByRole('button', { name: 'Service identities', exact: true }).click();
+  await expect(main.getByRole('heading', { name: 'Service identities', exact: true })).toBeVisible();
   await expect(main.getByText('API verification program', { exact: true })).toHaveCount(0);
   await expect(main.getByText('Catalog deploy smoke', { exact: true })).toHaveCount(0);
   await expect(main.getByRole('button', { name: 'Service account: finance-etl', exact: true })).toBeVisible();
@@ -538,15 +543,15 @@ test("permissions and group bindings fit a compact desktop in dark mode", async 
   expect(await page.locator(".main").evaluate((main) => main.scrollWidth <= main.clientWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath("schema-permissions-compact-dark.png") });
   await page.getByRole("cell", { name: "Analysts", exact: true }).getByRole("button").click();
-  await expect(page.getByRole("heading", { name: "Identity bindings", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Members", exact: true })).toBeVisible();
   expect(await page.locator(".main").evaluate((main) => main.scrollWidth <= main.clientWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath("group-bindings-compact-dark.png") });
 });
 
 test("workload identity settings preserve the caller and fixed-service choices", async ({ page }) => {
   const state = await setup(page);
-  await page.getByRole("button", { name: "Security", exact: true }).click();
-  await page.locator(".sidebar").getByRole("button", { name: "Services", exact: true }).click();
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Service identities", exact: true }).click();
   await page.locator(".main").getByRole("button", { name: "Sales app", exact: true }).click();
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByLabel("Data identity", { exact: true })).toHaveValue("caller");
@@ -739,7 +744,7 @@ test("app profiles: a Viewer gets Home and Data products only, and admins edit p
   const views = page.getByRole("navigation", { name: "Views" });
   // Only Home and Catalog in the activity bar; Documentation and Account stay.
   await expect(views.getByRole("button", { name: "Catalog", exact: true })).toBeVisible();
-  for (const name of ["Workspaces", "Workloads", "Storage", "Packages", "APIs", "Usage", "Security", "Administration"])
+  for (const name of ["Workspaces", "Workloads", "Storage", "Packages", "APIs", "Usage", "Access", "Administration"])
     await expect(views.getByRole("button", { name, exact: true })).toHaveCount(0);
   // Home: the products and dashboards they can use, opened straight away.
   const main = page.locator(".main");
@@ -765,7 +770,7 @@ test("administrators edit app profiles in a grid of features", async ({ page }) 
   await page.route(/\/v1\/admin\/app-profiles\//, (route) => { const body = route.request().postDataJSON(); saved.push(body);
     profiles = profiles.map((p) => p.name === decodeURIComponent(new URL(route.request().url()).pathname.split("/").pop()!) ? { ...p, ...body } : p);
     return route.fulfill({ json: body }); });
-  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Administration", exact: true }).click();
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Access", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: "App profiles", exact: true }).click();
   const grid = page.locator(".main").getByRole("table", { name: "App profiles" });
   await expect(grid.getByRole("checkbox", { name: "Workspaces in Viewer" })).not.toBeChecked();
@@ -928,14 +933,15 @@ test("runtime polling does not query data objects or reload the resource hierarc
   expect(state.reads.filter((path) => path === "/v1/rbac/resources").length).toBe(registryCount);
 });
 
-test("security sidebar links its four pages and secrets live there", async ({ page }) => {
+test("the Access area lists who, what groups see and credentials; secrets live there", async ({ page }) => {
   const state = await setup(page);
   const sidebar = page.locator(".sidebar"), main = page.locator(".main");
-  await page.getByRole("button", { name: "Security", exact: true }).click();
-  await expect(main.getByRole("heading", { name: "App groups", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "People", exact: true })).toBeVisible();
   // Lists and detail belong to the pages; the sidebar only switches between them.
-  await expect(sidebar.getByRole("button")).toHaveText(["", "App groups", "Users", "Services", "Secrets"]);
+  await expect(sidebar.getByRole("button")).toHaveText(["", "People", "Groups", "Service identities", "App profiles", "Secrets"]);
   await expect(page.getByRole("button", { name: "Secrets", exact: true }).and(page.locator(".activity button"))).toHaveCount(0);
+  await sidebar.getByRole("button", { name: "Groups", exact: true }).click();
   await main.getByRole("button", { name: /^Analysts/ }).click();
   await expect(main.getByRole("heading", { name: "Analysts", exact: true })).toBeVisible();
   await sidebar.getByRole("button", { name: "Secrets", exact: true }).click();
@@ -955,22 +961,23 @@ test("security sidebar links its four pages and secrets live there", async ({ pa
 test("IAM has separate group user and service pages with explicit identity origins", async ({ page }) => {
   const state = await setup(page);
   const main = page.locator('.main');
-  await page.getByRole('button', { name: 'Security', exact: true }).click();
-  // The sidebar is the only Security navigation; pages no longer repeat it.
-  await expect(page.getByRole('navigation', { name: 'Security pages' })).toHaveCount(0);
-  const navigation = page.getByRole('list', { name: 'Security pages' });
-  await expect(navigation.getByRole('button')).toHaveCount(4);
-  await expect(main.getByRole('heading', { name: 'IdP groups & roles', exact: true })).toBeVisible();
-  await navigation.getByRole('button', { name: 'Users', exact: true }).click();
-  await expect(main.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
-  await main.getByRole('button', { name: 'ana', exact: true }).click();
+  await page.getByRole('button', { name: 'Access', exact: true }).click();
+  // The sidebar is the only Access navigation; pages do not repeat it.
+  const navigation = page.getByRole('list', { name: 'Who' });
+  await expect(navigation.getByRole('button')).toHaveCount(3);
+  await expect(main.getByRole('heading', { name: 'People', exact: true })).toBeVisible();
+  await expect(main.getByText('IdP groups & roles', { exact: true })).toBeVisible();
+  await main.getByRole('button', { name: 'Open ana', exact: true }).click();
   await expect(main.getByRole('cell', { name: 'IdP · SCIM', exact: true })).toBeVisible();
   await expect(main.getByRole('cell', { name: 'Platform admin', exact: true })).toBeVisible();
-  await expect(main.getByRole('heading', { name: 'App security groups', exact: true })).toBeVisible();
-  await navigation.getByRole('button', { name: 'Services', exact: true }).click();
-  await expect(main.getByRole('columnheader', { name: 'Execution identity', exact: true })).toBeVisible();
-  await expect(main.getByRole('cell', { name: 'Caller for data requests', exact: true }).first()).toBeVisible();
-  await expect(main.getByRole('cell', { name: 'External / shared identity', exact: true })).toBeVisible();
+  // A person's groups (and through what) and what they can reach.
+  await expect(main.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
+  await expect(main.getByText('through idp-finance')).toBeVisible();
+  await expect(main.getByRole('table', { name: /What .* can reach/ })).toContainText('Reader');
+  await navigation.getByRole('button', { name: 'Service identities', exact: true }).click();
+  await expect(main.getByRole('columnheader', { name: 'Runs as', exact: true })).toBeVisible();
+  await expect(main.getByRole('cell', { name: 'The caller, for data', exact: true }).first()).toBeVisible();
+  await expect(main.getByRole('cell', { name: 'Service account', exact: true })).toBeVisible();
   expect(state.errors).toEqual([]);
   await page.screenshot({ path: test.info().outputPath('iam-services.png') });
 });
@@ -1462,7 +1469,7 @@ test("administrators limit a warehouse to layers and kinds of work", async ({ pa
   expect(state.errors).toEqual([]);
 });
 
-test("storage integrations are created by choosing a type and its required location", async ({ page }) => {
+test("storage connections are added on Storage by choosing a type and its required location", async ({ page }) => {
   const state = await setup(page);
   const types = [
     { kind: "postgres", label: "PostgreSQL", summary: "A PostgreSQL database.", external: "Create a Trino catalog.", secrets: [
@@ -1483,10 +1490,11 @@ test("storage integrations are created by choosing a type and its required locat
     if (!body.config.host) return route.fulfill({ status: 422, json: { detail: { message: "PostgreSQL integration is incomplete", errors: { host: "required" } } } });
     puts.push(body); return route.fulfill({ json: { id: "ds", groups: [], egress: [], ...body } });
   });
-  await page.getByRole("button", { name: "Administration", exact: true }).click();
+  // Connections are added on Storage itself; each one's settings are on its Settings tab.
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
   const main = page.locator(".main");
-  await expect(main.getByRole("heading", { name: "Storage integrations", exact: true })).toBeVisible();
-  await main.getByRole("button", { name: "Add integration", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "Storage", exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Add connection", exact: true }).click();
   await page.screenshot({ path: test.info().outputPath("storage-types.png") });
   await main.getByRole("button", { name: /^PostgreSQL/ }).click();
   await expect(main.getByText("Configure outside Floren Data Platform first.")).toBeVisible();
@@ -1496,12 +1504,12 @@ test("storage integrations are created by choosing a type and its required locat
   await main.getByLabel("Trino catalog *", { exact: true }).fill("sales");
   await main.getByLabel("Username *", { exact: true }).fill("gov");
   await main.getByLabel("Password *", { exact: true }).fill("secret");
-  await main.getByRole("button", { name: "Create integration", exact: true }).click();
+  await main.getByRole("button", { name: "Create connection", exact: true }).click();
   await expect(main.getByText("required", { exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("storage-form-errors.png") });
   await main.getByLabel("Host *", { exact: true }).fill("pg.internal");
-  await main.getByRole("button", { name: "Create integration", exact: true }).click();
-  await expect(main.getByRole("cell", { name: "pg.internal:5432/sales · catalog sales", exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Create connection", exact: true }).click();
+  await expect.poll(() => puts.length).toBe(1);
   expect(puts.at(-1)).toMatchObject({ name: "sales-dw", kind: "postgres", config: { host: "pg.internal", port: 5432, database: "sales", catalog: "sales" },
     provisioner_secret: { username: "gov", password: "secret" } });
   expect(state.errors).toEqual([]);
@@ -1579,7 +1587,7 @@ test("certificates are added as secrets with validation and shown with their fac
     secrets.push(saved); return route.fulfill({ json: saved });
   });
   const main = page.locator(".main");
-  await page.getByRole("button", { name: "Security", exact: true }).click();
+  await page.getByRole("button", { name: "Access", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: "Secrets", exact: true }).click();
   await main.getByRole("button", { name: "Add secret", exact: true }).click();
   await main.getByLabel("Name", { exact: true }).fill("finance-api");
@@ -2059,7 +2067,7 @@ test("Home starts with scoped activity and submits global search into the catalo
   const groupsOf = async () => nav.getByRole("group").evaluateAll((groups) => groups.map((g) =>
     [g.getAttribute("aria-label"), [...g.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))]));
   expect(await groupsOf()).toEqual([["Overview", ["Home", "Catalog", "Usage"]], ["Build", ["Workspaces", "Workloads", "Storage", "Packages"]], ["Integration", ["Kafka", "APIs"]]]);
-  expect(await nav.locator(":scope > button").evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label")))).toEqual(["Security", "Administration", "Documentation"]);
+  expect(await nav.locator(":scope > button").evaluateAll((nodes) => nodes.map((n) => n.getAttribute("aria-label")))).toEqual(["Access", "Administration", "Documentation"]);
   await expect(page.getByRole("button", { name: "Runs & apps", exact: true })).toHaveCount(0);
   await expect(main.getByRole("region", { name: "Your workspaces", exact: true })).toContainText("Pokemon Test workspace");
   await expect(main.getByRole("region", { name: "Recent runs", exact: true }).locator("li").first()).toContainText("Daily report");
@@ -2312,7 +2320,7 @@ test("active group stays in the sidebar across tabs and reloads", async ({ page 
   await picker.selectOption("operators");
   await expect(picker).toHaveValue("operators");
   expect(state.mutations.some((m)=>m.method==="PUT" && m.path==="/v1/me/active-group" && m.body.group_id==="operators")).toBeTruthy();
-  for(const name of ["Catalog","Workloads","Storage","Security"]) {
+  for(const name of ["Catalog","Workloads","Storage","Access"]) {
     await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name,exact:true}).click();
     await expect(picker).toBeVisible(); await expect(picker).toHaveValue("operators");
   }
@@ -3013,5 +3021,52 @@ test("administrators add a notification webhook, choose events and send a test",
   await expect(main.getByRole("table", { name: "Webhooks" })).toContainText("Signed");
   await main.getByRole("button", { name: "Send test" }).click();
   await expect(main.getByRole("status")).toHaveText("Test sent to Privacy mail.");
+  expect(state.errors).toEqual([]);
+});
+
+test("groups show members, what they reach and settings; connections and service accounts are set up where they live", async ({ page }) => {
+  const state = await setup(page);
+  const main = page.locator(".main"), sidebar = page.locator(".sidebar");
+  await page.route(/\/v1\/rbac\/groups\/analysts\/access$/, (route) => route.fulfill({ json: { system: false, app_profile: "Analyst",
+    compliance_roles: [{ role: "compliance_reviewer", label: "Review compliance forms in scope", scope: { classifications: ["restricted"] }, group: { id: "analysts", name: "Analysts" } }],
+    grants: [{ resource: state.resources.find((r) => r.id === "pg-reporting"), role: "Reader", group: { id: "analysts", name: "Analysts" }, via: "direct", product: null,
+      until: "2027-01-31T00:00:00Z", deadline: null, pending_membership: false }] } }));
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await sidebar.getByRole("button", { name: "Groups", exact: true }).click();
+  await main.getByRole("button", { name: /^Analysts/ }).click();
+  const sections = main.getByRole("navigation", { name: "Group sections" });
+  await expect(main.getByRole("table", { name: "Members" })).toBeVisible();
+  await sections.getByRole("button", { name: "Has access to", exact: true }).click();
+  const reach = main.getByRole("table", { name: "Has access to" });
+  await expect(reach.getByRole("row", { name: /reporting/ })).toContainText("until");
+  await expect(main.getByText("Review compliance forms in scope")).toBeVisible();
+  await sections.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(main.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Analysts");
+  // A storage connection's settings are on its Settings tab, not in Administration.
+  const saved: any[] = [];
+  await page.route(/\/v1\/admin\/datasources/, (route) => {
+    if (route.request().method() === "PUT") { saved.push(route.request().postDataJSON()); return route.fulfill({ json: { id: "pg", groups: [], ...route.request().postDataJSON() } }); }
+    return route.fulfill({ json: [{ id: "pg", name: "finance-dw", kind: "s3", description: "Finance", groups: [], egress: [], config: { layer_id: "1a0000000002" } }] });
+  });
+  await page.route("https://iam.test/api/v1/admin/storage-types", (route) => route.fulfill({ json: [{ kind: "s3", label: "S3 files", summary: "Plain files.", external: "Create a role.", config: [], secrets: [] }] }));
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  await sidebar.getByRole("button", { name: "finance-dw", exact: true }).click();
+  await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Settings", exact: true }).click();
+  await main.getByRole("textbox", { name: "Description" }).fill("Finance warehouse");
+  await main.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(main.getByRole("status")).toHaveText("Saved.");
+  expect(saved[0]).toMatchObject({ name: "finance-dw", description: "Finance warehouse" });
+  await expect(main.getByRole("button", { name: "Remove connection", exact: true })).toBeVisible();
+  // Administration keeps platform configuration only.
+  await page.getByRole("button", { name: "Administration", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: "Storage integrations" })).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: "Service accounts" })).toHaveCount(0);
+  // Service accounts are created under Access → Service identities.
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await sidebar.getByRole("button", { name: "Service identities", exact: true }).click();
+  await main.getByRole("button", { name: "New service account", exact: true }).click();
+  await main.getByRole("textbox", { name: "Name" }).fill("billing-sync");
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => state.mutations.find((m) => m.path.includes("billing-sync"))).toBeTruthy();
   expect(state.errors).toEqual([]);
 });

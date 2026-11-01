@@ -189,6 +189,95 @@ def group_assignments(group_id: str, db: Session = Depends(get_db), user: User =
     return result
 
 
+# --- effective access: what a group, person or service identity can reach -----------------------------------
+
+def access_rows(db, viewer, assigned: list, names: dict, held: set = frozenset()) -> List[dict]:
+    """Roles held directly and through data products, with end dates and deadlines from access policies.
+    names: group ID -> name (for "via"). held: (resource, group) still waiting for membership approval."""
+    from ..models import CatalogProduct, JustificationDeadline, JustifiedGrant
+    rows = []
+    for a in assigned + rbac.product_grants(db, [x for x in assigned if isinstance(x, RoleAssignment)]):
+        resource = db.get(Resource, a.resource_id)
+        if resource is None or not rbac.allowed(db, viewer, "read", resource):
+            continue
+        group_id = getattr(a, "app_group_id", None)
+        row = {"resource": resource_out(db, resource, viewer), "role": a.role,
+               "group": {"id": group_id, "name": names.get(group_id, group_id)} if group_id else None,
+               "via": "product" if isinstance(a, rbac.ProductGrant) else "direct", "product": None, "until": None, "deadline": None,
+               "pending_membership": (a.resource_id, group_id) in held}
+        if isinstance(a, rbac.ProductGrant):
+            product = db.scalar(select(CatalogProduct).where(CatalogProduct.access_resource_id == a.product_resource_id))
+            row["product"] = {"id": product.id, "title": product.title} if product else None
+        elif group_id:
+            grant = db.scalar(select(JustifiedGrant).where(JustifiedGrant.resource_id == a.resource_id, JustifiedGrant.app_group_id == group_id))
+            deadline = db.scalar(select(JustificationDeadline).where(JustificationDeadline.resource_id == a.resource_id,
+                                                                     JustificationDeadline.app_group_id == group_id))
+            row["until"] = grant.until if grant else None
+            row["deadline"] = deadline.due_at if deadline else None
+        rows.append(row)
+    rows.sort(key=lambda r: (r["resource"]["kind"] == "product", r["via"] == "product", r["resource"]["name"].lower()))
+    return rows
+
+
+def compliance_rows(db, group_ids) -> List[dict]:
+    from ..compliance import ROLES
+    from ..models import ComplianceRole
+    out = []
+    for item in db.scalars(select(ComplianceRole).where(ComplianceRole.app_group_id.in_(list(group_ids)))):
+        group = db.get(AppGroup, item.app_group_id)
+        out.append({"role": item.role, "label": ROLES.get(item.role, item.role), "scope": item.scope or {},
+                    "group": {"id": item.app_group_id, "name": group.name if group else item.app_group_id}})
+    return out
+
+
+@router.get("/groups/{group_id}/access")
+def group_access(group_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """What the group can reach: roles on objects (directly and through data products), compliance roles and its
+    app profile. For members, owners and administrators."""
+    from ..models import AppProfile
+    user = current(db, user)
+    group = db.get(AppGroup, group_id)
+    if not group:
+        raise HTTPException(404, "group not found")
+    if not user.is_admin and user.principal_id not in group.owners and group_id not in rbac.app_groups(db, user):
+        raise HTTPException(403, "group membership or ownership required")
+    assigned = list(db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id == group_id)))
+    profile = db.get(AppProfile, group.profile_id) if group.profile_id else None
+    return {"system": group_id == GLOBAL_ADMIN, "grants": access_rows(db, user, assigned, {group.id: group.name}),
+            "compliance_roles": compliance_rows(db, [group_id]), "app_profile": profile.name if profile else None}
+
+
+@router.get("/principals/{principal_id}/access")
+def principal_access(principal_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """What a person or service identity can reach, and through which group. For administrators and the
+    identity itself."""
+    from types import SimpleNamespace
+    from ..compliance import unapproved_justified
+    user = current(db, user)
+    principal = db.get(DirectoryPrincipal, principal_id)
+    if principal is None or principal.kind not in ("user", "service"):
+        raise HTTPException(404, "person or service identity not found")
+    if not user.is_admin and user.principal_id != principal_id:
+        raise HTTPException(403, "administrators, or the identity itself")
+    ids = rbac.closure(db, principal_id)
+    groups = []
+    for binding in db.scalars(select(IdentityBinding).where(IdentityBinding.principal_id.in_(list(ids)))):
+        group = db.get(AppGroup, binding.app_group_id)
+        if group is None or any(g["id"] == group.id for g in groups):
+            continue
+        via = db.get(DirectoryPrincipal, binding.principal_id)
+        groups.append({"id": group.id, "name": group.name, "system": group.id == GLOBAL_ADMIN,
+                       "via": None if binding.principal_id == principal_id else (via.name if via else binding.principal_id)})
+    groups.sort(key=lambda g: g["name"].lower())
+    group_ids = [g["id"] for g in groups]
+    assigned = list(db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id.in_(group_ids)))) if group_ids else []
+    direct = list(db.scalars(select(ServiceRoleAssignment).where(ServiceRoleAssignment.principal_id == principal_id)))
+    held = unapproved_justified(db, SimpleNamespace(principal_id=principal_id), group_ids)
+    return {"principal": {"id": principal.id, "name": principal.name, "kind": principal.kind, "active": principal.active},
+            "groups": groups, "grants": access_rows(db, user, assigned + direct, {g["id"]: g["name"] for g in groups}, held),
+            "compliance_roles": compliance_rows(db, group_ids)}
+
+
 def check_owners(db, owners):
     for owner in owners:
         p = db.get(DirectoryPrincipal, owner)

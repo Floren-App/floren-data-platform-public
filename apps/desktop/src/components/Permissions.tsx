@@ -272,7 +272,7 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
           </div>
           {assignments.some((a) => !a.inherited && (recipientType !== "group" ? a.principal_id === serviceId : a.app_group_id === groupId)) && <p className="hint">This replaces the recipient's direct role. Inherited roles still apply.</p>}
           <div className="form-actions"><button className="btn" disabled={busy || !recipientId}>{busy ? "Saving…" : "Assign role"}</button>
-            <button type="button" className="text-button" style={{ marginLeft: "auto" }} onClick={() => openTab({ kind: "access", title: "App groups" })}>Manage app groups</button></div>
+            <button type="button" className="text-button" style={{ marginLeft: "auto" }} onClick={() => openTab({ kind: "access", title: "Groups" })}>Manage groups</button></div>
         </form> : <p className="muted">An Owner can change permissions on this object. Inherited grants are managed on the parent.</p>}
         <details className="role-reference"><summary>What each role allows</summary>
           <dl className="kv">{Object.entries(roles).map(([name, description]) => <div className="role-description" key={name}>
