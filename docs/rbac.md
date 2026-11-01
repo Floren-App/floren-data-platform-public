@@ -48,6 +48,33 @@ sidebar only switches between them; each page carries its own list and detail.
   shows its tokens and what it can reach.
 
 Workload folders under Workloads are separate from groups.
+
+### Who may use the Access and Administration pages
+
+Every page in Access and Administration is an object you grant like any other, with two roles:
+**Viewer** (see the page) and **Manager** (also change it). Sections are their parents, so a role
+on a section covers all its pages, and a role on Administration covers everything. Platform
+administrators (Global Admin) have all of it. Grant them at the bottom of each page, under **Who can
+see or change this page** (administrators), or in Terraform:
+
+```hcl
+resource "fdp_role_assignment" "privacy_forms" {
+  resource_id  = "set-forms"   # Compliance forms
+  app_group_id = fdp_app_group.privacy_office.id
+  role         = "Manager"
+}
+```
+
+| Section (ID) | Pages (IDs) |
+|---|---|
+| Platform (`adm-platform`) | Layers (`set-layers`), Compute pools (`set-pools`), Runtimes (`set-runtimes`), Workspace templates (`set-template`), Alerts (`set-alerts`) |
+| Security (`adm-security`) | App profiles (`set-profiles`), Network allowlist (`set-network`) |
+| Privacy (`adm-privacy`) | Classifications (`set-classes`), Access policies (`set-policies`), Compliance forms (`set-forms`), Review duties (`set-duties`) |
+| Access (`adm-access`) | Groups: create groups (`set-groups`), Service identities: create service accounts (`set-services`), Access register (`set-register`), Audit log (`set-auditlog`), Query log (`set-querylog`) |
+
+The whole of Administration is `admin-root`. The app shows the pages you hold a role on; the API
+checks the same roles. The earlier **compliance administrator** role still counts as Manager on the
+Privacy pages. Group owners still manage their own groups, and review duties stay scoped duties.
 IdP identities and memberships carry **IdP · SCIM/OIDC** labels and are read-only here;
 application groups and managed service identities carry **App-managed** labels.
 

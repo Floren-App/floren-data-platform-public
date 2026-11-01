@@ -253,6 +253,8 @@ export interface Me {
   app_features?: AppFeature[];
   /** Compliance roles held in any scope: compliance_reviewer, membership_approver, compliance_admin. */
   compliance_roles?: string[];
+  /** Access and Administration pages this person may use: page id -> "view" or "manage". */
+  settings?: Record<string, "view" | "manage">;
   available_groups?: { id: string; name: string; system?: boolean }[];
   username: string;
   groups: string[];

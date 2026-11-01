@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import User, require_admin
+from .. import settings_access
 from ..config import get_settings
 from ..db import get_db
 from ..deps import get_actor, get_secret_store
@@ -59,13 +60,13 @@ def runtimes(db: Session = Depends(get_db), _: User = Depends(get_actor)):
 
 
 @router.get("/admin/runtimes", response_model=List[RuntimeOut], tags=["admin"])
-def admin_runtimes(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def admin_runtimes(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-runtimes", "view"))):
     return [_rt(r) for r in db.scalars(select(RuntimeImage).order_by(RuntimeImage.kind, RuntimeImage.version))]
 
 
 @router.put("/admin/runtimes/{kind}/{version}", response_model=RuntimeOut, tags=["admin"])
 def upsert_runtime(kind: str, version: str, body: RuntimeIn, db: Session = Depends(get_db),
-                   admin: User = Depends(require_admin)):
+                   admin: User = Depends(settings_access.needs("set-runtimes", "manage"))):
     from ..programs import VERSION
     import re
 
@@ -94,7 +95,7 @@ def upsert_runtime(kind: str, version: str, body: RuntimeIn, db: Session = Depen
 
 
 @router.delete("/admin/runtimes/{kind}/{version}", status_code=204, tags=["admin"])
-def delete_runtime(kind: str, version: str, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+def delete_runtime(kind: str, version: str, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-runtimes", "manage"))):
     row = db.scalar(select(RuntimeImage).where(RuntimeImage.kind == kind, RuntimeImage.version == version))
     if row is None:
         raise HTTPException(404, "runtime not found")
@@ -284,7 +285,7 @@ def list_service_accounts(db: Session = Depends(get_db), user: User = Depends(ge
 
 @router.put("/admin/service-accounts/{name}", response_model=ServiceAccountOut, tags=["admin"])
 def upsert_service_account(name: str, body: ServiceAccountIn, db: Session = Depends(get_db),
-                           admin: User = Depends(require_admin)):
+                           admin: User = Depends(settings_access.needs("set-services", "manage"))):
     import re
 
     if not re.match(NAME, name):
@@ -329,7 +330,7 @@ def upsert_service_account(name: str, body: ServiceAccountIn, db: Session = Depe
 
 
 @router.delete("/admin/service-accounts/{name}", status_code=204, tags=["admin"])
-def delete_service_account(name: str, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+def delete_service_account(name: str, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-services", "manage"))):
     from ..models import Workload
 
     sa = get_sa(db, name)

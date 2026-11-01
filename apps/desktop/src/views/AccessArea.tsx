@@ -3,7 +3,7 @@ import { AccessGrantRow, api, ApiError, CaseTarget, ComplianceRoleHeld, JustifyD
 import { JustifyPanel } from "../components/ComplianceForm";
 import { PageHeader } from "../components/Page";
 import type { Hub } from "../hub";
-import { OpenTab, resourcePath, resourceTab, rolesFor } from "../components/Permissions";
+import { OpenTab, PermissionsPanel, resourcePath, resourceTab, rolesFor } from "../components/Permissions";
 import { ProductIcon } from "../components/ProductIcon";
 
 const day = (v: string | null) => v ? new Date(v).toLocaleDateString() : "";
@@ -127,4 +127,33 @@ export function GiveAccess({ group, hub, onDone }: { group: { id: string; name: 
       <p className="hint">Only what you own is listed. When an access policy covers the data, you fill in its compliance form first and the access follows its review.</p>
     </form>}
   </section>;
+}
+
+const SECTION_OF: Record<string, [string, string]> = {
+  "set-layers": ["adm-platform", "Platform"], "set-pools": ["adm-platform", "Platform"], "set-runtimes": ["adm-platform", "Platform"],
+  "set-template": ["adm-platform", "Platform"], "set-alerts": ["adm-platform", "Platform"],
+  "set-profiles": ["adm-security", "Security"], "set-network": ["adm-security", "Security"],
+  "set-classes": ["adm-privacy", "Privacy"], "set-policies": ["adm-privacy", "Privacy"], "set-forms": ["adm-privacy", "Privacy"], "set-duties": ["adm-privacy", "Privacy"],
+  "set-groups": ["adm-access", "Access"], "set-services": ["adm-access", "Access"], "set-register": ["adm-access", "Access"],
+  "set-auditlog": ["adm-access", "Access"], "set-querylog": ["adm-access", "Access"],
+};
+
+/** Who may see or change an Access or Administration page: Viewer or Manager, on this page, its section, or all of
+ * Administration. Shown to whoever may give these roles (platform administrators). */
+export function SettingsPermissions({ page, hub, openTab }: { page: string; hub: Hub; openTab: OpenTab }) {
+  const [scope, setScope] = useState<"page" | "section" | "root">("page");
+  const [section, sectionName] = SECTION_OF[page] ?? ["", ""];
+  const id = scope === "page" ? page : scope === "section" ? section : "admin-root";
+  const resource = hub.resources.find((r) => r.id === id);
+  const self = hub.resources.find((r) => r.id === page);
+  if (!self || !self.actions.includes("assign")) return null;
+  return <details className="card settings-permissions">
+    <summary>Who can see or change this page</summary>
+    <p className="hint">Viewer may see it; Manager may also change it. Give a role on this page only, on all of {sectionName}, or on everything in Access and Administration.</p>
+    <div className="segmented" role="group" aria-label="Grant on">
+      {([["page", self.name], ["section", `All of ${sectionName}`], ["root", "Everything"]] as const).map(([value, label]) =>
+        <button key={value} type="button" aria-pressed={scope === value} className={scope === value ? "active" : ""} onClick={() => setScope(value)}>{label}</button>)}
+    </div>
+    {resource && <PermissionsPanel key={resource.id} resource={resource} resources={hub.resources} openTab={openTab} onChanged={hub.refresh} />}
+  </details>;
 }

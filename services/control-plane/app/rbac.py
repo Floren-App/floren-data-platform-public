@@ -207,6 +207,9 @@ def roles_for(resource: Resource) -> dict:
         return PACKAGE_ROLES
     if resource.kind in PRODUCT_KINDS:
         return PRODUCT_ROLES
+    if resource.kind in ("settings-root", "settings-section", "setting"):
+        from .settings_access import ROLES as SETTINGS_ROLES
+        return SETTINGS_ROLES
     return DATA_ROLES if resource.kind in ("source", "schema", "kafka", "topic") else PROGRAM_ROLES
 
 

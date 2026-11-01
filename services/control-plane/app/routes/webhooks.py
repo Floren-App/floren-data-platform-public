@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from .. import notify
 from ..auth import User, require_admin
+from .. import settings_access
 from ..db import get_db
 from ..deps import get_secret_store
 from ..models import Notification, NotificationWebhook
@@ -49,13 +50,13 @@ def _hook(db, name: str) -> NotificationWebhook:
 
 
 @router.get("/v1/admin/webhooks")
-def list_webhooks(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def list_webhooks(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-alerts", "view"))):
     return {"webhooks": [webhook_out(db, h) for h in db.scalars(select(NotificationWebhook).order_by(NotificationWebhook.name))],
             "events": [{"key": k, "label": v} for k, v in notify.EVENTS.items()]}
 
 
 @router.put("/v1/admin/webhooks/{name}")
-def put_webhook(name: str, body: WebhookIn, db: Session = Depends(get_db), user: User = Depends(require_admin),
+def put_webhook(name: str, body: WebhookIn, db: Session = Depends(get_db), user: User = Depends(settings_access.needs("set-alerts", "manage")),
                 secrets: SecretStore = Depends(get_secret_store)):
     """Create or change a webhook by name (a different body name renames it)."""
     parts = urlsplit(body.url)
@@ -85,7 +86,7 @@ def put_webhook(name: str, body: WebhookIn, db: Session = Depends(get_db), user:
 
 
 @router.delete("/v1/admin/webhooks/{name}", status_code=204)
-def delete_webhook(name: str, db: Session = Depends(get_db), user: User = Depends(require_admin),
+def delete_webhook(name: str, db: Session = Depends(get_db), user: User = Depends(settings_access.needs("set-alerts", "manage")),
                    secrets: SecretStore = Depends(get_secret_store)):
     hook = _hook(db, name)
     if hook.has_secret:
@@ -97,7 +98,7 @@ def delete_webhook(name: str, db: Session = Depends(get_db), user: User = Depend
 
 
 @router.post("/v1/admin/webhooks/{name}/test")
-def test_webhook(name: str, db: Session = Depends(get_db), user: User = Depends(require_admin),
+def test_webhook(name: str, db: Session = Depends(get_db), user: User = Depends(settings_access.needs("set-alerts", "manage")),
                  secrets: SecretStore = Depends(get_secret_store)):
     """Post a test message now and say how it went."""
     hook = _hook(db, name)
@@ -112,7 +113,7 @@ def test_webhook(name: str, db: Session = Depends(get_db), user: User = Depends(
 
 
 @router.get("/v1/admin/webhooks/{name}/deliveries")
-def deliveries(name: str, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def deliveries(name: str, db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-alerts", "view"))):
     """The latest messages to this webhook and how they went."""
     hook = _hook(db, name)
     return [{"id": n.id, "event": n.event, "subject": (n.payload or {}).get("subject", ""), "created_at": n.created_at,

@@ -408,20 +408,26 @@ function PackagesPanel({ hub, openTab, activeKey, activeRef }: Props) {
   </>;
 }
 
-/** Who may see which part of Access and Administration. */
+/** Who may see which part of Access and Administration: each page is granted on its own (Viewer or Manager),
+ * and the work queues follow review duties and data ownership. */
 export function accessSections(hub: Hub) {
-  const roles = hub.me?.compliance_roles ?? [], admin = !!hub.me?.is_admin;
+  const roles = hub.me?.compliance_roles ?? [], admin = !!hub.me?.is_admin, settings = hub.me?.settings ?? {};
+  const page = (id: string) => admin || !!settings[id];
   const privacyAdmin = admin || roles.includes("compliance_admin");
   return {
+    page,
     requests: hub.has("products.publish"),
     reviews: privacyAdmin || roles.includes("compliance_reviewer"),
     newMembers: privacyAdmin || roles.includes("membership_approver"),
     deadlines: hub.has("products.publish") || privacyAdmin || roles.includes("compliance_reviewer"),
-    who: admin || hub.has("security"),
-    register: privacyAdmin || roles.includes("compliance_reviewer"),
-    logs: admin,
+    who: admin || hub.has("security") || page("set-groups"),
+    services: admin || hub.has("security") || page("set-services"),
+    register: privacyAdmin || roles.includes("compliance_reviewer") || page("set-register"),
+    audit: page("set-auditlog"), queries: page("set-querylog"),
     secrets: admin || hub.has("workspaces") || hub.has("workloads.manage"),
-    platform: admin, security: admin, privacy: privacyAdmin,
+    platform: ["set-layers", "set-pools", "set-runtimes", "set-template", "set-alerts"].some(page),
+    security: ["set-profiles", "set-network"].some(page),
+    privacy: ["set-classes", "set-policies", "set-forms", "set-duties"].some(page),
   };
 }
 
@@ -454,10 +460,10 @@ function AccessPanel({ hub, openTab, activeKey }: Props) {
       can.newMembers && { kind: "privacy-memberships", title: "New members" },
       can.deadlines && !!badges.deadlines && { kind: "deadlines", title: "Needs a form" }]} />
     <NavList label="Who" activeKey={activeKey} openTab={openTab} items={[
-      can.who && { kind: "users", title: "People" }, can.who && { kind: "access", title: "Groups" }, can.who && { kind: "services", title: "Service identities" }]} />
+      can.who && { kind: "users", title: "People" }, can.who && { kind: "access", title: "Groups" }, can.services && { kind: "services", title: "Service identities" }]} />
     <NavList label="Records" activeKey={activeKey} openTab={openTab} items={[
-      can.register && { kind: "privacy-register", title: "Access register" }, can.logs && { kind: "admin-audit", title: "Audit log" },
-      can.logs && { kind: "admin-query-log", title: "Query log" }]} />
+      can.register && { kind: "privacy-register", title: "Access register" }, can.audit && { kind: "admin-audit", title: "Audit log" },
+      can.queries && { kind: "admin-query-log", title: "Query log" }]} />
     <NavList label="Credentials" activeKey={activeKey} openTab={openTab} items={[can.secrets && { kind: "secrets", title: "Secrets" }]} />
     <p className="sidebar-note muted">What each object allows is on its own Permissions tab. Your Git credentials are under Workspaces.</p>
   </>;
@@ -469,14 +475,14 @@ function AdminPanel({ hub, openTab, activeKey }: Props) {
   const can = accessSections(hub);
   return <>
     <NavList label="Platform" activeKey={activeKey} openTab={openTab} items={[
-      can.platform && { kind: "admin-layers", title: "Layers" }, can.platform && { kind: "admin-pools", title: "Compute pools" },
-      can.platform && { kind: "admin-runtimes", title: "Runtimes (versions)" }, can.platform && { kind: "admin-workspace-templates", title: "Workspace templates" },
-      can.platform && { kind: "admin-notifications", title: "Alerts" }]} />
+      can.page("set-layers") && { kind: "admin-layers", title: "Layers" }, can.page("set-pools") && { kind: "admin-pools", title: "Compute pools" },
+      can.page("set-runtimes") && { kind: "admin-runtimes", title: "Runtimes (versions)" }, can.page("set-template") && { kind: "admin-workspace-templates", title: "Workspace templates" },
+      can.page("set-alerts") && { kind: "admin-notifications", title: "Alerts" }]} />
     <NavList label="Security" activeKey={activeKey} openTab={openTab} items={[
-      can.security && { kind: "app-profiles", title: "App profiles" }, can.security && { kind: "admin-network", title: "Network allowlist" }]} />
+      can.page("set-profiles") && { kind: "app-profiles", title: "App profiles" }, can.page("set-network") && { kind: "admin-network", title: "Network allowlist" }]} />
     <NavList label="Privacy" activeKey={activeKey} openTab={openTab} items={[
-      can.privacy && { kind: "privacy-classifications", title: "Classifications" }, can.privacy && { kind: "privacy-policies", title: "Access policies" },
-      can.privacy && { kind: "privacy-forms", title: "Compliance forms" }, can.privacy && { kind: "privacy-roles", title: "Review duties" }]} />
+      can.page("set-classes") && { kind: "privacy-classifications", title: "Classifications" }, can.page("set-policies") && { kind: "privacy-policies", title: "Access policies" },
+      can.page("set-forms") && { kind: "privacy-forms", title: "Compliance forms" }, can.page("set-duties") && { kind: "privacy-roles", title: "Review duties" }]} />
     <p className="sidebar-note muted">Storage connections are under Storage, Git repositories under Workloads, service accounts under Access.</p>
   </>;
 }

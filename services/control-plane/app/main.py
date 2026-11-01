@@ -82,9 +82,11 @@ async def lifespan(app: FastAPI):
     seed()
     with SessionLocal() as db:  # create well-known roots up front rather than racing on first use
         from .rbac import api_root, packages_root, root
+        from .settings_access import ensure as settings_objects
         root(db)
         api_root(db)
         packages_root(db)
+        settings_objects(db)
         db.commit()
     tasks = []
     leadership = None

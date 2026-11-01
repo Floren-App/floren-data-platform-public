@@ -2760,7 +2760,8 @@ test("the privacy area sets policies per layer and classification and builds mul
     versions: [{ id: "v1", version: 1, published: true, published_at: "2026-10-30T09:00:00Z", published_by: "privacy", definition: { pages: [complianceDefinition.pages[0]] } }] };
   await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "priya", is_admin: false, active_group_id: "analysts", active_layer_id: null,
     available_groups: [{ id: "analysts", name: "Analysts" }], groups: [], pools: [], data_sources: [], app_features: ["products.browse"],
-    compliance_roles: ["compliance_reviewer", "compliance_admin"] } }));
+    compliance_roles: ["compliance_reviewer", "compliance_admin"],
+    settings: { "set-classes": "manage", "set-policies": "manage", "set-forms": "manage", "set-duties": "manage" } } }));
   await page.route(/\/v1\/compliance\//, (route) => {
     const req = route.request(), url = new URL(req.url()).pathname.replace("/api", "");
     if (req.method() !== "GET") sent.push({ method: req.method(), url, body: req.postDataJSON() });
@@ -3142,5 +3143,34 @@ test("a new group is made in one page and given access from its own page; people
   await main.getByLabel("Add ana to a group").selectOption("operators");
   await main.getByRole("button", { name: "Add to group" }).click();
   await expect(main.getByRole("status").filter({ hasText: "Added ana to Operators." })).toBeVisible();
+  expect(state.errors).toEqual([]);
+});
+
+test("Administration shows the pages you hold a role on, and each page says who can see or change it", async ({ page }) => {
+  const state = await setup(page);
+  const main = page.locator(".main"), sidebar = page.locator(".sidebar");
+  state.resources.push(resource("admin-root", "settings-root", "Administration"), resource("adm-privacy", "settings-section", "Privacy", "admin-root"),
+    resource("set-forms", "setting", "Compliance forms", "adm-privacy"), resource("adm-platform", "settings-section", "Platform", "admin-root"),
+    resource("set-layers", "setting", "Layers", "adm-platform"));
+  await page.route(/\/v1\/compliance\/forms$/, (route) => route.fulfill({ json: [] }));
+  await page.reload();
+  // An administrator grants one page to a group, from the page itself.
+  await page.getByRole("button", { name: "Administration", exact: true }).click();
+  await sidebar.getByRole("button", { name: "Compliance forms", exact: true }).click();
+  await main.getByText("Who can see or change this page").click();
+  const panel = main.getByRole("region", { name: "Permissions for Compliance forms" });
+  await panel.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
+  await panel.getByLabel("Role", { exact: true }).selectOption("Manager");
+  await panel.getByRole("button", { name: "Assign role", exact: true }).click();
+  expect(state.mutations.at(-1)).toMatchObject({ method: "PUT", path: "/v1/rbac/resources/set-forms/assignments", body: { app_group_id: "analysts", role: "Manager" } });
+  // Someone who manages only compliance forms sees only that page in Administration.
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "fay", is_admin: false, active_group_id: "analysts", active_layer_id: null,
+    available_groups: [{ id: "analysts", name: "Analysts" }], groups: [], pools: [], data_sources: [], app_features: ["products.browse"], compliance_roles: [],
+    settings: { "set-forms": "manage" } } }));
+  await page.reload();
+  await page.getByRole("button", { name: "Administration", exact: true }).click();
+  await expect(sidebar.getByRole("list", { name: "Privacy" }).getByRole("button")).toHaveText(["Compliance forms"]);
+  await expect(sidebar.getByRole("list", { name: "Platform" })).toHaveCount(0);
+  await expect(main.getByRole("heading", { name: "Compliance forms" })).toBeVisible();
   expect(state.errors).toEqual([]);
 });
