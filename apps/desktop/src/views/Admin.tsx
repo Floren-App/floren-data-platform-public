@@ -321,13 +321,23 @@ function WorkspaceLimits({ pools }: { pools: Pool[] }) {
   );
 }
 
-export function AdminAudit() {
-  const { data: events, error } = useLoad(api.admin.audit, [] as AuditEvent[]);
+export function AdminAudit({ initialActor = "", initialTarget = "" }: { initialActor?: string; initialTarget?: string }) {
+  const [filters, setFilters] = useState({ actor: initialActor, action: "", target: initialTarget });
+  const [events, setEvents] = useState<AuditEvent[]>([]), [error, setError] = useState("");
+  useEffect(() => {  // filter as people type, without a request per keystroke
+    const t = setTimeout(() => api.admin.audit(filters).then((e) => { setEvents(e); setError(""); }).catch((e: Error) => setError(e.message)), 250);
+    return () => clearTimeout(t);
+  }, [filters]);
   return (
     <>
-      <PageHeader title="Audit log" subtitle="Every data connection (and denial), workspace start, run and catalog change." />
+      <PageHeader title="Audit log" subtitle="Who changed what: every data connection (and denial), grant, workspace start, run and catalog change, newest first." />
+      <div className="arg-grid" role="search" aria-label="Filter the audit log">
+        <div className="field"><label htmlFor="audit-actor">Who</label><input id="audit-actor" value={filters.actor} onChange={(e) => setFilters({ ...filters, actor: e.target.value })} placeholder="person or service" /></div>
+        <div className="field"><label htmlFor="audit-action">Action</label><input id="audit-action" value={filters.action} onChange={(e) => setFilters({ ...filters, action: e.target.value })} placeholder="rbac, compliance, workspace…" /></div>
+        <div className="field"><label htmlFor="audit-target">Object ID</label><input id="audit-target" className="mono" value={filters.target} onChange={(e) => setFilters({ ...filters, target: e.target.value })} /></div>
+      </div>
       {error && <p className="error" role="alert">{error}</p>}
-      <table>
+      <table aria-label="Audit events">
         <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Detail</th></tr></thead>
         <tbody>
           {events.map((e, i) => (
@@ -336,6 +346,7 @@ export function AdminAudit() {
               <td className="mono muted" style={{ overflowWrap: "anywhere" }}>{JSON.stringify(e.detail)}</td>
             </tr>
           ))}
+          {!events.length && <tr><td colSpan={5} className="muted">No events match.</td></tr>}
         </tbody>
       </table>
     </>

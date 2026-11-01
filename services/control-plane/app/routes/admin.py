@@ -476,7 +476,16 @@ def delete_pool(name: str, db: Session = Depends(get_db), admin: User = Depends(
 
 
 @router.get("/audit")
-def audit_log(limit: int = 200, db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    events = db.scalars(select(AuditEvent).order_by(AuditEvent.id.desc()).limit(min(limit, 1000)))
+def audit_log(limit: int = 200, actor: str = "", action: str = "", target: str = "",
+              db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """The newest events first; filter by who (part of the name), action (prefix) and object (its ID)."""
+    query = select(AuditEvent).order_by(AuditEvent.id.desc())
+    if actor:
+        query = query.where(AuditEvent.actor.ilike(f"%{actor}%"))
+    if action:
+        query = query.where(AuditEvent.action.like(f"{action}%"))
+    if target:
+        query = query.where(AuditEvent.target == target)
+    events = db.scalars(query.limit(max(1, min(limit, 1000))))
     return [{"at": e.at, "actor": e.actor, "action": e.action, "target": e.target, "detail": e.detail}
             for e in events]

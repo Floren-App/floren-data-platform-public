@@ -36,7 +36,7 @@ It groups the sections by what you do:
 | | **Packages** | The platform's Python and R package repository ([packages](packages.md)) |
 | Integration | **Kafka** | Managed Kafka per layer and its topics; shown once a cluster is available to you |
 | | **APIs** | Internal and external REST/SOAP APIs ([API management](api-management.md)) |
-| Bottom | **Access** | The daily work around access. **To do**: access requests, reviews and new members waiting for you, with counts. **Who**: people, groups and service identities, each with what they can reach. **Records**: the access register, audit log and query log. **Credentials**: secrets ([RBAC](rbac.md), [access policies](access-policies.md)) |
+| Bottom | **Access** | The daily work around access. **To do**: access requests, reviews, new members and access that needs a form, waiting for you, with counts. **Who**: people, groups and service identities, each with what they can reach. **Records**: the access register, audit log and query log. **Credentials**: secrets ([RBAC](rbac.md), [access policies](access-policies.md)) |
 | | **Administration** | The rules, set up once in a while. **Platform**: layers, compute pools, runtimes, workspace templates, alerts. **Security**: app profiles, network allowlist. **Privacy**: classifications, access policies, compliance forms, review duties |
 
 Each person sees only the parts they may use: a privacy officer, for example, sees their reviews and

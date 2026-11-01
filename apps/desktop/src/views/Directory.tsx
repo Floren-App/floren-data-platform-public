@@ -86,5 +86,8 @@ function PersonAccess({ id, hub, openTab }: { id: string; hub: Hub; openTab: Ope
     <h3>Has access to</h3>
     <HasAccessTo rows={data.grants} hub={hub} openTab={openTab} showGroup label={`What ${data.principal.name} can reach`} />
     <ComplianceRolesHeld roles={data.compliance_roles} openTab={openTab} showGroup />
+    {hub.me?.is_admin && <div className="form-actions">
+      <button className="btn secondary" onClick={() => openTab({ kind: "admin-audit", title: "Audit log", search: data.principal.name })}>What {data.principal.name} changed (audit log)</button>
+      <button className="btn secondary" onClick={() => openTab({ kind: "admin-query-log", title: "Query log", search: data.principal.name })}>What {data.principal.name} queried</button></div>}
   </>;
 }

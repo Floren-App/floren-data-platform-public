@@ -1090,7 +1090,8 @@ export const api = {
       { warehouse: s.warehouse, max_running: s.max_running, max_running_per_user: s.max_running_per_user }),
     egress: () => request<EgressAllowlist>("GET", "/v1/admin/settings/egress"),
     saveEgress: (hosts: EgressHost[]) => request<EgressAllowlist>("PUT", "/v1/admin/settings/egress", { hosts }),
-    audit: () => request<AuditEvent[]>("GET", "/v1/admin/audit?limit=200"),
+    audit: (filters: { actor?: string; action?: string; target?: string } = {}) =>
+      request<AuditEvent[]>("GET", `/v1/admin/audit?${new URLSearchParams({ limit: "200", ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) })}`),
   },
 };
 

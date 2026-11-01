@@ -416,6 +416,7 @@ export function accessSections(hub: Hub) {
     requests: hub.has("products.publish"),
     reviews: privacyAdmin || roles.includes("compliance_reviewer"),
     newMembers: privacyAdmin || roles.includes("membership_approver"),
+    deadlines: hub.has("products.publish") || privacyAdmin || roles.includes("compliance_reviewer"),
     who: admin || hub.has("security"),
     register: privacyAdmin || roles.includes("compliance_reviewer"),
     logs: admin,
@@ -444,12 +445,14 @@ function AccessPanel({ hub, openTab, activeKey }: Props) {
   const requests = useCached("catalog:requests:approve", () => api.products.requests("approve"), can.requests);
   const reviews = useCached("privacy:reviews", () => api.compliance.cases("review"), can.reviews);
   const members = useCached("privacy:memberships", () => api.compliance.memberships(), can.newMembers);
+  const deadlines = useCached("privacy:deadlines", () => api.compliance.deadlines(), can.deadlines);
   const badges = { "access-requests": (requests.data ?? []).filter((r) => r.status === "pending").length,
-    "privacy-reviews": reviews.data?.length ?? 0, "privacy-memberships": members.data?.length ?? 0 };
+    "privacy-reviews": reviews.data?.length ?? 0, "privacy-memberships": members.data?.length ?? 0, deadlines: deadlines.data?.length ?? 0 };
   return <>
     <NavList label="To do" activeKey={activeKey} openTab={openTab} badges={badges} items={[
       can.requests && { kind: "access-requests", title: "Access requests" }, can.reviews && { kind: "privacy-reviews", title: "Reviews" },
-      can.newMembers && { kind: "privacy-memberships", title: "New members" }]} />
+      can.newMembers && { kind: "privacy-memberships", title: "New members" },
+      can.deadlines && !!badges.deadlines && { kind: "deadlines", title: "Needs a form" }]} />
     <NavList label="Who" activeKey={activeKey} openTab={openTab} items={[
       can.who && { kind: "users", title: "People" }, can.who && { kind: "access", title: "Groups" }, can.who && { kind: "services", title: "Service identities" }]} />
     <NavList label="Records" activeKey={activeKey} openTab={openTab} items={[

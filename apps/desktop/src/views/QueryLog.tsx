@@ -9,9 +9,9 @@ const ms = (n: number) => n < 1000 ? `${n} ms` : n < 60000 ? `${(n / 1000).toFix
 const bytes = (n: number) => n < 1024 ? `${n} B` : n < 1024 ** 2 ? `${(n / 1024).toFixed(0)} KB` : n < 1024 ** 3 ? `${(n / 1024 ** 2).toFixed(1)} MB` : `${(n / 1024 ** 3).toFixed(1)} GB`;
 
 /** Every query on the layers' Trino: who or what ran it, on which tables, how long and with what result. */
-export function QueryLogView({ hub }: { hub: Hub }) {
+export function QueryLogView({ hub, initialActor = "" }: { hub: Hub; initialActor?: string }) {
   const [rows, setRows] = useState<QueryLogRow[]>([]), [error, setError] = useState("");
-  const [filters, setFilters] = useState({ actor: "", layer_id: "", state: "", table: "" });
+  const [filters, setFilters] = useState({ actor: initialActor, layer_id: "", state: "", table: "" });
   const [settings, setSettings] = useState<QueryLogSettings | null>(null), [saved, setSaved] = useState("");
   const reload = useCallback(() => api.queryLog(filters).then((r) => { setRows(r); setError(""); }).catch((e: Error) => setError(e.message)), [filters]);
   useEffect(() => { void reload(); }, [reload]);

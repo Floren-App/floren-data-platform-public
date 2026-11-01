@@ -3075,3 +3075,26 @@ test("groups show members, what they reach and settings; connections and service
   await expect.poll(() => state.mutations.find((m) => m.path.includes("billing-sync"))).toBeTruthy();
   expect(state.errors).toEqual([]);
 });
+
+test("To do lists access that needs a form, and a person's page leads to what they changed", async ({ page }) => {
+  const state = await setup(page);
+  const main = page.locator(".main"), sidebar = page.locator(".sidebar");
+  const audits: string[] = [];
+  await page.route(/\/v1\/compliance\/deadlines/, (route) => route.fulfill({ json: [{ resource_id: "pg-reporting", resource: "reporting", kind: "schema", product_id: null,
+    app_group_id: "analysts", group: "Analysts", role: "Reader", classification: "confidential", due_at: "2099-11-30T00:00:00Z" }] }));
+  await page.route(/\/v1\/admin\/audit/, (route) => { audits.push(new URL(route.request().url()).search);
+    return route.fulfill({ json: [{ at: "2026-11-01T09:00:00Z", actor: "ana", action: "rbac.assign", target: "pg-reporting", detail: {} }] }); });
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: /Needs a form/ })).toContainText("1");
+  await sidebar.getByRole("button", { name: /Needs a form/ }).click();
+  await main.getByRole("table", { name: "Needs a form" }).getByRole("button", { name: "Justify" }).click();
+  await expect(page.getByRole("region", { name: "Permissions for reporting" })).toBeVisible();
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await sidebar.getByRole("button", { name: "People", exact: true }).click();
+  await main.getByRole("button", { name: "Open ana", exact: true }).click();
+  await main.getByRole("button", { name: /What .* changed/ }).click();
+  await expect(main.getByRole("table", { name: "Audit events" })).toContainText("rbac.assign");
+  await expect(main.getByLabel("Who")).not.toHaveValue("");
+  await expect.poll(() => audits.some((q) => q.includes("actor="))).toBe(true);
+  expect(state.errors).toEqual([]);
+});

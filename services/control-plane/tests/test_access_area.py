@@ -30,3 +30,17 @@ def test_group_and_person_access_show_roles_products_and_where_they_come_from(cl
     assert client.get(f"/v1/rbac/principals/{me['principal_id']}/access", headers=as_("admin")).status_code == 200
     assert client.get(f"/v1/rbac/principals/{me['principal_id']}/access", headers=as_("ana")).status_code == 403
     assert readers
+
+
+def test_the_audit_log_filters_by_who_what_and_object(client):
+    from app.db import SessionLocal
+    from app.models import AuditEvent
+    with SessionLocal() as db:
+        db.add_all([AuditEvent(actor="ana", action="rbac.assign", target="res1", detail={}),
+                    AuditEvent(actor="bob", action="rbac.assign", target="res2", detail={}),
+                    AuditEvent(actor="ana", action="workspace.start", target="ws1", detail={})])
+        db.commit()
+    get = lambda **q: [(e["actor"], e["action"], e["target"]) for e in client.get("/v1/admin/audit", headers=as_("admin"), params=q).json()]  # noqa: E731
+    assert get(actor="an", action="rbac") == [("ana", "rbac.assign", "res1")]
+    assert get(target="res2") == [("bob", "rbac.assign", "res2")]
+    assert client.get("/v1/admin/audit", headers=as_("ana")).status_code == 403
