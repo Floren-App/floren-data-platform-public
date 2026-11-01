@@ -109,3 +109,9 @@ def test_alert_rules_send_runs_slas_and_requests_to_the_right_channel(client, re
     assert all(body["subject"] for _, body in posted)
     listed = client.get("/v1/alerts/rules", headers=as_("ana"), params={"resource_id": ids["public"]}).json()
     assert [r["name"] for r in listed] == ["Requests", "SLA"]   # the schema's owner sees every rule on it
+
+
+def test_platform_administrators_see_the_pages_in_listings_to_grant_them(client):
+    listed = {r["id"]: r for r in client.get("/v1/rbac/resources", headers=as_("admin")).json()}
+    assert {"admin-root", "adm-privacy", "set-forms"} <= set(listed) and "assign" in listed["set-forms"]["actions"]
+    assert "set-forms" not in {r["id"] for r in client.get("/v1/rbac/resources", headers=as_("ana")).json()}
