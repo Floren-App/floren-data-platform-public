@@ -114,8 +114,8 @@ export function DataObjectView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; o
   const location = tab.data;
   const schema = hub.resources.find((r) => r.id === location?.schemaId && r.kind === "schema");
   if (!schema || !location) return <p className="muted">Data object not available.</p>;
-  const section = tab.section ?? "overview";
   const file = location.item?.kind === "file";
+  const section = tab.section ?? (file ? "preview" : "overview");   // a file opens on what is in it
   const parts = location.table !== undefined ? [{ name: location.table }] : (location.path ?? "").split("/").filter(Boolean).map((name, i, all) => ({ name,
     ...(i < all.length - 1 ? { onClick: () => openTab(dataTab(schema, { kind: "folder", name, path: all.slice(0, i + 1).join("/") })) } : {}) }));
   return <>
@@ -124,13 +124,15 @@ export function DataObjectView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; o
       subtitle={<>{location.item ? kindLabel(location.item) : "Data object"} · {schema.name}</>}
       actions={location.table !== undefined && <PublishButton resourceId={schema.id} objectPath={location.table} openTab={openTab} hub={hub} />} />
     {schema.layer_name && <p className="hint">Layer · <strong>{schema.layer_name}</strong></p>}
-    <ObjectTabs active={section} lineage preview={location.table !== undefined} onChange={(s) => openTab({ ...tab, section: s })} />
+    <ObjectTabs active={section} lineage preview={location.table !== undefined || file} onChange={(s) => openTab({ ...tab, section: s })} />
     {section === "permissions" ? <><p className="scope-note">This object uses its schema's permissions. Grants apply to every current and future object in <strong>{schema.name}</strong>.</p>
       <PermissionsPanel resource={schema} resources={hub.resources} openTab={openTab} onChanged={hub.refresh} /></>
       : section === "lineage" ? <ObjectLineage resourceId={schema.id} objectPath={location.table ?? location.path ?? location.item?.name} openTab={openTab} />
       : section === "preview" && location.table !== undefined ? <DataPreview schema={schema} table={location.table} />
-      : file ? <section className="card"><h2>File metadata</h2><dl className="kv"><dt>Path</dt><dd className="mono">{location.path}</dd>
-        <dt>Size</dt><dd>{location.item?.size ?? "—"} bytes</dd><dt>Modified</dt><dd>{location.item?.modified_at ? new Date(location.item.modified_at).toLocaleString() : "—"}</dd></dl></section>
+      : section === "preview" && file && location.path ? <FilePreviewPanel schema={schema} path={location.path} />
+      : file ? <><section className="card"><h2>File metadata</h2><dl className="kv"><dt>Path</dt><dd className="mono">{location.path}</dd>
+        <dt>Size</dt><dd>{formatBytes(location.item?.size)}</dd><dt>Modified</dt><dd>{location.item?.modified_at ? new Date(location.item.modified_at).toLocaleString() : "—"}</dd></dl></section>
+        <UseInCode schema={schema} path={location.path ?? ""} resources={hub.resources} /></>
       : <DataListing key={tab.ref} schema={schema} location={location} openTab={openTab} />}
   </>;
 }
@@ -146,5 +148,46 @@ function DataPreview({ schema, table }: { schema: AccessResource; table: string 
         <tbody>{state.data?.rows.map((row, i) => <tr key={i}>{row.map((v, j) => <td key={j} title={typeof v === "string" ? v : undefined}>{value(v)}</td>)}</tr>)}</tbody></table></div>
       <p className="hint">{state.data?.rows.length ?? 0} rows shown.</p>
     </>}
+  </section>;
+}
+
+const formatBytes = (n?: number | null) => n == null ? "—" : n < 1024 ? `${n} bytes` : n < 1024 ** 2 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 ** 2).toFixed(1)} MB`;
+
+/** The start of a file: tables show their first rows, JSON is formatted, text shows its first part, images show. */
+function FilePreviewPanel({ schema, path }: { schema: AccessResource; path: string }) {
+  const state = useCached("data:file:" + JSON.stringify([schema.id, path]), () => api.dataFile(schema.id, path));
+  const p = state.data;
+  const value = (v: unknown) => v === null || v === undefined ? <span className="muted">NULL</span> : typeof v === "object" ? JSON.stringify(v) : String(v);
+  return <section aria-label={`Preview of ${path}`}>
+    <div className="section-heading" style={{ marginTop: 0 }}><div><h2>Preview</h2>
+      <p className="muted">The start of the file, read with your data permissions and recorded in the audit log. To work with all of it, read it in code (Overview).</p></div>
+      <button className="btn secondary" disabled={state.status === "loading"} onClick={state.refresh}><IconRefresh size={14} />Refresh</button></div>
+    {state.status === "loading" || state.status === "idle" ? <p className="muted" role="status">Loading preview…</p>
+      : state.error ? <p className="error" role="alert">{state.error}</p>
+      : !p ? null
+      : p.kind === "table" ? <>
+        <div className="preview-table"><table aria-label="File rows"><thead><tr>{(p.columns ?? []).map((c, i) => <th key={i}>{c}{p.types?.[i] && <div className="muted small">{p.types[i]}</div>}</th>)}</tr></thead>
+          <tbody>{(p.rows ?? []).map((row, i) => <tr key={i}>{row.map((v, j) => <td key={j}>{value(v)}</td>)}</tr>)}
+            {!(p.rows ?? []).length && <tr><td colSpan={(p.columns ?? []).length || 1} className="muted">No rows.</td></tr>}</tbody></table></div>
+        <p className="hint">First {(p.rows ?? []).length} rows{p.total_rows != null ? ` of ${p.total_rows.toLocaleString()}` : p.truncated ? " (from the start of the file)" : ""}.</p></>
+      : p.kind === "image" ? <img className="file-image" alt={path} src={`data:${p.content_type};base64,${p.data}`} />
+      : p.kind === "none" ? <p className="muted">{p.note}</p>
+      : <><pre className="code file-text">{p.text}</pre>{p.truncated && <p className="hint">Only the start of the file is shown.</p>}</>}
+  </section>;
+}
+
+/** How to read this file in a workspace or workload: the connection name and its path there. */
+function UseInCode({ schema, path, resources }: { schema: AccessResource; path: string; resources: AccessResource[] }) {
+  const source = resources.find((r) => r.id === schema.parent_id);
+  const namespace = typeof schema.config.prefix === "string" ? schema.config.prefix : schema.name;
+  const full = [namespace, path].filter(Boolean).join("/");
+  const ext = path.split(".").pop()?.toLowerCase();
+  const read = ext === "csv" ? "read_csv" : ext === "json" ? "read_json" : ext === "parquet" ? "read_parquet" : ext === "jsonl" || ext === "ndjson" ? "read_jsonl" : "read_text";
+  const readR = ext === "csv" ? "read_csv" : ext === "json" ? "read_json" : ext === "parquet" ? "read_raw" : "read_text";
+  if (!source) return null;
+  return <section className="card"><h2>Use in code</h2>
+    <p className="muted">In a workspace or workload, with the same permissions.</p>
+    <h3>Python</h3><pre className="code">{`import fdp\n\nfiles = fdp.files(${JSON.stringify(source.name)})\ndata = files.${read}(${JSON.stringify(full)})`}</pre>
+    <h3>R</h3><pre className="code">{`files <- fdp::files(${JSON.stringify(source.name)})\ndata <- files$${readR}(${JSON.stringify(full)})`}</pre>
   </section>;
 }

@@ -28,6 +28,31 @@ Once created, an integration's type is fixed. When you edit one, leave a credent
 keep the stored value. Deleting an integration removes only its registration and stored
 credentials; the storage itself is not touched.
 
+## Reading files
+
+In **Storage**, a file in an S3 files namespace opens on its **Preview**: the start of the file, read
+with your own data permissions (the same short-lived, prefix-scoped credentials programs get).
+
+| File | Preview |
+|---|---|
+| CSV, TSV | The first 25 rows, with the header; the separator is detected |
+| JSON lines (`.jsonl`, `.ndjson`) | The first 25 records as rows, one column per key |
+| Parquet | The first 25 rows with column types and the total number of rows (files up to 50 MB) |
+| JSON | Formatted |
+| Text, logs, YAML, XML, SQL, code | The first 64 KB |
+| PNG, JPEG, GIF, WebP | The image (up to 5 MB) |
+
+At most the first 1 MB of a text file is read; files are never downloaded whole, so data stays on
+the platform. Every preview is recorded in the audit log (`storage.file_preview`). The file's
+**Overview** shows its size and date and how to read all of it in a workspace or workload:
+
+```python
+import fdp
+
+files = fdp.files("lake-files")
+data = files.read_csv("landing/sales.csv")
+```
+
 ## Engine catalogs
 
 The SQL types are queried through Trino catalogs:

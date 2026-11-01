@@ -704,3 +704,6 @@ tr.overdue td:first-child { box-shadow: inset 3px 0 0 var(--err); }
 .form-answers dl { display: grid; gap: 8px; margin: 0; } .form-answers dd { white-space: pre-wrap; }
 .decision-panel { display: grid; gap: 10px; border-left: 3px solid var(--accent); }
 .case-history { list-style: none; padding: 0; display: grid; gap: 6px; }
+/* File previews: images fit the page; long text scrolls inside its box. */
+.file-image { max-width: 100%; max-height: 70vh; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-side); }
+.file-text { max-height: 70vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }

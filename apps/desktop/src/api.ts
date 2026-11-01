@@ -608,6 +608,10 @@ export interface WebhookDelivery { id: number; event: string; subject: string; c
 export interface AccessGrantRow { resource: AccessResource; role: string; group: { id: string; name: string } | null; via: "direct" | "product";
   product: { id: string; title: string } | null; until: string | null; deadline: string | null; pending_membership: boolean }
 export interface ComplianceRoleHeld { role: string; label: string; scope: ComplianceRoleItem["scope"]; group: { id: string; name: string } }
+/** The start of a file in an S3 files namespace, read with your data permissions. */
+export interface FilePreview { path: string; size: number; content_type: string; truncated: boolean; read: number;
+  kind: "table" | "json" | "text" | "image" | "none"; columns?: string[]; rows?: unknown[][]; total_rows?: number; types?: string[];
+  text?: string; data?: string; note?: string }
 export interface RegisterRow { group: string; app_group_id: string; access: string; kind: string; classification: string; layer: string; form: string;
   requester: string; approved_by: string; approved_at: string | null; until: string | null; members: number; case_id: string }
 export type CaseTarget = { kind: "product" | "role"; app_group_id: string; product_id?: string; option_id?: string; resource_id?: string; role?: string };
@@ -878,6 +882,7 @@ export const api = {
     lineage: (id: string, filters: Record<string, string> = {}) => request<CatalogGraph>("GET", `/v1/catalog/assets/${id}/lineage?${new URLSearchParams(filters)}`),
     import: (id: string, kind: "dbt" | "airflow", body: unknown) => request<{ ok: boolean; asset_id: string }>("POST", `/v1/catalog/resources/${id}/import/${kind}`, body),
   },
+  dataFile: (schemaId: string, path: string) => request<FilePreview>("GET", `/v1/data/schemas/${schemaId}/file?${new URLSearchParams({ path })}`),
   dataPreview: (schemaId: string, table: string) => request<{ columns: string[]; rows: unknown[][]; limit: number; query_id: string }>(
     "GET", `/v1/data/schemas/${encodeURIComponent(schemaId)}/preview?${new URLSearchParams({ table })}`),
   metadataQuery: (sql: string) => request<{ columns: string[]; rows: unknown[][]; rowcount: number; truncated: boolean; query_id: string }>(

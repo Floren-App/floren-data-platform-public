@@ -3211,3 +3211,28 @@ test("alert rules send chosen events to a channel, from the Alerts page or an ob
   expect(created[1]).toMatchObject({ events: ["sla.breached"], resource_ids: ["pg-reporting"] });
   expect(state.errors).toEqual([]);
 });
+
+test("a file opens on its preview, and its overview shows how to read it in code", async ({ page }) => {
+  const state = await setup(page);
+  const main = page.locator(".main");
+  state.resources.push(resource("source-files", "source", "lake-files", null, { source_kind: "s3" }, "files"),
+    resource("files-landing", "schema", "landing", "source-files", { state: "ready", source_kind: "s3", prefix: "landing" }, "files"));
+  const previews: string[] = [];
+  await page.route(/\/v1\/data\/schemas\/files-landing\/children/, (route) => route.fulfill({ json: { next_cursor: null,
+    children: [{ name: "sales.csv", kind: "file", path: "sales.csv", size: 2048, modified_at: "2026-11-01T09:00:00Z" }] } }));
+  await page.route(/\/v1\/data\/schemas\/files-landing\/file/, (route) => { previews.push(new URL(route.request().url()).searchParams.get("path")!);
+    return route.fulfill({ json: { path: "sales.csv", size: 2048, content_type: "text/csv", truncated: false, read: 2048, kind: "table",
+      columns: ["region", "amount"], rows: [["North", "120"], ["South", "80"]] } }); });
+  await page.reload();
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "lake-files", exact: true }).click();
+  await main.getByRole("button", { name: "landing", exact: true }).click();
+  await main.getByRole("button", { name: "sales.csv", exact: true }).click();
+  const rows = main.getByRole("table", { name: "File rows" });
+  await expect(rows.getByRole("row", { name: /North/ })).toContainText("120");
+  expect(previews).toEqual(["sales.csv"]);
+  await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Overview", exact: true }).click();
+  await expect(main.getByText('files = fdp.files("lake-files")')).toBeVisible();
+  await expect(main.getByText('data = files.read_csv("landing/sales.csv")')).toBeVisible();
+  expect(state.errors).toEqual([]);
+});

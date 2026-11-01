@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
 | `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -187,6 +187,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/data/schemas/{resource_id}/children` | Children |
+| `GET` | `/v1/data/schemas/{resource_id}/file` | File Preview |
 | `GET` | `/v1/data/schemas/{resource_id}/preview` | Preview |
 
 ## data policies
@@ -368,8 +369,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/pages/{token}` | Page |
+| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |
