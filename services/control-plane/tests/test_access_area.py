@@ -66,3 +66,46 @@ def test_each_access_and_administration_page_is_granted_on_its_own(client):
     assert me["settings"]["set-classes"] == "manage" and me["settings"]["set-forms"] == "manage" and "set-layers" not in me["settings"]
     assert client.get("/v1/me", headers=as_("admin")).json()["settings"]["set-layers"] == "manage"
     assert forms
+
+
+def test_alert_rules_send_runs_slas_and_requests_to_the_right_channel(client, repo, monkeypatch):  # noqa: F811
+    import json
+    from datetime import timedelta
+    from app import notify
+    from app.db import SessionLocal
+    from app.models import CatalogAsset, ComputePool, Run, SlaIncident, Workload, utcnow
+    posted = []
+    monkeypatch.setattr(notify, "_post", lambda url, body, headers: posted.append((url, json.loads(body))) or 200)
+    ids = setup_products(client, repo)
+    for name in ("ops", "data"):
+        client.put(f"/v1/admin/webhooks/{name}", headers=as_("admin"), json={"name": name, "url": f"https://hooks.test/{name}"}).raise_for_status()
+    hooks = {h["name"]: h["id"] for h in client.get("/v1/admin/webhooks", headers=as_("admin")).json()["webhooks"]}
+    with SessionLocal() as db:
+        workload = db.query(Workload).first()
+        folder = db.get(__import__("app.models", fromlist=["Resource"]).Resource, workload.resource_id).parent_id
+    # Failed runs under that folder to ops; SLA failures of the public schema to data.
+    rule = client.post("/v1/alerts/rules", headers=as_("admin"), json={"name": "Failed runs", "events": ["run.failed"], "channel_id": hooks["ops"],
+                                                                       "resource_ids": [folder]})
+    assert rule.status_code == 201, rule.text
+    client.post("/v1/alerts/rules", headers=as_("admin"), json={"name": "SLA", "events": ["sla.breached", "sla.recovered"], "channel_id": hooks["data"],
+                                                                "resource_ids": [ids["public"]]}).raise_for_status()
+    # Someone who owns no object cannot make a rule; an object's owner can, for that object.
+    assert client.post("/v1/alerts/rules", headers=as_("bob"), json={"name": "x", "events": ["run.failed"], "channel_id": hooks["ops"],
+                                                                     "resource_ids": [folder]}).status_code == 403
+    mine = client.post("/v1/alerts/rules", headers=as_("ana"), json={"name": "Requests", "events": ["access.requested"], "channel_id": hooks["data"],
+                                                                     "resource_ids": [ids["public"]]})
+    assert mine.status_code == 201, mine.text
+    with SessionLocal() as db:
+        pool = db.query(ComputePool).first()
+        later = utcnow() + timedelta(seconds=1)
+        db.add(Run(owner="ana", workload_id=workload.id, pool_id=pool.id, kind="script", entrypoint="x.py", status="failed", finished_at=later))
+        asset = db.get(CatalogAsset, ids["sales"])
+        db.add(SlaIncident(asset_id=asset.id, status="breached", opened_at=later, updated_at=later))
+        db.commit()
+    notify.tick(SessionLocal)
+    notify.tick(SessionLocal)   # once
+    sent = [(url.rsplit("/", 1)[1], body["event"]) for url, body in posted]
+    assert sorted(sent) == [("data", "sla.breached"), ("ops", "run.failed")]
+    assert all(body["subject"] for _, body in posted)
+    listed = client.get("/v1/alerts/rules", headers=as_("ana"), params={"resource_id": ids["public"]}).json()
+    assert [r["name"] for r in listed] == ["Requests", "SLA"]   # the schema's owner sees every rule on it

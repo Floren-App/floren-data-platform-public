@@ -1,4 +1,5 @@
 import { ObjectLineage } from "../components/ObjectLineage";
+import { AlertRules } from "./Alerts";
 import { objectKindLabel } from "../objectKinds";
 import { useCallback, useEffect, useState } from "react";
 import { ago, openInWindow, api, AccessResource, ApiError, startingPool, usablePools, programRuntime, Workload, WorkloadCommit, WorkloadVersions, PullResult, Repo, Run, runtimeLabel, ServiceAccount, workloadStatus, workloadDot } from "../api";
@@ -380,7 +381,8 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
         </>} />
 
       <ObjectTabs active={section} lineage={!!resource} versions logs settings={pub.actions.includes("identity") || !!parent?.actions.includes("delete")}
-        onChange={(s) => openTab({ ...tab, section: s })} />
+        alerts={!!resource?.actions.includes("assign")} onChange={(s) => openTab({ ...tab, section: s })} />
+      {section === "alerts" && resource && <AlertRules hub={hub} resource={resource} />}
       {error && <AccessError error={error} openTab={openTab} />}
       {!error && loadError && <AccessError error={loadError} openTab={openTab} />}
       {section === "permissions" && (resource ? <PermissionsPanel resource={resource} resources={hub.resources} openTab={openTab} onChanged={hub.refresh} />

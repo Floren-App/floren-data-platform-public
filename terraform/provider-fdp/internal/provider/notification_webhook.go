@@ -51,13 +51,14 @@ func (r *notificationWebhookResource) Schema(_ context.Context, _ resource.Schem
 			"for compliance cases, a case summary; form answers are never included. Headers: X-FDP-Event, X-FDP-Delivery and, " +
 			"with a secret, X-FDP-Signature (sha256=<HMAC-SHA256 of the body>). Events: review.waiting, review.due, " +
 			"review.overdue, case.approved, case.declined, case.changes_requested, case.comment, membership.waiting, " +
-			"access.renewal_ready, access.ending, access.ended, access.deadline, access.removed. Import by name.",
+			"access.renewal_ready, access.ending, access.ended, access.deadline, access.removed, access.requested, " +
+			"access.request_decided, run.failed, deploy.failed, sla.breached, sla.recovered, certificate.expiring. Import by name.",
 		Attributes: map[string]schema.Attribute{
 			"id":   schema.StringAttribute{Computed: true, PlanModifiers: keepComputed},
 			"name": schema.StringAttribute{Required: true},
 			"url":  schema.StringAttribute{Required: true, Description: "https:// (or http:// inside your network)."},
 			"events": schema.SetAttribute{ElementType: types.StringType, Optional: true, Computed: true,
-				Default: setdefault.StaticValue(setValue(nil)), Description: "Events to send; empty sends all."},
+				Default: setdefault.StaticValue(setValue(nil)), Description: "Events this channel always gets, everywhere; empty: only what alert rules (fdp_alert_rule) send it."},
 			"enabled": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true)},
 			"secret_wo": schema.StringAttribute{Optional: true, Sensitive: true, WriteOnly: true,
 				Description: "Signing secret (at least 16 characters), kept in the platform's secret store. Write-only: never " +
@@ -174,4 +175,13 @@ func (r *notificationWebhookResource) Delete(ctx context.Context, req resource.D
 	if err := r.api.Do(ctx, "DELETE", "/v1/admin/webhooks/"+url.PathEscape(state.Name.ValueString()), nil, nil); err != nil && !client.IsNotFound(err) {
 		apiError(&resp.Diagnostics, "deleting notification webhook", err)
 	}
+}
+
+// fdp_alert_channel is the same resource under the name the app uses (Administration → Alerts → Channels).
+type alertChannelResource struct{ notificationWebhookResource }
+
+func NewAlertChannelResource() resource.Resource { return &alertChannelResource{} }
+
+func (r *alertChannelResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_alert_channel"
 }

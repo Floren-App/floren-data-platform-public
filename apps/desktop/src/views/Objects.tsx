@@ -7,6 +7,7 @@ import { ObjectBreadcrumbs, ObjectTabs, OpenTab, PermissionsPanel, resourceChain
 import { RunList, type TabRef } from "./Tabs";
 import { ServiceAccountForm, TokensCard } from "./Identity";
 import { HasAccessTo } from "./AccessArea";
+import { AlertRules } from "./Alerts";
 import { StorageConnectionForm, StorageConnectionSettings } from "./Admin";
 import { DataListing } from "../components/DataBrowser";
 import { DataPoliciesPanel } from "../components/DataPolicies";
@@ -137,8 +138,9 @@ export function SchemaView({ tab, hub, openTab }: ObjectProps) {
     {resource.layer_name && <p className="hint">Layer · <strong>{resource.layer_name}</strong></p>}
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
     <ObjectTabs active={section} lineage sql={!!resource.config.system_metadata} onChange={(s) => openTab({ ...tab, section: s })}
-      policies={(sourceKind === "postgres" || sourceKind === "iceberg") && !resource.config.system_metadata} />
-    {section === "policies" ? <DataPoliciesPanel schema={resource} />
+      policies={(sourceKind === "postgres" || sourceKind === "iceberg") && !resource.config.system_metadata} alerts={resource.actions.includes("assign")} />
+    {section === "alerts" ? <AlertRules hub={hub} resource={resource} />
+      : section === "policies" ? <DataPoliciesPanel schema={resource} />
       : section === "permissions" ? <ObjectAccess resource={resource} hub={hub} openTab={openTab} initialServiceId={tab.grantPrincipalId} />
       : section === "lineage" ? <ObjectLineage resourceId={resource.id} openTab={openTab} />
       : section === "sql" && resource.config.system_metadata ? <MetadataSql schema={resource} hub={hub} /> : <>
@@ -209,8 +211,9 @@ export function FolderView({ tab, hub, openTab }: ObjectProps) {
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
     {!!resource.config.environment && <p className="hint">Branch policy · Deploy from <code>{String(resource.config.branch)}</code>. Promotion creates a separate instance in its target layer.</p>}
     <ObjectTabs active={section} overview="Contents" runs logs settings={resource.kind === "folder" && resource.actions.includes("delete")}
-      onChange={(s) => openTab({ ...tab, section: s })} />
-    {section === "logs" ? <LogView scope={{ folder_id: resource.id }} layerId={hub.layerId} openTab={openTab} label={`Log of ${resource.name}`} />
+      alerts={resource.actions.includes("assign")} onChange={(s) => openTab({ ...tab, section: s })} />
+    {section === "alerts" ? <AlertRules hub={hub} resource={resource} />
+      : section === "logs" ? <LogView scope={{ folder_id: resource.id }} layerId={hub.layerId} openTab={openTab} label={`Log of ${resource.name}`} />
       : section === "runs" ? <RunList runs={runs} hub={hub} openTab={openTab} />
       : section === "permissions" ? <ObjectAccess resource={resource} hub={hub} openTab={openTab} />
       : section === "settings" ? <OrganizationSettings resource={resource} hub={hub} openTab={openTab} /> : <>

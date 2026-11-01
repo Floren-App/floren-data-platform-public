@@ -6,6 +6,7 @@ import { ProductIcon } from "../components/ProductIcon";
 import { PermissionsPanel } from "../components/Permissions";
 import { Answers, FormRenderer, JustifyPanel, uploadFiles } from "../components/ComplianceForm";
 import { CaseTable } from "./Cases";
+import { AlertRules } from "./Alerts";
 import { IconCatalog, IconPlus } from "../components/Icons";
 import { objectKindLabel } from "../objectKinds";
 import type { TabRef } from "./Tabs";
@@ -295,6 +296,7 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
   const target = openTarget(detail.open, detail.name, detail.kind);
   const sections: [NonNullable<TabRef["productSection"]>, string][] = [["overview", "Overview"], ["options", "Access options"], ["lineage", "Lineage"], ["used-by", "Used by"]];
   if (detail.access_resource) sections.push(["permissions", "Permissions"]);
+  if (detail.access_resource && detail.can_manage) sections.push(["alerts", "Alerts"]);
   return <>
     <div className="crumbs muted"><button className="text-button" onClick={() => openTab({ kind: "products", title: "Data products" })}>Data products</button>{detail.domain && <> › {detail.domain}</>}</div>
     <div className="product-header">
@@ -342,6 +344,7 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
     {section === "used-by" && <>{detail.used_by.length ? <div className="product-grid">{detail.used_by.map((p) => <ProductCard key={p.id} p={p} openTab={openTab} hub={hub} />)}</div>
       : <p className="muted">No other published products are built on this one.</p>}
       {detail.used_by_others > 0 && <p className="hint">{detail.used_by_others} other object{detail.used_by_others === 1 ? " uses" : "s use"} it (not published).</p>}</>}
+    {section === "alerts" && detail.access_resource && <AlertRules hub={hub} resource={detail.access_resource} />}
     {section === "permissions" && detail.access_resource && <PermissionsPanel resource={detail.access_resource} resources={[detail.access_resource]} openTab={openTab} onChanged={async () => { await load(); }} />}
   </>;
 }
