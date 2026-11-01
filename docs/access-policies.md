@@ -74,7 +74,7 @@ answered. Optionally, say until when the access is needed.
 
 ## Compliance roles
 
-Compliance work is done by app groups with a **compliance role**. A role can be scoped; an empty
+Compliance work is done by groups with a **review duty** (a compliance role). A duty can be scoped; an empty
 scope means everything.
 
 | Role | Does | Scoped by |
@@ -94,23 +94,24 @@ Access given through a form belongs to the group *as it was reviewed*. When some
 group later, directly or through the identity provider, they do not get that access until a
 membership approver approves them. Everything else the group can do, they get straight away.
 
-## The privacy area
+## Where the privacy work happens
 
-People with a compliance role get **Privacy** in the activity bar:
+The daily work is under **Access**; the rules are under **Administration → Privacy**.
 
-- **Reviews**: the cases waiting for your decision, the earliest deadline first; overdue ones are
-  marked. *All cases* shows every case you may see, by status.
-- **Memberships**: people who joined a group with access given through a form, waiting for a
-  membership approver.
-- **Access register**: what was given through a form, to which group, approved by whom and until
+- **Access → To do → Reviews**: the cases waiting for your decision, the earliest deadline first;
+  overdue ones are marked. *All cases* shows every case you may see, by status.
+- **Access → To do → New members**: people who joined a group with access given through a form,
+  waiting for a membership approver.
+- **Access → Records → Access register**: what was given through a form, to which group, approved by whom and until
   when, with the number of people in the group. **Export CSV** downloads it for audits. Compliance
   administrators see all of it; reviewers what is in their scope.
-- **Access policies**: the grid of layers and classifications; open a cell to set its form,
-  review steps and durations. Reviewers see the grid read-only.
-- **Compliance forms**: the forms, their versions, and the builder: add, remove and reorder pages
-  and questions, set conditions, preview, save a draft and publish.
-- **Compliance roles**: which groups have which compliance role, and for what.
-- **Classifications**: the levels and what masked data counts as.
+- **Administration → Access policies**: the grid of layers and classifications; open a cell to set
+  its form, review steps and durations.
+- **Administration → Compliance forms**: the forms, their versions, and the builder: add, remove and
+  reorder pages and questions, set conditions, preview, save a draft and publish.
+- **Administration → Review duties**: which groups review forms or approve new members, and for what
+  (the compliance roles below).
+- **Administration → Classifications**: the levels and what masked data counts as.
 
 ## Reviewing a case
 
@@ -155,7 +156,7 @@ Access that needs a form but has none gets a **deadline** instead of being remov
 The object's owners and the group's owners are told. The group's row on the object's
 **Permissions** (or on the product's **Access options**) says *Needs a form by …* with **Justify**,
 which opens the form for exactly that access. An approved case clears the deadline; at the
-deadline, the access is removed. The privacy area's **Access register** lists everything waiting
+deadline, the access is removed. **Access → Records → Access register** lists everything waiting
 for a form.
 
 The data's owners need no form for their own use of it: a group with a role that may give access

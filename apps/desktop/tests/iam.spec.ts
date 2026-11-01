@@ -770,7 +770,7 @@ test("administrators edit app profiles in a grid of features", async ({ page }) 
   await page.route(/\/v1\/admin\/app-profiles\//, (route) => { const body = route.request().postDataJSON(); saved.push(body);
     profiles = profiles.map((p) => p.name === decodeURIComponent(new URL(route.request().url()).pathname.split("/").pop()!) ? { ...p, ...body } : p);
     return route.fulfill({ json: body }); });
-  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Access", exact: true }).click();
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Administration", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: "App profiles", exact: true }).click();
   const grid = page.locator(".main").getByRole("table", { name: "App profiles" });
   await expect(grid.getByRole("checkbox", { name: "Workspaces in Viewer" })).not.toBeChecked();
@@ -937,9 +937,10 @@ test("the Access area lists who, what groups see and credentials; secrets live t
   const state = await setup(page);
   const sidebar = page.locator(".sidebar"), main = page.locator(".main");
   await page.getByRole("button", { name: "Access", exact: true }).click();
-  await expect(main.getByRole("heading", { name: "People", exact: true })).toBeVisible();
-  // Lists and detail belong to the pages; the sidebar only switches between them.
-  await expect(sidebar.getByRole("button")).toHaveText(["", "People", "Groups", "Service identities", "App profiles", "Secrets"]);
+  // Access opens on your to-do list; lists and detail belong to the pages, the sidebar only switches between them.
+  await expect(main.getByRole("heading", { name: "Reviews", exact: true })).toBeVisible();
+  await expect(sidebar.getByRole("button")).toHaveText(["", "Access requests", "Reviews", "New members", "People", "Groups", "Service identities",
+    "Access register", "Audit log", "Query log", "Secrets"]);
   await expect(page.getByRole("button", { name: "Secrets", exact: true }).and(page.locator(".activity button"))).toHaveCount(0);
   await sidebar.getByRole("button", { name: "Groups", exact: true }).click();
   await main.getByRole("button", { name: /^Analysts/ }).click();
@@ -965,6 +966,7 @@ test("IAM has separate group user and service pages with explicit identity origi
   // The sidebar is the only Access navigation; pages do not repeat it.
   const navigation = page.getByRole('list', { name: 'Who' });
   await expect(navigation.getByRole('button')).toHaveCount(3);
+  await navigation.getByRole('button', { name: 'People', exact: true }).click();
   await expect(main.getByRole('heading', { name: 'People', exact: true })).toBeVisible();
   await expect(main.getByText('IdP groups & roles', { exact: true })).toBeVisible();
   await main.getByRole('button', { name: 'Open ana', exact: true }).click();
@@ -1860,7 +1862,7 @@ test("administrators see who or what ran each query and set the query log's rete
     return route.fulfill({ json: { retention_days: 90, record_sql: false } });
   });
   const main = page.locator(".main");
-  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Administration", exact: true }).click();
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Access", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: "Query log", exact: true }).click();
   const table = main.getByRole("table", { name: "Queries" });
   await expect(table).toContainText("ana");
@@ -2778,10 +2780,13 @@ test("the privacy area sets policies per layer and classification and builds mul
   });
   await page.reload();
   const main = page.locator(".main");
-  // The privacy team gets only its own part of the app.
-  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Privacy", exact: true }).click();
+  // The privacy team gets only its own part of the app: its work under Access, its rules under Administration.
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Access", exact: true }).click();
   await expect(page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workspaces", exact: true })).toHaveCount(0);
   await expect(main.getByRole("heading", { name: "Reviews" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("button", { name: "People", exact: true })).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Administration", exact: true }).click();
+  await expect(page.locator(".sidebar").getByRole("button", { name: "Layers", exact: true })).toHaveCount(0);
   await page.locator(".sidebar").getByRole("button", { name: "Access policies", exact: true }).click();
   const grid = main.getByRole("table", { name: "Access policies" });
   await expect(grid.getByRole("button", { name: /^Prod, confidential: Personal data access/ })).toBeVisible();
@@ -2859,7 +2864,7 @@ test("reviewers work the queue by deadline, read the answers and decide in the a
   });
   await page.reload();
   const main = page.locator(".main");
-  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Privacy", exact: true }).click();
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Access", exact: true }).click();
   await expect(page.locator(".sidebar").getByRole("button", { name: /Reviews/ })).toContainText("2");
   // Oldest deadline first; the late one says so.
   const queue = main.getByRole("table", { name: "Waiting for me" });
@@ -2898,14 +2903,14 @@ test("the register exports CSV and approvers let new members in", async ({ page 
   });
   await page.reload();
   const main = page.locator(".main");
-  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Privacy", exact: true }).click();
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Access", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: /Access register/ }).click();
   await expect(main.getByRole("table", { name: "Access register" })).toContainText("Personal data access v1");
   const download = page.waitForEvent("download");
   await main.getByRole("button", { name: "Export CSV" }).click();
   expect((await download).suggestedFilename()).toBe("access-register.csv");
-  await page.locator(".sidebar").getByRole("button", { name: /Memberships/ }).click();
-  await main.getByRole("table", { name: "Memberships to approve" }).getByRole("button", { name: "Approve", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: /New members/ }).click();
+  await main.getByRole("table", { name: "New members to approve" }).getByRole("button", { name: "Approve", exact: true }).click();
   await expect(main.getByRole("status")).toHaveText("Approved carl.");
   expect(decided[0]).toMatchObject({ url: "/api/v1/compliance/memberships/analysts/p-carl", body: { approve: true } });
   expect(state.errors).toEqual([]);
@@ -3005,7 +3010,7 @@ test("administrators add a notification webhook, choose events and send a test",
       { key: "access.ending", label: "Access ends soon and the renewal was not sent" }] } });
   });
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Administration", exact: true }).click();
-  await page.locator(".sidebar").getByRole("button", { name: "Notifications", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Alerts", exact: true }).click();
   const main = page.locator(".main");
   await expect(main.getByRole("table", { name: "Webhooks" })).toContainText("No webhooks");
   await main.getByRole("button", { name: "Add webhook" }).click();

@@ -46,14 +46,14 @@ and compute pools; declare them in Terraform. For example:
 | Engineer | Everything except `security` |
 | Analyst | `products.request`, `catalog.objects`, `workspaces`, `workloads.view`, `storage` |
 | Viewer | `products.browse` |
-| Privacy | `products.browse`; with a compliance role, the privacy area comes on top (see [access policies](access-policies.md)) |
+| Privacy | `products.browse`; with a review duty, their reviews and the register appear under Access (see [access policies](access-policies.md)) |
 
 At most one profile is the **default**: groups without a profile get it. Without a default, groups
 without a profile get the whole app.
 
 ## Configure
 
-- **Access → App profiles** shows profiles against features as a grid: tick features,
+- **Administration → App profiles** shows profiles against features as a grid: tick features,
   rename a profile, choose the default and add or remove profiles. A profile given to a group
   cannot be removed.
 - **Access → Groups**: a group's **Settings** show its profile; administrators change it there.

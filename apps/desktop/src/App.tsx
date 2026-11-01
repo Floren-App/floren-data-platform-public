@@ -4,10 +4,10 @@ import { currentUser, getServer, onSessionExpired, resetManager, setServer, sign
 import { useHub } from "./hub";
 import { ObjectCacheProvider } from "./cache";
 import {
-  IconPin, IconHome, IconBook, IconAccount, IconAdmin, IconCatalog, IconClose, IconCompute, IconApi, IconPackage, IconData, IconStream, IconDeployed, IconPrivacy, IconSettings, IconWorkspaces,
+  IconPin, IconHome, IconBook, IconAccount, IconAdmin, IconCatalog, IconClose, IconCompute, IconApi, IconPackage, IconData, IconStream, IconDeployed, IconSettings, IconWorkspaces,
 } from "./components/Icons";
 import { MenuButton } from "./components/Menu";
-import { Sidebar, View } from "./views/Sidebar";
+import { accessSections, Sidebar, View } from "./views/Sidebar";
 import { TabContent, TabRef } from "./views/Tabs";
 import { GitChoiceHost } from "./views/GitCredentials";
 import { openInWindow, type AppFeature } from "./api";
@@ -21,19 +21,20 @@ const viewForTab = (tab: TabRef): View => {
   // Workspace runs belong with workspaces; runs of deployed programs with workloads.
   if ((tab.kind === "run" && tab.runScope === "workspace") || (tab.kind === "runs" && tab.ref === "workspace")) return "workspaces";
   if (["run", "runs", "workload", "deploy", "folder", "docs"].includes(tab.kind)) return "workloads";
-  if (tab.kind.startsWith("catalog") || ["products", "product", "access-requests", "case"].includes(tab.kind)) return "catalog";
+  // Requests to decide are work under Access; your own requests stay with the Catalog.
+  if (tab.kind === "access-requests") return tab.ref === "mine" ? "catalog" : "access";
+  if (tab.kind.startsWith("catalog") || ["products", "product", "case"].includes(tab.kind)) return "catalog";
   if (["apis", "api"].includes(tab.kind)) return "apis";
   if (["kafka", "kafka-clusters"].includes(tab.kind)) return "kafka";
   if (["data", "source", "schema", "data-object"].includes(tab.kind)) return "data";
   if (tab.kind === "pool") return "compute";
   if (tab.kind.startsWith("package")) return "packages";
-  // Pages that moved to their subject's home; old links still land there.
+  // Pages that moved to their subject's home; old links still land there. Access holds the work (to do, who,
+  // records); Administration the rules.
   if (tab.kind === "admin-sources") return "data";
   if (["repos", "admin-repos"].includes(tab.kind)) return "workloads";
-  if (["app-profiles", "admin-app-profiles", "admin-service-accounts"].includes(tab.kind)) return "access";
-  if (tab.kind === "admin-classifications") return "privacy";
-  if (tab.kind.startsWith("admin-")) return "admin";
-  if (tab.kind.startsWith("privacy-")) return "privacy";
+  if (["admin-service-accounts", "admin-audit", "admin-query-log", "privacy-reviews", "privacy-memberships", "privacy-register", "privacy-case"].includes(tab.kind)) return "access";
+  if (["app-profiles", "admin-app-profiles", "admin-classifications"].includes(tab.kind) || tab.kind.startsWith("privacy-") || tab.kind.startsWith("admin-")) return "admin";
   return "access";
 };
 const key = (t: TabRef) => t.kind === "access" || t.kind === "users" || t.kind === "catalog" || t.kind === "apis" ? `${t.kind}:` : `${t.kind}:${t.ref ?? ""}`;
@@ -194,9 +195,13 @@ function Shell({ user }: { user: User }) {
       data: { kind: "data", title: "Storage" },
       kafka: { kind: "kafka-clusters", title: "Kafka" },
       compute: { kind: "pool", title: "Usage" },
-      admin: { kind: "admin-layers", title: "Layers" },
-      privacy: hub.me?.compliance_roles?.some((r) => r !== "membership_approver") ? { kind: "privacy-reviews", title: "Reviews" } : { kind: "privacy-memberships", title: "Memberships" },
+      admin: hub.me?.is_admin ? { kind: "admin-layers", title: "Layers" } : { kind: "privacy-policies", title: "Access policies" },
     };
+    if (next === "access") {  // the first page this person may use: their to-do list first
+      const can = accessSections(hub);
+      defaults.access = can.reviews ? { kind: "privacy-reviews", title: "Reviews" } : can.requests ? { kind: "access-requests", title: "Access requests" }
+        : can.newMembers ? { kind: "privacy-memberships", title: "New members" } : can.who ? { kind: "users", title: "People" } : { kind: "secrets", title: "Secrets" };
+    }
     if (defaults[next]) openTab(defaults[next]!);
   };
   const runningWs = hub.workspaces.filter((w) => w.status === "running").length;
@@ -209,9 +214,9 @@ function Shell({ user }: { user: User }) {
         {groups.filter((g) => g.items.length).map((g, i) => <div key={g.label} className="activity-group" role="group" aria-label={g.label}>
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />
-        {(hub.has("security") || hub.has("workspaces")) && activityButton({ id: "access", label: "Access", icon: <IconAdmin /> })}
-        {!!hub.me?.compliance_roles?.length && activityButton({ id: "privacy", label: "Privacy", icon: <IconPrivacy /> })}
-        {hub.me?.is_admin && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}
+        {(() => { const can = accessSections(hub); return <>
+          {(can.requests || can.reviews || can.newMembers || can.who || can.register || can.secrets) && activityButton({ id: "access", label: "Access", icon: <IconAdmin /> })}
+          {(can.platform || can.security || can.privacy) && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}</>; })()}
         <button aria-label="Documentation" onClick={() => {
           void hub.act(() => openInWindow(documentationUrl(view), "FDP documentation", `fdp-help-${view}`));
         }}><IconBook /><span className="activity-label">Documentation</span></button>

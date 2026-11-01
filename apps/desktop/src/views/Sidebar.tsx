@@ -7,11 +7,10 @@ import { useCached, useObjectCache } from "../cache";
 import type { Hub } from "../hub";
 import { IconHome, IconWorkspaces, IconDeployed, IconCatalog, IconRuns, IconApi, IconBranch, IconChevron, IconClose, IconOpen, IconPlay, IconPlus, IconRefresh, IconStop, IconPackage, IconImport, IconKey, IconLog } from "../components/Icons";
 import { MenuButton } from "../components/Menu";
-import { SECURITY_PAGES, SecurityIcon } from "./Directory";
 import type { TabRef } from "./Tabs";
 import { ensureGitChoice } from "./GitCredentials";
 
-export type View = "home" | "apis" | "catalog" | "access" | "workspaces" | "workloads" | "data" | "kafka" | "compute" | "packages" | "privacy" | "admin";
+export type View = "home" | "apis" | "catalog" | "access" | "workspaces" | "workloads" | "data" | "kafka" | "compute" | "packages" | "admin";
 
 interface Props {
   view: View;
@@ -25,7 +24,7 @@ interface Props {
 export function Sidebar(props: Props) {
   const { view, hub } = props;
   const cache = useObjectCache();
-  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Access", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Usage", packages: "Packages", privacy: "Privacy", admin: "Administration" }[view];
+  const title = { home: "Home", apis: "API management", catalog: "Catalog", access: "Access", workspaces: "Workspaces", workloads: "Workloads", data: "Storage", kafka: "Kafka", compute: "Usage", packages: "Packages", admin: "Administration" }[view];
   return (
     <>
       <h2>
@@ -53,7 +52,6 @@ export function Sidebar(props: Props) {
       {view === "apis" && <ApisPanel {...props} />}
       {view === "compute" && <ComputePanel {...props} />}
       {view === "packages" && <PackagesPanel {...props} />}
-      {view === "privacy" && <PrivacyPanel {...props} />}
       {view === "admin" && <AdminPanel {...props} />}
     </>
   );
@@ -373,25 +371,6 @@ function ApisPanel({ hub, openTab, activeKey }: Props) {
 }
 
 /** Security: the pages carry their own lists and detail; the sidebar only switches between them. */
-/** Access: who (people, groups, service identities), the app profiles groups get, and credentials. What each
- * object allows stays on its own Permissions tab. */
-function AccessPanel({ hub, openTab, activeKey }: Props) {
-  const page = activeKey.split(":")[0];
-  const current = page === "service" ? "services" : page === "admin-app-profiles" ? "app-profiles" : page;
-  const item = (kind: TabRef["kind"], title: string, icon: JSX.Element) => <li key={kind} className={current === kind ? "selected" : ""}>
-    <button className="nav-item" aria-current={current === kind ? "page" : undefined} onClick={() => openTab({ kind, title })}>{icon}{title}</button></li>;
-  const who = SECURITY_PAGES.filter((p) => p.kind !== "secrets");
-  return <>
-    <div className="section-title">Who</div>
-    <ul className="list" aria-label="Who">{who.map((p) => item(p.kind, p.title, <SecurityIcon icon={p.icon} />))}</ul>
-    {hub.me?.is_admin && <><div className="section-title">What groups see</div>
-      <ul className="list" aria-label="What groups see">{item("app-profiles", "App profiles", <ProductIcon kind="layer" size={16} />)}</ul></>}
-    <div className="section-title">Credentials</div>
-    <ul className="list" aria-label="Credentials">{item("secrets", "Secrets", <SecurityIcon icon="key" />)}</ul>
-    <p className="sidebar-note muted">What each object allows is on its own Permissions tab. Your Git credentials are under Workspaces.</p>
-  </>;
-}
-
 function ComputePanel({ hub, openTab, activeRef }: Props) {
   const everywhere = hub.usageAllLayers, setEverywhere = hub.setUsageAllLayers;
   const all = hub.me?.pools ?? [];
@@ -429,53 +408,72 @@ function PackagesPanel({ hub, openTab, activeKey, activeRef }: Props) {
   </>;
 }
 
-/** The privacy team's part of the app: only what their job needs. */
-function PrivacyPanel({ hub, openTab, activeKey }: Props) {
-  const roles = hub.me?.compliance_roles ?? [];
-  const admin = roles.includes("compliance_admin"), reviewer = admin || roles.includes("compliance_reviewer");
-  const reviews = useCached("privacy:reviews", () => api.compliance.cases("review"), reviewer);
-  const members = useCached("privacy:memberships", () => api.compliance.memberships(), admin || roles.includes("membership_approver"));
-  const badge: Record<string, number> = { "privacy-reviews": reviews.data?.length ?? 0, "privacy-memberships": members.data?.length ?? 0 };
-  const items: TabRef[] = [
-    ...(reviewer ? [{ kind: "privacy-reviews", title: "Reviews" }] as TabRef[] : []),
-    ...(admin || roles.includes("membership_approver") ? [{ kind: "privacy-memberships", title: "Memberships" }] as TabRef[] : []),
-    ...(reviewer ? [{ kind: "privacy-register", title: "Access register" }] as TabRef[] : []),
-    { kind: "privacy-policies", title: "Access policies" },
-    ...(admin ? [{ kind: "privacy-forms", title: "Compliance forms" }, { kind: "privacy-roles", title: "Compliance roles" },
-      { kind: "privacy-classifications", title: "Classifications" }] as TabRef[] : []),
-  ];
+/** Who may see which part of Access and Administration. */
+export function accessSections(hub: Hub) {
+  const roles = hub.me?.compliance_roles ?? [], admin = !!hub.me?.is_admin;
+  const privacyAdmin = admin || roles.includes("compliance_admin");
+  return {
+    requests: hub.has("products.publish"),
+    reviews: privacyAdmin || roles.includes("compliance_reviewer"),
+    newMembers: privacyAdmin || roles.includes("membership_approver"),
+    who: admin || hub.has("security"),
+    register: privacyAdmin || roles.includes("compliance_reviewer"),
+    logs: admin,
+    secrets: admin || hub.has("workspaces") || hub.has("workloads.manage"),
+    platform: admin, security: admin, privacy: privacyAdmin,
+  };
+}
+
+function NavList({ label, items, activeKey, openTab, badges = {} }: { label: string; items: (TabRef | false)[]; activeKey: string; openTab: Props["openTab"]; badges?: Record<string, number> }) {
+  const shown = items.filter(Boolean) as TabRef[];
+  if (!shown.length) return null;
+  const current = activeKey.split(":")[0];
   return <>
-    <ul className="list">
-      {items.map((t) => <li key={t.kind} className={activeKey === `${t.kind}:` ? "selected" : ""}>
-        <button className="nav-item" onClick={() => openTab(t)}><span className="grow">{t.title}</span>
-          {!!badge[t.kind] && <span className="badge" aria-label={`${badge[t.kind]} waiting`}>{badge[t.kind]}</span>}</button></li>)}
-    </ul>
-    <p className="sidebar-note muted">Reviews of compliance forms, people waiting to use a group's justified access, which data needs a form, the forms people fill in, and who reviews them.</p>
+    <div className="section-title">{label}</div>
+    <ul className="list" aria-label={label}>{shown.map((t) => { const on = current === t.kind || (t.kind === "services" && current === "service");
+      return <li key={t.kind} className={on ? "selected" : ""}>
+        <button className="nav-item" aria-current={on ? "page" : undefined} onClick={() => openTab(t)}><span className="grow">{t.title}</span>
+          {!!badges[t.kind] && <span className="badge" aria-label={`${badges[t.kind]} waiting`}>{badges[t.kind]}</span>}</button></li>; })}</ul>
   </>;
 }
 
-function AdminPanel({ openTab, activeKey }: Props) {
-  // Platform configuration only. Things people work with have their settings on their own page: storage
-  // connections (Storage), Git repositories (Workloads), service accounts and app profiles (Access),
-  // classifications (Privacy).
-  const items: TabRef[] = [
-    { kind: "admin-layers", title: "Layers" },
-    { kind: "admin-pools", title: "Compute pools" },
-    { kind: "admin-runtimes", title: "Runtimes (versions)" },
-    { kind: "admin-workspace-templates", title: "Workspace templates" },
-    { kind: "admin-network", title: "Network allowlist" },
-    { kind: "admin-notifications", title: "Notifications" },
-    { kind: "admin-query-log", title: "Query log" },
-    { kind: "admin-audit", title: "Audit log" },
-  ];
-  return (<>
-    <ul className="list">
-      {items.map((t) => (
-        <li key={t.kind} className={activeKey === `${t.kind}:` ? "selected" : ""}>
-          <button className="nav-item" onClick={() => openTab(t)}>{t.title}</button>
-        </li>
-      ))}
-    </ul>
-    <p className="sidebar-note muted">Storage connections are under Storage, Git repositories under Workloads, service accounts and app profiles under Access, classifications under Privacy.</p>
-  </>);
+/** Access: the work around who can reach what. What is waiting for you, the people and groups, the records you
+ * consult, and credentials. What each object allows stays on its own Permissions tab. */
+function AccessPanel({ hub, openTab, activeKey }: Props) {
+  const can = accessSections(hub);
+  const requests = useCached("catalog:requests:approve", () => api.products.requests("approve"), can.requests);
+  const reviews = useCached("privacy:reviews", () => api.compliance.cases("review"), can.reviews);
+  const members = useCached("privacy:memberships", () => api.compliance.memberships(), can.newMembers);
+  const badges = { "access-requests": (requests.data ?? []).filter((r) => r.status === "pending").length,
+    "privacy-reviews": reviews.data?.length ?? 0, "privacy-memberships": members.data?.length ?? 0 };
+  return <>
+    <NavList label="To do" activeKey={activeKey} openTab={openTab} badges={badges} items={[
+      can.requests && { kind: "access-requests", title: "Access requests" }, can.reviews && { kind: "privacy-reviews", title: "Reviews" },
+      can.newMembers && { kind: "privacy-memberships", title: "New members" }]} />
+    <NavList label="Who" activeKey={activeKey} openTab={openTab} items={[
+      can.who && { kind: "users", title: "People" }, can.who && { kind: "access", title: "Groups" }, can.who && { kind: "services", title: "Service identities" }]} />
+    <NavList label="Records" activeKey={activeKey} openTab={openTab} items={[
+      can.register && { kind: "privacy-register", title: "Access register" }, can.logs && { kind: "admin-audit", title: "Audit log" },
+      can.logs && { kind: "admin-query-log", title: "Query log" }]} />
+    <NavList label="Credentials" activeKey={activeKey} openTab={openTab} items={[can.secrets && { kind: "secrets", title: "Secrets" }]} />
+    <p className="sidebar-note muted">What each object allows is on its own Permissions tab. Your Git credentials are under Workspaces.</p>
+  </>;
+}
+
+/** Administration: the rules, set up once in a while. Things people work with have their settings on their own
+ * page: storage connections (Storage), Git repositories (Workloads), service accounts (Access). */
+function AdminPanel({ hub, openTab, activeKey }: Props) {
+  const can = accessSections(hub);
+  return <>
+    <NavList label="Platform" activeKey={activeKey} openTab={openTab} items={[
+      can.platform && { kind: "admin-layers", title: "Layers" }, can.platform && { kind: "admin-pools", title: "Compute pools" },
+      can.platform && { kind: "admin-runtimes", title: "Runtimes (versions)" }, can.platform && { kind: "admin-workspace-templates", title: "Workspace templates" },
+      can.platform && { kind: "admin-notifications", title: "Alerts" }]} />
+    <NavList label="Security" activeKey={activeKey} openTab={openTab} items={[
+      can.security && { kind: "app-profiles", title: "App profiles" }, can.security && { kind: "admin-network", title: "Network allowlist" }]} />
+    <NavList label="Privacy" activeKey={activeKey} openTab={openTab} items={[
+      can.privacy && { kind: "privacy-classifications", title: "Classifications" }, can.privacy && { kind: "privacy-policies", title: "Access policies" },
+      can.privacy && { kind: "privacy-forms", title: "Compliance forms" }, can.privacy && { kind: "privacy-roles", title: "Review duties" }]} />
+    <p className="sidebar-note muted">Storage connections are under Storage, Git repositories under Workloads, service accounts under Access.</p>
+  </>;
 }

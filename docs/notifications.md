@@ -9,7 +9,7 @@ Without webhooks, nothing is sent; the app itself shows what waits.
 
 ## Configure
 
-- **Administration → Notifications**: add a webhook with its URL, the events it wants (none chosen:
+- **Administration → Alerts**: add a webhook with its URL, the events it wants (none chosen:
   all) and an optional signing secret. **Send test** posts a test message right away; **Messages**
   shows the latest messages and how they went.
 - **Terraform**: `fdp_notification_webhook` (see the
