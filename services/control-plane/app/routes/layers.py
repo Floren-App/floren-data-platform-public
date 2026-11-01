@@ -18,7 +18,7 @@ router = APIRouter(tags=["layers"])
 
 @router.get('/v1/admin/layers/{ident}/infrastructure')
 def infrastructure_state(ident: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    settings_access.require(db, user, "set-layers", "view")
+    settings_access.require(db, user, "set-layers", "layer_infrastructure.read", layer_id=ident)
     layer = layers.require_layer(db, ident)
     from .. import cert_monitor
     return {**infrastructure.state(db, layer), 'certificates': [cert_monitor.out(r) for r in cert_monitor.rows(db, layer.id)]}
@@ -27,7 +27,7 @@ def infrastructure_state(ident: str, db: Session = Depends(get_db), user: User =
 @router.get('/v1/admin/certificates')
 def certificates(db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Every monitored certificate (gateways and layer endpoints), most severe first."""
-    settings_access.require(db, user, "set-layers", "view")
+    settings_access.require(db, user, "set-layers", "certificates.read")
     from .. import cert_monitor
     found = [cert_monitor.out(r) for r in cert_monitor.rows(db)]
     return sorted(found, key=lambda c: (-c['severity'], c['not_after'] is None, c['not_after'] or 0, c['key']))
@@ -35,8 +35,9 @@ def certificates(db: Session = Depends(get_db), user: User = Depends(get_actor))
 
 @router.put('/v1/admin/layers/{ident}/infrastructure', status_code=202)
 def configure_infrastructure(ident: str, body: InfrastructureChange, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = settings_access.require(db, user, "set-layers")
+    user = settings_access.require(db, user, "set-layers", "layer_infrastructure.apply", layer_id=ident)
     if body.spec.retired:
+        settings_access.require(db, user, "set-layers", "layer_infrastructure.retire", layer_id=ident)
         # Retiring through a full update (e.g. infrastructure-as-code) has the same precondition.
         layer = layers.require_layer(db, ident)
         current = InfrastructureSpec.model_validate(layer.config.get('infrastructure', {}))
@@ -51,7 +52,7 @@ def configure_infrastructure(ident: str, body: InfrastructureChange, db: Session
 
 @router.post('/v1/admin/layers/{ident}/infrastructure/retry', status_code=202)
 def retry_infrastructure(ident: str, body: InfrastructureRetry, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = settings_access.require(db, user, "set-layers")
+    user = settings_access.require(db, user, "set-layers", "layer_infrastructure.retry", layer_id=ident)
     layer = layers.require_layer(db, ident)
     layer = db.scalar(select(Resource).where(Resource.id == layer.id).with_for_update()
                       .execution_options(populate_existing=True))
@@ -71,7 +72,7 @@ class InfrastructureRetire(BaseModel):
 @router.post('/v1/admin/layers/{ident}/infrastructure/retire', status_code=202)
 def retire_infrastructure(ident: str, body: InfrastructureRetire, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Scale a managed layer's compute to zero; its namespace, volumes and policies are retained."""
-    user = settings_access.require(db, user, "set-layers")
+    user = settings_access.require(db, user, "set-layers", "layer_infrastructure.retire", layer_id=ident)
     layer = layers.require_layer(db, ident)
     layer = db.scalar(select(Resource).where(Resource.id == layer.id).with_for_update()
                       .execution_options(populate_existing=True))
@@ -92,7 +93,7 @@ def retire_infrastructure(ident: str, body: InfrastructureRetire, db: Session = 
 @router.get('/v1/admin/layers/{ident}/operations')
 def infrastructure_operations(ident: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     from ..models import LayerOperation
-    settings_access.require(db, user, "set-layers", "view")
+    settings_access.require(db, user, "set-layers", "layer_infrastructure.history.read", layer_id=ident)
     layers.require_layer(db, ident)
     return [infrastructure.operation_out(row) for row in db.scalars(select(LayerOperation).where(
         LayerOperation.layer_id == ident).order_by(LayerOperation.generation.desc()).limit(100))]
@@ -129,7 +130,7 @@ def listing(db: Session = Depends(get_db), user: User = Depends(get_actor)):
 @router.get("/v1/admin/settings/default-layer")
 def default_layer(db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """The layer work without one goes to. Unset with exactly one layer: that layer."""
-    settings_access.require(db, user, "set-layers", "view")
+    settings_access.require(db, user, "set-layers", "platform.defaults.read")
     from ..models import PlatformSetting
     setting = db.get(PlatformSetting, layers.DEFAULTS)
     return {"layer_id": layers.default_layer(db), "configured": bool(setting and (setting.value or {}).get("default"))}
@@ -137,7 +138,7 @@ def default_layer(db: Session = Depends(get_db), user: User = Depends(get_actor)
 
 @router.put("/v1/admin/settings/default-layer")
 def set_default_layer(body: DefaultLayerIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = settings_access.require(db, user, "set-layers")
+    user = settings_access.require(db, user, "set-layers", "platform.defaults.default_layer.set")
     from ..models import PlatformSetting
     layer = db.get(Resource, body.layer_id)
     if layer is None or layer.kind != "layer":
@@ -152,7 +153,7 @@ def set_default_layer(body: DefaultLayerIn, db: Session = Depends(get_db), user:
 
 @router.delete("/v1/admin/settings/default-layer", status_code=204)
 def clear_default_layer(db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = settings_access.require(db, user, "set-layers")
+    user = settings_access.require(db, user, "set-layers", "platform.defaults.default_layer.reset")
     from ..models import PlatformSetting
     row = db.get(PlatformSetting, layers.DEFAULTS)
     if row:
@@ -163,9 +164,12 @@ def clear_default_layer(db: Session = Depends(get_db), user: User = Depends(get_
 
 @router.post("/v1/admin/layers", status_code=201)
 def create(body: LayerIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = settings_access.require(db, user, "set-layers")
-    from ..ownership import require_create
-    require_create(db,user)
+    user = settings_access.require(db, user, "set-layers", "layers.collection.create")
+    # Collection create is delegable; ownership still requires a valid primary group.
+    from ..ownership import owner_group
+    group = owner_group(db, user)
+    if body.production:
+        settings_access.require(db, user, "set-layers", "layers.object.production.set")
     if not body.name.strip():
         raise HTTPException(422, "enter a layer name")
     if any(r.name.casefold() == body.name.strip().casefold() for r in layers.all_layers(db)):
@@ -174,6 +178,9 @@ def create(body: LayerIn, db: Session = Depends(get_db), user: User = Depends(ge
                                                                    "production": body.production})
     db.add(layer); db.flush()
     rbac.own(db,user,layer)
+    from ..models import PermissionGrant
+    db.add(PermissionGrant(target_id="set-layers", namespace="layers.object", layer_id=layer.id,
+                           app_group_id=group.id, role="Owner", actions=[]))
     audit(db, user.username, "layer.create", layer.id, name=layer.name, workspaces=body.workspaces, production=body.production)
     db.commit()
     return out(layer, layers.default_layer(db))
@@ -181,8 +188,10 @@ def create(body: LayerIn, db: Session = Depends(get_db), user: User = Depends(ge
 
 @router.put("/v1/admin/layers/{ident}")
 def update(ident: str, body: LayerIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = settings_access.require(db, user, "set-layers")
+    user = settings_access.require(db, user, "set-layers", "layers.object.settings.edit", layer_id=ident)
     layer = layers.require_layer(db, ident)
+    if bool(body.production) != bool((layer.config or {}).get("production")):
+        settings_access.require(db, user, "set-layers", "layers.object.production.set", layer_id=ident)
     layer = db.scalar(select(Resource).where(Resource.id == layer.id).with_for_update()
                       .execution_options(populate_existing=True))
     if not body.name.strip():
@@ -198,7 +207,7 @@ def update(ident: str, body: LayerIn, db: Session = Depends(get_db), user: User 
 
 @router.delete("/v1/admin/layers/{ident}", status_code=204)
 def remove(ident: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = settings_access.require(db, user, "set-layers")
+    user = settings_access.require(db, user, "set-layers", "layers.object.delete_unused", layer_id=ident)
     layer = layers.require_layer(db, ident)
     layer = db.scalar(select(Resource).where(Resource.id == layer.id).with_for_update()
                       .execution_options(populate_existing=True))
@@ -221,6 +230,8 @@ def remove(ident: str, db: Session = Depends(get_db), user: User = Depends(get_a
     if used:
         raise HTTPException(409, "layer still contains objects, workspaces or run history")
     rbac.delete_resource_assignments(db,layer.id)
+    from ..models import PermissionGrant
+    db.execute(delete(PermissionGrant).where(PermissionGrant.layer_id == layer.id))
     from ..models import LayerOperation
     # Its provisioning history goes with it (the audit log keeps the deletion).
     db.execute(delete(LayerOperation).where(LayerOperation.layer_id == layer.id))

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, AccessResource, ALL_FEATURES, AppFeature, Layer, Me, modeLayerId, Workload, Run, Workspace } from "./api";
+import { api, AccessResource, AppFeature, Layer, Me, modeLayerId, Workload, Run, Workspace } from "./api";
 import { useObjectCache } from "./cache";
 import { SessionExpiredError } from "./auth";
+import { pageVisible } from "./permissions";
 
 export interface Hub {
   me: Me | null;
@@ -58,7 +59,15 @@ export function useHub(enabled: boolean): Hub {
   // The app profile decides which listings to load: features that are off are refused by the API.
   const features = useRef<Set<string> | null>(null);
   // A server without app profiles sends no list: then everything is on, as before.
-  const learn = (value: Me) => { features.current = value.app_features ? new Set(value.app_features) : new Set(ALL_FEATURES); };
+  const featurePages: Partial<Record<AppFeature, string>> = { workspaces: "workspaces", "workloads.view": "workloads", "workloads.manage": "workloads",
+    "products.browse": "products", "products.request": "requests", "products.publish": "products", "catalog.objects": "catalog", storage: "storage", packages: "packages", kafka: "kafka", apis: "apis", usage: "usage", security: "set-groups" };
+  const learnedPages = useRef<string | null>(null);
+  const learn = (value: Me) => {
+    const revision = JSON.stringify(value.pages ?? {});
+    if (learnedPages.current !== null && learnedPages.current !== revision) cache.invalidate("");
+    learnedPages.current = revision;
+    features.current = new Set((value.app_features ?? []).filter((f) => pageVisible(value, featurePages[f] ?? "")));
+  };
 
   const update = useCallback(async function update(includeResources: boolean): Promise<void> {
     const revision = groupRevision.current;
@@ -201,5 +210,5 @@ export function useHub(enabled: boolean): Hub {
   }, [enabled, refresh, update]);
 
   return { me, workspaces, runs, hasMoreRuns, loadMoreRuns, workloads, resources, layers, error, refresh, selectActiveGroup, layerId, selectActiveLayer, usageAllLayers, setUsageAllLayers, act, dismissError,
-    has: (feature: AppFeature) => !me?.app_features || me.app_features.includes(feature) };
+    has: (feature: AppFeature) => !!me?.app_features?.includes(feature) && pageVisible(me, featurePages[feature] ?? "") };
 }

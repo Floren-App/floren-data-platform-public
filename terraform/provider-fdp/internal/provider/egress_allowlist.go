@@ -2,6 +2,9 @@ package provider
 
 import (
 	"context"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -17,8 +20,9 @@ const egressAllowlistID = "egress"
 type egressAllowlistResource struct{ api *client.Client }
 
 type egressAllowlistModel struct {
-	ID    types.String `tfsdk:"id"`
-	Hosts types.Map    `tfsdk:"hosts"`
+	ID      types.String `tfsdk:"id"`
+	LayerID types.String `tfsdk:"layer_id"`
+	Hosts   types.Map    `tfsdk:"hosts"`
 }
 
 type egressHost struct {
@@ -27,7 +31,8 @@ type egressHost struct {
 }
 
 type egressAllowlistOut struct {
-	Hosts []egressHost `json:"hosts"`
+	Hosts   []egressHost `json:"hosts"`
+	LayerID *string      `json:"layer_id"`
 }
 
 func NewEgressAllowlistResource() resource.Resource { return &egressAllowlistResource{} }
@@ -38,12 +43,13 @@ func (r *egressAllowlistResource) Metadata(_ context.Context, req resource.Metad
 
 func (r *egressAllowlistResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Host names VS Code and RStudio workspaces may reach over HTTPS, through the platform's egress proxy " +
-			"(declare it once; Helm egressProxy.enabled). Everything else on the internet stays unreachable, and names " +
-			"resolving to private addresses are refused. Changes apply to running workspaces within seconds. " +
-			"Destroy empties the list. Import with ID \"egress\".",
+		Description: "A global HTTPS host ceiling or one layer's editor host list (Helm egressProxy.enabled). " +
+			"Both must allow a destination. New connections require a signed workspace ticket and verified source address. " +
+			"Private destinations and public package indexes remain blocked. Destroy empties this scope's list. " +
+			"Import as egress (global ceiling) or egress:LAYER_ID.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{Computed: true, PlanModifiers: keepComputed},
+			"id":       schema.StringAttribute{Computed: true, PlanModifiers: keepComputed},
+			"layer_id": schema.StringAttribute{Optional: true, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, Description: "Layer policy inside the global host ceiling. Omit only for the explicit global ceiling (Owner required). Import as egress:LAYER_ID."},
 			"hosts": schema.MapAttribute{ElementType: types.StringType, Required: true,
 				Description: "Host name (lowercase) to a description: \"github.com\", or \"*.githubusercontent.com\" for its subdomains."},
 		},
@@ -54,9 +60,23 @@ func (r *egressAllowlistResource) Configure(_ context.Context, req resource.Conf
 	r.api = configured(req.ProviderData, &resp.Diagnostics)
 }
 
-func (r *egressAllowlistResource) ImportState(ctx context.Context, _ resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resp.Diagnostics.Append(resp.State.Set(ctx, &egressAllowlistModel{ID: types.StringValue(egressAllowlistID),
-		Hosts: types.MapNull(types.StringType)})...)
+func (r *egressAllowlistResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	m := egressAllowlistModel{ID: types.StringValue(req.ID), LayerID: types.StringNull(), Hosts: types.MapNull(types.StringType)}
+	if req.ID != egressAllowlistID {
+		prefix, layer, ok := strings.Cut(req.ID, ":")
+		if !ok || prefix != "egress" || layer == "" {
+			resp.Diagnostics.AddError("Invalid import ID", "Use egress or egress:LAYER_ID")
+			return
+		}
+		m.LayerID = types.StringValue(layer)
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
+}
+func (m *egressAllowlistModel) endpoint() string {
+	if !m.LayerID.IsNull() && m.LayerID.ValueString() != "" {
+		return "/v1/admin/settings/egress?layer_id=" + url.QueryEscape(m.LayerID.ValueString())
+	}
+	return "/v1/admin/settings/egress"
 }
 
 func (m *egressAllowlistModel) apply(out *egressAllowlistOut) {
@@ -65,6 +85,10 @@ func (m *egressAllowlistModel) apply(out *egressAllowlistOut) {
 		hosts[h.Host] = h.Description
 	}
 	m.ID, m.Hosts = types.StringValue(egressAllowlistID), mapValue(hosts)
+	m.LayerID = permissionString(out.LayerID)
+	if out.LayerID != nil {
+		m.ID = types.StringValue(egressAllowlistID + ":" + *out.LayerID)
+	}
 }
 
 func (r *egressAllowlistResource) put(ctx context.Context, hosts map[string]string, m *egressAllowlistModel, d *diagSink) {
@@ -82,7 +106,7 @@ func (r *egressAllowlistResource) put(ctx context.Context, hosts map[string]stri
 		entries = append(entries, egressHost{Host: host, Description: hosts[host]})
 	}
 	var out egressAllowlistOut
-	if err := r.api.Do(ctx, "PUT", "/v1/admin/settings/egress", map[string]any{"hosts": entries}, &out); err != nil {
+	if err := r.api.Do(ctx, "PUT", m.endpoint(), map[string]any{"hosts": entries}, &out); err != nil {
 		apiError(d.d, "saving the egress allowlist", err)
 		return
 	}
@@ -108,7 +132,7 @@ func (r *egressAllowlistResource) Read(ctx context.Context, req resource.ReadReq
 	var state egressAllowlistModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	var out egressAllowlistOut
-	if err := r.api.Do(ctx, "GET", "/v1/admin/settings/egress", nil, &out); err != nil {
+	if err := r.api.Do(ctx, "GET", state.endpoint(), nil, &out); err != nil {
 		apiError(&resp.Diagnostics, "reading the egress allowlist", err)
 		return
 	}
@@ -129,6 +153,11 @@ func (r *egressAllowlistResource) Update(ctx context.Context, req resource.Updat
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *egressAllowlistResource) Delete(ctx context.Context, _ resource.DeleteRequest, resp *resource.DeleteResponse) {
-	r.put(ctx, map[string]string{}, nil, &diagSink{&resp.Diagnostics})
+func (r *egressAllowlistResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state egressAllowlistModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	r.put(ctx, map[string]string{}, &state, &diagSink{&resp.Diagnostics})
 }

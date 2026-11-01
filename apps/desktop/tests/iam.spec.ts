@@ -1,4 +1,7 @@
 import { expect, test, Page } from "playwright/test";
+import { TAB_PAGES } from "../src/permissions";
+const ALL_FEATURES = ["products.browse", "products.request", "products.publish", "catalog.objects", "workspaces", "workloads.view", "workloads.manage", "storage", "packages", "kafka", "apis", "usage", "security"];
+const allPages = Object.fromEntries(Object.values(TAB_PAGES).map((p) => [p, true]));
 
 type Resource = { id: string; kind: string; name: string; parent_id: string | null; object_id: string | null; config: Record<string, unknown>; actions: string[]; data_access?: boolean };
 type Grant = { id: string; resource_id: string; app_group_id: string | null; group: string | null;
@@ -56,7 +59,7 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     if (method !== "GET") mutations.push({ method, path, body }); else reads.push(path);
     if (path === "/v1/layers") return respond([{ id: "1a0000000001", name: "Prod", description: "", workspaces: false, production: true }, { id: "1a0000000002", name: "Non-Prod", description: "", workspaces: true, default: true }]);
     if (path === "/v1/client-config") return respond({ oidc_issuer: "https://idp.test", oidc_client_id: "desktop", oidc_scopes: "openid", public_url: "https://iam.test" });
-    if (path === "/v1/me") return respond({ username: "admin", is_admin: access === "owner", active_group_id: activeGroup, active_layer_id: activeLayer, available_groups: groups.map((g) => ({ id: g.id, name: g.name })), groups: [], pools: [{ id: "small", name: "small", cpu: 2, memory_gb: 4, max_concurrent: 10, auto_suspend_seconds: 600, usage_available: true, active_runs: 1, active_services: 3, active_products: 2, active_executions: 4, in_use: 4, queued: 2 }], data_sources: [] });
+    if (path === "/v1/me") return respond({ username: "admin", is_admin: access === "owner", acting_admin: access === "owner", pages: allPages, app_features: ALL_FEATURES, active_group_id: activeGroup, active_layer_id: activeLayer, available_groups: groups.map((g) => ({ id: g.id, name: g.name })), groups: [], pools: [{ id: "small", name: "small", cpu: 2, memory_gb: 4, max_concurrent: 10, auto_suspend_seconds: 600, usage_available: true, active_runs: 1, active_services: 3, active_products: 2, active_executions: 4, in_use: 4, queued: 2 }], data_sources: [] });
     if (path === "/v1/compute/warehouses") return respond([{ name: "small", cpu: 2, memory_gb: 4, gpu: 0, max_concurrent: 10, in_use: 4, queued: 2,
       layers: [{ layer_id: "1a0000000002", layer_name: "Non-Prod", in_use: 3, queued: 2 }, { layer_id: "1a0000000001", layer_name: "Prod", in_use: 1, queued: 0 }],
       occupants: [{ category: "trino", kind: "workers", state: "running", slots: 1, name: "Trino workers", owner: "platform", layer_id: "1a0000000001", layer_name: "Prod", queue_position: null, run_id: null, workload_id: null, workspace_id: null },
@@ -679,7 +682,8 @@ test("catalog: bundled data products as cards, lineage without access, requests 
   // Without access: what it is and its lineage, no details; request access for a group.
   await card.getByRole("button", { name: "Request access", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Pokemon cards", exact: true })).toBeVisible();
-  await expect(main).toContainText("Approval makes the group you choose a Consumer of this product: Executor on Cards dashboard, Reader on schema pokemon_history (all its tables).");
+  await expect(main.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Permissions", exact: true })).toHaveCount(0);
   const inside = main.getByRole("list", { name: "In this product" });
   await expect(inside.getByRole("listitem")).toHaveCount(3);
   await expect(inside.getByRole("listitem").filter({ hasText: "Cards dashboard" })).toContainText("You have access");
@@ -689,10 +693,11 @@ test("catalog: bundled data products as cards, lineage without access, requests 
   await expect(main.getByRole("status")).toContainText("Request sent");
   expect(posted[0]).toEqual({ app_group_id: "analysts", reason: "Weekly price report" });
   await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
-  const lineage = main.getByRole("list", { name: "Lineage" });
-  await expect(lineage.getByRole("listitem")).toHaveCount(5);                                 // 2 steps + the 3 objects in it
-  await expect(lineage.getByRole("listitem").first()).toContainText("pokemon-landing");      // sources on the left
-  await expect(lineage.locator(".product-step.hidden")).toHaveCount(2);
+  const lineage = main.getByRole("list", { name: "Object lineage" });
+  await expect(lineage.getByRole("listitem")).toHaveCount(3);
+  await expect(lineage.getByRole("button", { name: "View lineage of Cards dashboard", exact: true })).toBeVisible();
+  await expect(lineage.getByRole("button", { name: "View lineage of pokemon_stats", exact: true })).toHaveCount(0);
+  await expect(lineage).not.toContainText("pokemon-landing");
   await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Used by", exact: true }).click();
   await expect(main.getByRole("article", { name: "Pokemon dashboard" })).toBeVisible();
   await expect(main).toContainText("1 other object uses it (not published).");
@@ -731,7 +736,7 @@ test("app profiles: a Viewer gets Home and Data products only, and admins edit p
   page.on("request", (r) => { if (r.url().includes("/api/v1/")) asked.push(new URL(r.url()).pathname); });
   await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "vera", is_admin: false, groups: [], data_sources: [], pools: [],
     active_group_id: "viewers", active_layer_id: "1a0000000002", available_groups: [{ id: "viewers", name: "Viewers" }],
-    app_profile: "Viewer", app_features: ["products.browse"] } }));
+    pages: { home: true, products: true }, app_profile: "Viewer", app_features: ["products.browse"] } }));
   const dashboard = { id: "p1", asset_id: "a1", title: "Pokemon dashboard", summary: "Prices per set.", kind: "app", runtime: "python", name: "dash", layer_id: "1a0000000002",
     layer_name: "Non-Prod", domain: "Games", classification: "internal", status: "draft", steward: "", owner_group_name: "Data engineers", updated_at: null, sla_status: "",
     published_at: "2026-10-31T09:00:00Z", published_by: "admin", access: "granted", can_manage: false,
@@ -790,16 +795,29 @@ test("product access options: requesters choose one, owners see masks and move g
       ...(owner ? { masks: [{ asset_id: "a-sales", table: "sales", column: "email", method: "hash", expression: "" }], filters: [] } : { masked_columns: 1, filtered_tables: 0 }) },
     { id: "o-full", name: "Full", description: "Everything", default: false, classification: "restricted", ...(owner ? { masks: [], filters: [] } : { masked_columns: 0, filtered_tables: 0 }) }];
   let owner = false;
+  let consumers = [{ group_id: "analysts", group: "Analysts", option_id: "o-masked", option: "Masked" },
+    { group_id: "operators", group: "Operators", option_id: "o-masked", option: "Masked" }];
+  let rejectRemoval = false;
   const product = () => ({ id: "p1", asset_id: "a-sales", title: "Sales", summary: "Orders.", kind: "table", runtime: null, name: "sales", layer_id: "1a0000000002",
     layer_name: "Non-Prod", domain: "Finance", classification: "restricted", status: "draft", steward: "", owner_group_name: "Finance", updated_at: null, sla_status: "",
     published_at: "2026-10-31T09:00:00Z", published_by: "ana", access: owner ? "granted" : "none", can_manage: owner,
     members: [{ asset_id: "a-sales", name: "sales", kind: "table", runtime: null, access: owner ? "granted" : "none", updated_at: null, open: null }],
     grants: [{ resource_id: "s", kind: "schema", name: "public", role: "Reader", object: "sales" }], open: null, options: options(owner),
     lineage: [], lineage_edges: [], used_by: [], used_by_others: 0,
-    ...(owner ? { consumers: [{ group_id: "analysts", group: "Analysts", option_id: "o-masked", option: "Masked" }] } : {}) });
+    ...(owner ? { consumers } : {}) });
   await page.route(/\/v1\/catalog\/products/, (route) => {
     const url = new URL(route.request().url()), method = route.request().method();
-    if (method !== "GET") { sent.push({ url: url.pathname, body: route.request().postDataJSON() }); return route.fulfill({ status: 201, json: {} }); }
+    if (method !== "GET") {
+      const body = route.request().postDataJSON();
+      sent.push({ url: url.pathname, body });
+      if (url.pathname.includes("/consumers/")) {
+        const id = url.pathname.split("/").pop()!;
+        if (method === "DELETE" && rejectRemoval) return route.fulfill({ status: 403, json: { detail: "Owner required" } });
+        consumers = consumers.filter((consumer) => consumer.group_id !== id);
+        if (method === "PUT") consumers.push({ group_id: id, group: id === "analysts" ? "Analysts" : "Operators", option_id: body.option_id, option: body.option_id === "o-full" ? "Full" : "Masked" });
+      }
+      return route.fulfill({ status: 201, json: {} });
+    }
     if (url.pathname.endsWith("/products")) return route.fulfill({ json: { items: [product()], domains: [], kinds: ["table"] } });
     return route.fulfill({ json: product() });
   });
@@ -818,16 +836,78 @@ test("product access options: requesters choose one, owners see masks and move g
   await main.getByRole("button", { name: "Send request", exact: true }).click();
   await expect.poll(() => sent.length).toBe(1);
   expect(sent[0]).toMatchObject({ url: "/api/v1/catalog/products/p1/requests", body: { option_id: "o-full", reason: "Fraud analysis needs real emails" } });
-  // Owners see the masks and which group has which option, and move a group.
+  // Catalog browsing remains discovery-only even when this account owns the product.
   owner = true;
   await page.reload();
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
   await main.getByRole("button", { name: "Sales", exact: true }).click();
-  await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Access options", exact: true }).click();
+  const sections = main.getByRole("navigation", { name: "Product sections" });
+  await expect(sections.getByRole("button", { name: "Permissions", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+  await sections.getByRole("button", { name: "Access options", exact: true }).click();
+  await expect(table.getByRole("button")).toHaveCount(0);
+  await expect(table.getByRole("columnheader", { name: "Groups", exact: true })).toHaveCount(0);
+  // My products contains owner tools. The option rows show names, without inline controls.
+  await page.locator(".sidebar").getByRole("button", { name: "My products", exact: true }).click();
+  await main.getByRole("button", { name: "Sales", exact: true }).click();
+  await sections.getByRole("button", { name: "Access options", exact: true }).click();
   await expect(table).toContainText("sales.email: hash");
-  await table.getByRole("combobox", { name: "Option of Analysts" }).selectOption("o-full");
+  await expect(table).toContainText("Analysts, Operators");
+  await expect(table.getByRole("combobox")).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Give access", exact: true })).toHaveCount(0);
+  const pencil = table.getByRole("button", { name: "Edit groups for Masked", exact: true });
+  await pencil.click();
+  const dialog = page.getByRole("dialog", { name: "Manage product access" });
+  await expect(dialog.getByRole("table", { name: "Groups with product access" })).toContainText("Analysts");
+  await expect(dialog.getByRole("table", { name: "Groups with product access" })).toContainText("Operators");
+  await dialog.getByRole("combobox", { name: "Option of Analysts" }).selectOption("o-full");
   await expect.poll(() => sent.length).toBe(2);
   expect(sent[1]).toMatchObject({ url: "/api/v1/catalog/products/p1/consumers/analysts", body: { option_id: "o-full" } });
+  await expect(dialog.getByRole("combobox", { name: "Option of Analysts" })).toHaveValue("o-full");
+  await dialog.getByRole("button", { name: "Remove access for Operators", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Remove access for Operators", exact: true })).toHaveCount(0);
+  await dialog.getByRole("combobox", { name: "Group to give access", exact: true }).selectOption("operators");
+  await dialog.getByRole("button", { name: "Add group", exact: true }).click();
+  await expect(dialog.getByRole("combobox", { name: "Option of Operators" })).toHaveValue("o-masked");
+  expect(sent[3]).toMatchObject({ url: "/api/v1/catalog/products/p1/consumers/operators", body: { option_id: "o-masked" } });
+  rejectRemoval = true;
+  await dialog.getByRole("button", { name: "Remove access for Operators", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toHaveText("Owner required");
+  await expect(dialog.getByRole("combobox", { name: "Option of Operators" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(pencil).toBeFocused();
+  await expect(table.getByRole("row", { name: /Full/ })).toContainText("Analysts");
+  await pencil.click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+test("product lineage opens the selected object's canonical explorer", async ({ page }) => {
+  const state = await setup(page);
+  const product = { id: "lineage-product", title: "Reporting product", name: "Revenue", kind: "table", runtime: null,
+    summary: "Sales outputs", access: "granted", can_manage: true, options: [], domain: "Finance", classification: "internal",
+    status: "draft", owner_group_name: "Finance", grants: [], open: null, published_at: "2026-10-31T09:00:00Z", published_by: "admin",
+    members: state.catalogItems.filter((asset) => ["cat-table", "cat-script"].includes(asset.id)).map((asset) => ({
+      asset_id: asset.id, name: asset.name, kind: asset.kind, runtime: null, access: "granted", updated_at: null, open: null })),
+    lineage: [], used_by: [], used_by_others: 0 };
+  await page.route(/\/v1\/catalog\/products/, (route) => route.fulfill({ json: new URL(route.request().url()).pathname.endsWith("/products")
+    ? { items: [product], domains: [], kinds: [] } : product }));
+  const main = page.locator(".main");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await main.getByRole("button", { name: "Reporting product", exact: true }).click();
+  await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
+  const objects = main.getByRole("list", { name: "Object lineage" });
+  await expect(objects.getByRole("listitem")).toHaveCount(2);
+  await objects.getByRole("button", { name: "View lineage of Revenue", exact: true }).click();
+  await expect(main.getByRole("navigation", { name: "Catalog sections" }).getByRole("button", { name: "Lineage", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect.poll(() => state.reads.some((path) => path.startsWith("/v1/catalog/assets/cat-table/lineage"))).toBe(true);
+  await page.locator(".sidebar").getByRole("button", { name: "Data products", exact: true }).click();
+  await main.getByRole("button", { name: "Reporting product", exact: true }).click();
+  await main.getByRole("navigation", { name: "Product sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
+  await objects.getByRole("button", { name: "View lineage of Daily report", exact: true }).click();
+  await expect.poll(() => state.reads.some((path) => path.startsWith("/v1/catalog/assets/cat-script/lineage"))).toBe(true);
   expect(state.errors).toEqual([]);
 });
 
@@ -1194,7 +1274,7 @@ test("storage and workloads open the same canonical lineage and controls as cata
   await main.getByRole("button", { name: "Sales app", exact: true }).click();
   await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
   await expect(main.getByRole("region", { name: "Interactive lineage graph" })).toBeVisible();
-  expect(state.reads.some(path => path.startsWith("/v1/catalog/assets/cat-sales/lineage"))).toBe(true);
+  await expect.poll(() => state.reads.some(path => path.startsWith("/v1/catalog/assets/cat-sales/lineage"))).toBe(true);
   await main.getByLabel("Show operational dependencies", { exact: true }).check();
   await main.getByLabel("Show columns", { exact: true }).check();
   await main.getByRole("button", { name: "Downstream lineage", exact: true }).click();
@@ -1409,7 +1489,7 @@ test("workspace runs are a tab of Workspaces, apart from runs of deployed progra
 
 test("warehouse choices start with the default and never offer Trino's warehouse", async ({ page }) => {
   const state = await setup(page);
-  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "admin", is_admin: true, groups: [], data_sources: [], available_groups: [],
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "admin", is_admin: true, acting_admin: true, pages: allPages, app_features: ALL_FEATURES, groups: [], data_sources: [], available_groups: [],
     pools: [{ id: "a", name: "small", cpu: 1, memory_gb: 2, max_concurrent: 6, auto_suspend_seconds: 600, allowed_groups: [] },
       { id: "b", name: "medium", cpu: 2, memory_gb: 2, max_concurrent: 6, auto_suspend_seconds: 600, allowed_groups: [], default: true },
       { id: "c", name: "tf-trino", cpu: 1, memory_gb: 1, max_concurrent: 6, auto_suspend_seconds: 600, allowed_groups: [], trino_layers: ["Non-Prod"] }] } }));
@@ -1428,7 +1508,7 @@ test("warehouse choices start with the default and never offer Trino's warehouse
 test("warehouse choices only offer warehouses meant for the layer and kind, starting with the scoped default", async ({ page }) => {
   const state = await setup(page);
   const pool = (id: string, name: string, extra: object = {}) => ({ id, name, cpu: 1, memory_gb: 2, max_concurrent: 6, auto_suspend_seconds: 600, allowed_groups: [], ...extra });
-  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "admin", is_admin: true, groups: [], data_sources: [], available_groups: [],
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "admin", is_admin: true, acting_admin: true, pages: allPages, app_features: ALL_FEATURES, groups: [], data_sources: [], available_groups: [],
     pools: [pool("a", "shared", { default: true }), pool("b", "dbt-only", { workload_kinds: ["dbt"] }),
       pool("c", "prod-only", { layer_ids: ["1a0000000001"], layer_names: ["Prod"] }),
       pool("d", "nonprod-scripts", { layer_ids: ["1a0000000002"], workload_kinds: ["script"],
@@ -1682,7 +1762,7 @@ test("admins define group workspace templates that every member gets", async ({ 
 test("admins allow host names workspaces may reach", async ({ page }) => {
   const state = await setup(page);
   let saved: any = null;
-  await page.route("https://iam.test/api/v1/admin/settings/egress", async (route) => {
+  await page.route(/\/v1\/admin\/settings\/egress(?:\?|$)/, async (route) => {
     const req = route.request();
     if (req.method() === "PUT") { saved = req.postDataJSON(); return route.fulfill({ json: { ...saved, proxy: true } }); }
     return route.fulfill({ json: { hosts: saved?.hosts ?? [], proxy: true } });
@@ -1830,7 +1910,7 @@ test("people find packages, Publishers import from PyPI and publish their own, o
 
 test("an installation without R offers no RStudio and no R packages", async ({ page }) => {
   const state = await setup(page);
-  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "admin", is_admin: true, active_group_id: null,
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "admin", is_admin: true, acting_admin: true, pages: allPages, app_features: ALL_FEATURES, active_group_id: null,
     available_groups: [], groups: [], pools: [], data_sources: [], features: { r: false } } }));
   await page.route("https://iam.test/api/v1/packages**", (route) => route.fulfill({ json: { packages: [], actions: ["create", "import"],
     resource_id: "packages", upstream: { python: true, r: false }, kinds: ["python"], max_upload_mb: 200 } }));
@@ -2761,6 +2841,8 @@ test("the privacy area sets policies per layer and classification and builds mul
   await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "priya", is_admin: false, active_group_id: "analysts", active_layer_id: null,
     available_groups: [{ id: "analysts", name: "Analysts" }], groups: [], pools: [], data_sources: [], app_features: ["products.browse"],
     compliance_roles: ["compliance_reviewer", "compliance_admin"],
+    permission_grants: ["1a0000000001", "1a0000000002"].map((layer_id) => ({ target_id: "set-policies", namespace: "compliance.policies", layer_id, actions: ["compliance.policies.apply", "compliance.policies.remove"] })),
+    pages: { "set-classes": true, "set-policies": true, "set-forms": true, "set-duties": true, reviews: true, cases: true },
     settings: { "set-classes": "manage", "set-policies": "manage", "set-forms": "manage", "set-duties": "manage" } } }));
   await page.route(/\/v1\/compliance\//, (route) => {
     const req = route.request(), url = new URL(req.url()).pathname.replace("/api", "");
@@ -2843,7 +2925,7 @@ const reviewCase = (extra: Record<string, unknown> = {}) => ({ id: "case1", kind
 
 async function privacyUser(page: Page, roles: string[]) {
   await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "priya", is_admin: false, active_group_id: "analysts", active_layer_id: null,
-    available_groups: [{ id: "analysts", name: "Analysts" }], groups: [], pools: [], data_sources: [], app_features: ["products.browse"], compliance_roles: roles } }));
+    available_groups: [{ id: "analysts", name: "Analysts" }], groups: [], pools: [], data_sources: [], pages: { home: true, products: true, reviews: true, cases: true, memberships: true, "set-register": true, deadlines: true }, app_features: ["products.browse"], compliance_roles: roles } }));
 }
 
 test("reviewers work the queue by deadline, read the answers and decide in the app", async ({ page }) => {
@@ -3164,7 +3246,7 @@ test("Administration shows the pages you hold a role on, and each page says who 
   await panel.getByRole("button", { name: "Assign role", exact: true }).click();
   expect(state.mutations.at(-1)).toMatchObject({ method: "PUT", path: "/v1/rbac/resources/set-forms/assignments", body: { app_group_id: "analysts", role: "Manager" } });
   // Someone who manages only compliance forms sees only that page in Administration.
-  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "fay", is_admin: false, active_group_id: "analysts", active_layer_id: null,
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "fay", is_admin: false, pages: { "set-forms": true }, active_group_id: "analysts", active_layer_id: null,
     available_groups: [{ id: "analysts", name: "Analysts" }], groups: [], pools: [], data_sources: [], app_features: ["products.browse"], compliance_roles: [],
     settings: { "set-forms": "manage" } } }));
   await page.reload();
@@ -3243,11 +3325,61 @@ test("an administrator acting as the privacy office sees only the privacy part o
   await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "admin", is_admin: true, acting_admin: false,
     active_group_id: "analysts", active_layer_id: null, available_groups: [{ id: "analysts", name: "Privacy office" }], groups: [], pools: [], data_sources: [],
     app_features: ["products.browse"], compliance_roles: ["compliance_admin"],
+    pages: { "set-classes": true, "set-policies": true, "set-forms": true, "set-duties": true },
     settings: { "set-classes": "manage", "set-policies": "manage", "set-forms": "manage", "set-duties": "manage" } } }));
   await page.reload();
   await page.getByRole("button", { name: "Administration", exact: true }).click();
   await expect(sidebar.getByRole("list", { name: "Privacy" }).getByRole("button")).toHaveText(["Classifications", "Access policies", "Compliance forms", "Review duties"]);
   await expect(sidebar.getByRole("list", { name: "Platform" })).toHaveCount(0);
   await expect(sidebar.getByRole("list", { name: "Security" })).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+test("page Viewer hides layer mutations and revocation removes its open tab", async ({ page }) => {
+  const state = await setup(page);
+  let revoked = false;
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: {
+    username: "reader", is_admin: false, acting_admin: false, active_group_id: "analysts",
+    active_layer_id: "1a0000000002", available_groups: [{ id: "analysts", name: "Readers" }, { id: "operators", name: "Other" }],
+    groups: [], pools: [], data_sources: [], app_features: [], settings: {},
+    pages: revoked ? {} : { "set-layers": true }, permission_grants: [],
+  } }));
+  await page.reload();
+  const nav = page.getByRole("navigation", { name: "Views" });
+  await expect(nav.getByRole("button", { name: "Storage", exact: true })).toHaveCount(0);
+  await nav.getByRole("button", { name: "Administration", exact: true }).click();
+  const main = page.locator(".main");
+  await expect(main.getByRole("heading", { name: "Layers", exact: true })).toBeVisible();
+  await expect(main.getByRole("button", { name: "Add layer", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: /Delete layer/ })).toHaveCount(0);
+  revoked = true;
+  await page.getByRole("combobox", { name: "Active group", exact: true }).selectOption("operators");
+  await expect(page.getByRole("tab", { name: "Layers", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Administration", exact: true })).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+test("network Viewer has read-only controls and requests the selected layer", async ({ page }) => {
+  const state = await setup(page);
+  const requested: string[] = [];
+  await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: {
+    username: "reader", is_admin: false, acting_admin: false, active_group_id: "analysts", active_layer_id: "1a0000000002",
+    available_groups: [{ id: "analysts", name: "Readers" }], groups: [], pools: [], data_sources: [], app_features: [],
+    settings: {}, pages: { "set-network": true }, permission_grants: [{ target_id: "set-network", namespace: "network.editor_allowlist",
+      layer_id: "1a0000000002", actions: ["network.editor_allowlist.read"] }],
+  } }));
+  await page.route(/\/v1\/admin\/settings\/egress\?/, (route) => {
+    requested.push(route.request().url());
+    return route.fulfill({ json: { hosts: [{ host: "dev.example.com", description: "Dev" }], proxy: true } });
+  });
+  await page.reload();
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Administration", exact: true }).click();
+  const main = page.locator(".main");
+  await expect(main.getByRole("textbox", { name: "Host 1", exact: true })).toBeDisabled();
+  await expect(main.getByRole("button", { name: "Add host", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: /Remove dev/ })).toHaveCount(0);
+  await expect(main.getByRole("checkbox", { name: "Platform host ceiling" })).toHaveCount(0);
+  expect(requested.every((url) => url.includes("layer_id=1a0000000002"))).toBe(true);
   expect(state.errors).toEqual([]);
 });

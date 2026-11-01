@@ -67,7 +67,7 @@ generated for you, so provide:
 | OpenBao | A KV v2 mount (default `fdp`) and a token limited to it: `path "fdp/data/*" { capabilities = ["create","read","update","delete"] }` and `path "fdp/metadata/*" { capabilities = ["read","list","delete"] }`. Renew or replace the token before it expires |
 | Identity provider | An API audience (`oidc.audience`, default `fdp-api`) in access tokens; a public desktop client (`oidc.clientId`) with PKCE; a confidential client with a service account for OpenTofu; an admin role (`oidc.adminRole`) |
 | Directory | SCIM provisioning from your IdP to `https://<host>/api/scim/v2` with `FDP_SCIM_TOKEN`. Provision people **and** the automation service account (its token's username), giving administrators the admin role |
-| Platform Secret (`existingSecret`) | `FDP_DATABASE_URL` (`postgresql+psycopg://user:password@host:5432/db`), `FDP_SESSION_SIGNING_KEY`, `FDP_GATEWAY_CONFIG_TOKEN`, `FDP_TRINO_SIGNING_KEY` (random strings), `FDP_TRINO_JWT_PRIVATE_KEY` (an EC P-256 private key, PEM), `FDP_SCIM_TOKEN`, `FDP_OPENBAO_TOKEN` |
+| Platform Secret (`existingSecret`) | `FDP_DATABASE_URL` (`postgresql+psycopg://user:password@host:5432/db`), `FDP_SESSION_SIGNING_KEY`, `FDP_GATEWAY_CONFIG_TOKEN`, `FDP_TRINO_SIGNING_KEY` (random strings), `FDP_TRINO_JWT_PRIVATE_KEY` (an EC P-256 private key, PEM), `FDP_SCIM_TOKEN`, `FDP_OPENBAO_TOKEN`; when the egress proxy is enabled, a separate random `FDP_EGRESS_PROXY_TOKEN` |
 
 Instead of OpenBao, `secretManagement.backend` can be `vault` (same settings, under `openbao`), `kubernetes`,
 `aws`, `azure` or `gcp`. With OpenBao or Vault, `openbao.auth.method: kubernetes` or `approle` avoids a

@@ -12,6 +12,7 @@ import { TabContent, TabRef } from "./views/Tabs";
 import { GitChoiceHost } from "./views/GitCredentials";
 import { openInWindow, type AppFeature } from "./api";
 import { documentationUrl } from "./documentation";
+import { pageVisible, TAB_PAGES } from "./permissions";
 
 const HOME: TabRef = { kind: "home", title: "Home" };
 type EditorTab = TabRef & { pinned: boolean };
@@ -114,6 +115,7 @@ function Shell({ user }: { user: User }) {
     requestAnimationFrame(() => document.getElementById("catalog-search")?.focus());
   };
   const openTab = (t: TabRef) => {
+    if (!pageVisible(hub.me, TAB_PAGES[t.kind])) return;
     setView(viewForTab(t));
     setTabs((ts) => {
       if (ts.some((x) => key(x) === key(t))) return ts.map((x) => key(x) === key(t) ? { ...t, pinned: x.pinned } : x);
@@ -174,7 +176,9 @@ function Shell({ user }: { user: User }) {
       { id: "apis", label: "APIs", icon: <IconApi />, feature: "apis" },
     ] },
   ];
-  const groups = allGroups.map((g) => ({ ...g, items: g.items.filter((a) => !a.feature || hub.has(a.feature)) }));
+  const viewPages: Partial<Record<View, string>> = { home: "home", catalog: "products", compute: "usage", workspaces: "workspaces", workloads: "workloads", data: "storage", packages: "packages", kafka: "kafka", apis: "apis" };
+  const groups = allGroups.map((g) => ({ ...g, items: g.items.filter((a) =>
+    pageVisible(hub.me, viewPages[a.id] ?? "") && (!a.feature || hub.has(a.feature))) }));
   const layer = hub.layers.find((l) => l.id === hub.layerId);
   const activityButton = (a: Activity) => (
     <button key={a.id} aria-label={a.label} aria-current={view === a.id ? "page" : undefined}
@@ -232,7 +236,7 @@ function Shell({ user }: { user: User }) {
           {(close) => <>
             <div className="menu-header"><strong>{user.profile.preferred_username ?? hub.me?.username}</strong>
               <span className="muted">{new URL(getServer()).host}</span></div>
-            <button role="menuitem" onClick={() => { close(); openTab({ kind: "git-credentials", title: "Git credentials" }); }}>Git credentials</button>
+            {pageVisible(hub.me, "git-creds") && <button role="menuitem" onClick={() => { close(); openTab({ kind: "git-credentials", title: "Git credentials" }); }}>Git credentials</button>}
             <button role="menuitem" onClick={() => { close(); void signOut(); }}>Sign out</button>
           </>}
         </MenuButton>
@@ -263,7 +267,7 @@ function Shell({ user }: { user: User }) {
 
       <main className="main">
         <div className="tabs" role="tablist" aria-label="Open editors">
-          {tabs.map((t) => (
+          {tabs.filter((t) => pageVisible(hub.me, TAB_PAGES[t.kind])).map((t) => (
             <div key={key(t)} role="tab" aria-label={t.title} aria-selected={key(t) === active} tabIndex={key(t) === active ? 0 : -1} title={t.title}
                  className={`tab ${t.pinned ? "pinned" : "preview"} ${key(t) === active ? "active" : ""}`} onClick={() => { setActive(key(t)); setView(viewForTab(t)); }}
                  onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(key(t)); } }}

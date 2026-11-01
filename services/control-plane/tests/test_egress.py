@@ -49,6 +49,7 @@ def test_proxy_tunnels_allowed_hosts_and_refuses_the_rest(monkeypatch):
         monkeypatch.setattr(egress_proxy, "public_addresses", lambda host: ["127.0.0.1"])
         proxy = Proxy("http://unused")
         proxy.patterns = ["github.com"]
+        monkeypatch.setattr(proxy, "authorize", lambda header, host, source_ip: True)  # ticket admission covered separately
         server = await asyncio.start_server(proxy.handle, "127.0.0.1", 0)
         port = server.sockets[0].getsockname()[1]
 
@@ -74,17 +75,21 @@ def test_proxy_tunnels_allowed_hosts_and_refuses_the_rest(monkeypatch):
     asyncio.run(scenario())
 
 
-def test_administrators_manage_the_allowlist_and_the_proxy_reads_it(client):
+def test_administrators_manage_the_allowlist_and_the_proxy_reads_it(client, monkeypatch):
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "egress_proxy_token", "proxy-service-proof")
+    proof = {"X-FDP-Egress-Proxy": "proxy-service-proof"}
     path = "/v1/admin/settings/egress"
     assert client.get(path, headers=as_("ana")).status_code == 403
     assert client.get(path, headers=ADMIN).json()["hosts"] == []
-    assert client.get("/internal/egress/allowlist").json() == {"hosts": []}   # empty: no internet access
+    assert client.get("/internal/egress/allowlist").status_code == 401
+    assert client.get("/internal/egress/allowlist", headers=proof).json() == {"hosts": []}
     body = {"hosts": [{"host": "GitHub.com", "description": "Git"}, {"host": "*.githubusercontent.com"}]}
     r = client.put(path, headers=ADMIN, json=body)
     assert r.status_code == 200, r.text
     assert r.json()["hosts"] == [{"host": "github.com", "description": "Git"},
                                  {"host": "*.githubusercontent.com", "description": ""}]
-    assert client.get("/internal/egress/allowlist").json() == {"hosts": [{"host": "github.com"}, {"host": "*.githubusercontent.com"}]}
+    assert client.get("/internal/egress/allowlist", headers=proof).json() == {"hosts": [{"host": "github.com"}, {"host": "*.githubusercontent.com"}]}
     for bad in ("*", "*.com", "10.0.0.1", "https://github.com", "github.com/path", "git hub.com", "*.*.example.com"):
         assert client.put(path, headers=ADMIN, json={"hosts": [{"host": bad}]}).status_code == 422, bad
     assert client.put(path, headers=ADMIN, json={"hosts": [{"host": "a.io"}, {"host": "A.io"}]}).status_code == 422
@@ -107,7 +112,11 @@ def test_vscode_and_rstudio_use_the_proxy_when_the_installation_runs_it(client):
                              workspace_spec(get_settings(), db.get(Workspace, ws["id"]), [], []))
     for editor in ("vscode", "rstudio"):
         spec, without = specs[editor]
-        assert spec.env["HTTPS_PROXY"] == spec.env["https_proxy"] == "http://fdp-egress-proxy.fdp.svc:3128"
+        from urllib.parse import urlsplit
+        assert spec.env["HTTPS_PROXY"] == spec.env["https_proxy"]
+        parsed = urlsplit(spec.env["HTTPS_PROXY"])
+        assert parsed.hostname == "fdp-egress-proxy.fdp.svc" and parsed.username == "fdp"
+        assert parsed.password  # scoped signed workspace ticket
         assert ".svc" in spec.env["NO_PROXY"].split(",")    # the platform itself is reached directly
         assert spec.labels["fdp.floren.app/egress"] == "proxy"
         assert "HTTPS_PROXY" not in without.env and "fdp.floren.app/egress" not in without.labels

@@ -55,6 +55,11 @@ endpoints with stable addresses so the grants stay narrow.
 
 ## Outbound paths: data, the workspace allowlist and APIs
 
+Editor HTTPS access now requires both a platform host ceiling and an explicit host list for its
+own layer. New CONNECT requests use a signed active-workspace ticket and recheck both lists.
+Dev policy management cannot modify another layer or the platform ceiling. Configure and migrate
+these grants as described in [scoped permissions](../scoped-permissions.md#network-migration-and-operations).
+
 Three separate mechanisms control traffic leaving a layer. They do not overlap:
 
 ```mermaid

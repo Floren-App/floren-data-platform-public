@@ -15,6 +15,7 @@ import time
 import hmac
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
@@ -75,10 +76,51 @@ def certificate_metrics(db: Session = Depends(get_db), authorization: str = Head
 
 
 @router.get("/egress/allowlist")
-def egress_allowlist(db: Session = Depends(get_db)):
-    """For the egress proxy. Host names only: workspaces may read it too, they are told what they may reach."""
+def egress_allowlist(db: Session = Depends(get_db), x_fdp_egress_proxy: str = Header(default="")):
+    """Proxy-only global ceiling; desktop inventory uses its Viewer-gated endpoint."""
+    token = get_settings().egress_proxy_token
+    if not token or not hmac.compare_digest(token, x_fdp_egress_proxy):
+        raise HTTPException(401, "proxy service authentication required")
     from .. import egress
     return {"hosts": [{"host": h["host"]} for h in egress.hosts(db)]}
+
+
+class EgressCheck(BaseModel):
+    host: str = Field(min_length=1, max_length=253)
+    source_ip: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/egress/authorize")
+def egress_authorize(body: EgressCheck, authorization: str = Header(default=""),
+                     x_fdp_egress_proxy: str = Header(default=""), db: Session = Depends(get_db)):
+    """Per-CONNECT policy check. The ticket names a workspace; its layer is read from the database."""
+    proxy_token = get_settings().egress_proxy_token
+    if not proxy_token or not hmac.compare_digest(proxy_token, x_fdp_egress_proxy):
+        raise HTTPException(401, "proxy service authentication required")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(401, "workspace proxy ticket required")
+    token = read_token(authorization[7:], "egress")
+    workspace = db.get(Workspace, token.get("sub", ""))
+    if not workspace or workspace.status not in ("starting", "running"):
+        raise HTTPException(403, "workspace is not active")
+    from ..models import DirectoryPrincipal
+    principal = db.get(DirectoryPrincipal, workspace.principal_id) if workspace.principal_id else None
+    if not principal or not principal.active:
+        raise HTTPException(403, "workspace identity is inactive")
+    # A Dev ticket copied into a Prod pod must not apply Dev policy to Prod traffic.
+    import ipaddress
+    from ..deps import get_orchestrator
+    def address(value):
+        parsed = ipaddress.ip_address(value)
+        return parsed.ipv4_mapped if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped else parsed
+    try:
+        addresses = get_orchestrator().execution_addresses(workspace.execution_ref or "")
+        if address(body.source_ip) not in {address(value) for value in addresses}:
+            raise HTTPException(403, "proxy ticket does not match connection source")
+    except (ValueError, OSError):
+        raise HTTPException(403, "proxy source could not be verified") from None
+    from .. import egress
+    return {"allowed": egress.permitted(db, body.host.lower().rstrip("."), workspace.environment_id)}
 
 
 @router.get("/traefik/config")

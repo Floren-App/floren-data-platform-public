@@ -344,6 +344,9 @@ def delete_group(group_id: str, db: Session = Depends(get_db), user: User = Depe
         raise HTTPException(409,"transfer this group's object ownership before deleting it")
     if db.scalar(select(RoleAssignment).where(RoleAssignment.app_group_id == group.id)):
         raise HTTPException(409, "remove this group's resource assignments before deleting it")
+    from ..models import PermissionGrant
+    if db.scalar(select(PermissionGrant.id).where(PermissionGrant.app_group_id == group.id)):
+        raise HTTPException(409, "remove this group's permission assignments before deleting it")
     db.execute(delete(IdentityBinding).where(IdentityBinding.app_group_id == group.id))
     for preference in db.scalars(select(UserPreference).where(UserPreference.active_group_id == group.id)):
         preference.active_group_id = None

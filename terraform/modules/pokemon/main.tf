@@ -1,6 +1,7 @@
 locals {
   branch = var.environment == "prod" ? "main" : "test"
-  jobs   = toset(["bootstrap", "extract", "load", "models", "process-event", "explorer", "monitor", "pipelines"])
+  jobs = toset(concat(["bootstrap", "extract", "load", "models", "process-event", "explorer", "monitor", "pipelines"],
+  !var.streaming_enabled ? [] : concat(["price-bootstrap", "price-publish", "price-await", "price-models", "price-monitor"], var.price_sink_enabled ? ["price-sink"] : [])))
   prefix = "pokemon-${var.environment}"
 }
 
@@ -22,7 +23,7 @@ resource "fdp_folder" "this" {
 resource "fdp_role_assignment" "engineers_folder" {
   resource_id  = fdp_folder.this.id
   app_group_id = var.engineers_group_id
-  role         = "Admin"
+  role         = var.engineering_folder_role
 }
 
 resource "fdp_data_source" "landing" {
@@ -48,9 +49,9 @@ resource "fdp_schema" "history" {
   name        = "pokemon_history"
 }
 resource "fdp_role_assignment" "engineers_data" {
-  for_each = {
+  for_each = var.engineering_data_access ? {
     landing = fdp_schema.landing.id, raw = fdp_schema.raw.id, history = fdp_schema.history.id
-  }
+  } : {}
   resource_id  = each.value
   app_group_id = var.engineers_group_id
   role         = "Admin"
@@ -72,6 +73,7 @@ resource "fdp_api_operation" "get" {
   path     = each.value
 }
 resource "fdp_role_assignment" "engineers_api" {
+  count        = var.engineering_data_access ? 1 : 0
   resource_id  = fdp_api.tcgdex.resource_id
   app_group_id = var.engineers_group_id
   role         = "Admin"
@@ -89,7 +91,6 @@ locals {
     models_history    = { job = "models", resource = fdp_schema.history.id, role = "Admin" }
     models_product    = { job = "models", resource = var.product_schema_id, role = "Admin" }
     events_raw        = { job = "process-event", resource = fdp_schema.raw.id, role = "Contributor" }
-    explorer_product  = { job = "explorer", resource = var.product_schema_id, role = "Reader" }
     monitor_raw       = { job = "monitor", resource = fdp_schema.raw.id, role = "Reader" }
     monitor_history   = { job = "monitor", resource = fdp_schema.history.id, role = "Reader" }
   }
@@ -103,14 +104,15 @@ resource "fdp_workload" "job" {
   program        = "${each.key}-${var.environment}"
   slug           = "pokemon-${each.key}-${var.environment}"
   title          = "Pokemon ${title(each.key)} ${title(var.environment)}"
-  warehouse      = contains(["explorer", "monitor"], each.key) ? var.warehouses.app : var.warehouses.job
+  warehouse      = contains(["explorer", "monitor", "price-monitor"], each.key) ? var.warehouses.app : var.warehouses.job
   layer_id       = var.layer_id
   folder_id      = fdp_folder.this.id
-  execution_mode = "fixed"
+  execution_mode = each.key == "explorer" ? "caller" : "fixed"
   auto_update    = true
   managed_identity_grants = merge(
     { for grant in local.data_grants : grant.resource => grant.role if grant.job == each.key },
-    each.key == "extract" ? { (fdp_api.tcgdex.resource_id) = "Consumer" } : {}
+    each.key == "extract" ? { (fdp_api.tcgdex.resource_id) = "Consumer" } : {},
+    { for grant in local.price_grants : grant.resource => grant.role if grant.job == each.key }
   )
   depends_on = [fdp_api_operation.get]
 }
@@ -124,8 +126,9 @@ resource "fdp_workload" "pipelines" {
   layer_id       = var.layer_id
   folder_id      = fdp_folder.this.id
   execution_mode = "fixed"
+  env            = { POKEMON_STREAMING_ENABLED = !var.streaming_enabled ? "false" : "true" }
   managed_identity_grants = {
-    for name in ["extract", "load", "models", "process-event"] : fdp_workload.job[name].resource_id => "Executor"
+    for name in concat(["extract", "load", "models", "process-event"], !var.streaming_enabled ? [] : ["price-publish", "price-await", "price-models"]) : fdp_workload.job[name].resource_id => "Executor"
   }
 }
 resource "fdp_role_assignment" "analysts_dashboard" {
@@ -139,7 +142,8 @@ locals {
     raw       = fdp_schema.raw.id, history = fdp_schema.history.id, landing = fdp_schema.landing.id,
     product   = var.product_schema_id, api = fdp_api.tcgdex.resource_id,
     pipelines = fdp_workload.pipelines.resource_id
-  }, { for name, job in fdp_workload.job : name => job.resource_id })
+    }, { for name, job in fdp_workload.job : name => job.resource_id },
+  !var.streaming_enabled ? {} : { prices = fdp_schema.prices[0].id, market = fdp_schema.market[0].id, quotes = fdp_kafka_topic.prices[0].id })
 }
 resource "fdp_catalog_governance" "this" {
   for_each       = local.governed
@@ -158,9 +162,8 @@ output "pipeline_workload" { value = fdp_workload.pipelines.slug }
 output "product_dashboard" { value = fdp_workload.job["explorer"].url }
 output "monitoring_dashboard" { value = fdp_workload.job["monitor"].url }
 
-# Column masks and a row filter on the product, for demonstrations. The explorer dashboard runs as its own
-# identity, so it shows what analysts see. The pipeline identities that build the product are exempt: they
-# must process the real data.
+# Column masks and a row filter apply to the viewer of the caller-bound explorer.
+# Only the identities that build the product are exempt from these policies.
 locals {
   demo_policies = var.demo_data_policies ? {
     price = {
@@ -244,10 +247,10 @@ resource "fdp_data_product" "cards" {
   ])
   depends_on = [fdp_column_classification.cards_current, fdp_catalog_governance.this]
 }
-# Data engineers own the product: they change it and are its data owners in reviews.
+# The configured product-owner group governs the product and its access reviews.
 resource "fdp_role_assignment" "engineers_product" {
   resource_id  = fdp_data_product.cards.access_resource_id
-  app_group_id = var.engineers_group_id
+  app_group_id = coalesce(var.product_owner_group_id, var.engineers_group_id)
   role         = "Owner"
 }
 # Analysts (and other groups the root names, such as dashboard viewers) use the product with the Standard
@@ -260,3 +263,9 @@ resource "fdp_data_product_consumer" "standard" {
 }
 
 output "data_product" { value = fdp_data_product.cards.id }
+
+# Preserve the existing Test API assignment when introducing optional human access.
+moved {
+  from = fdp_role_assignment.engineers_api
+  to   = fdp_role_assignment.engineers_api[0]
+}

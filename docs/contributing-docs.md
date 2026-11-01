@@ -17,6 +17,11 @@ program schema, Python signatures and Terraform resource tables from source.
 That target needs the control-plane Python environment and Go. The ordinary
 Markdown preview uses the checked-in generated references.
 
+The same target generates the full permission matrix and CSV from
+`services/control-plane/app/permission_registry.json`. Edit that registry rather than the generated
+role columns. Run `python scripts/permission_reference.py --check` to detect drift. The named-check
+column records literal checks found in source; it is not a substitute for endpoint/backend tests.
+
 ## Add or update a page
 
 1. Edit a Markdown guide or add a new one under `docs/`.

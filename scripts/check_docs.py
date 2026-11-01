@@ -1,5 +1,6 @@
 """Check the built site, including search, rather than trusting navigation alone."""
 import json
+import csv
 from pathlib import Path
 import re
 import sys
@@ -44,8 +45,16 @@ def check(site):
     locations = [item['location'] for item in index['docs']]
     assert not any('progress' in p or '/verification/' in p or 'rbac-plan' in p for p in locations)
     for route in ['workspaces', 'rbac', 'catalog', 'terraform', 'pokemon', 'troubleshooting', 'reference/api',
-                  'compute', 'configuration', 'deploying', 'api-management', 'packages', 'storage-integrations']:
+                  'compute', 'configuration', 'deploying', 'api-management', 'packages', 'storage-integrations',
+                  'scoped-permissions', 'permission-matrix']:
         assert (site / route / 'index.html').exists(), f'Missing app/help route: {route}'
+    with (site / 'permission-matrix.csv').open(newline='') as stream:
+        matrix = list(csv.DictReader(stream))
+    assert matrix and len({row['Permission key'] for row in matrix}) == len(matrix), 'Invalid permission matrix attachment'
+    for role in ('Viewer', 'Executor', 'Contributor', 'Manager', 'Admin', 'Owner'):
+        assert role in matrix[0], f'Missing role column: {role}'
+    rendered = (site / 'permission-matrix/index.html').read_text()
+    assert all(row['Permission key'] in rendered for row in matrix), 'Published matrix is incomplete'
     print(f'Documentation checks passed: {len(locations)} searchable sections; no runtime material detected.')
 
 

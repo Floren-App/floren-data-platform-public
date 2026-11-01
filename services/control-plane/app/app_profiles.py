@@ -62,7 +62,7 @@ def interactive(user) -> bool:
 
 def acting_as_admin(user) -> bool:
     """Administrators with Global Admin (or no group) active get the whole app. With another group active they see
-    the app as that group's profile, to work as or check it; the API still lets them do everything (feature_gate)."""
+    the app as that group's profile; the resolved actor also loses the administrator bypass in that context."""
     from .ownership import GLOBAL_ADMIN
     return user.is_admin and not user.execution_context and getattr(user, "active_group_id", None) in (None, GLOBAL_ADMIN)
 

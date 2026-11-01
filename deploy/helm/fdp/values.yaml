@@ -212,6 +212,7 @@ openbao:
 # Optional SCIM provisioning: add FDP_SCIM_TOKEN to the existing Secret.
 # Existing Secret: FDP_DATABASE_URL, FDP_SESSION_SIGNING_KEY,
 # FDP_OPENBAO_TOKEN, FDP_GATEWAY_CONFIG_TOKEN (a separate random gateway-only credential).
+# With egressProxy.enabled: FDP_EGRESS_PROXY_TOKEN, shared only by proxy and control plane.
 existingSecret: fdp-control-plane
 
 bootstrap:

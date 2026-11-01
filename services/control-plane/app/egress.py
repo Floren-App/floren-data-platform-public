@@ -21,12 +21,29 @@ def valid_host(host: str) -> bool:
     return len(host) <= 253 and bool(HOST.fullmatch(host))
 
 
-def hosts(db: Session) -> List[Dict[str, str]]:
-    row = db.get(PlatformSetting, KEY)
+def hosts(db: Session, layer_id=None) -> List[Dict[str, str]]:
+    row = db.get(PlatformSetting, KEY if layer_id is None else KEY + ":" + layer_id)
     return list((row.value or {}).get("hosts", [])) if row else []
 
 
-def set_hosts(db: Session, entries: List[Dict[str, str]]) -> None:
-    row = db.get(PlatformSetting, KEY) or PlatformSetting(key=KEY)
+def set_hosts(db: Session, entries: List[Dict[str, str]], layer_id=None) -> None:
+    key = KEY if layer_id is None else KEY + ":" + layer_id
+    row = db.get(PlatformSetting, key) or PlatformSetting(key=key)
     row.value = {"hosts": entries}
     db.add(row)
+
+
+def permitted(db, host, layer_id):
+    from .egress_proxy import allowed, package_index
+    return bool(layer_id and not package_index(host) and
+                allowed(host, [h["host"] for h in hosts(db)]) and
+                allowed(host, [h["host"] for h in hosts(db, layer_id)]))
+
+
+def within_ceiling(db, pattern):
+    from .egress_proxy import allowed
+    ceiling = [h["host"] for h in hosts(db)]
+    if not pattern.startswith("*."):
+        return allowed(pattern, ceiling)
+    suffix = pattern[2:]
+    return any(p.startswith("*.") and (suffix == p[2:] or suffix.endswith("." + p[2:])) for p in ceiling)

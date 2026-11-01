@@ -1,0 +1,9 @@
+name: pokemon_prices
+version: '1.0.0'
+config-version: 2
+profile: fdp
+model-paths: [models]
+models:
+  pokemon_prices:
+    +materialized: table
+    +tags: [Pokemon, prices]

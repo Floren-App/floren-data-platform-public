@@ -60,13 +60,13 @@ def runtimes(db: Session = Depends(get_db), _: User = Depends(get_actor)):
 
 
 @router.get("/admin/runtimes", response_model=List[RuntimeOut], tags=["admin"])
-def admin_runtimes(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-runtimes", "view"))):
+def admin_runtimes(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-runtimes", "runtimes.list"))):
     return [_rt(r) for r in db.scalars(select(RuntimeImage).order_by(RuntimeImage.kind, RuntimeImage.version))]
 
 
 @router.put("/admin/runtimes/{kind}/{version}", response_model=RuntimeOut, tags=["admin"])
 def upsert_runtime(kind: str, version: str, body: RuntimeIn, db: Session = Depends(get_db),
-                   admin: User = Depends(settings_access.needs("set-runtimes", "manage"))):
+                   admin: User = Depends(settings_access.needs("set-runtimes", "runtimes.register"))):
     from ..programs import VERSION
     import re
 
@@ -95,7 +95,7 @@ def upsert_runtime(kind: str, version: str, body: RuntimeIn, db: Session = Depen
 
 
 @router.delete("/admin/runtimes/{kind}/{version}", status_code=204, tags=["admin"])
-def delete_runtime(kind: str, version: str, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-runtimes", "manage"))):
+def delete_runtime(kind: str, version: str, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-runtimes", "runtimes.remove"))):
     row = db.scalar(select(RuntimeImage).where(RuntimeImage.kind == kind, RuntimeImage.version == version))
     if row is None:
         raise HTTPException(404, "runtime not found")

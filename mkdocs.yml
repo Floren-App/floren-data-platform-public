@@ -96,8 +96,13 @@ nav:
       - API management: api-management.md
       - Packages: packages.md
       - "Example: end-to-end data product": pokemon.md
+      - "Pokémon demo and access matrix": pokemon-demo.md
   - Govern:
       - Security and roles: rbac.md
+      - Scoped permissions and Terraform: scoped-permissions.md
+      - Full permission matrix: permission-matrix.md
+      - Permission model design: permission-model-plan.md
+      - Route and page inventory: permission-route-inventory.md
       - Column masks and row filters: data-masking.md
       - Active groups and ownership: active-groups.md
       - App profiles: app-profiles.md

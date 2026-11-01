@@ -75,19 +75,26 @@ def test_postgres_airflow_uses_local_executor_and_stops_siblings(tmp_path, datab
     assert not any(line.startswith('standalone') for line in calls)
 
 
-def test_pokemon_manifest_separates_layers_and_declares_two_dashboards():
+def test_pokemon_manifest_separates_layers_and_declares_governed_dashboards():
     folder = REPO / 'examples/pokemon'
     config, errors = parse_config((folder/'fdp.json').read_text())
     assert not errors
     for environment, layer in [('test','Non-Prod'),('prod','Prod')]:
         programs = {name:p for name,p in config.programs.items() if name.endswith('-'+environment)}
-        assert len(programs) == 8
-        assert len([p for p in programs.values() if p.kind == 'app']) == 2
+        assert len(programs) == 14
+        assert len([p for p in programs.values() if p.kind == 'app']) == 3
         for program in programs.values():
             assert program.layer == layer and program.env['POKEMON_ENV'] == environment
             assert (folder/program.entrypoint).exists()
         assert programs['extract-'+environment].data_sources == ['pokemon-landing-'+environment]
         assert programs['models-'+environment].dbt.schema_ == 'pokemon_history'
+        assert programs['price-models-'+environment].dbt.schema_ == 'pokemon_market'
+        assert programs['price-models-'+environment].entrypoint == 'dbt/prices'
+        assert programs['price-sink-'+environment].kind == 'stream'
+        assert programs['price-sink-'+environment].env['POKEMON_PRICE_TOPIC'] == 'pokemon-card-prices-'+environment
+        assert programs['price-publish-'+environment].data_sources == []
+        for name in ('price-publish', 'price-await'):
+            assert {a.name for a in programs[name+'-'+environment].args if a.required} == {'run_id', 'observed_at'}
 
 CONFIG = {
     "$schema": "./.fdp/fdp.schema.json",

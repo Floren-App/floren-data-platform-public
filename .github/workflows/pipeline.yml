@@ -102,7 +102,9 @@ jobs:
           helm repo add traefik https://traefik.github.io/charts
           helm repo add strimzi https://strimzi.io/charts/
           helm dependency build deploy/helm/fdp
-      - run: pip install -e 'services/control-plane[dev]'
+      - run: pip install -e 'services/control-plane[dev]' -e sdk/python
+      - name: Pokemon ingestion and streaming contracts
+        run: python -m pytest examples/pokemon/tests -q
       - working-directory: services/control-plane
         run: python -m pytest -q -n auto   # in parallel: the tests share no state across processes
 

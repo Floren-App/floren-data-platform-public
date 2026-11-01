@@ -1,23 +1,22 @@
-"""Analyst data product. This identity can read only the reporting schema."""
+"""Caller-bound data product: every query carries the current viewer token."""
 import os
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd
 import streamlit as st
-import fdp
+from pokemon_pipeline.product_queries import query_product
 
 st.set_page_config(page_title='Pokémon Card Explorer', page_icon='⚡', layout='wide')
 st.title('Pokémon Card Explorer')
 st.caption(f"{os.environ['POKEMON_ENV'].upper()} · English cards · Governed data product")
 
-@st.cache_data(ttl=60)
 def query(table):
-    # Fixed allowlist: no arbitrary SQL or schema names from UI input.
-    if table not in ('cards_current', 'set_summary'):
-        raise ValueError('unknown product')
-    result = fdp.query(os.environ['POKEMON_SOURCE'], f'SELECT * FROM reporting.{table}', max_rows=10000)
+    result = query_product(os.environ['POKEMON_SOURCE'], table,
+                           st.context.headers.get('X-FDP-Viewer'))
     return pd.DataFrame(result['rows'], columns=result['columns'])
 
-if st.button('Refresh data'):
-    st.cache_data.clear()
+st.button('Refresh data')  # Streamlit reruns; no shared cross-viewer data cache.
 try:
     cards, summary = query('cards_current'), query('set_summary')
 except Exception:
@@ -40,3 +39,10 @@ st.dataframe(filtered[['record_id','card_name','set_name','card_number','rarity'
              hide_index=True,use_container_width=True)
 st.download_button('Download filtered product',filtered.to_csv(index=False),'pokemon-cards.csv','text/csv')
 st.caption('Source: TCGdex. Prices are optional upstream metadata. Pokémon belongs to its respective rights holders.')
+
+st.subheader('Streaming synthetic quotes')
+st.caption('Synthetic EUR demo values; not live market prices. The table refreshes on the two-minute price DAG.')
+try:
+    st.dataframe(query('card_prices_current'), hide_index=True, use_container_width=True)
+except Exception:
+    st.info('The optional price product is not available yet, or you do not have access.')

@@ -156,13 +156,17 @@ def test_product_requests_under_a_policy_carry_the_form_and_go_through_the_steps
     assert again.status_code == 201
 
 
-def test_compliance_admins_manage_forms_and_classifications_but_not_their_own_role(client):
+def test_legacy_compliance_admin_needs_explicit_page_grants(client):
     privacy = grant_group(client, "workloads", "Privacy admins", "Executor", users=["bob"])
     levels = client.get("/v1/catalog/classifications", headers=as_("bob")).json()["levels"]
     assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 403
     assert client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": privacy}).status_code == 201
     me = client.get("/v1/me", headers=as_("bob")).json()
     assert me["compliance_roles"] == ["compliance_admin"]
+    assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 403
+    assert client.put("/v1/compliance/forms/Privacy impact", headers=as_("bob"), json={"name": "Privacy impact", "definition": FORM}).status_code == 403
+    grant_group(client, "set-classes", "Privacy admins", "Manager", users=["bob"])
+    grant_group(client, "set-forms", "Privacy admins", "Manager", users=["bob"])
     assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 200
     assert client.put("/v1/compliance/forms/Privacy impact", headers=as_("bob"), json={"name": "Privacy impact", "definition": FORM}).status_code == 200
     # Only platform administrators make compliance administrators.

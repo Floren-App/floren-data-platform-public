@@ -17,7 +17,7 @@ TCGDex managed API
 RustFS landing: immutable JSON batches + manifests/checksums
        │ load Python job; one row per list record
        ▼
-Raw PostgreSQL: append-only payloads + provenance / load commits
+Layer SQL / Iceberg: append-only payloads + provenance / load commits
        │ dbt engineering models and tests
        ▼
 SCD2 history + process-history evidence
@@ -57,7 +57,7 @@ do not commit them. Pin remote module source to a reviewed platform commit.
 | Load identity | Landing reads and append-only raw writes |
 | dbt identity | Raw reads and required history/product DDL/DML |
 | Orchestrator identity | Execute only its own environment's pipeline steps |
-| Analyst dashboard identity | Read reporting output only |
+| Analyst dashboard | Caller-bound: queries use the current viewer's product access and masks |
 | Engineering dashboard identity | Read raw/history/process evidence |
 | Analysts | The *Pokemon cards* data product with its Standard option (illustrators masked); no raw/history access |
 | Engineers | Development and monitoring permissions as explicitly assigned |
@@ -85,8 +85,7 @@ The module classifies the columns that matter (levels from the platform's
 sensitive column.
 
 It publishes the **Pokemon cards** [data product](catalog.md#data-products)
-(`cards_current`, `set_summary` and the explorer dashboard), owned by the data
-engineers, with two access options:
+(`cards_current`, `set_summary` and the explorer dashboard), owned by `product_owner_group_id` (or engineers when omitted), with two access options:
 
 - **Standard** (default) hides most of the illustrator's name, so it counts as
   `internal`. Analysts use the product with this option.
@@ -94,8 +93,8 @@ engineers, with two access options:
 
 With an [access policy](access-policies.md) on confidential data in Prod, a group
 that asks for *With illustrators* there fills in the compliance form; the data
-engineers (the product's owners) and then the privacy reviewers decide. The data
-engineers own the lakes, so their own access needs no form.
+owners and then the scoped privacy reviewers decide. Production release managers and
+product owners are separate from development engineers in the demo configuration.
 
 ## Apply and run
 
@@ -126,3 +125,10 @@ then initialize/run Prod deliberately with its own identities.
 
 These are repeatable acceptance criteria. Do not infer success merely from green
 publication status; check actual runs, data and denied-access cases.
+
+## Streaming and demo personas
+
+The optional Kafka pipeline publishes synthetic EUR quotes into an append-only
+table and a separate market product schema. The [demo walkthrough and access
+matrices](pokemon-demo.md) cover setup, managed identities, groups, denials, retry
+semantics, and the remaining RBAC migration limits.

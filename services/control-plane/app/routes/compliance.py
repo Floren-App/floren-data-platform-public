@@ -50,11 +50,13 @@ def form_out(db, form: AccessForm, versions: bool = False) -> dict:
 
 @router.get("/forms")
 def list_forms(db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    settings_access.require(db, user, "set-forms", "compliance.forms.list")
     return [form_out(db, f) for f in db.scalars(select(AccessForm).order_by(AccessForm.name))]
 
 
 @router.get("/forms/{form_id}")
 def get_form(form_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    settings_access.require(db, user, "set-forms", "compliance.forms.read")
     form = db.get(AccessForm, form_id)
     if form is None:
         raise HTTPException(404, "form not found")
@@ -64,7 +66,8 @@ def get_form(form_id: str, db: Session = Depends(get_db), user: User = Depends(g
 @router.put("/forms/{name}")
 def put_form(name: str, body: FormIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Save a form's draft (created when missing). Publishing makes it the version new cases use."""
-    settings_access.require(db, user, "set-forms")
+    existing = db.scalar(select(AccessForm).where(AccessForm.name == name))
+    settings_access.require(db, user, "set-forms", "compliance.forms.draft.edit" if existing else "compliance.forms.create")
     definition = cp.validate_definition(body.definition)
     form = db.scalar(select(AccessForm).where(AccessForm.name == name))
     if body.name != name and db.scalar(select(AccessForm).where(AccessForm.name == body.name)):
@@ -86,7 +89,7 @@ def put_form(name: str, body: FormIn, db: Session = Depends(get_db), user: User 
 
 @router.post("/forms/{form_id}/publish")
 def publish_form(form_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    settings_access.require(db, user, "set-forms")
+    settings_access.require(db, user, "set-forms", "compliance.forms.publish")
     draft = db.scalar(select(AccessFormVersion).where(AccessFormVersion.form_id == form_id, AccessFormVersion.published.is_(False))
                       .order_by(AccessFormVersion.version.desc()))
     if draft is None:
@@ -99,7 +102,7 @@ def publish_form(form_id: str, db: Session = Depends(get_db), user: User = Depen
 
 @router.delete("/forms/{form_id}", status_code=204)
 def delete_form(form_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    settings_access.require(db, user, "set-forms")
+    settings_access.require(db, user, "set-forms", "compliance.forms.delete")
     form = db.get(AccessForm, form_id)
     if form is None:
         raise HTTPException(404, "form not found")
@@ -143,15 +146,19 @@ def policy_out(db, p: AccessPolicy) -> dict:
 
 @router.get("/policies")
 def list_policies(db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    settings_access.require(db, user, "set-policies", "view")
     """The grid: layers × classifications, with the policy of each filled cell."""
-    return {"layers": [{"id": l.id, "name": l.name} for l in layers.all_layers(db)],
+    visible = {l.id for l in layers.all_layers(db) if
+               settings_access.allowed(db, user, "set-policies", "compliance.policies.read") or
+               settings_access.allowed(db, user, "set-policies", "compliance.policies.read", l.id)}
+    return {"layers": [{"id": l.id, "name": l.name} for l in layers.all_layers(db) if l.id in visible],
             "classifications": classification.levels(db),
-            "policies": [policy_out(db, p) for p in db.scalars(select(AccessPolicy))]}
+            "policies": [policy_out(db, p) for p in db.scalars(select(AccessPolicy)) if p.layer_id in visible]}
 
 
 @router.put("/policies/{layer_id}/{level}")
 def put_policy(layer_id: str, level: str, body: PolicyIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    settings_access.require(db, user, "set-policies")
+    settings_access.require(db, user, "set-policies", "compliance.policies.apply", layer_id=layer_id)
     layer = db.get(Resource, layer_id)
     if layer is None or layer.kind != "layer":
         raise HTTPException(404, "layer not found")
@@ -161,6 +168,11 @@ def put_policy(layer_id: str, level: str, body: PolicyIn, db: Session = Depends(
     if cp.current_version(db, body.form_id) is None:
         raise HTTPException(422, "publish the form first")
     policy = db.scalar(select(AccessPolicy).where(AccessPolicy.layer_id == layer_id, AccessPolicy.classification == level))
+    if policy is not None and (policy.form_id != body.form_id or
+            policy.steps != [s.model_dump() for s in body.steps] or
+            body.max_days > policy.max_days or body.review_days > policy.review_days or
+            body.grace_days > (policy.grace_days or 30)):
+        settings_access.require(db, user, "set-policies", "compliance.policies.weaken", layer_id=layer_id)
     before = policy_out(db, policy) if policy else None
     if policy is None:
         policy = AccessPolicy(layer_id=layer_id, classification=level)
@@ -176,7 +188,7 @@ def put_policy(layer_id: str, level: str, body: PolicyIn, db: Session = Depends(
 
 @router.delete("/policies/{layer_id}/{level}", status_code=204)
 def delete_policy(layer_id: str, level: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    settings_access.require(db, user, "set-policies")
+    settings_access.require(db, user, "set-policies", "compliance.policies.remove", layer_id=layer_id)
     policy = db.scalar(select(AccessPolicy).where(AccessPolicy.layer_id == layer_id, AccessPolicy.classification == level))
     if policy is not None:
         audit(db, user.username, "compliance.policy_removed", layer_id, classification=level)
@@ -209,6 +221,7 @@ def role_out(db, r: ComplianceRole) -> dict:
 
 @router.get("/roles")
 def list_roles(db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    settings_access.require(db, user, "set-duties", "compliance.duties.read")
     return {"roles": [role_out(db, r) for r in db.scalars(select(ComplianceRole))],
             "kinds": [{"key": k, "label": v} for k, v in cp.ROLES.items()]}
 
@@ -220,7 +233,7 @@ def add_role(body: RoleIn, db: Session = Depends(get_db), user: User = Depends(g
     resolved = rbac.resolve_user(db, user)
     if body.role == "compliance_admin" and not resolved.is_admin:
         raise HTTPException(403, "platform administrator required")
-    settings_access.require(db, user, "set-duties")
+    settings_access.require(db, user, "set-duties", "compliance.duties.appoint")
     if not db.get(AppGroup, body.app_group_id):
         raise HTTPException(422, "choose an existing app group")
     for level in body.scope.classifications:
@@ -241,7 +254,7 @@ def remove_role(role_id: str, db: Session = Depends(get_db), user: User = Depend
     resolved = rbac.resolve_user(db, user)
     if role.role == "compliance_admin" and not resolved.is_admin:
         raise HTTPException(403, "platform administrator required")
-    settings_access.require(db, user, "set-duties")
+    settings_access.require(db, user, "set-duties", "compliance.duties.revoke")
     audit(db, resolved.username, "compliance.role_removed", role.app_group_id, role=role.role)
     db.delete(role)
     db.commit()

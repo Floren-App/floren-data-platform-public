@@ -14,6 +14,7 @@ class FakeOrchestrator:
         # Why a pending execution waits (tests set it), keyed like states.
         self.waiting: Dict[str, str] = {}
         self.egress: Dict[str, List[str]] = {}
+        self.addresses: Dict[str, List[str]] = {}
         # Simulated per-user volumes: owner volume name -> {absolute path: content}.
         self.volumes: Dict[str, Dict[str, bytes]] = {}
         # Tests can simulate what a container does when it starts (write files, finish, ...).
@@ -31,6 +32,9 @@ class FakeOrchestrator:
 
     def inventory(self) -> List[dict]:
         return [{"ref": ref, "state": self.status(ref), "labels": spec.labels} for ref, spec in self.executions.items()]
+
+    def execution_addresses(self, ref: str) -> List[str]:
+        return self.addresses.get(ref, [])
 
     def start(self, spec: ExecutionSpec) -> ExecutionHandle:
         self.executions[spec.name] = spec

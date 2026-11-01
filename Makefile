@@ -20,6 +20,7 @@ docs-build:
 	$(DOCS_PYTHON) scripts/check_docs.py site
 
 docs-reference:
+	$(CP_PYTHON) scripts/permission_reference.py
 	$(CP_PYTHON) scripts/docs_reference.py
 	cd terraform/provider-fdp && go run ./cmd/docs ../../docs/reference/terraform
 

@@ -4,6 +4,7 @@
 Requires Go and OpenTofu. Builds the provider into a temporary local mirror, copies
 only checked-in configuration (no tfvars/secrets), and removes everything afterward.
 """
+import argparse
 import os
 from pathlib import Path
 import shutil
@@ -19,6 +20,9 @@ def run(args, **kwargs):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--installation', action='store_true', help='Also validate the separate local data-platform roots')
+    options = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pokemon-config-') as directory:
         work = Path(directory)
         platform = '_'.join(subprocess.check_output(['go','env','GOOS','GOARCH'], text=True).split())
@@ -32,6 +36,8 @@ def main():
                           ' include = ["registry.opentofu.org/floren-app/fdp"]\n }\n'
                           ' direct { exclude = ["registry.opentofu.org/floren-app/fdp"] }\n}\n')
         folders = ['terraform/modules/pokemon']
+        if options.installation:
+            folders += ['data-platform/terraform', 'data-platform/pokemon/module', 'data-platform/pokemon/terraform']
         for folder in folders:
             checkout = work/'repo'/folder
             checkout.mkdir(parents=True)

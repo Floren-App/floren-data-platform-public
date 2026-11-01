@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AccessCaseItem, AccessFormItem, AccessPolicyItem, api, JustifyDeadline, RegisterRow, saveFile, AppGroup, ClassificationLevel, ComplianceRoleItem, FieldType, FormCondition, FormDefinition, FormField, FormPage } from "../api";
 import type { Hub } from "../hub";
+import { can } from "../permissions";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
 import { IconPlus, IconTrash } from "../components/Icons";
@@ -9,15 +10,15 @@ import type { TabRef } from "./Tabs";
 import { CaseTable, overdue } from "./Cases";
 
 const STEP_LABEL = { data_owner: "Data owners", compliance_reviewer: "Compliance reviewers" } as const;
-export const isComplianceAdmin = (hub: Hub) => !!hub.me?.compliance_roles?.includes("compliance_admin");
+export const isComplianceAdmin = (hub: Hub) => hub.me?.acting_admin === true;
 
 /** Which form each layer and classification needs. An empty cell needs no form. */
 export function PrivacyPolicies({ hub }: { hub: Hub }) {
-  const admin = isComplianceAdmin(hub);
+  const editable = (layer: string) => can(hub.me, "compliance.policies.apply", "set-policies", layer);
   const [grid, setGrid] = useState<{ layers: { id: string; name: string }[]; classifications: ClassificationLevel[]; policies: AccessPolicyItem[] } | null>(null);
   const [forms, setForms] = useState<AccessFormItem[]>([]), [error, setError] = useState(""), [message, setMessage] = useState("");
   const [cell, setCell] = useState<{ layer: string; level: string } | null>(null);
-  const load = useCallback(() => Promise.all([api.compliance.policies(), api.compliance.forms()])
+  const load = useCallback(() => Promise.all([api.compliance.policies(), api.compliance.forms().catch(() => [] as AccessFormItem[])])
     .then(([g, f]) => { setGrid(g); setForms(f); }).catch((e: Error) => setError(e.message)), []);
   useEffect(() => { void load(); }, [load]);
   if (!grid) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
@@ -34,11 +35,11 @@ export function PrivacyPolicies({ hub }: { hub: Hub }) {
           const label = p ? `${p.form ?? "Form"}: ${p.steps.map((s) => STEP_LABEL[s.role]).join(" → ")}, at most ${p.max_days} days` : "No form needed";
           return <td key={l.id} className={`${p ? "policy-cell filled" : "policy-cell"}${open ? " selected" : ""}`}>
             {c.name === lowest ? <span className="muted">Never</span>
-              : <button className="text-button" disabled={!admin && !p} aria-label={`${l.name}, ${c.name}: ${label}`} onClick={() => setCell(open ? null : { layer: l.id, level: c.name })}>
+              : <button className="text-button" disabled={!editable(l.id) && !p} aria-label={`${l.name}, ${c.name}: ${label}`} onClick={() => setCell(open ? null : { layer: l.id, level: c.name })}>
                 {p ? <><strong>{p.form}</strong><div className="muted small">{p.steps.map((s) => STEP_LABEL[s.role] + (s.approvals > 1 ? ` ×${s.approvals}` : "")).join(" → ")}</div>
                   <div className="muted small">at most {p.max_days} days</div></> : <span className="muted">No form</span>}</button>}</td>; })}</tr>)}</tbody></table></div>
     {cell && <PolicyEditor key={`${cell.layer}/${cell.level}`} layer={grid.layers.find((l) => l.id === cell.layer)!} level={cell.level} policy={policy(cell.layer, cell.level)}
-      forms={forms} readOnly={!admin} onClose={() => setCell(null)} onSaved={(text) => { setMessage(text); setCell(null); void load(); }} />}
+      forms={forms} readOnly={!editable(cell.layer)} onClose={() => setCell(null)} onSaved={(text) => { setMessage(text); setCell(null); void load(); }} />}
     <p className="hint">The lowest classification never needs a form. Masked columns count as their masked level, so a product option that masks personal data can fall in a cell without a form.
       Also configurable with Terraform (fdp_access_policy).</p>
   </>;
@@ -96,7 +97,7 @@ function PolicyEditor({ layer, level, policy, forms, readOnly, onClose, onSaved 
 
 /** The forms: each has versions; cases keep the version they were filled in with. */
 export function PrivacyForms({ hub, openTab }: { hub: Hub; openTab: (t: TabRef) => void }) {
-  const admin = isComplianceAdmin(hub);
+  const admin = can(hub.me, "compliance.forms.draft.edit", "set-forms");
   const [forms, setForms] = useState<AccessFormItem[] | null>(null), [error, setError] = useState(""), [name, setName] = useState("");
   useEffect(() => { api.compliance.forms().then(setForms).catch((e: Error) => setError(e.message)); }, []);
   const create = (e: React.FormEvent) => { e.preventDefault(); setError("");
@@ -135,7 +136,9 @@ const newPage = (pages: FormPage[]): FormPage => ({ id: freeId("page", pages.map
 
 /** One form: the builder for its draft, a preview, and its versions. */
 export function PrivacyForm({ id, hub, onRenamed, onDeleted }: { id: string; hub: Hub; onRenamed: (name: string) => void; onDeleted: () => void }) {
-  const admin = isComplianceAdmin(hub);
+  const admin = can(hub.me, "compliance.forms.draft.edit", "set-forms");
+  const publishAllowed = can(hub.me, "compliance.forms.publish", "set-forms");
+  const deleteAllowed = can(hub.me, "compliance.forms.delete", "set-forms");
   const [form, setForm] = useState<AccessFormItem | null>(null), [error, setError] = useState(""), [message, setMessage] = useState("");
   const [name, setName] = useState(""), [description, setDescription] = useState(""), [definition, setDefinition] = useState<FormDefinition>({ pages: [] });
   const [dirty, setDirty] = useState(false), [preview, setPreview] = useState(false), [answers, setAnswers] = useState<Answers>({});
@@ -161,7 +164,7 @@ export function PrivacyForm({ id, hub, onRenamed, onDeleted }: { id: string; hub
       actions={<div className="row" style={{ gap: 8 }}>
         <button className="btn secondary" onClick={() => { setPreview(!preview); setAnswers({}); }}>{preview ? "Edit" : "Preview"}</button>
         {admin && <button className="btn secondary" disabled={!dirty} onClick={() => void save().catch((e: Error) => setError(e.message))}>Save draft</button>}
-        {admin && <button className="btn" disabled={!dirty && !form.has_draft} onClick={publish}>Publish</button>}</div>} />
+        {publishAllowed && <button className="btn" disabled={dirty || !form.has_draft} onClick={publish}>Publish</button>}</div>} />
     {error && <p className="error" role="alert">{error}</p>}
     {message && <p className="scope-note" role="status">{message}</p>}
     {preview ? <section className="card"><FormRenderer definition={definition} answers={answers} onChange={setAnswers} /></section> : <>
@@ -176,7 +179,7 @@ export function PrivacyForm({ id, hub, onRenamed, onDeleted }: { id: string; hub
     <div className="table-scroll"><table aria-label="Versions"><thead><tr><th>Version</th><th>Status</th><th>Published</th></tr></thead><tbody>
       {[...versions].reverse().map((v) => <tr key={v.id}><td>{v.version}</td><td>{v.published ? (v.version === form.published_version ? "Current" : "Earlier") : "Draft"}</td>
         <td>{v.published_at ? `${new Date(v.published_at).toLocaleString()} by ${v.published_by}` : <span className="muted">—</span>}</td></tr>)}</tbody></table></div>
-    {admin && <div className="form-actions"><button className="btn danger" disabled={form.used_by > 0} title={form.used_by ? "A policy uses this form" : undefined} onClick={remove}>Delete form</button></div>}
+    {deleteAllowed && <div className="form-actions"><button className="btn danger" disabled={form.used_by > 0} title={form.used_by ? "A policy uses this form" : undefined} onClick={remove}>Delete form</button></div>}
   </>;
 }
 
@@ -258,7 +261,7 @@ const scopeText = (s: ComplianceRoleItem["scope"], layers: { id: string; name: s
 /** Who reviews, who approves new members, and who sets this up: roles given to groups, scoped. */
 /** Review duties for every group, or (on a group's Settings) for one group. */
 export function PrivacyRoles({ hub, groupId }: { hub: Hub; groupId?: string }) {
-  const admin = isComplianceAdmin(hub);
+  const admin = can(hub.me, "compliance.duties.appoint", "set-duties");
   const [data, setData] = useState<{ roles: ComplianceRoleItem[]; kinds: { key: string; label: string }[] } | null>(null);
   const [groups, setGroups] = useState<AppGroup[]>([]), [layers, setLayers] = useState<{ id: string; name: string }[]>([]), [levels, setLevels] = useState<ClassificationLevel[]>([]);
   const [error, setError] = useState(""), [role, setRole] = useState("compliance_reviewer"), [group, setGroup] = useState(groupId ?? "");

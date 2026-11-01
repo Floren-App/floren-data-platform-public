@@ -53,7 +53,7 @@ export function DeadlinesView({ hub, openTab }: { hub: Hub; openTab: OpenTab }) 
   const [rows, setRows] = useState<JustifyDeadline[] | null>(null), [error, setError] = useState("");
   useEffect(() => { api.compliance.deadlines().then(setRows).catch((e: Error) => setError(e.message)); }, []);
   const justify = (d: JustifyDeadline) => {
-    if (d.product_id) return openTab({ kind: "product", ref: d.product_id, title: d.resource, productSection: "options" });
+    if (d.product_id) return openTab({ kind: "product", ref: d.product_id, title: d.resource, productManagement: true, productSection: "options" });
     const resource = hub.resources.find((r) => r.id === d.resource_id);
     if (resource) openTab(resourceTab(resource, "permissions"));
   };

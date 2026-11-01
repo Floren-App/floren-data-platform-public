@@ -20,6 +20,7 @@ from .runtimes import sync_installation_runtimes
 from .routes import layers, admin, apis, connect, gateway, identity, deploy, runs, workspaces, rbac, scim, delegation, sql, data_browser, catalog, measurements, compute, workspace_templates, git_credentials, packages, query_log, data_policies, kafka, logs, products, app_profiles as app_profile_routes, compliance as compliance_routes, webhooks as webhook_routes
 from .app_profiles import feature_gate
 from . import workload_logs  # noqa: F401 -- records run and deploy events in the central log
+from .routes import permissions as permission_routes
 
 logging.basicConfig(level=logging.INFO)
 
@@ -176,6 +177,7 @@ app.add_middleware(
 for module in (workspaces, workspace_templates, git_credentials, packages, query_log, runs, compute, admin, connect, deploy, identity, gateway, rbac, scim, delegation, sql, data_browser, catalog, apis, layers, data_policies, kafka, logs, products, app_profile_routes, compliance_routes, webhook_routes):
     app.include_router(module.router)
 app.include_router(gateway.docs_router)
+app.include_router(permission_routes.router)
 
 
 @app.exception_handler(OperationalError)

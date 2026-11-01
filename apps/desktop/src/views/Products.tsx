@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { AccessCaseItem, AccessRequestItem, ago, api, ApiError, openInWindow, AppGroup, CaseTarget, JustifyDeadline, Requirement, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen, ProductStep } from "../api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AccessCaseItem, AccessRequestItem, ago, api, ApiError, openInWindow, AppGroup, CaseTarget, JustifyDeadline, Requirement, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen } from "../api";
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
@@ -7,7 +7,7 @@ import { PermissionsPanel } from "../components/Permissions";
 import { Answers, FormRenderer, JustifyPanel, uploadFiles } from "../components/ComplianceForm";
 import { CaseTable } from "./Cases";
 import { AlertRules } from "./Alerts";
-import { IconCatalog, IconPlus } from "../components/Icons";
+import { IconCatalog, IconPencil, IconPlus } from "../components/Icons";
 import { objectKindLabel } from "../objectKinds";
 import type { TabRef } from "./Tabs";
 
@@ -62,11 +62,11 @@ function AccessState({ p }: { p: Product }) {
     : <span className="product-chip">No access yet</span>;
 }
 
-export function ProductCard({ p, openTab, hub }: { p: Product; openTab: OpenTab; hub: Hub }) {
+export function ProductCard({ p, openTab, hub, managing = false }: { p: Product; openTab: OpenTab; hub: Hub; managing?: boolean }) {
   return <article className="product-card" aria-label={p.title}>
     <BigIcon p={p} />
     <div className="product-card-head">
-      <button className="text-button product-title" onClick={() => openTab(productTab(p))}>{p.title}</button>
+      <button className="text-button product-title" onClick={() => openTab(productTab(p, { productManagement: managing }))}>{p.title}</button>
       <span className="muted">{p.owner_group_name ?? "No owner group"}{p.domain && ` · ${p.domain}`}</span>
     </div>
     <p className="product-summary">{p.summary || <span className="muted">No summary yet.</span>}</p>
@@ -101,9 +101,9 @@ export function ProductsView({ hub, openTab, tab }: { hub: Hub; openTab: OpenTab
     <PageHeader icon={<IconCatalog size={22} />} title={mine ? "My products" : "Data products"}
       subtitle={mine ? "Products you own. Change what is in them, who has access, or unpublish them."
         : `Data products shared in ${layer ?? "this layer"}. Open one to see where it comes from and what uses it; request access to the ones you need.`}
-      actions={hub.has("products.publish") && <button className="btn" aria-expanded={publishing} onClick={() => setPublishing(!publishing)}><IconPlus size={14} />Publish a product</button>} />
-    {publishing && <PublishPanel hub={hub} assetId={tab.assetId} onClose={() => setPublishing(false)}
-      onPublished={(p) => { setPublishing(false); setVersion((v) => v + 1); openTab(productTab(p)); }} />}
+      actions={mine && hub.has("products.publish") && <button className="btn" aria-expanded={publishing} onClick={() => setPublishing(!publishing)}><IconPlus size={14} />Publish a product</button>} />
+    {mine && hub.has("products.publish") && publishing && <PublishPanel hub={hub} assetId={tab.assetId} onClose={() => setPublishing(false)}
+      onPublished={(p) => { setPublishing(false); setVersion((v) => v + 1); openTab(productTab(p, { productManagement: true })); }} />}
     <div className="object-toolbar product-filters">
       <input type="search" aria-label="Search data products" placeholder="Search products, owners, domains, tables…" value={q} onChange={(e) => setQ(e.target.value)} />
       <select aria-label="Domain" value={domain} onChange={(e) => setDomain(e.target.value)}><option value="">All domains</option>{data?.domains.map((d) => <option key={d}>{d}</option>)}</select>
@@ -114,7 +114,7 @@ export function ProductsView({ hub, openTab, tab }: { hub: Hub; openTab: OpenTab
     {!data ? <p className="muted" role="status">Loading data products…</p>
       : !data.items.length ? <div className="empty-state"><p>{q || domain || kind || accessible ? "No products match." : mine ? "You do not own a product in this layer yet."
           : "Nothing is published in this layer yet."}</p><p className="muted">A product bundles what you share: for example a dashboard with the tables it uses. Publish from an object's page, or with Publish a product.</p></div>
-      : <div className="product-grid">{data.items.map((p) => <ProductCard key={p.id} p={p} openTab={openTab} hub={hub} />)}</div>}
+      : <div className="product-grid">{data.items.map((p) => <ProductCard key={p.id} p={p} openTab={openTab} hub={hub} managing={mine} />)}</div>}
   </>;
 }
 
@@ -182,26 +182,19 @@ export function PublishPanel({ hub, assetId, onPublished, onClose }: { hub: Hub;
   </form>;
 }
 
-/** The lineage of a product: from its sources (left) to what is in it (right). Steps you cannot open are dashed. */
-function Lineage({ detail, openTab }: { detail: ProductDetail; openTab: OpenTab }) {
-  const depth = Math.max(0, ...detail.lineage.map((s) => s.depth));
-  const columns: ProductStep[][] = Array.from({ length: depth }, (_, i) => detail.lineage.filter((s) => s.depth === depth - i));
-  if (!detail.lineage.length) return <p className="muted">No lineage recorded yet. It appears when the platform sees what produces this product: dbt and Airflow imports, and the tables workloads read and write.</p>;
-  return <div className="table-scroll"><div className="product-lineage" role="list" aria-label="Lineage">
-    {columns.map((column, i) => <div key={i} className="product-lineage-column" role="presentation">
-      {column.map((s) => <div key={s.key} role="listitem" className={`product-step ${s.visible ? "" : "hidden"}`} title={s.visible ? undefined : "You cannot open this step: only its name, kind and owner are shown."}>
-        <span className="row"><ProductIcon kind={s.kind} runtime={s.runtime ?? undefined} size={16} />
-          {s.product_id ? <button className="text-button" onClick={() => openTab({ kind: "product", ref: s.product_id!, title: s.name })}>{s.name}</button>
-            : s.asset_id ? <button className="text-button" onClick={() => openTab({ kind: "catalog-object", ref: s.asset_id!, title: s.name })}>{s.name}</button> : <span>{s.name}</span>}</span>
-        <small className="muted">{kindLabel(s.kind)}{s.owner_group_name ? ` · ${s.owner_group_name}` : ""}{s.product_id ? " · in another product" : ""}</small>
-      </div>)}
-    </div>)}
-    <div className="product-lineage-column product-lineage-members" role="presentation" aria-label="In this product">
-      {detail.members.map((m) => <div key={m.asset_id} role="listitem" className="product-step current">
-        <span className="row"><ProductIcon kind={m.kind} runtime={m.runtime ?? undefined} size={16} /><strong>{m.name}</strong></span>
-        <small className="muted">{kindLabel(m.kind)} · in this product</small></div>)}
-    </div>
-  </div></div>;
+/** Open the canonical lineage for each accessible object in this product. */
+function ObjectLineage({ detail, hub, openTab }: { detail: ProductDetail; hub: Hub; openTab: OpenTab }) {
+  return <>
+    <p className="hint">Choose an object to explore its upstream and downstream lineage.</p>
+    <ul className="product-uses" aria-label="Object lineage">{detail.members.map((member) => <li key={member.asset_id}>
+      <ProductIcon kind={member.kind} runtime={member.runtime ?? undefined} size={16} />
+      <span>{member.name}</span><span className="muted">{kindLabel(member.kind)}</span>
+      {member.access === "granted" && hub.has("catalog.objects")
+        ? <button className="text-button" onClick={() => openTab({ kind: "catalog-object", ref: member.asset_id, title: member.name, catalogSection: "lineage" })}>
+            View lineage of {member.name}</button>
+        : <span className="muted">{member.access === "granted" ? "Catalog access required" : "Object access required"}</span>}
+    </li>)}</ul>
+  </>;
 }
 
 function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDone: () => void; onCancel: () => void }) {
@@ -292,13 +285,14 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
   useEffect(() => { if (tab.intent === "request") setRequesting(true); }, [tab.intent]);
   if (error && !detail) return <p className="error" role="alert">{error}</p>;
   if (!detail) return <p className="muted" role="status">Loading…</p>;
-  const section = tab.productSection ?? "overview";
+  const managing = !!tab.productManagement && detail.can_manage && hub.has("products.publish");
+  const section = !managing && ["permissions", "alerts"].includes(tab.productSection ?? "") ? "overview" : tab.productSection ?? "overview";
   const target = openTarget(detail.open, detail.name, detail.kind);
   const sections: [NonNullable<TabRef["productSection"]>, string][] = [["overview", "Overview"], ["options", "Access options"], ["lineage", "Lineage"], ["used-by", "Used by"]];
-  if (detail.access_resource) sections.push(["permissions", "Permissions"]);
-  if (detail.access_resource && detail.can_manage) sections.push(["alerts", "Alerts"]);
+  if (managing && detail.access_resource) sections.push(["permissions", "Permissions"]);
+  if (managing && detail.access_resource) sections.push(["alerts", "Alerts"]);
   return <>
-    <div className="crumbs muted"><button className="text-button" onClick={() => openTab({ kind: "products", title: "Data products" })}>Data products</button>{detail.domain && <> › {detail.domain}</>}</div>
+    <div className="crumbs muted"><button className="text-button" onClick={() => openTab({ kind: "products", ref: managing ? "mine" : undefined, title: managing ? "My products" : "Data products" })}>{managing ? "My products" : "Data products"}</button>{detail.domain && <> › {detail.domain}</>}</div>
     <div className="product-header">
       <BigIcon p={detail} size={34} />
       <div className="product-header-text"><h1>{detail.title}</h1>
@@ -308,12 +302,12 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
         {(detail.access === "none" || detail.access === "partial") && !requesting && hub.has("products.request") && <button className="btn" onClick={() => setRequesting(true)}>Request access</button>}
         {detail.access !== "none" && <AccessState p={detail} />}
         {target && detail.kind === "app" && <OpenDashboard p={detail} hub={hub} openTab={openTab} />}
-        {detail.can_manage && <button className="btn secondary" aria-expanded={editing} onClick={() => setEditing(!editing)}>Edit</button>}
+        {managing && <button className="btn secondary" aria-expanded={editing} onClick={() => setEditing(!editing)}>Edit</button>}
       </div>
     </div>
     {sent && <p className="scope-note" role="status">Request sent. You will see the decision here and under Access requests → My requests.</p>}
     {requesting && hub.has("products.request") && <RequestForm p={detail} hub={hub} onCancel={() => setRequesting(false)} onDone={() => { setRequesting(false); setSent(true); void load(); }} />}
-    {editing && <EditForm detail={detail} hub={hub} openTab={openTab} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); }} />}
+    {managing && editing && <EditForm detail={detail} hub={hub} openTab={openTab} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); }} />}
     {error && <p className="error" role="alert">{error}</p>}
     <nav className="object-tabs" aria-label="Product sections">
       {sections.map(([id, label]) => <button key={id} className={section === id ? "active" : ""} aria-current={section === id ? "page" : undefined}
@@ -327,7 +321,8 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
           <dt>Certification</dt><dd>{words(detail.status)}</dd>
           <dt>Freshness</dt><dd>{detail.updated_at ? <>Updated {ago(detail.updated_at)}</> : "—"}{detail.sla_status && detail.sla_status !== "not_configured" && <> · SLA {words(detail.sla_status)}</>}</dd>
           <dt>Published</dt><dd>{ago(detail.published_at)} by {detail.published_by}</dd>
-          <dt>Access</dt><dd>Consumers of this product get {grantsText(detail.grants)}.</dd>
+          {managing ? <><dt>Access</dt><dd>Consumers of this product get {grantsText(detail.grants)}.</dd></>
+            : <><dt>Your access</dt><dd><AccessState p={detail} /></dd></>}
         </dl></section>
       <div className="section-heading"><h2>In this product</h2></div>
       <ul className="product-uses" aria-label="In this product">{detail.members.map((m) => { const open = openTarget(m.open, m.name, m.kind); return <li key={m.asset_id}>
@@ -337,62 +332,99 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
         {m.access === "granted" ? <span className="product-chip ok">You have access</span> : <span className="product-chip">No access</span>}</li>; })}</ul>
       {detail.access !== "granted" && <p className="hint">Columns, previews and SQL are shown on each object's own page once you have access.</p>}
     </>}
-    {section === "options" && <AccessOptions detail={detail} onChanged={() => void load()} />}
-    {section === "lineage" && <><Lineage detail={detail} openTab={openTab} />
-      <p className="hint">Dashed steps are ones you cannot open: you see their name, kind and owner. {hub.has("catalog.objects") && detail.members.some((m) => m.access === "granted") &&
-        <button className="text-button" onClick={() => { const m = detail.members.find((x) => x.access === "granted")!; openTab({ kind: "catalog-object", ref: m.asset_id, title: m.name, catalogSection: "lineage" }); }}>Open the full lineage graph</button>}</p></>}
+    {section === "options" && <AccessOptions detail={detail} managing={managing} onChanged={load} />}
+    {section === "lineage" && <ObjectLineage detail={detail} hub={hub} openTab={openTab} />}
     {section === "used-by" && <>{detail.used_by.length ? <div className="product-grid">{detail.used_by.map((p) => <ProductCard key={p.id} p={p} openTab={openTab} hub={hub} />)}</div>
       : <p className="muted">No other published products are built on this one.</p>}
       {detail.used_by_others > 0 && <p className="hint">{detail.used_by_others} other object{detail.used_by_others === 1 ? " uses" : "s use"} it (not published).</p>}</>}
-    {section === "alerts" && detail.access_resource && <AlertRules hub={hub} resource={detail.access_resource} />}
-    {section === "permissions" && detail.access_resource && <PermissionsPanel resource={detail.access_resource} resources={[detail.access_resource]} openTab={openTab} onChanged={async () => { await load(); }} />}
+    {managing && section === "alerts" && detail.access_resource && <AlertRules hub={hub} resource={detail.access_resource} />}
+    {managing && section === "permissions" && detail.access_resource && <PermissionsPanel resource={detail.access_resource} resources={[detail.access_resource]} openTab={openTab} onChanged={async () => { await load(); }} />}
   </>;
 }
 
-/** The product's access options: what each shows, the level that leads to, and (for owners) which groups have it. */
-function AccessOptions({ detail, onChanged }: { detail: ProductDetail; onChanged: () => void }) {
-  const [groups, setGroups] = useState<AppGroup[]>([]), [group, setGroup] = useState(""), [option, setOption] = useState(""), [error, setError] = useState("");
-  useEffect(() => { if (detail.can_manage) api.access.groups().then(setGroups).catch(() => setGroups([])); }, [detail.can_manage]);
+/** Native dialog provides keyboard focus containment, Escape and focus restoration. */
+function AccessGroupsDialog({ busy, onClose, children }: { busy: boolean; onClose: () => void; children: React.ReactNode }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const element = dialog.current!;
+    element.showModal();
+    return () => { element.close(); if (previous?.isConnected) previous.focus(); };
+  }, []);
+  return <dialog ref={dialog} className="modal wide" aria-modal="true" aria-labelledby="product-access-title"
+    onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}>
+    <h2 id="product-access-title">Manage product access</h2>
+    {children}
+    <div className="form-actions"><button className="btn secondary" disabled={busy} onClick={onClose}>Done</button></div>
+  </dialog>;
+}
+
+/** Options remain readable; group changes live in the owner's access dialog. */
+function AccessOptions({ detail, managing, onChanged }: { detail: ProductDetail; managing: boolean; onChanged: () => Promise<void> }) {
+  const canManage = managing && detail.can_manage;
+  const [groups, setGroups] = useState<AppGroup[]>([]), [group, setGroup] = useState(""), [option, setOption] = useState("");
+  const [error, setError] = useState(""), [message, setMessage] = useState(""), [busy, setBusy] = useState(false), [editing, setEditing] = useState(false);
+  useEffect(() => { if (canManage) api.access.groups().then(setGroups).catch(() => setGroups([])); }, [canManage]);
   const consumers = detail.consumers ?? [];
-  const [justify, setJustify] = useState<{ target: CaseTarget; requirement: Requirement } | null>(null), [message, setMessage] = useState("");
-  // Consumers from before the product's data needed a form: they stay until their deadline.
+  const defaultOption = detail.options?.find((item) => item.default)?.id ?? detail.options?.[0]?.id ?? "";
+  const optionFor = (id: string | null) => id ?? defaultOption;
+  const [justify, setJustify] = useState<{ target: CaseTarget; requirement: Requirement } | null>(null);
   const [deadlines, setDeadlines] = useState<JustifyDeadline[]>([]);
-  useEffect(() => { if (detail.can_manage) api.compliance.deadlines().then((all) => setDeadlines(all.filter((d) => d.product_id === detail.id))).catch(() => setDeadlines([])); }, [detail.id, detail.can_manage]);
-  const justifyExisting = (groupId: string, optionId: string) => { setError(""); setMessage("");
-    const target: CaseTarget = { kind: "product", app_group_id: groupId, product_id: detail.id, option_id: optionId };
-    api.compliance.requirement(target).then((requirement) => setJustify({ target, requirement })).catch((e: Error) => setError(e.message)); };
-  const act = (p: Promise<unknown>, target?: CaseTarget) => { setError(""); setMessage(""); setJustify(null); void p.then(onChanged).catch((e: Error) => {
-    // Data under an access policy: the group becomes a consumer once a compliance form is approved.
-    if (target && e instanceof ApiError && e.requirement) setJustify({ target, requirement: e.requirement });
-    setError(e.message);
-  }); };
+  useEffect(() => { if (canManage) api.compliance.deadlines().then((all) => setDeadlines(all.filter((d) => d.product_id === detail.id))).catch(() => setDeadlines([])); }, [detail.id, canManage]);
+  const target = (groupId: string, optionId: string): CaseTarget => ({ kind: "product", app_group_id: groupId, product_id: detail.id, option_id: optionId });
+  const justifyExisting = async (groupId: string, optionId: string) => {
+    setBusy(true); setError(""); setMessage("");
+    try { const access = target(groupId, optionId); setJustify({ target: access, requirement: await api.compliance.requirement(access) }); }
+    catch (error) { setError((error as Error).message); } finally { setBusy(false); }
+  };
+  const act = async (action: () => Promise<unknown>, access?: CaseTarget) => {
+    if (busy) return;
+    setBusy(true); setError(""); setMessage(""); setJustify(null);
+    try { await action(); await onChanged(); setGroup(""); }
+    catch (error) {
+      if (access && error instanceof ApiError && error.requirement) setJustify({ target: access, requirement: error.requirement });
+      setError((error as Error).message);
+    } finally { setBusy(false); }
+  };
+  const close = () => { setEditing(false); setJustify(null); setError(""); setMessage(""); };
   return <>
     <p className="hint">Each option is a way to use this product: the masks and row filters its consumers get. The level shows what consumers of the option really see; masked columns count lower.</p>
-    <div className="table-scroll"><table aria-label="Access options"><thead><tr><th>Option</th><th>Consumers see</th><th>Level</th>{detail.can_manage && <th>Groups</th>}</tr></thead><tbody>
+    <div className="table-scroll"><table aria-label="Access options"><thead><tr><th>Option</th><th>Consumers see</th><th>Level</th>{canManage && <><th>Groups</th><th aria-label="Actions" /></>}</tr></thead><tbody>
       {(detail.options ?? []).map((o) => <tr key={o.id}><td><strong>{o.name}</strong>{o.default && <span className="muted"> · default</span>}{o.description && <div className="muted small">{o.description}</div>}</td>
         <td>{o.masks ? <>{o.masks.map((m) => <div key={m.table + m.column} className="mono small">{m.table}.{m.column}: {m.method}</div>)}
             {(o.filters ?? []).map((f) => <div key={f.table} className="mono small">{f.table}: rows where {f.expression}</div>)}{!o.masks.length && !(o.filters ?? []).length && <span className="muted">everything, unmasked</span>}</>
           : <span className="muted">{o.masked_columns ? `${o.masked_columns} masked column${o.masked_columns === 1 ? "" : "s"}` : "no masked columns"}{o.filtered_tables ? ` · rows filtered on ${o.filtered_tables} table${o.filtered_tables === 1 ? "" : "s"}` : ""}</span>}</td>
         <td><span className="product-chip">{words(o.classification)}</span></td>
-        {detail.can_manage && <td>{consumers.filter((c) => c.option_id === o.id).map((c) => <div key={c.group_id} className="row" style={{ gap: 6 }}>{c.group}
-          <select aria-label={`Option of ${c.group}`} value={o.id} onChange={(e) => act(api.products.setConsumer(detail.id, c.group_id, e.target.value))}>
-            {(detail.options ?? []).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-          <button className="text-button" onClick={() => act(api.products.removeConsumer(detail.id, c.group_id))}>Remove</button>
-          {(() => { const d = deadlines.find((x) => x.app_group_id === c.group_id); return d && <span className="small">
-            <span className="error-text">Needs a form by {new Date(d.due_at).toLocaleDateString()}</span>{" "}
-            <button className="text-button" onClick={() => justifyExisting(c.group_id, o.id)}>Justify</button></span>; })()}</div>)}
-          {!consumers.some((c) => c.option_id === o.id) && <span className="muted">—</span>}</td>}
+        {canManage && <><td>{consumers.filter((consumer) => optionFor(consumer.option_id) === o.id).map((consumer) => consumer.group).join(", ") || <span className="muted">—</span>}</td>
+          <td className="table-actions"><button className="icon-btn" aria-label={`Edit groups for ${o.name}`} title={`Edit groups for ${o.name}`}
+            onClick={() => { setOption(o.id); setGroup(""); setEditing(true); }}><IconPencil size={16} /></button></td></>}
       </tr>)}</tbody></table></div>
-    {detail.can_manage && <form className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }} onSubmit={(e) => { e.preventDefault(); act(api.products.setConsumer(detail.id, group, option || undefined),
-      { kind: "product", app_group_id: group, product_id: detail.id, option_id: option || undefined }); }}>
-      <select aria-label="Group to give access" value={group} onChange={(e) => setGroup(e.target.value)}><option value="">Give a group access…</option>
-        {groups.filter((g) => !consumers.some((c) => c.group_id === g.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
-      <select aria-label="With option" value={option} onChange={(e) => setOption(e.target.value)}><option value="">Default option</option>{(detail.options ?? []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>
-      <button className="btn secondary" disabled={!group}>Give access</button></form>}
-    {error && !justify && <p className="error" role="alert">{error}</p>}
-    {message && <p className="success-message" role="status">{message}</p>}
-    {justify && <JustifyPanel target={justify.target} requirement={justify.requirement} onCancel={() => { setJustify(null); setError(""); }}
-      onDone={(text) => { setJustify(null); setError(""); setMessage(text); onChanged(); }} />}
+    {editing && canManage && <AccessGroupsDialog busy={busy} onClose={close}>
+      <p className="muted">Groups with access to {detail.title}. Changes take effect immediately.</p>
+      <div className="table-scroll"><table aria-label="Groups with product access"><thead><tr><th>Group</th><th>Access option</th><th>Actions</th></tr></thead><tbody>
+        {consumers.map((consumer) => <tr key={consumer.group_id}><td>{consumer.group}
+          {(() => { const deadline = deadlines.find((item) => item.app_group_id === consumer.group_id); return deadline && <div className="small">
+            <span className="error-text">Needs a form by {new Date(deadline.due_at).toLocaleDateString()}</span>{" "}
+            <button className="text-button" disabled={busy} onClick={() => void justifyExisting(consumer.group_id, optionFor(consumer.option_id))}>Justify</button></div>; })()}</td>
+          <td><select aria-label={`Option of ${consumer.group}`} disabled={busy} value={optionFor(consumer.option_id)}
+            onChange={(event) => { const optionId = event.target.value; void act(() => api.products.setConsumer(detail.id, consumer.group_id, optionId), target(consumer.group_id, optionId)); }}>
+            {(detail.options ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></td>
+          <td><button className="text-button" disabled={busy} aria-label={`Remove access for ${consumer.group}`}
+            onClick={() => void act(() => api.products.removeConsumer(detail.id, consumer.group_id))}>Remove</button></td></tr>)}
+        {!consumers.length && <tr><td colSpan={3} className="muted">No groups have access yet.</td></tr>}
+      </tbody></table></div>
+      <form className="product-access-add" aria-label="Add group access" onSubmit={(event) => { event.preventDefault(); if (group) void act(() => api.products.setConsumer(detail.id, group, option || undefined), target(group, option)); }}>
+        <div className="field"><label htmlFor="product-access-group">Group to give access</label><select id="product-access-group" disabled={busy} value={group} onChange={(event) => setGroup(event.target.value)}>
+          <option value="">Choose a group…</option>{groups.filter((item) => !consumers.some((consumer) => consumer.group_id === item.id)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+        <div className="field"><label htmlFor="product-access-option">With option</label><select id="product-access-option" disabled={busy} value={option} onChange={(event) => setOption(event.target.value)}>
+          {(detail.options ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+        <button className="btn secondary" disabled={busy || !group}><IconPlus size={14} />Add group</button>
+      </form>
+      {error && !justify && <p className="error" role="alert">{error}</p>}
+      {message && <p className="success-message" role="status">{message}</p>}
+      {justify && <JustifyPanel target={justify.target} requirement={justify.requirement} onCancel={() => { setJustify(null); setError(""); }}
+        onDone={(text) => { setJustify(null); setError(""); setMessage(text); void onChanged(); }} />}
+    </AccessGroupsDialog>}
   </>;
 }
 
@@ -481,7 +513,7 @@ export function PublishButton({ resourceId, objectPath, openTab, hub }: { resour
   }, [resourceId, objectPath, allowed]);
   if (!allowed || !state || !state.info.publishable) return null;
   const product = state.info.products[0];
-  if (product) return <button className="btn secondary" title={state.info.products.map((p) => p.title).join(", ")} onClick={() => openTab(productTab(product))}>
+  if (product) return <button className="btn secondary" title={state.info.products.map((p) => p.title).join(", ")} onClick={() => openTab(productTab(product, { productManagement: true }))}>
     In {state.info.products.length === 1 ? product.title : `${state.info.products.length} products`}</button>;
   if (!state.info.can_publish) return null;
   return <button className="btn secondary" onClick={() => openTab({ kind: "products", ref: "mine", title: "My products", intent: "publish", assetId: state.assetId })}>Publish to catalog</button>;

@@ -37,7 +37,7 @@ variable "warehouses" {
 variable "demo_data_policies" {
   type        = bool
   default     = false
-  description = "Demonstrate column masks and a row filter on the product: analysts and the explorer dashboard see prices rounded, illustrators partly hidden and no rare cards; data engineers and the pipeline identities that build the product are exempt."
+  description = "Demonstrate column masks and a row filter on the product: analysts and the caller-bound explorer see prices rounded, illustrators partly hidden and no rare cards; data engineers and the pipeline identities that build the product are exempt."
 }
 variable "levels" {
   type        = object({ internal = string, personal = string })
@@ -48,4 +48,61 @@ variable "consumer_group_ids" {
   type        = list(string)
   default     = []
   description = "Further app groups that use the Pokemon cards product with its Standard option, such as dashboard viewers."
+}
+
+variable "kafka_cluster_id" {
+  type        = string
+  default     = null
+  description = "Managed Kafka cluster in this layer; required when streaming_enabled is true."
+}
+variable "price_sink_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable only after running price-bootstrap once in this layer."
+  validation {
+    condition     = !var.price_sink_enabled || var.streaming_enabled
+    error_message = "The price sink requires streaming_enabled."
+  }
+}
+variable "topic_replication_factor" {
+  type    = number
+  default = 1
+  validation {
+    condition     = contains([1, 3, 5], var.topic_replication_factor)
+    error_message = "Use 1, 3 or 5, no more than the cluster's broker count."
+  }
+}
+variable "engineering_data_access" {
+  type        = bool
+  default     = true
+  description = "Disable for production release managers: deploy authority does not imply interactive raw-data access."
+}
+variable "engineering_folder_role" {
+  type    = string
+  default = "Admin"
+}
+variable "product_owner_group_id" {
+  type    = string
+  default = null
+}
+variable "stream_operator_group_id" {
+  type    = string
+  default = null
+}
+variable "streaming_enabled" {
+  type        = bool
+  default     = false
+  description = "Plan-time switch; when true kafka_cluster_id must identify this layer's cluster."
+  validation {
+    condition     = !var.streaming_enabled || var.kafka_cluster_id != null
+    error_message = "Supply kafka_cluster_id when enabling streaming."
+  }
+}
+variable "stream_operators_enabled" {
+  type    = bool
+  default = false
+  validation {
+    condition     = !var.stream_operators_enabled || var.stream_operator_group_id != null
+    error_message = "Supply stream_operator_group_id when enabling operator grants."
+  }
 }

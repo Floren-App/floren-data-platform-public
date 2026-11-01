@@ -53,7 +53,7 @@ def test_no_profiles_until_configured_and_profiles_follow_the_active_group(clien
     assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": gid}).status_code == 200
     acting = me(client, "admin")
     assert acting["app_profile"] == "Viewer" and acting["app_features"] == ["products.browse"]
-    assert client.get("/v1/workspaces", headers=as_("admin")).status_code == 200   # the API still lets administrators do everything
+    assert client.get("/v1/workspaces", headers=as_("admin")).status_code == 403   # active group constrains the API too
     assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": "000000000001"}).status_code == 200
     assert me(client, "admin")["app_profile"] == "Full access (administrator)"
 

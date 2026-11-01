@@ -9,6 +9,7 @@ plane every few seconds; while it cannot be read, the last good one stays in for
 from __future__ import annotations
 
 import asyncio
+import base64
 import ipaddress
 import json
 import logging
@@ -72,8 +73,31 @@ class Proxy:
         self.patterns: List[str] = []
 
     def load(self) -> None:
-        with urllib.request.urlopen(self.allowlist_url, timeout=5) as response:
+        request = urllib.request.Request(self.allowlist_url,
+            headers={"X-FDP-Egress-Proxy": os.environ.get("FDP_EGRESS_PROXY_TOKEN", "")})
+        with urllib.request.urlopen(request, timeout=5) as response:
             self.patterns = [h["host"] for h in json.load(response).get("hosts", [])]
+
+    def authorize(self, header: bytes, host: str, source_ip: str) -> bool:
+        """Require a signed workspace ticket, then check its current layer policy. Fail closed."""
+        try:
+            values = [line.split(b":", 1)[1].strip() for line in header.split(b"\r\n")[1:]
+                      if line.lower().startswith(b"proxy-authorization:")]
+            if len(values) != 1 or not values[0].startswith(b"Basic "):
+                return False
+            credentials = base64.b64decode(values[0][6:], validate=True).decode("ascii")
+            user, token = credentials.split(":", 1)
+            if user != "fdp" or not token or len(token) > 4096:
+                return False
+            url = self.allowlist_url.rsplit("/", 1)[0] + "/authorize"
+            request = urllib.request.Request(url, data=json.dumps({"host": host, "source_ip": source_ip}).encode(),
+                headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                         "X-FDP-Egress-Proxy": os.environ.get("FDP_EGRESS_PROXY_TOKEN", "")}, method="POST")
+            with urllib.request.urlopen(request, timeout=5) as response:
+                return json.load(response).get("allowed") is True
+        except Exception:
+            # Do not log tickets or upstream error bodies.
+            return False
 
     async def refresh(self) -> None:
         while True:
@@ -93,6 +117,11 @@ class Proxy:
         request = head.split(b"\r\n", 1)[0].decode("latin-1").split()
         target = request[1] if len(request) == 3 and request[0] == "CONNECT" else ""
         host, _, port = target.rpartition(":")
+        if not await asyncio.to_thread(self.authorize, head, host, peer):
+            writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            await writer.drain()
+            writer.close()
+            return
         address = self.check(host, port)
         if isinstance(address, str) and address.startswith("refused:"):
             log.info("refused %s from %s: %s", target or request[:1], peer, address[8:])

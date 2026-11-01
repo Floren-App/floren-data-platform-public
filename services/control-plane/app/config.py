@@ -116,6 +116,7 @@ class Settings(BaseSettings):
     # VS Code and RStudio reach the internet only through this proxy (http://host:port), and only the host names
     # administrators allow. Empty: no proxy, so workspaces have no internet access at all.
     egress_proxy_url: str = ""
+    egress_proxy_token: str = ""
     # API management calls backends from the control plane: only public addresses unless listed here (CIDRs).
     api_private_networks: str = ""
     # Requests per second (average, burst) per credential on the public API, SQL and API gateway routes; 0 disables.

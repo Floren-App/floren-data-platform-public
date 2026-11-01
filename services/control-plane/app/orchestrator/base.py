@@ -128,6 +128,9 @@ class ExecutionHandle:
 
 
 class Orchestrator(Protocol):
+    def execution_addresses(self, ref: str) -> List[str]:
+        """Current execution IPs, for authenticated proxy source attestation. Never client supplied."""
+        ...
     def inventory(self) -> List[dict]:
         """Managed execution states/labels only, without environment variables or secrets."""
         ...

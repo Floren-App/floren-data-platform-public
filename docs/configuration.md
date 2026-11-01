@@ -45,7 +45,7 @@ and never overlap:
 
 | Helm value | OpenTofu / app |
 |---|---|
-| `egressProxy.enabled`: runs the workspace egress proxy | `fdp_egress_allowlist`: which host names workspaces may reach |
+| `egressProxy.enabled`: runs the workspace egress proxy; `FDP_EGRESS_PROXY_TOKEN` authenticates it | `fdp_egress_allowlist`: global host ceiling plus explicit lists per layer |
 | `packages.*`: package storage, upstream PyPI/CRAN, import platforms | `fdp_role_assignment` on `packages`: who publishes and imports |
 | `layerController.*`, including the cluster's `network` CIDRs | `fdp_layer` with `infrastructure`: each layer's Trino, storage and quotas |
 | `registryCredentials`: pull secret for private images | `fdp_runtime.image`: may point at that registry |
