@@ -3013,18 +3013,18 @@ test("administrators add a notification webhook, choose events and send a test",
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Administration", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: "Alerts", exact: true }).click();
   const main = page.locator(".main");
-  await expect(main.getByRole("table", { name: "Webhooks" })).toContainText("No webhooks");
-  await main.getByRole("button", { name: "Add webhook" }).click();
-  const form = main.getByRole("form", { name: "New webhook" });
+  await expect(main.getByRole("table", { name: "Channels" })).toContainText("No channels");
+  await main.getByRole("button", { name: "Add channel" }).click();
+  const form = main.getByRole("form", { name: "New channel" });
   await form.getByRole("textbox", { name: "Name" }).fill("Privacy mail");
   await form.getByRole("textbox", { name: "URL" }).fill("https://automation.example.test/fdp");
   await form.getByLabel(/Signing secret/).fill("a-long-signing-secret-123");
   await form.getByRole("checkbox", { name: /A compliance form waits/ }).check();
-  await form.getByRole("button", { name: "Save webhook" }).click();
+  await form.getByRole("button", { name: "Save channel" }).click();
   await expect(main.getByRole("status")).toHaveText("Saved Privacy mail.");
   expect(sent[0]).toMatchObject({ url: "/v1/admin/webhooks/Privacy%20mail", body: { name: "Privacy mail", url: "https://automation.example.test/fdp",
     events: ["review.waiting"], enabled: true, secret: "a-long-signing-secret-123" } });
-  await expect(main.getByRole("table", { name: "Webhooks" })).toContainText("Signed");
+  await expect(main.getByRole("table", { name: "Channels" })).toContainText("Signed");
   await main.getByRole("button", { name: "Send test" }).click();
   await expect(main.getByRole("status")).toHaveText("Test sent to Privacy mail.");
   expect(state.errors).toEqual([]);
@@ -3172,5 +3172,42 @@ test("Administration shows the pages you hold a role on, and each page says who 
   await expect(sidebar.getByRole("list", { name: "Privacy" }).getByRole("button")).toHaveText(["Compliance forms"]);
   await expect(sidebar.getByRole("list", { name: "Platform" })).toHaveCount(0);
   await expect(main.getByRole("heading", { name: "Compliance forms" })).toBeVisible();
+  expect(state.errors).toEqual([]);
+});
+
+test("alert rules send chosen events to a channel, from the Alerts page or an object's Alerts tab", async ({ page }) => {
+  const state = await setup(page);
+  const main = page.locator(".main"), sidebar = page.locator(".sidebar");
+  const created: any[] = [];
+  await page.route(/\/v1\/alerts\/(events|channels|rules)/, (route) => {
+    const req = route.request(), url = new URL(req.url()).pathname.replace("/api", "");
+    if (url.endsWith("/events")) return route.fulfill({ json: { events: [{ key: "run.failed", label: "A run of a workload failed" }, { key: "sla.breached", label: "A data SLA or quality check failed" }],
+      groups: { "Runs and workloads": ["run.failed"], "Data quality": ["sla.breached"] } } });
+    if (url.endsWith("/channels")) return route.fulfill({ json: [{ id: "c1", name: "#data-ops", enabled: true }] });
+    if (req.method() === "POST") { created.push(req.postDataJSON()); return route.fulfill({ status: 201, json: { id: "r1", ...req.postDataJSON(), channel: "#data-ops", objects: [], created_by: "admin" } }); }
+    return route.fulfill({ json: created.map((r, i) => ({ id: `r${i}`, ...r, channel: "#data-ops", objects: [], created_by: "admin" })) });
+  });
+  await page.route(/\/v1\/admin\/webhooks$/, (route) => route.fulfill({ json: { webhooks: [], events: [], groups: {} } }));
+  await page.getByRole("button", { name: "Administration", exact: true }).click();
+  await sidebar.getByRole("button", { name: "Alerts", exact: true }).click();
+  await main.getByRole("button", { name: "Add alert" }).click();
+  const form = main.getByRole("form", { name: "New alert" });
+  await form.getByLabel("Name").fill("Failed runs in Prod");
+  await form.getByLabel("Send to").selectOption("c1");
+  await form.getByRole("checkbox", { name: "A run of a workload failed" }).check();
+  await form.getByRole("checkbox", { name: "Prod", exact: true }).check();
+  await form.getByRole("button", { name: "Add alert" }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Added Failed runs in Prod." })).toBeVisible();
+  expect(created[0]).toMatchObject({ name: "Failed runs in Prod", events: ["run.failed"], channel_id: "c1", layer_ids: ["1a0000000001"], resource_ids: [] });
+  // An owner adds an alert on their own schema; the rule names that schema.
+  await openSchema(page);
+  await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Alerts", exact: true }).click();
+  await main.getByRole("button", { name: "Add alert" }).click();
+  await main.getByLabel("Name").fill("Reporting SLA");
+  await main.getByLabel("Send to").selectOption("c1");
+  await main.getByRole("checkbox", { name: "A data SLA or quality check failed" }).check();
+  await main.getByRole("button", { name: "Add alert" }).last().click();
+  await expect.poll(() => created.length).toBe(2);
+  expect(created[1]).toMatchObject({ events: ["sla.breached"], resource_ids: ["pg-reporting"] });
   expect(state.errors).toEqual([]);
 });

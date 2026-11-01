@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, AppFeature, Webhook, WebhookDelivery, AppGroup, AppProfile, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput, WORKLOAD_KINDS, WorkloadKind, usablePools } from "../api";
 import type { Hub } from "../hub";
 import { OpenTab } from "../components/Permissions";
+import { AlertRules } from "./Alerts";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
 import { IconCompute, IconPlus, IconTrash, IconWorkspaces } from "../components/Icons";
@@ -509,7 +510,7 @@ export function AdminClassifications() {
 }
 
 /** Notifications: webhooks the platform posts its events to, for example a chat channel or automation that sends email. */
-export function AdminNotifications() {
+export function AdminNotifications({ hub }: { hub: Hub }) {
   const [data, setData] = useState<{ webhooks: Webhook[]; events: { key: string; label: string }[] } | null>(null);
   const [error, setError] = useState(""), [message, setMessage] = useState("");
   const [editing, setEditing] = useState<{ current: string; name: string; url: string; events: string[]; enabled: boolean; secret: string; remove: boolean; has: boolean } | null>(null);
@@ -529,15 +530,16 @@ export function AdminNotifications() {
   const show = (h: Webhook) => api.webhooks.deliveries(h.name).then((items) => setDeliveries({ name: h.name, items })).catch((e: Error) => setError(e.message));
   return <>
     <PageHeader icon={<ProductIcon kind="api" size={22} />} title="Alerts"
-      subtitle="Webhooks the platform posts its events to as JSON: a chat channel, or automation that sends the email. Each message says what happened, who should act (with their email) and links into the app; form answers are never included."
-      actions={<button className="btn" onClick={() => setEditing({ current: "", name: "", url: "", events: [], enabled: true, secret: "", remove: false, has: false })}><IconPlus size={14} />Add webhook</button>} />
+      subtitle="Channels are where alerts go: a chat channel, or automation that sends the email, posted to as JSON. Rules choose which events go to which channel, for which layers, objects and classifications; owners also add rules on their own objects' Alerts tab. Each message says what happened, who should act (with their email) and links into the app; form answers are never included."
+      actions={<button className="btn" onClick={() => setEditing({ current: "", name: "", url: "", events: [], enabled: true, secret: "", remove: false, has: false })}><IconPlus size={14} />Add channel</button>} />
     {error && <p className="error" role="alert">{error}</p>}
     {message && <p className="scope-note" role="status">{message}</p>}
-    <div className="table-scroll"><table aria-label="Webhooks"><thead><tr><th>Name</th><th>URL</th><th>Events</th><th>Last message</th><th /></tr></thead><tbody>
+    <h2>Channels</h2>
+    <div className="table-scroll"><table aria-label="Channels"><thead><tr><th>Name</th><th>URL</th><th>Events</th><th>Last message</th><th /></tr></thead><tbody>
       {data.webhooks.map((h) => <tr key={h.id}>
         <td><strong>{h.name}</strong>{!h.enabled && <span className="badge"> Off</span>}{h.has_secret && <div className="muted small">Signed</div>}</td>
         <td className="mono small">{h.url}</td>
-        <td className="small">{h.events.length ? h.events.map(label).join(", ") : <span className="muted">All events</span>}</td>
+        <td className="small">{h.events.length ? h.events.map(label).join(", ") : <span className="muted">What rules send it</span>}</td>
         <td className="small">{h.last ? <>{h.last.event} · {h.last.sent_at ? "delivered" : h.last.error ? <span className="error-text">{h.last.error}</span> : "waiting"}</> : <span className="muted">None yet</span>}
           {h.failing && <div className="error-text">Some messages could not be delivered</div>}</td>
         <td className="table-actions"><div className="row" style={{ gap: 4 }}>
@@ -546,9 +548,9 @@ export function AdminNotifications() {
           <button className="btn sm secondary" onClick={() => setEditing({ current: h.name, name: h.name, url: h.url, events: h.events, enabled: h.enabled, secret: "", remove: false, has: h.has_secret })}>Edit</button>
           <button className="icon-btn" aria-label={`Remove ${h.name}`} onClick={() => void api.webhooks.remove(h.name).then(() => done(`Removed ${h.name}.`)).catch((e: Error) => setError(e.message))}><IconTrash size={14} /></button></div></td>
       </tr>)}
-      {!data.webhooks.length && <tr><td colSpan={5} className="muted">No webhooks: the app alone shows what waits for people.</td></tr>}</tbody></table></div>
-    {editing && <form className="card" aria-label={editing.current ? `Edit ${editing.current}` : "New webhook"} onSubmit={save}>
-      <h2>{editing.current ? `Edit ${editing.current}` : "New webhook"}</h2>
+      {!data.webhooks.length && <tr><td colSpan={5} className="muted">No channels yet: the app alone shows what waits for people.</td></tr>}</tbody></table></div>
+    {editing && <form className="card" aria-label={editing.current ? `Edit ${editing.current}` : "New channel"} onSubmit={save}>
+      <h2>{editing.current ? `Edit ${editing.current}` : "New channel"}</h2>
       <div className="arg-grid">
         <div className="field"><label htmlFor="hook-name">Name</label><input id="hook-name" value={editing.name} maxLength={120} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></div>
         <div className="field"><label htmlFor="hook-url">URL</label><input id="hook-url" value={editing.url} placeholder="https://" onChange={(e) => setEditing({ ...editing, url: e.target.value })} /></div>
@@ -558,11 +560,11 @@ export function AdminNotifications() {
           {editing.has && <label className="row"><input type="checkbox" checked={editing.remove} onChange={(e) => setEditing({ ...editing, remove: e.target.checked, secret: "" })} />Remove the secret</label>}</div>
         <label className="row"><input type="checkbox" checked={editing.enabled} onChange={(e) => setEditing({ ...editing, enabled: e.target.checked })} />Enabled</label>
       </div>
-      <fieldset className="field form-choices"><legend>Events</legend><span className="hint">None chosen: all events.</span>
+      <fieldset className="field form-choices"><legend>Events this channel always gets</legend><span className="hint">None chosen: only what alert rules send it (below).</span>
         {data.events.map((ev) => <label key={ev.key} className="row"><input type="checkbox" checked={editing.events.includes(ev.key)}
           onChange={(e) => setEditing({ ...editing, events: e.target.checked ? [...editing.events, ev.key] : editing.events.filter((x) => x !== ev.key) })} />
           {ev.label} <span className="muted mono small">{ev.key}</span></label>)}</fieldset>
-      <div className="form-actions"><button className="btn" disabled={!editing.name.trim() || !editing.url.trim()}>Save webhook</button>
+      <div className="form-actions"><button className="btn" disabled={!editing.name.trim() || !editing.url.trim()}>Save channel</button>
         <button type="button" className="btn secondary" onClick={() => setEditing(null)}>Cancel</button></div>
     </form>}
     {deliveries && <section className="card" aria-label={`Messages to ${deliveries.name}`}><h2>Messages to {deliveries.name}</h2>
@@ -571,6 +573,8 @@ export function AdminNotifications() {
           <td>{d.sent_at ? "Delivered" : d.error ? <span className="error-text">{d.error} ({d.attempts} attempts)</span> : "Waiting"}</td></tr>)}
         {!deliveries.items.length && <tr><td colSpan={4} className="muted">No messages yet.</td></tr>}</tbody></table></div>
       <button className="btn secondary" onClick={() => setDeliveries(null)}>Close</button></section>}
-    <p className="hint">Also configurable with Terraform (fdp_notification_webhook).</p>
+    <h2>Rules</h2>
+    <AlertRules hub={hub} />
+    <p className="hint">Also configurable with Terraform: fdp_alert_channel and fdp_alert_rule.</p>
   </>;
 }

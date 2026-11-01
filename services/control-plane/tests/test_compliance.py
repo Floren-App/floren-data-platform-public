@@ -190,7 +190,8 @@ def capture(monkeypatch, client, events=None, secret=None, status=200):
         return status
     monkeypatch.setattr(notify, "_post", post)
     client.put("/v1/admin/webhooks/privacy", headers=as_("admin"), json={
-        "name": "privacy", "url": "https://hooks.example.test/fdp", "events": events or [], **({"secret": secret} if secret else {})}).raise_for_status()
+        "name": "privacy", "url": "https://hooks.example.test/fdp", "events": events or list(notify.EVENTS),
+        **({"secret": secret} if secret else {})}).raise_for_status()
 
 
 def set_email(username, address):

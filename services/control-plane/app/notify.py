@@ -14,7 +14,7 @@ from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
 
 from .config import get_settings
-from .models import (AccessCase, AccessForm, AccessFormVersion, AppGroup, CatalogProduct, DirectoryPrincipal, Notification,
+from .models import (AccessCase, AccessForm, AccessFormVersion, AlertRule, AppGroup, CatalogProduct, DirectoryPrincipal, Notification,
                      NotificationWebhook, ProductOption, Resource, RoleAssignment, utcnow)
 
 log = logging.getLogger(__name__)
@@ -33,7 +33,19 @@ EVENTS = {
     "access.ended": "Justified access ended",
     "access.deadline": "Existing access needs a compliance form by a deadline",
     "access.removed": "Access without a form was removed at its deadline",
+    "access.requested": "Someone asked for access to a data product",
+    "access.request_decided": "An access request was approved or declined",
+    "run.failed": "A run of a workload failed",
+    "deploy.failed": "A workload could not be deployed or synced from Git",
+    "sla.breached": "A data SLA or quality check failed",
+    "sla.recovered": "A failed data SLA is met again",
+    "certificate.expiring": "A certificate the platform serves expires soon or is invalid",
 }
+EVENT_GROUPS = {"Runs and workloads": ["run.failed", "deploy.failed"], "Data quality": ["sla.breached", "sla.recovered"],
+                "Access": ["access.requested", "access.request_decided", "review.waiting", "review.due", "review.overdue", "case.approved",
+                           "case.declined", "case.changes_requested", "case.comment", "membership.waiting"],
+                "Grants ending": ["access.renewal_ready", "access.ending", "access.ended", "access.deadline", "access.removed"],
+                "Platform": ["certificate.expiring"]}
 
 
 def secret_path(webhook_id: str) -> str:
@@ -63,11 +75,50 @@ def principal_of(db, username: str) -> Optional[str]:
     return db.scalar(select(DirectoryPrincipal.id).where(DirectoryPrincipal.kind == "user", DirectoryPrincipal.name == username))
 
 
+def channels_for(db, event: str, resource_id: Optional[str] = None, layer_id: Optional[str] = None,
+                 classification: Optional[str] = None, occurred_at=None) -> List[NotificationWebhook]:
+    """The channels an event goes to: channels that list the event themselves, and the channels of matching rules.
+    A rule narrows by layer, by object (the event's object or anything above it) and by classification. Channels
+    and rules only get events that happened after they were made."""
+    from . import rbac
+    def fresh(created):
+        if occurred_at is None or created is None:
+            return True
+        aware = lambda d: d if d.tzinfo else d.replace(tzinfo=occurred_at.tzinfo)  # noqa: E731
+        return aware(created) <= aware(occurred_at)
+    out = {}
+    for hook in db.scalars(select(NotificationWebhook).where(NotificationWebhook.enabled.is_(True))):
+        if event in (hook.events or []) and fresh(hook.created_at):
+            out[hook.id] = hook
+    chain = None
+    for rule in db.scalars(select(AlertRule).where(AlertRule.enabled.is_(True))):
+        if event not in (rule.events or []) or not fresh(rule.created_at):
+            continue
+        if rule.layer_ids and layer_id not in rule.layer_ids:
+            continue
+        if rule.classifications and classification not in rule.classifications:
+            continue
+        if rule.resource_ids:
+            if chain is None:
+                resource = db.get(Resource, resource_id) if resource_id else None
+                chain = {r.id for r in rbac.ancestors(db, resource)} if resource else set()
+            if not chain & set(rule.resource_ids):
+                continue
+        hook = db.get(NotificationWebhook, rule.channel_id)
+        if hook is not None and hook.enabled:
+            out[hook.id] = hook
+    return list(out.values())
+
+
 def queue(db, event: str, principal_ids: Iterable[str], subject: str, text: str, case: Optional[AccessCase] = None,
-          key: Optional[str] = None, link_to: Optional[str] = None) -> int:
-    """Put the event in the outbox of every enabled webhook that wants it. With a key, each webhook gets it once."""
-    hooks = [h for h in db.scalars(select(NotificationWebhook).where(NotificationWebhook.enabled.is_(True)))
-             if not h.events or event in h.events]
+          key: Optional[str] = None, link_to: Optional[str] = None, resource_id: Optional[str] = None,
+          layer_id: Optional[str] = None, classification: Optional[str] = None, occurred_at=None) -> int:
+    """Put the event in the outbox of every channel it goes to (see channels_for). With a key, each channel gets it once."""
+    if case is not None:
+        from .compliance import case_target
+        resource_id = resource_id or case_target(db, case) or case.resource_id
+        layer_id, classification = layer_id or case.layer_id, classification or case.classification
+    hooks = channels_for(db, event, resource_id, layer_id, classification, occurred_at)
     if not hooks:
         return 0
     people = []
@@ -253,8 +304,11 @@ def deliver_one(db, item: Notification, hook: NotificationWebhook, secrets=None)
 
 def tick(factory) -> None:
     from .deps import get_secret_store
+    from .alerts import scan
     with factory() as db:
         membership_notices(db)
+        db.commit()
+        scan(db)
         db.commit()
         deliver(db, get_secret_store())
         db.commit()

@@ -20,10 +20,10 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
 | `POST` | `/v1/egress/{slug}/{path}` | Egress |
-| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
-| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
 | `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
+| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -316,6 +316,12 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `DELETE` | `/v1/admin/webhooks/{name}` | Delete Webhook |
 | `GET` | `/v1/admin/webhooks/{name}/deliveries` | Deliveries |
 | `POST` | `/v1/admin/webhooks/{name}/test` | Test Webhook |
+| `GET` | `/v1/alerts/channels` | Alert Channels |
+| `GET` | `/v1/alerts/events` | Alert Events |
+| `GET` | `/v1/alerts/rules` | List Rules |
+| `POST` | `/v1/alerts/rules` | Create Rule |
+| `PUT` | `/v1/alerts/rules/{rule_id}` | Update Rule |
+| `DELETE` | `/v1/alerts/rules/{rule_id}` | Delete Rule |
 
 ## observability
 
@@ -362,8 +368,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `GET` | `/v1/sql/pages/{token}` | Page |
 | `DELETE` | `/v1/sql/pages/{token}` | Page |
+| `GET` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

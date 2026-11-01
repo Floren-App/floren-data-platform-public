@@ -5,7 +5,7 @@ import { ProductIcon } from "./ProductIcon";
 import type { TabRef } from "../views/Tabs";
 import { IconRefresh } from "./Icons";
 
-export type ObjectSection = "overview" | "permissions" | "settings" | "preview" | "runs" | "sql" | "lineage" | "policies" | "versions" | "logs";
+export type ObjectSection = "overview" | "permissions" | "settings" | "preview" | "runs" | "sql" | "lineage" | "policies" | "versions" | "logs" | "alerts";
 export type OpenTab = (tab: TabRef) => void;
 
 export function resourcePath(resource: AccessResource, resources: AccessResource[]): string {
@@ -73,8 +73,8 @@ export function rolesFor(resource: Pick<AccessResource, "kind">) {
   return { roles, initial, isData, isProduct, isApi, isPackage, isKafka };
 }
 
-export function ObjectTabs({ active, onChange, settings = false, overview = "Overview", preview = false, runs = false, sql = false, lineage = false, policies = false, versions = false, logs = false }: {
-  active: ObjectSection; onChange: (section: ObjectSection) => void; settings?: boolean; overview?: string; preview?: boolean; runs?: boolean; sql?: boolean; lineage?: boolean; policies?: boolean; versions?: boolean; logs?: boolean;
+export function ObjectTabs({ active, onChange, settings = false, overview = "Overview", preview = false, runs = false, sql = false, lineage = false, policies = false, versions = false, logs = false, alerts = false }: {
+  active: ObjectSection; onChange: (section: ObjectSection) => void; settings?: boolean; overview?: string; preview?: boolean; runs?: boolean; sql?: boolean; lineage?: boolean; policies?: boolean; versions?: boolean; logs?: boolean; alerts?: boolean;
 }) {
   const tabs: [ObjectSection, string][] = [["overview", overview], ["permissions", "Permissions"]];
   if (logs) tabs.splice(1, 0, ["logs", "Logs"]);
@@ -83,6 +83,7 @@ export function ObjectTabs({ active, onChange, settings = false, overview = "Ove
   if (runs) tabs.splice(1, 0, ["runs", "Recent runs"]);
   if (preview) tabs.splice(1, 0, ["preview", "Data preview"]);
   if (lineage) tabs.splice(1, 0, ["lineage", "Lineage"]);
+  if (alerts) tabs.push(["alerts", "Alerts"]);
   if (settings) tabs.push(["settings", "Settings"]);
   if (sql) tabs.splice(1, 0, ["sql", "SQL"]);
   return <nav className="object-tabs" aria-label="Object sections">

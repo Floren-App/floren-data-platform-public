@@ -1157,6 +1157,23 @@ class NotificationWebhook(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class AlertRule(Base):
+    """Which events go to which channel, optionally narrowed: to layers, to objects (and what is under them), to
+    classifications. Rules made from an object's Alerts tab name that object."""
+    __tablename__ = "alert_rules"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(120))
+    events: Mapped[list] = mapped_column(JSON, default=list)
+    channel_id: Mapped[str] = mapped_column(String(12), index=True)
+    layer_ids: Mapped[list] = mapped_column(JSON, default=list)
+    resource_ids: Mapped[list] = mapped_column(JSON, default=list)
+    classifications: Mapped[list] = mapped_column(JSON, default=list)
+    enabled: Mapped[bool] = mapped_column(default=True)
+    created_by: Mapped[str] = mapped_column(String(256), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Notification(Base):
     """A message in the outbox of one webhook. A key sends a notice once per webhook."""
     __tablename__ = "notifications"

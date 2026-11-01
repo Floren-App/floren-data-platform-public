@@ -2,12 +2,12 @@
 
 Generated from the current provider schema.
 
-A webhook the platform posts notifications to as JSON: a chat channel, or automation that sends email. Each message has event, subject, text, link (into the app), recipients (username and email of who should act) and, for compliance cases, a case summary; form answers are never included. Headers: X-FDP-Event, X-FDP-Delivery and, with a secret, X-FDP-Signature (sha256=<HMAC-SHA256 of the body>). Events: review.waiting, review.due, review.overdue, case.approved, case.declined, case.changes_requested, case.comment, membership.waiting, access.renewal_ready, access.ending, access.ended, access.deadline, access.removed. Import by name.
+A webhook the platform posts notifications to as JSON: a chat channel, or automation that sends email. Each message has event, subject, text, link (into the app), recipients (username and email of who should act) and, for compliance cases, a case summary; form answers are never included. Headers: X-FDP-Event, X-FDP-Delivery and, with a secret, X-FDP-Signature (sha256=<HMAC-SHA256 of the body>). Events: review.waiting, review.due, review.overdue, case.approved, case.declined, case.changes_requested, case.comment, membership.waiting, access.renewal_ready, access.ending, access.ended, access.deadline, access.removed, access.requested, access.request_decided, run.failed, deploy.failed, sla.breached, sla.recovered, certificate.expiring. Import by name.
 
 | Attribute | Type | Behavior | Description |
 |---|---|---|---|
 | `enabled` | `basetypes.BoolType` | Optional, Computed |  |
-| `events` | `types.SetType[basetypes.StringType]` | Optional, Computed | Events to send; empty sends all. |
+| `events` | `types.SetType[basetypes.StringType]` | Optional, Computed | Events this channel always gets, everywhere; empty: only what alert rules (fdp_alert_rule) send it. |
 | `has_secret` | `basetypes.BoolType` | Computed |  |
 | `id` | `basetypes.StringType` | Computed |  |
 | `name` | `basetypes.StringType` | Required |  |

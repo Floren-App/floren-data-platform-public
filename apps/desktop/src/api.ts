@@ -599,6 +599,8 @@ export interface AccessCaseItem {
 /** Access that needs a compliance form and has none yet: kept until due_at, then removed. */
 export interface JustifyDeadline { resource_id: string; resource: string; kind: string; product_id: string | null; app_group_id: string; group: string;
   role: string; classification: string; due_at: string }
+export interface AlertRuleInput { name: string; events: string[]; channel_id: string; layer_ids: string[]; resource_ids: string[]; classifications: string[]; enabled: boolean }
+export interface AlertRuleItem extends AlertRuleInput { id: string; channel: string | null; objects: { id: string; name: string; kind: string }[]; created_by: string }
 export interface Webhook { id: string; name: string; url: string; events: string[]; enabled: boolean; has_secret: boolean; created_at: string;
   last: { event: string; at: string; sent_at: string | null; error: string } | null; failing: boolean }
 export interface WebhookDelivery { id: number; event: string; subject: string; created_at: string; sent_at: string | null; attempts: number; error: string }
@@ -828,6 +830,14 @@ export const api = {
     put: (current: string, body: { name: string; description: string; features: AppFeature[]; default: boolean }) =>
       request<AppProfile>("PUT", `/v1/admin/app-profiles/${encodeURIComponent(current)}`, body),
     remove: (name: string) => request<void>("DELETE", `/v1/admin/app-profiles/${encodeURIComponent(name)}`),
+  },
+  alerts: {
+    events: () => request<{ events: { key: string; label: string }[]; groups: Record<string, string[]> }>("GET", "/v1/alerts/events"),
+    channels: () => request<{ id: string; name: string; enabled: boolean }[]>("GET", "/v1/alerts/channels"),
+    rules: (resource_id = "") => request<AlertRuleItem[]>("GET", `/v1/alerts/rules${resource_id ? `?resource_id=${resource_id}` : ""}`),
+    createRule: (body: AlertRuleInput) => request<AlertRuleItem>("POST", "/v1/alerts/rules", body),
+    updateRule: (id: string, body: AlertRuleInput) => request<AlertRuleItem>("PUT", `/v1/alerts/rules/${id}`, body),
+    deleteRule: (id: string) => request<void>("DELETE", `/v1/alerts/rules/${id}`),
   },
   webhooks: {
     list: () => request<{ webhooks: Webhook[]; events: { key: string; label: string }[] }>("GET", "/v1/admin/webhooks"),

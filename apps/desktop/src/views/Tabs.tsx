@@ -46,7 +46,7 @@ export interface TabRef {
   intent?: "create-folder" | "create" | "publish" | "request";
   /** Data products: the catalog object to publish (intent "publish"). */
   assetId?: string;
-  productSection?: "overview" | "options" | "lineage" | "used-by" | "permissions";
+  productSection?: "overview" | "options" | "lineage" | "used-by" | "permissions" | "alerts";
   catalogSection?: "overview" | "lineage" | "governance" | "sla" | "access" | "metrics";
   apiSection?: "operations" | "settings" | "calls" | "permissions";
   /** An endpoint group or operation resource to select on the API page. */
@@ -99,7 +99,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "workload": return <WorkloadView tab={tab} id={tab.ref!} hub={hub} openTab={openTab} runTab={runTab} />;
     case "admin-layers": return <><AdminLayers hub={hub} /><SettingsPermissions page="set-layers" hub={hub} openTab={openTab} /></>;
     case "app-profiles": case "admin-app-profiles": return <><AdminAppProfiles /><SettingsPermissions page="set-profiles" hub={hub} openTab={openTab} /></>;
-    case "admin-notifications": return <><AdminNotifications /><SettingsPermissions page="set-alerts" hub={hub} openTab={openTab} /></>;
+    case "admin-notifications": return <><AdminNotifications hub={hub} /><SettingsPermissions page="set-alerts" hub={hub} openTab={openTab} /></>;
     case "admin-classifications": case "privacy-classifications": return <><AdminClassifications /><SettingsPermissions page="set-classes" hub={hub} openTab={openTab} /></>;
     case "privacy-policies": return <><PrivacyPolicies hub={hub} /><SettingsPermissions page="set-policies" hub={hub} openTab={openTab} /></>;
     case "privacy-reviews": return <PrivacyReviews openTab={openTab} />;
