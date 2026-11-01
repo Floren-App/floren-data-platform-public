@@ -9,6 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -329,7 +331,7 @@ func (r *complianceRoleResource) Metadata(_ context.Context, req resource.Metada
 
 func (r *complianceRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	emptySet := func(desc string) schema.SetAttribute {
-		return schema.SetAttribute{ElementType: types.StringType, Optional: true, Computed: true, Description: desc}
+		return schema.SetAttribute{ElementType: types.StringType, Optional: true, Computed: true, Description: desc, PlanModifiers: []planmodifier.Set{setplanmodifier.RequiresReplace()}}
 	}
 	resp.Schema = schema.Schema{
 		Description: "A compliance role an app group holds within a scope: compliance_reviewer (reviews compliance forms), " +
