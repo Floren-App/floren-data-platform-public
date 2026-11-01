@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from .. import app_profiles
 from ..auth import User, require_admin
+from .. import settings_access
 from ..db import get_db
 from ..deps import get_actor
 from ..models import AppGroup, AppProfile
@@ -42,7 +43,7 @@ def list_profiles(db: Session = Depends(get_db), _: User = Depends(get_actor)):
 
 
 @router.put("/v1/admin/app-profiles/{name}")
-def put_profile(name: str, body: ProfileIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+def put_profile(name: str, body: ProfileIn, db: Session = Depends(get_db), user: User = Depends(settings_access.needs("set-profiles", "manage"))):
     """Create or change a profile by name (a different body name renames it)."""
     profile = db.scalar(select(AppProfile).where(AppProfile.name == name))
     if body.name != name and db.scalar(select(AppProfile).where(AppProfile.name == body.name)):
@@ -63,7 +64,7 @@ def put_profile(name: str, body: ProfileIn, db: Session = Depends(get_db), user:
 
 
 @router.delete("/v1/admin/app-profiles/{name}", status_code=204)
-def delete_profile(name: str, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+def delete_profile(name: str, db: Session = Depends(get_db), user: User = Depends(settings_access.needs("set-profiles", "manage"))):
     profile = db.scalar(select(AppProfile).where(AppProfile.name == name))
     if profile is None:
         raise HTTPException(404, "app profile not found")

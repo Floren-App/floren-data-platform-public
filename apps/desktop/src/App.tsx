@@ -195,8 +195,16 @@ function Shell({ user }: { user: User }) {
       data: { kind: "data", title: "Storage" },
       kafka: { kind: "kafka-clusters", title: "Kafka" },
       compute: { kind: "pool", title: "Usage" },
-      admin: hub.me?.is_admin ? { kind: "admin-layers", title: "Layers" } : { kind: "privacy-policies", title: "Access policies" },
+      admin: { kind: "admin-layers", title: "Layers" },
     };
+    if (next === "admin") {  // the first Administration page this person may use
+      const can = accessSections(hub);
+      const first = ([["set-layers", "admin-layers", "Layers"], ["set-pools", "admin-pools", "Compute pools"], ["set-runtimes", "admin-runtimes", "Runtimes (versions)"],
+        ["set-template", "admin-workspace-templates", "Workspace templates"], ["set-alerts", "admin-notifications", "Alerts"], ["set-profiles", "app-profiles", "App profiles"],
+        ["set-network", "admin-network", "Network allowlist"], ["set-classes", "privacy-classifications", "Classifications"], ["set-policies", "privacy-policies", "Access policies"],
+        ["set-forms", "privacy-forms", "Compliance forms"], ["set-duties", "privacy-roles", "Review duties"]] as const).find(([id]) => can.page(id));
+      if (first) defaults.admin = { kind: first[1], title: first[2] };
+    }
     if (next === "access") {  // the first page this person may use: their to-do list first
       const can = accessSections(hub);
       defaults.access = can.reviews ? { kind: "privacy-reviews", title: "Reviews" } : can.requests ? { kind: "access-requests", title: "Access requests" }
@@ -215,7 +223,7 @@ function Shell({ user }: { user: User }) {
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />
         {(() => { const can = accessSections(hub); return <>
-          {(can.requests || can.reviews || can.newMembers || can.who || can.register || can.secrets) && activityButton({ id: "access", label: "Access", icon: <IconAdmin /> })}
+          {(can.requests || can.reviews || can.newMembers || can.who || can.services || can.register || can.audit || can.queries || can.secrets) && activityButton({ id: "access", label: "Access", icon: <IconAdmin /> })}
           {(can.platform || can.security || can.privacy) && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}</>; })()}
         <button aria-label="Documentation" onClick={() => {
           void hub.act(() => openInWindow(documentationUrl(view), "FDP documentation", `fdp-help-${view}`));

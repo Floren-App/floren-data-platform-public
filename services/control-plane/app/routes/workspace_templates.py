@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import User, require_admin
+from .. import settings_access
 from ..db import get_db
 from ..deps import get_orchestrator
 from ..models import AppGroup, GitRepository, Resource, Workspace, WorkspaceTemplate
@@ -58,12 +59,12 @@ def _apply(db, orch) -> None:
 
 
 @router.get("")
-def list_templates(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def list_templates(db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-template", "view"))):
     return [out(db, t) for t in db.scalars(select(WorkspaceTemplate).order_by(WorkspaceTemplate.name))]
 
 
 @router.post("", status_code=201)
-def create_template(body: TemplateIn, db: Session = Depends(get_db), admin: User = Depends(require_admin),
+def create_template(body: TemplateIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-template", "manage")),
                     orch: Orchestrator = Depends(get_orchestrator)):
     _validate(db, body)
     template = WorkspaceTemplate(**{**body.model_dump(), "name": body.name.strip()})
@@ -76,7 +77,7 @@ def create_template(body: TemplateIn, db: Session = Depends(get_db), admin: User
 
 
 @router.get("/{template_id}")
-def get_template(template_id: str, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def get_template(template_id: str, db: Session = Depends(get_db), _: User = Depends(settings_access.needs("set-template", "view"))):
     template = db.get(WorkspaceTemplate, template_id)
     if template is None:
         raise HTTPException(404, "workspace template not found")
@@ -84,7 +85,7 @@ def get_template(template_id: str, db: Session = Depends(get_db), _: User = Depe
 
 
 @router.put("/{template_id}")
-def update_template(template_id: str, body: TemplateIn, db: Session = Depends(get_db), admin: User = Depends(require_admin),
+def update_template(template_id: str, body: TemplateIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-template", "manage")),
                     orch: Orchestrator = Depends(get_orchestrator)):
     template = db.get(WorkspaceTemplate, template_id)
     if template is None:
@@ -99,7 +100,7 @@ def update_template(template_id: str, body: TemplateIn, db: Session = Depends(ge
 
 
 @router.delete("/{template_id}", status_code=204)
-def delete_template(template_id: str, db: Session = Depends(get_db), admin: User = Depends(require_admin),
+def delete_template(template_id: str, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-template", "manage")),
                     orch: Orchestrator = Depends(get_orchestrator)):
     template = db.get(WorkspaceTemplate, template_id)
     if template is None:

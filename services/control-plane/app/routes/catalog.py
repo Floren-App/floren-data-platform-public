@@ -418,10 +418,9 @@ class LevelsIn(BaseModel):
 def put_classifications(body: LevelsIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Change the classifications (platform or compliance administrators). A level still in use cannot be removed."""
     from .. import classification as levels
-    from ..compliance import is_compliance_admin
+    from .. import settings_access
     from ..models import PlatformSetting
-    if not is_compliance_admin(db, user):
-        raise HTTPException(403, "platform or compliance administrator required")
+    settings_access.require(db, user, "set-classes")
     new = levels.validate_levels(db, [l.model_dump() for l in body.levels])
     setting = db.get(PlatformSetting, levels.SETTING) or PlatformSetting(key=levels.SETTING, value={})
     before = levels.levels(db)

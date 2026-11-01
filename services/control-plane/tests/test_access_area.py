@@ -44,3 +44,25 @@ def test_the_audit_log_filters_by_who_what_and_object(client):
     assert get(actor="an", action="rbac") == [("ana", "rbac.assign", "res1")]
     assert get(target="res2") == [("bob", "rbac.assign", "res2")]
     assert client.get("/v1/admin/audit", headers=as_("ana")).status_code == 403
+
+
+def test_each_access_and_administration_page_is_granted_on_its_own(client):
+    from .rbac_helpers import grant_group
+    forms = grant_group(client, "set-forms", "Form editors", "Manager", users=["bob"])
+    form = {"name": "Purpose", "definition": {"pages": [{"id": "p", "title": "P", "fields": [{"id": "why", "label": "Why", "type": "short_text"}]}]}}
+    assert client.put("/v1/compliance/forms/Purpose", headers=as_("bob"), json=form).status_code == 200
+    # Manager on compliance forms is not Manager on classifications.
+    levels = client.get("/v1/catalog/classifications", headers=as_("bob")).json()["levels"]
+    refused = client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels})
+    assert refused.status_code == 403 and "Manager on Classifications" in refused.text
+    # Viewer on the audit log reads it and changes nothing.
+    grant_group(client, "set-auditlog", "Auditors", "Viewer", users=["ana"])
+    assert client.get("/v1/admin/audit", headers=as_("ana")).status_code == 200
+    assert client.put("/v1/admin/settings/egress", headers=as_("ana"), json={"hosts": []}).status_code == 403
+    # A section covers its pages.
+    grant_group(client, "adm-privacy", "Form editors", "Manager", users=["bob"])
+    assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 200
+    me = client.get("/v1/me", headers=as_("bob")).json()
+    assert me["settings"]["set-classes"] == "manage" and me["settings"]["set-forms"] == "manage" and "set-layers" not in me["settings"]
+    assert client.get("/v1/me", headers=as_("admin")).json()["settings"]["set-layers"] == "manage"
+    assert forms

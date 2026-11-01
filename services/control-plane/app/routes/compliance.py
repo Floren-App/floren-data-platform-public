@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import classification, compliance as cp, layers, notify, rbac
+from .. import classification, compliance as cp, layers, notify, rbac, settings_access
 from ..auth import User
 from ..db import get_db
 from ..deps import get_actor
@@ -64,7 +64,7 @@ def get_form(form_id: str, db: Session = Depends(get_db), user: User = Depends(g
 @router.put("/forms/{name}")
 def put_form(name: str, body: FormIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Save a form's draft (created when missing). Publishing makes it the version new cases use."""
-    require_admin_role(db, user)
+    settings_access.require(db, user, "set-forms")
     definition = cp.validate_definition(body.definition)
     form = db.scalar(select(AccessForm).where(AccessForm.name == name))
     if body.name != name and db.scalar(select(AccessForm).where(AccessForm.name == body.name)):
@@ -86,7 +86,7 @@ def put_form(name: str, body: FormIn, db: Session = Depends(get_db), user: User 
 
 @router.post("/forms/{form_id}/publish")
 def publish_form(form_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    require_admin_role(db, user)
+    settings_access.require(db, user, "set-forms")
     draft = db.scalar(select(AccessFormVersion).where(AccessFormVersion.form_id == form_id, AccessFormVersion.published.is_(False))
                       .order_by(AccessFormVersion.version.desc()))
     if draft is None:
@@ -99,7 +99,7 @@ def publish_form(form_id: str, db: Session = Depends(get_db), user: User = Depen
 
 @router.delete("/forms/{form_id}", status_code=204)
 def delete_form(form_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    require_admin_role(db, user)
+    settings_access.require(db, user, "set-forms")
     form = db.get(AccessForm, form_id)
     if form is None:
         raise HTTPException(404, "form not found")
@@ -151,7 +151,7 @@ def list_policies(db: Session = Depends(get_db), user: User = Depends(get_actor)
 
 @router.put("/policies/{layer_id}/{level}")
 def put_policy(layer_id: str, level: str, body: PolicyIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    require_admin_role(db, user)
+    settings_access.require(db, user, "set-policies")
     layer = db.get(Resource, layer_id)
     if layer is None or layer.kind != "layer":
         raise HTTPException(404, "layer not found")
@@ -176,7 +176,7 @@ def put_policy(layer_id: str, level: str, body: PolicyIn, db: Session = Depends(
 
 @router.delete("/policies/{layer_id}/{level}", status_code=204)
 def delete_policy(layer_id: str, level: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    require_admin_role(db, user)
+    settings_access.require(db, user, "set-policies")
     policy = db.scalar(select(AccessPolicy).where(AccessPolicy.layer_id == layer_id, AccessPolicy.classification == level))
     if policy is not None:
         audit(db, user.username, "compliance.policy_removed", layer_id, classification=level)
@@ -218,8 +218,9 @@ def add_role(body: RoleIn, db: Session = Depends(get_db), user: User = Depends(g
     """Give a group a compliance role within a scope (platform administrators; compliance administrators for the
     reviewer and membership roles)."""
     resolved = rbac.resolve_user(db, user)
-    if not resolved.is_admin and (body.role == "compliance_admin" or not cp.is_compliance_admin(db, user)):
-        raise HTTPException(403, "platform administrator required" if body.role == "compliance_admin" else "compliance administrator required")
+    if body.role == "compliance_admin" and not resolved.is_admin:
+        raise HTTPException(403, "platform administrator required")
+    settings_access.require(db, user, "set-duties")
     if not db.get(AppGroup, body.app_group_id):
         raise HTTPException(422, "choose an existing app group")
     for level in body.scope.classifications:
@@ -238,8 +239,9 @@ def remove_role(role_id: str, db: Session = Depends(get_db), user: User = Depend
     if role is None:
         raise HTTPException(404, "role not found")
     resolved = rbac.resolve_user(db, user)
-    if not resolved.is_admin and (role.role == "compliance_admin" or not cp.is_compliance_admin(db, user)):
-        raise HTTPException(403, "administrator required")
+    if role.role == "compliance_admin" and not resolved.is_admin:
+        raise HTTPException(403, "platform administrator required")
+    settings_access.require(db, user, "set-duties")
     audit(db, resolved.username, "compliance.role_removed", role.app_group_id, role=role.role)
     db.delete(role)
     db.commit()
@@ -595,7 +597,7 @@ REGISTER_COLUMNS = ["group", "access", "kind", "classification", "layer", "form"
 def register_rows(db, user) -> List[dict]:
     """Access that was given because a compliance form was approved, with who approved it and until when."""
     from ..models import JustifiedGrant
-    admin = cp.is_compliance_admin(db, user)
+    admin = cp.is_compliance_admin(db, user) or settings_access.allowed(db, user, "set-register", "view")
     rows = []
     for grant in db.scalars(select(JustifiedGrant).order_by(JustifiedGrant.created_at.desc())):
         case = db.get(AccessCase, grant.case_id)
@@ -623,8 +625,8 @@ def access_register(format: Literal["json", "csv"] = "json", db: Session = Depen
     import io
     held = db.scalar(select(ComplianceRole.id).where(ComplianceRole.role == "compliance_reviewer",
                                                      ComplianceRole.app_group_id.in_(list(rbac.app_groups(db, rbac.resolve_user(db, user))))))
-    if not (cp.is_compliance_admin(db, user) or held):
-        raise HTTPException(403, "a compliance role is required")
+    if not (cp.is_compliance_admin(db, user) or held or settings_access.allowed(db, user, "set-register", "view")):
+        raise HTTPException(403, "Viewer on Access register, or a review duty, required")
     rows = register_rows(db, user)
     audit(db, rbac.resolve_user(db, user).username, "compliance.register_read", "compliance-register", rows=len(rows), format=format)
     db.commit()

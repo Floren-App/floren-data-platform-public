@@ -28,7 +28,7 @@ import { rEnabled, type PackageKind } from "../api";
 import { KafkaClustersView, KafkaView } from "./Kafka";
 import { PrivacyForm, PrivacyForms, PrivacyMemberships, PrivacyPolicies, PrivacyRegister, PrivacyReviews, PrivacyRoles } from "./Privacy";
 import { CaseView } from "./Cases";
-import { DeadlinesView } from "./AccessArea";
+import { DeadlinesView, SettingsPermissions } from "./AccessArea";
 
 export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
   | "products" | "product" | "access-requests" | "app-profiles" | "repos" | "deadlines"
@@ -75,8 +75,9 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "product": return <ProductView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
     case "access-requests": return <AccessRequestsView key={tab.ref ?? ""} tab={tab} hub={hub} openTab={openTab} />;
     case "catalog-object": return <CatalogObject tab={tab} hub={hub} openTab={openTab} />;
-    case "access": return <AccessTab hub={hub} openTab={openTab} groupId={tab.ref} section={tab.groupSection ?? "members"} bindingPrincipalId={tab.bindingPrincipalId}
-      onSelect={(id, name, section) => openTab({ kind: "access", ref: id, title: name, bindingPrincipalId: tab.bindingPrincipalId, groupSection: section })} />;
+    case "access": return <><AccessTab hub={hub} openTab={openTab} groupId={tab.ref} section={tab.groupSection ?? "members"} bindingPrincipalId={tab.bindingPrincipalId}
+      onSelect={(id, name, section) => openTab({ kind: "access", ref: id, title: name, bindingPrincipalId: tab.bindingPrincipalId, groupSection: section })} />
+      {!tab.ref && <SettingsPermissions page="set-groups" hub={hub} openTab={openTab} />}</>;
     case "users": return <UsersTab hub={hub} selectedId={tab.ref} openTab={openTab} />;
     case "home": return <Home hub={hub} openTab={openTab} />;
     case "workspaces": return <WorkspacesView hub={hub} openTab={openTab} />;
@@ -93,36 +94,36 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "pool": return <PoolView name={tab.ref} hub={hub} openTab={openTab} />;
     case "folder": return <FolderView tab={tab} hub={hub} openTab={openTab} />;
     case "service": return <ServiceView tab={tab} hub={hub} openTab={openTab} />;
-    case "services": case "admin-service-accounts": return <ServicesView hub={hub} openTab={openTab} />;
+    case "services": case "admin-service-accounts": return <><ServicesView hub={hub} openTab={openTab} /><SettingsPermissions page="set-services" hub={hub} openTab={openTab} /></>;
     case "deploy": return <DeployWizard hub={hub} openTab={openTab} initialFolder={tab.ref} />;
     case "workload": return <WorkloadView tab={tab} id={tab.ref!} hub={hub} openTab={openTab} runTab={runTab} />;
-    case "admin-layers": return <AdminLayers hub={hub} />;
-    case "app-profiles": case "admin-app-profiles": return <AdminAppProfiles />;
-    case "admin-notifications": return <AdminNotifications />;
-    case "admin-classifications": case "privacy-classifications": return <AdminClassifications />;
-    case "privacy-policies": return <PrivacyPolicies hub={hub} />;
+    case "admin-layers": return <><AdminLayers hub={hub} /><SettingsPermissions page="set-layers" hub={hub} openTab={openTab} /></>;
+    case "app-profiles": case "admin-app-profiles": return <><AdminAppProfiles /><SettingsPermissions page="set-profiles" hub={hub} openTab={openTab} /></>;
+    case "admin-notifications": return <><AdminNotifications /><SettingsPermissions page="set-alerts" hub={hub} openTab={openTab} /></>;
+    case "admin-classifications": case "privacy-classifications": return <><AdminClassifications /><SettingsPermissions page="set-classes" hub={hub} openTab={openTab} /></>;
+    case "privacy-policies": return <><PrivacyPolicies hub={hub} /><SettingsPermissions page="set-policies" hub={hub} openTab={openTab} /></>;
     case "privacy-reviews": return <PrivacyReviews openTab={openTab} />;
     case "privacy-memberships": return <PrivacyMemberships hub={hub} />;
-    case "privacy-register": return <PrivacyRegister openTab={openTab} />;
+    case "privacy-register": return <><PrivacyRegister openTab={openTab} /><SettingsPermissions page="set-register" hub={hub} openTab={openTab} /></>;
     case "privacy-case": case "case": return <CaseView key={tab.ref} id={tab.ref ?? ""} hub={hub} openTab={(t) => openTab(t.kind === "privacy-case" && tab.kind === "case" ? { ...t, kind: "case" } : t)} />;
-    case "privacy-forms": return <PrivacyForms hub={hub} openTab={openTab} />;
-    case "privacy-roles": return <PrivacyRoles hub={hub} />;
+    case "privacy-forms": return <><PrivacyForms hub={hub} openTab={openTab} /><SettingsPermissions page="set-forms" hub={hub} openTab={openTab} /></>;
+    case "privacy-roles": return <><PrivacyRoles hub={hub} /><SettingsPermissions page="set-duties" hub={hub} openTab={openTab} /></>;
     case "privacy-form": return <PrivacyForm key={tab.ref} id={tab.ref ?? ""} hub={hub} onRenamed={(title) => openTab({ ...tab, title })}
       onDeleted={() => openTab({ kind: "privacy-forms", title: "Compliance forms" })} />;
     case "admin-sources": return <DataSourcesView hub={hub} openTab={openTab} adding />;
     case "repos": case "admin-repos": return <AdminRepos />;
-    case "admin-runtimes": return <AdminRuntimes withR={rEnabled(hub.me)} />;
+    case "admin-runtimes": return <><AdminRuntimes withR={rEnabled(hub.me)} /><SettingsPermissions page="set-runtimes" hub={hub} openTab={openTab} /></>;
     case "secrets": return <SecretsTab hub={hub} selectedRef={tab.ref} creating={tab.intent === "create"} openTab={openTab} />;
     case "docs": return <DocsTab runId={tab.ref!} />;
-    case "admin-pools": return <AdminPools hub={hub} />;
-    case "admin-workspace-templates": return <AdminWorkspaceTemplates hub={hub} />;
-    case "admin-network": return <AdminNetwork />;
-    case "admin-query-log": return <QueryLogView key={tab.search ?? ""} hub={hub} initialActor={tab.search} />;
+    case "admin-pools": return <><AdminPools hub={hub} /><SettingsPermissions page="set-pools" hub={hub} openTab={openTab} /></>;
+    case "admin-workspace-templates": return <><AdminWorkspaceTemplates hub={hub} /><SettingsPermissions page="set-template" hub={hub} openTab={openTab} /></>;
+    case "admin-network": return <><AdminNetwork /><SettingsPermissions page="set-network" hub={hub} openTab={openTab} /></>;
+    case "admin-query-log": return <><QueryLogView key={tab.search ?? ""} hub={hub} initialActor={tab.search} /><SettingsPermissions page="set-querylog" hub={hub} openTab={openTab} /></>;
     case "git-credentials": return <GitCredentialsTab sections={<WorkspaceSections active="git" openTab={openTab} />} />;
     case "packages": return <PackagesView key={tab.ref ?? "all"} hub={hub} openTab={openTab} kind={tab.ref as PackageKind | undefined} />;
     case "package": return <PackageView key={tab.ref} hub={hub} openTab={openTab} reference={tab.ref!} />;
     case "package-imports": return <PackageImportsView />;
-    case "admin-audit": return <AdminAudit key={tab.search ?? ""} initialActor={tab.search} />;
+    case "admin-audit": return <><AdminAudit key={tab.search ?? ""} initialActor={tab.search} /><SettingsPermissions page="set-auditlog" hub={hub} openTab={openTab} /></>;
     case "deadlines": return <DeadlinesView hub={hub} openTab={openTab} />;
   }
 }

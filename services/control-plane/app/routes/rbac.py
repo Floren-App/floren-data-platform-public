@@ -287,8 +287,10 @@ def check_owners(db, owners):
 
 @router.post("/groups", status_code=201)
 def create_group(body: GroupIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = admin(db, user)
-    require_create(db,user)
+    from .. import settings_access
+    user = settings_access.require(db, user, "set-groups")
+    if user.is_admin:
+        require_create(db, user)  # administrators create with Global Admin active; Groups managers need no active group
     if body.name.strip().casefold() == "global admin":
         raise HTTPException(409,"Global Admin is a protected system group")
     check_owners(db, body.owners)

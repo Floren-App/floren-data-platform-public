@@ -66,6 +66,8 @@ export function rolesFor(resource: Pick<AccessResource, "kind">) {
   const isApi = API_KINDS.includes(resource.kind);
   const isPackage = PACKAGE_KINDS.includes(resource.kind);
   const isProduct = resource.kind === "product";
+  if (["setting", "settings-section", "settings-root"].includes(resource.kind))
+    return { roles: { Viewer: "See this page", Manager: "Also change it" } as Record<string, string>, initial: "Viewer", isData, isProduct, isApi, isPackage, isKafka };
   const roles: Record<string, string> = isProduct ? PRODUCT_ROLES : isKafka ? { Reader: "Consume and commit offsets for own groups", Contributor: "Also produce messages", Admin: "Also create, alter and delete topics", Owner: "All topic permissions and role assignments" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
   const initial = isProduct ? "Consumer" : isData ? "Reader" : isApi ? "Consumer" : isPackage ? (resource.kind === "package" ? "Maintainer" : "Publisher") : "Executor";
   return { roles, initial, isData, isProduct, isApi, isPackage, isKafka };
