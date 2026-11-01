@@ -309,9 +309,9 @@ def manifests(layer_id, generation, spec: InfrastructureSpec, config: Controller
     s3_tls = s3 and spec.rustfs.tls.mode != 'disabled'  # adds the restart sidecar (100m / 128Mi limits)
     pg_databases = ('iceberg',) if spec.iceberg.enabled else ()
     pg_sidecars = int(pg_tls) + int(bool(pg_databases))  # 100m / 128Mi limits each
-    if spec.kafka.enabled and kafka_workers is None:
+    if spec.kafka.running and kafka_workers is None:
         raise ProvisioningError('KafkaWarehouseMissing', 'Kafka needs a resolved broker warehouse')
-    kafka_count = spec.kafka.replicas if spec.kafka.enabled else 0
+    kafka_count = spec.kafka.replicas if spec.kafka.running else 0
     kafka_cpu = kafka_workers.cpu * kafka_count + (0.5 if kafka_count else 0) if kafka_workers else 0
     kafka_memory = int(kafka_workers.memory_gb * 2**30) * kafka_count + (512 * 2**20 if kafka_count else 0) if kafka_workers else 0
     if (kafka_cpu + spec.trino.coordinator.cpu + workers.cpu * peak + (0.1 if tls else 0) * (1 + peak) + 0.2 +
@@ -601,7 +601,7 @@ def manifests(layer_id, generation, spec: InfrastructureSpec, config: Controller
         for document in result:
             if document['kind'] in ('Deployment', 'StatefulSet'):
                 document['spec']['template']['spec']['imagePullSecrets'] = [{'name': config.image_pull_secret}]
-    if spec.kafka.enabled:
+    if spec.kafka.running:
         from .layer_kafka import manifests as kafka_manifests
         result.extend(kafka_manifests(layer_id, namespace, spec, config, kafka_workers))
     return result

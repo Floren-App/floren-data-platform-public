@@ -62,6 +62,10 @@ def seed() -> None:
         migrate(db)
         from .ownership import migrate as migrate_ownership
         migrate_ownership(db)
+        from .layer_kafka import ensure_cluster
+        from .layers import all_layers
+        for layer in all_layers(db):
+            ensure_cluster(db, layer)
         from .rbac import root
         root(db)
         from .platform_metadata import setup as setup_metadata

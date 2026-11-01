@@ -1760,10 +1760,11 @@
       },
       "KafkaInfrastructure": {
         "additionalProperties": false,
-        "description": "Opt-in Strimzi/KRaft cluster. The image must contain FDP's policy authorizer.",
+        "description": "Built-in layer capability; running controls broker compute, never availability.",
         "properties": {
           "enabled": {
-            "default": false,
+            "const": true,
+            "default": true,
             "title": "Enabled",
             "type": "boolean"
           },
@@ -1789,6 +1790,11 @@
             ],
             "title": "Replicas",
             "type": "integer"
+          },
+          "running": {
+            "default": false,
+            "title": "Running",
+            "type": "boolean"
           },
           "size": {
             "default": "20Gi",
@@ -1840,6 +1846,19 @@
           }
         },
         "title": "KafkaInfrastructure",
+        "type": "object"
+      },
+      "KafkaRunning": {
+        "properties": {
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "running"
+        ],
+        "title": "KafkaRunning",
         "type": "object"
       },
       "KindUse": {
@@ -20908,6 +20927,88 @@
           }
         },
         "summary": "Get Cluster",
+        "tags": [
+          "kafka"
+        ]
+      }
+    },
+    "/v1/kafka/clusters/{ident}/running": {
+      "put": {
+        "operationId": "put_v1_kafka_clusters_ident_running",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KafkaRunning"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Running",
         "tags": [
           "kafka"
         ]

@@ -178,6 +178,8 @@ def create(body: LayerIn, db: Session = Depends(get_db), user: User = Depends(ge
                                                                    "production": body.production})
     db.add(layer); db.flush()
     rbac.own(db,user,layer)
+    from ..layer_kafka import ensure_cluster
+    ensure_cluster(db, layer)
     from ..models import PermissionGrant
     db.add(PermissionGrant(target_id="set-layers", namespace="layers.object", layer_id=layer.id,
                            app_group_id=group.id, role="Owner", actions=[]))
@@ -224,11 +226,17 @@ def remove(ident: str, db: Session = Depends(get_db), user: User = Depends(get_a
         if current.reason != 'StorageDeleted':
             raise HTTPException(409, f'retained storage still exists in namespace {current.namespace}; delete that namespace '
                                      'to remove the data permanently, then retry once the controller reports it gone')
-    used = any(r.id != layer.id and layers.explicit_layer(db, r) == layer.id for r in db.scalars(select(Resource)))
+    builtin_kafka = list(db.scalars(select(Resource).where(Resource.kind == 'kafka', Resource.object_id == layer.id)))
+    builtin_ids = {item.id for item in builtin_kafka}
+    used = any(r.id != layer.id and r.id not in builtin_ids and layers.explicit_layer(db, r) == layer.id for r in db.scalars(select(Resource)))
     used |= any(w.environment_id == layer.id for model in (Workspace, Run) for w in db.scalars(select(model)))
     used |= any((x.config or {}).get("layer_id") == layer.id for model in (DataSource, ApiDefinition) for x in db.scalars(select(model)))
     if used:
         raise HTTPException(409, "layer still contains objects, workspaces or run history")
+    for item in builtin_kafka:
+        rbac.delete_resource_assignments(db, item.id)
+        db.delete(item)
+    db.flush()
     rbac.delete_resource_assignments(db,layer.id)
     from ..models import PermissionGrant
     db.execute(delete(PermissionGrant).where(PermissionGrant.layer_id == layer.id))

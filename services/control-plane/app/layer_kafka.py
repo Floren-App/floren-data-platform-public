@@ -10,7 +10,7 @@ POLICY_SECRET = 'fdp-kafka-policy'
 
 
 def broker_plan(db, spec, layer_id):
-    if not spec.kafka.enabled:
+    if not spec.kafka.running:
         return None
     pool = db.scalar(select(ComputePool).where(ComputePool.name == spec.kafka.warehouse))
     if not pool or pool.memory_gb < 1:
@@ -26,7 +26,7 @@ def broker_plan(db, spec, layer_id):
 
 
 def manifests(layer_id, namespace, spec, config, plan):
-    if not spec.kafka.enabled:
+    if not spec.kafka.running:
         return []
     if plan is None:
         raise ProvisioningError('KafkaWarehouseMissing', 'Resolve the Kafka broker warehouse before provisioning')
@@ -99,10 +99,9 @@ def manifests(layer_id, namespace, spec, config, plan):
             'privateKey':{'algorithm':'ECDSA','size':256,'encoding':'PKCS8','rotationPolicy':'Always'}}}, 'cert-manager.io/v1'))
     # Retiring pauses Strimzi reconciliation first; brokers must be stopped explicitly
     # by the operator because an empty KRaft quorum is not a valid normal desired state.
-    if spec.retired:
-        for document in docs:
-            if document['kind'] == 'Kafka':
-                document['metadata']['annotations'] = {'strimzi.io/pause-reconciliation':'true'}
+    for document in docs:
+        if document['kind'] == 'Kafka':
+            document['metadata']['annotations'] = {'strimzi.io/pause-reconciliation':'true' if spec.retired else 'false'}
     clients = {'namespaceSelector':{'matchLabels':{'kubernetes.io/metadata.name':namespace}},
                'podSelector':{'matchExpressions':[{'key':'fdp.floren.app/role','operator':'In',
                    'values':['workspace','job','app','stream','workload']}]}}
@@ -152,3 +151,34 @@ def topic_manifest(resource, namespace, installation):
             'labels':{OWNER:installation,LAYER:c['layer_id'],'strimzi.io/cluster':CLUSTER}},
         'spec':{'topicName':resource.name, 'partitions':c['partitions'], 'replicas':c['replication_factor'],
                 'config':{'retention.ms':c['retention_ms'],'cleanup.policy':c['cleanup_policy']}}}
+
+
+def ensure_cluster(db, layer):
+    """Idempotent catalog identity for every layer; never grants data to ordinary groups."""
+    import hashlib
+    from .models import RoleAssignment
+    from .ownership import GLOBAL_ADMIN, ensure_global_admin
+    existing = db.scalar(select(Resource).where(Resource.kind == 'kafka', Resource.object_id == layer.id))
+    if existing:
+        if existing.config.get('deleted'):
+            existing.config = {**existing.config, 'deleted':False}
+            db.flush()
+        return existing
+    ensure_global_admin(db)
+    ident = hashlib.sha256(('layer-kafka:' + layer.id).encode()).hexdigest()[:12]
+    values = dict(id=ident, kind='kafka', name=layer.name+' Kafka', object_id=layer.id,
+                  parent_id=layer.id, config={'layer_id':layer.id, 'managed':True, 'owner_group_id':GLOBAL_ADMIN})
+    if db.bind.dialect.name in ('sqlite', 'postgresql'):
+        if db.bind.dialect.name == 'sqlite':
+            from sqlalchemy.dialects.sqlite import insert
+        else:
+            from sqlalchemy.dialects.postgresql import insert
+        db.execute(insert(Resource).values(**values).on_conflict_do_nothing(index_elements=['id']))
+        grant_id = hashlib.sha256(('layer-kafka-owner:' + layer.id).encode()).hexdigest()[:12]
+        db.execute(insert(RoleAssignment).values(id=grant_id, resource_id=ident, app_group_id=GLOBAL_ADMIN, role='Owner')
+                   .on_conflict_do_nothing(index_elements=['id']))
+    else:
+        db.add(Resource(**values)); db.flush()
+        db.add(RoleAssignment(resource_id=ident, app_group_id=GLOBAL_ADMIN, role='Owner'))
+    db.flush()
+    return db.get(Resource, ident)

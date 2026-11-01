@@ -22,11 +22,11 @@ def broker_credential(layer_id, key=None):
     return hmac.new(key.encode(), ('fdp-kafka-policy-v1:'+layer_id).encode(), hashlib.sha256).hexdigest()
 
 
-def specification(db, layer_id):
+def specification(db, layer_id, require_running=True):
     layer = layers.require_layer(db, layer_id)
     spec = InfrastructureSpec.model_validate((layer.config or {}).get('infrastructure', {}))
-    if not spec.enabled or not spec.kafka.enabled or spec.retired:
-        raise HTTPException(409, 'Kafka is not enabled in this layer')
+    if require_running and (not spec.enabled or not spec.kafka.running or spec.retired):
+        raise HTTPException(409, 'Kafka brokers are stopped in this layer; start them through layer infrastructure')
     return layer, spec
 
 

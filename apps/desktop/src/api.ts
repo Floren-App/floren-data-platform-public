@@ -822,6 +822,7 @@ export interface OrchestratorHistory { runs: OrchestratorRun[]; dags: string[] }
 
 export const api = {
   kafka: {
+    setRunning: (id: string, running: boolean) => request<unknown>("PUT", `/v1/kafka/clusters/${id}/running`, { running }),
     clusters: () => request<AccessResource[]>("GET", "/v1/kafka/clusters"),
     cluster: (id: string) => request<AccessResource>("GET", `/v1/kafka/clusters/${id}`),
     register: (layer: string) => request<AccessResource>("POST", `/v1/kafka/clusters/${layer}`),

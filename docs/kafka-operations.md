@@ -1,12 +1,29 @@
-# Managed Kafka: operating the first phase
+# Managed Kafka: capability and broker lifecycle
 
-Implementation notes, deliberately outside public site navigation. The proposal in
-`kafka-plan.md` remains unchanged. See `kafka-implementation.md` for the delivery
-checklist and outstanding work; this is not a claim that all four phases shipped.
+## Built-in capability and broker runtime
+
+Every layer has a Kafka catalog identity, even before broker compute is configured.
+Kafka cannot be removed from a layer. `infrastructure.kafka.running` controls broker
+compute; legacy `enabled` input is accepted as a running/stopped setting. The
+capability's `enabled` value is always true. Running requires a pinned FDP authorizer
+image, a dedicated broker warehouse and trusted TLS. Production requires at least
+three brokers.
+
+Use **Kafka → cluster → Start brokers / Stop brokers**, or update
+`fdp_layer.infrastructure` with `kafka.running`. The buttons require the scoped
+`layer_infrastructure.apply` permission. Stop pauses Strimzi reconciliation before
+clearing the owned broker pod set and topic-operator deployment; it retains the
+cluster identity, quorum configuration, topics, grants, certificates and PVCs.
+Start resumes the same cluster. This is explicit lifecycle control, not automatic
+idle detection. Producing, consuming and topic changes require running brokers;
+metadata and permissions remain available while stopped. Stopping interrupts clients.
+A Terraform-managed runtime switch is reconciled on the next apply.
+
 
 ## Installation
 
-Kafka is opt-in. Existing layers keep their current infrastructure until changed.
+Kafka is built into every layer; broker compute starts only when configured to run.
+Existing running layers keep their current broker configuration until changed.
 The tested combination is Strimzi 1.2.0, Kafka 4.3.1, Java 21 and the FDP Kafka image
 built from `images/kafka/Dockerfile`. A stock Kafka image lacks the FDP authorizer.
 
@@ -36,7 +53,7 @@ The layer's `fdp_layer.infrastructure` JSON accepts:
 
 ```hcl
 kafka = {
-  enabled   = true
+  running   = true
   image     = "your-registry/fdp-kafka:tested-commit"
   version   = "4.3.1"
   warehouse = fdp_compute_pool.kafka.name

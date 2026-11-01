@@ -94,6 +94,7 @@ nav:
       - SQL execution: query-execution.md
       - Iceberg and files: data-lake.md
       - API management: api-management.md
+      - Kafka lifecycle and operations: kafka-operations.md
       - Packages: packages.md
       - "Example: end-to-end data product": pokemon.md
       - "Pokémon demo and access matrix": pokemon-demo.md

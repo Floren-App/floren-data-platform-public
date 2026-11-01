@@ -88,7 +88,7 @@ def held(db) -> Dict[str, int]:
     for layer in db.scalars(select(Resource).where(Resource.kind == 'layer')):
         infrastructure = layer.config.get('infrastructure') or {}
         kafka = infrastructure.get('kafka') or {}
-        if infrastructure.get('enabled') and not infrastructure.get('retired') and kafka.get('enabled'):
+        if infrastructure.get('enabled') and not infrastructure.get('retired') and kafka.get('running', kafka.get('enabled', False)):
             counts[kafka['warehouse']] += kafka.get('replicas', 1)
     return dict(counts)
 
@@ -151,7 +151,7 @@ def infrastructure_layers(db) -> Dict[str, List[str]]:
     for layer in all_layers(db):
         infrastructure = (layer.config or {}).get("infrastructure") or {}
         kafka = infrastructure.get("kafka") or {}
-        if infrastructure.get("enabled") and not infrastructure.get("retired") and kafka.get("enabled") and kafka.get("warehouse"):
+        if infrastructure.get("enabled") and not infrastructure.get("retired") and kafka.get("running", kafka.get("enabled", False)) and kafka.get("warehouse"):
             if layer.id not in out[kafka["warehouse"]]:
                 out[kafka["warehouse"]].append(layer.id)
     return dict(out)

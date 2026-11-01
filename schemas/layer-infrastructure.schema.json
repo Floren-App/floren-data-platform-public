@@ -102,11 +102,17 @@
     },
     "KafkaInfrastructure": {
       "additionalProperties": false,
-      "description": "Opt-in Strimzi/KRaft cluster. The image must contain FDP's policy authorizer.",
+      "description": "Built-in layer capability; running controls broker compute, never availability.",
       "properties": {
         "enabled": {
-          "default": false,
+          "const": true,
+          "default": true,
           "title": "Enabled",
+          "type": "boolean"
+        },
+        "running": {
+          "default": false,
+          "title": "Running",
           "type": "boolean"
         },
         "image": {

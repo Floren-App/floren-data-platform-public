@@ -41,7 +41,7 @@ def register_cluster(layer_id: str, db=Depends(get_db), user=Depends(get_actor))
     user = admin(db, user)
     from ..ownership import require_create
     require_create(db, user)
-    layer, spec = kafka.specification(db, layer_id)
+    layer, spec = kafka.specification(db, layer_id, require_running=False)
     item = kafka.cluster(db, layer.id)
     if not item:
         item = Resource(kind='kafka', name=layer.name+' Kafka', object_id=layer.id,
@@ -83,9 +83,12 @@ def get_cluster(ident: str, db=Depends(get_db), user=Depends(get_actor)):
     result = resource_out(db, item, user)
     layer = layers.require_layer(db, item.object_id)
     infrastructure = layer.config.get('infrastructure') or {}
-    brokers = (infrastructure.get('kafka') or {}).get('replicas', 1)
+    settings = (infrastructure.get('kafka') or {})
+    brokers = settings.get('replicas', 1)
     return {**result, 'config':{**result['config'], 'broker_count':brokers,
-                              'retired':bool(infrastructure.get('retired'))}}
+                              'retired':bool(infrastructure.get('retired')),
+                              'running':bool(settings.get('running', settings.get('enabled', False))),
+                              'configured':bool(settings.get('image') and settings.get('warehouse'))}}
 
 
 @router.delete('/v1/kafka/clusters/{ident}', status_code=204)
@@ -94,15 +97,7 @@ def unregister_cluster(ident: str, db=Depends(get_db), user=Depends(get_actor)):
     item = db.get(Resource, ident)
     if not item or item.kind != 'kafka':
         raise HTTPException(404, 'Kafka integration not found')
-    db.scalar(select(Resource).where(Resource.id == ident).with_for_update())
-    rbac.require(db, user, 'assign', item)
-    if db.scalar(select(Resource.id).where(Resource.parent_id == ident,
-            Resource.config['phase'].as_string() != 'Deleted')):
-        raise HTTPException(409, 'Delete the topics and wait for broker deletion before unregistering Kafka')
-    # Topic tombstones remain for audit. This unregisters metadata, never deletes the brokers/PVCs.
-    item.config = {**item.config, 'deleted':True}
-    audit(db, user.username, 'kafka.cluster.unregister', ident)
-    db.commit()
+    raise HTTPException(409, 'Kafka is a built-in layer capability; stop its brokers instead of removing it')
 
 
 @router.get('/v1/kafka/resolve')
@@ -257,3 +252,31 @@ def allow(layer_id: str, body: Dict[str, Any], authorization: str = Header(defau
           operation=str(action.get('operation', ''))[:64], allowed=bool(permitted))
     db.commit()
     return {'result':bool(permitted)}
+
+
+class KafkaRunning(BaseModel):
+    running: bool
+
+
+@router.put('/v1/kafka/clusters/{ident}/running', status_code=202)
+def set_running(ident: str, body: KafkaRunning, db=Depends(get_db), user=Depends(get_actor)):
+    from .. import layer_infrastructure as infrastructure, settings_access
+    item = db.get(Resource, ident)
+    if not item or item.kind != 'kafka':
+        raise HTTPException(404, 'Kafka cluster not found')
+    layer = layers.require_layer(db, item.object_id)
+    user = settings_access.require(db, user, 'set-layers', 'layer_infrastructure.apply', layer_id=layer.id)
+    current = infrastructure.state(db, layer)
+    if body.running and current['spec']['retired']:
+        raise HTTPException(409, 'Reactivate the layer before starting Kafka brokers')
+    from pydantic import ValidationError
+    try:
+        spec = infrastructure.InfrastructureSpec.model_validate({**current['spec'],
+            'kafka':{**current['spec']['kafka'], 'running':body.running}})
+    except ValidationError as exc:
+        raise HTTPException(422, str(exc)) from None
+    result = infrastructure.configure(db, layer.id, infrastructure.InfrastructureChange(
+        expected_generation=current['generation'], spec=spec))
+    audit(db, user.username, 'kafka.brokers.running', item.id, running=body.running)
+    db.commit()
+    return result
