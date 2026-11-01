@@ -255,3 +255,10 @@ def test_kafka_stop_waits_for_pause_without_touching_quorum_or_storage():
     docs = manifests(ID, 'ns', spec(), CONFIG, PLAN)
     assert next(item for item in docs if item['kind'] == 'KafkaNodePool')['spec']['replicas'] == 3
     assert next(item for item in docs if item['kind'] == 'Kafka')['metadata']['annotations']['strimzi.io/pause-reconciliation'] == 'false'
+
+def test_kafka_network_access_includes_actual_batch_compute_label():
+    docs = manifests(ID, 'ns', spec(), CONFIG, PLAN)
+    policy = next(item for item in docs if item['kind'] == 'NetworkPolicy' and item['metadata']['name'] == 'kafka-clients')
+    assert 'compute' in policy['spec']['podSelector']['matchExpressions'][0]['values']
+    assert policy['spec']['egress'][0]['ports'] == [{'protocol':'TCP', 'port':9093}]
+    assert 'namespaceSelector' not in policy['spec']['egress'][0]['to'][0]
