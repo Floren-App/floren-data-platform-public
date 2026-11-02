@@ -124,7 +124,11 @@ def scope_for_execution(db, execution, source):
         run = db.get(Run, execution.run_id)
         if not run or run.status not in ("pending", "running") or run.owner != execution.username:
             raise HTTPException(401, "run is no longer active")
-        return (run.access_snapshot or {}).get(source.id, {})
+        legacy = (run.access_snapshot or {}).get(source.id, {})
+        from .sql_access import SQL_KINDS
+        if get_settings().query_executor == 'trino' and source.kind in SQL_KINDS:
+            return {**{name:'Named' for name in (run.named_access_snapshot or {}).get(source.id, {})}, **legacy}
+        return legacy
     from .models import Workload
     if execution.workload_id:
         pub = db.get(Workload, execution.workload_id)
@@ -132,7 +136,13 @@ def scope_for_execution(db, execution, source):
             return {}
     from .auth import User
     from .environments import execution_user
-    return rbac.data_scope(db, rbac.resolve_user(db, execution_user(db, execution)), source)
+    user = rbac.resolve_user(db, execution_user(db, execution))
+    scope = rbac.data_scope(db, user, source)
+    from .sql_access import SQL_KINDS
+    if get_settings().query_executor == 'trino' and source.kind in SQL_KINDS:
+        from .object_access import snapshot as named_snapshot
+        return {**{name:'Named' for name in named_snapshot(db, user).get(source.id, {})}, **scope}
+    return scope
 
 
 def credentials(db, source, scope, store, principal, run_id=None):

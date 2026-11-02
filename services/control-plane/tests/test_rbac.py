@@ -7,7 +7,7 @@ from app.db import SessionLocal
 from app.models import (AppGroup, DirectoryPrincipal, DirectoryMembership, IdentityBinding,
                         RoleAssignment, Resource, DataSource, Run)
 from .conftest import as_
-from .rbac_helpers import grant_group, integration
+from .rbac_helpers import grant_group, integration, select_group
 from .test_api import setup_finance_db, start_workspace, execution_token
 from .test_deploying import repo, deploy  # noqa: F401
 
@@ -35,10 +35,12 @@ def test_folder_inheritance_is_additive_and_cycles_are_rejected(client):
     parent = client.post('/v1/rbac/folders', headers=as_('ana'), json={'name': 'Finance'}).json()
     child = client.post('/v1/rbac/folders', headers=as_('ana'), json={'name': 'Reports', 'parent_id': parent['id']}).json()
     gid = grant_group(client, parent['id'], 'Report editors', 'Contributor', users=['bob'])
+    select_group(client, 'bob', gid)
     client.put(f"/v1/rbac/resources/{child['id']}/assignments", headers=as_('ana'),
                json={'app_group_id': gid, 'role': 'Executor'})
     access = client.get(f"/v1/rbac/resources/{child['id']}/access", headers=as_('bob')).json()
-    assert 'deploy' in access['resource']['actions']  # weaker child grant does not block parent
+    assert {'read','edit','execute'} <= set(access['resource']['actions'])
+    assert 'deploy' not in access['resource']['actions']  # Neither Contributor nor Executor deploys
     assert client.post('/v1/rbac/folders', headers=as_('bob'), json={'name': 'No', 'parent_id': child['id']}).status_code == 403
     assert client.patch(f"/v1/rbac/resources/{parent['id']}", headers=as_('ana'),
                         json={'name': 'Finance', 'parent_id': child['id']}).status_code == 422
@@ -48,11 +50,17 @@ def test_folder_inheritance_is_additive_and_cycles_are_rejected(client):
                       json={'app_group_id': gid, 'role': 'Custom'}).status_code == 422
 
 
-def test_contributor_deploys_but_cannot_change_identity_grants_or_delete(client, repo):
+def test_contributor_cannot_execute_deploy_or_change_managed_settings(client, repo):
     pub = deploy(client, repo, program='sales-report', slug='report').json()
-    grant_group(client, pub['resource_id'], 'Editors', 'Contributor', users=['bob'])
-    assert client.patch(f"/v1/workloads/{pub['id']}", headers=as_('bob'), json={'title': 'Edited', 'auto_update': True}).status_code == 200
-    assert client.post(f"/v1/workloads/{pub['id']}/sync", headers=as_('bob')).status_code == 200
+    editors = grant_group(client, pub['resource_id'], 'Editors', 'Contributor', users=['bob'])
+    select_group(client, 'bob', editors)
+    assert client.patch(f"/v1/workloads/{pub['id']}", headers=as_('bob'), json={'title':'Edited','auto_update':True}).status_code==403
+    assert client.post(f"/v1/workloads/{pub['id']}/sync",headers=as_('bob')).status_code==403
+    assert client.post(f"/v1/workloads/{pub['id']}/runs",headers=as_('bob'),json={}).status_code==403
+    client.put(f"/v1/rbac/resources/{pub['resource_id']}/assignments",headers=as_('admin'),json={'app_group_id':editors,'role':'Manager'}).raise_for_status()
+    assert client.patch(f"/v1/workloads/{pub['id']}",headers=as_('bob'),json={'title':'Edited','auto_update':True}).status_code==200
+    assert client.post(f"/v1/workloads/{pub['id']}/sync",headers=as_('bob')).status_code==200
+    assert client.post(f"/v1/workloads/{pub['id']}/runs",headers=as_('bob'),json={}).status_code==403
     for patch in ({'execution_mode': 'fixed'}, {'run_as': ''}, {'secrets': {}}, {'env': {}}):
         assert client.patch(f"/v1/workloads/{pub['id']}", headers=as_('bob'), json=patch).status_code == 403
     assert client.delete(f"/v1/workloads/{pub['id']}", headers=as_('bob')).status_code == 403
@@ -86,10 +94,14 @@ def test_environment_folders_deploy_same_app_from_independent_branches(client, r
     assert client.put('/v1/me/active-group',headers=as_('bob'),json={'group_id':acceptance}).status_code==200
     visible = client.get('/v1/workloads', headers=as_('bob')).json()
     assert {p['id'] for p in visible} == {apps['acp']['id']}
-    grants = client.get(f"/v1/rbac/resources/{apps['tst']['resource_id']}/assignments", headers=as_('bob')).json()
+    assert client.get(f"/v1/rbac/resources/{apps['tst']['resource_id']}/assignments", headers=as_('bob')).status_code == 403
+    select_group(client, 'bob', testers)
+    assert client.get(f"/v1/rbac/resources/{apps['tst']['resource_id']}/assignments", headers=as_('bob')).status_code == 403
+    grants = client.get(f"/v1/rbac/resources/{apps['tst']['resource_id']}/assignments", headers=as_('admin')).json()
     assert any(g['app_group_id'] == testers and g['inherited'] for g in grants)
     assert client.post(f"/v1/workloads/{apps['tst']['id']}/open", headers=as_('bob')).status_code == 200
     assert client.patch(f"/v1/workloads/{apps['tst']['id']}", headers=as_('bob'), json={'title': 'No'}).status_code == 403
+    select_group(client, 'bob', acceptance)
     child = client.post('/v1/rbac/folders', headers=as_('bob'), json={'name': 'Reports', 'parent_id': folders['acp']['id']})
     assert child.status_code == 201 and 'assign' in child.json()['actions']  # The active creating group owns the new child.
     assert client.put(f"/v1/rbac/resources/{child.json()['id']}/assignments", headers=as_('bob'),
@@ -184,7 +196,8 @@ def test_service_execution_right_does_not_allow_tokens_or_secrets(client):
     make_sa(client)
     resources = client.get('/v1/rbac/resources', headers=as_('admin')).json()
     account = next(r for r in resources if r['config'].get('service_account'))
-    grant_group(client, account['id'], 'Service callers', 'Executor', users=['bob'])
+    callers = grant_group(client, account['id'], 'Service callers', 'Executor', users=['bob'])
+    select_group(client, 'bob', callers)
     assert client.get('/v1/service-accounts', headers=as_('bob')).json()[0]['name'] == 'finance-etl'
     assert client.post('/v1/service-accounts/finance-etl/tokens', headers=as_('bob'), json={'name': 'not-allowed'}).status_code == 403
     assert client.put('/v1/secrets/sa/finance-etl/not-allowed', headers=as_('bob'), json={'value': 'no'}).status_code == 403

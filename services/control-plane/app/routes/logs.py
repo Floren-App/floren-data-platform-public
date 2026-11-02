@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import rbac
+from .. import rbac, permissions
 from ..auth import Execution, User, get_execution
 from ..db import get_db
 from ..deps import get_actor
@@ -118,16 +118,17 @@ class _Visibility:
     def workload(self, workload_id: str) -> bool:
         if workload_id not in self.workloads:
             pub = self.db.get(Workload, workload_id)
-            self.workloads[workload_id] = bool(pub) and (self.user.is_admin or rbac.allowed(
-                self.db, self.user, "read", rbac.workload_resource(self.db, pub)))
+            self.workloads[workload_id] = bool(pub) and permissions.domain_allowed(
+                self.db, self.user, 'logs.read', rbac.workload_resource(self.db, pub), 'execute')
         return self.workloads[workload_id]
 
     def run(self, run_id: str) -> bool:
         if run_id not in self.runs:
             from .runs import owned_run
             try:
-                owned_run(self.db, run_id, self.user)
-                self.runs[run_id] = True
+                run=owned_run(self.db, run_id, self.user)
+                from ..run_access import allowed
+                self.runs[run_id] = allowed(self.db,self.user,'logs.read',run)
             except HTTPException:
                 self.runs[run_id] = False
         return self.runs[run_id]

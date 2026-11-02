@@ -107,8 +107,9 @@ def actor(db, authorization, viewer=""):
                     delegated.get("pub") != pub.id or execution.username != pub.identity):
                 raise HTTPException(403, "viewer context does not belong to this caller-mode app")
             user = rbac.resolve_user(db, bind(db, User(delegated["sub"], principal_id=delegated.get("pid", "")), rbac.workload_resource(db, pub)))
-            rbac.require(db, user, "execute", rbac.workload_resource(db, pub))
-            return SqlActor(user, binding + ":viewer:" + user.principal_id, execution, viewer, pub.id)
+            from .permissions import require_domain
+            require_domain(db,user,"delegation.query",rbac.workload_resource(db,pub),"execute")
+            return SqlActor(user, binding + ":viewer:" + user.principal_id + ":group:" + (user.active_group_id or ""), execution, viewer, pub.id)
         if execution.workload_id:
             pub = db.get(Workload, execution.workload_id)
             if pub and pub.kind == "app" and pub.execution_mode == "caller":
@@ -124,7 +125,7 @@ def actor(db, authorization, viewer=""):
     if viewer:
         raise HTTPException(403, "viewer delegation requires its app execution")
     user = rbac.resolve_user(db, get_verifier().verify(token), refresh=True)
-    return SqlActor(user, "user:" + user.principal_id)
+    return SqlActor(user,"user:"+user.principal_id+":group:"+(user.active_group_id or ""))
 
 
 def scopes(db, who):
@@ -139,11 +140,16 @@ def scopes(db, who):
         if not db.scalar(select(DirectoryPrincipal.active).where(DirectoryPrincipal.id == who.user.principal_id)):
             raise HTTPException(401, "identity is inactive")
         for grant in rbac.role_grants(db, who.user):
-            if grant.role in LEVELS and LEVELS[grant.role] > LEVELS.get(grants.get(grant.resource_id), 0):
-                grants[grant.resource_id] = grant.role
+            if grant.role=='Contributor':
+                continue
+            role = 'Reader' if grant.role == 'Executor' else grant.role
+            if role in LEVELS and LEVELS[role] > LEVELS.get(grants.get(grant.resource_id), 0):
+                grants[grant.resource_id] = role
     schemas = list(db.scalars(select(Resource).where(Resource.kind == "schema")))
     from .ownership import creation_data_snapshot
     primary = (job.primary_create_snapshot if job.primary_create_snapshot is not None else job.access_snapshot) if job else creation_data_snapshot(db,who.user)
+    from .object_access import snapshot as named_snapshot
+    named = (job.named_access_snapshot or {}) if job else named_snapshot(db, who.user)
     result = {}
     for catalog, source in catalog_sources(db).items():
         from . import platform_metadata as metadata
@@ -165,15 +171,23 @@ def scopes(db, who):
                 role = max((grants.get(schema.id), grants.get(schema.parent_id)), key=lambda x: LEVELS.get(x, 0))
             if role in LEVELS:
                 scope[schema.name] = role
+        source_named = named.get(source.id, {})
+        for schema in schemas:
+            if schema.object_id == source.id and schema.config.get("state") == "ready" and schema.name in source_named:
+                scope.setdefault(schema.name, "Named")
         if scope:
             result[catalog] = {"source_id": source.id, "kind": source.kind, "schemas": scope,
+                               "named_objects": source_named,
                                "append_only_schemas": [s.name for s in schemas if s.object_id == source.id and
                                                        s.name in scope and s.config.get('append_only')],
                                "create_schemas":[name for name in scope if LEVELS.get(primary.get(source.id,{}).get(name),0) >= 3]}
     if who.scope_limit is not None:
-        result = {catalog: {**scope, 'schemas': {name: 'Reader' for name in scope['schemas'] if name in who.scope_limit.get(catalog, [])}, 'create_schemas': []}
+        result = {catalog: {**scope, 'schemas': {name: ('Named' if scope['schemas'][name] == 'Named' else 'Reader') for name in scope['schemas'] if name in who.scope_limit.get(catalog, [])}, 'create_schemas': []}
                   for catalog, scope in result.items() if catalog in who.scope_limit and not scope.get('system_metadata')}
         result = {catalog: scope for catalog, scope in result.items() if scope['schemas']}
+        from .object_access import read_only
+        for item in result.values():
+            item['named_objects'] = {name:read_only(rules) for name,rules in item.get('named_objects', {}).items()}
     return result
 
 
@@ -284,12 +298,24 @@ def admit(db, who, catalog="", layer=""):
         raise HTTPException(404, "catalog not available")
     if not scope:
         raise HTTPException(403, "no SQL schema grants")
-    # Column masks and row filters that apply to this caller, fixed for the query like its grants.
-    from .data_policies import attach
-    scope = attach(db, who.user, scope)
-    from .product_options import attach as attach_product_options
-    scope = attach_product_options(db, who.user, scope)
     run = db.get(Run, who.execution.run_id) if who.execution and who.execution.run_id else None
+    if run:
+        if run.sql_policy_snapshot is None:
+            raise HTTPException(409,'Run predates privacy admission snapshots; retry under current policy')
+        import copy
+        for item in scope.values():
+            privacy = run.sql_policy_snapshot.get(item['source_id'])
+            if not privacy or not set(item['schemas']).issubset(privacy.get('schemas',[])):
+                raise HTTPException(403,'SQL schema has no admitted privacy policy')
+            item['policies'] = copy.deepcopy(privacy.get('policies',{}))
+            item['groups'] = list(privacy.get('groups',[]))
+    else:
+        # Live calls capture current transforms. Jobs retain their admission policy,
+        # so removing a product grant cannot accidentally remove its masking.
+        from .data_policies import attach
+        scope = attach(db, who.user, scope)
+        from .product_options import attach as attach_product_options
+        scope = attach_product_options(db, who.user, scope)
     query = SqlQuery(principal_id=who.user.principal_id, actor=who.user.username,
                      initiator_id=(run.initiator_id or "") if run else who.user.principal_id,
                      binding=who.binding, run_id=run.id if run else "",
@@ -304,6 +330,28 @@ def admit(db, who, catalog="", layer=""):
     # Persist before Trino makes policy callbacks on a separate DB connection.
     db.commit()
     return query
+
+
+def query_function_allowed(query, action):
+    """Query ownership is necessary; admitted source/function authority is also required."""
+    from .permissions import REGISTRY
+    for scope in query.scope.values():
+        for role in scope.get('schemas', {}).values():
+            canonical = {'Reader':'Executor'}.get(role,role)
+            if canonical in REGISTRY[action]['roles']:
+                return True
+        for rules in scope.get('named_objects', {}).values():
+            if action in rules.get('actions', []):
+                return True
+            for table in rules.get('tables', {}).values():
+                if action in table.get('actions', []) or any(action in keys for keys in table.get('columns', {}).values()):
+                    return True
+    return False
+
+
+def require_query_function(query, action):
+    if not query_function_allowed(query, action):
+        raise HTTPException(403, action+' permission required')
 
 
 def context_token(query):
@@ -642,16 +690,24 @@ def policy_allow(query, action):
             return False
         if op == 'CreateTable' and [schema, obj.get('tableName')] not in query.scope[catalog].get('append_only_creates', []):
             return False
+    from .object_access import policy_allow as named_allow
+    rules = metadata_scope.get('named_objects', {}).get(schema, {})
+    columns = obj.get('columns')
+    if columns is None and isinstance(obj.get('column') or obj.get('columnName'), str):
+        columns = [obj.get('column') or obj.get('columnName')]
+    if columns is not None and (not isinstance(columns, list) or any(not isinstance(c, str) for c in columns)):
+        return False
+    named = named_allow(rules, op, obj.get('tableName', ''), columns)
     if op in READ:
-        return level >= 1
+        return level >= 1 or named
     if op in WRITE:
-        return level >= 2
+        return level >= 2 or named
     if op in DDL:
-        if level < 3:
+        if level < 3 and not named:
             return False
         if op in {"CreateTable","CreateView","CreateMaterializedView","CreateSchema"}:
             primary = query.scope.get(catalog,{}).get("create_schemas")
-            if primary is not None and schema not in primary:
+            if primary is not None and schema not in primary and not named:
                 return False
         # A caller must not choose storage locations, aliases, or external metadata.
         properties = obj.get("properties") or {}
@@ -662,8 +718,12 @@ def policy_allow(query, action):
         target = target.get("table") or target.get("schema")
         if target and target.get('schemaName') in query.scope.get(target.get('catalogName'), {}).get('append_only_schemas', []):
             return False
-        if target and LEVELS.get(query.scope.get(target.get("catalogName"), {}).get("schemas", {}).get(target.get("schemaName")), 0) < 3:
-            return False
+        if target:
+            destination_scope = query.scope.get(target.get("catalogName"), {})
+            destination_level = LEVELS.get(destination_scope.get("schemas", {}).get(target.get("schemaName")), 0)
+            destination_rules = destination_scope.get('named_objects', {}).get(target.get('schemaName'), {})
+            if destination_level < 3 and not named_allow(destination_rules, 'CreateTable', target.get('tableName', '')):
+                return False
         return True
     # Definer views, arbitrary routines/maintenance, grants, authorization transfers,
     # authorization transfers and every new/unreviewed engine action are denied.
@@ -679,9 +739,15 @@ def metadata_filters(query, table):
         return "'" + value.replace("'", "''") + "'"
     clauses = []
     for catalog, scope in query.scope.items():
-        schemas = ",".join(quote(schema) for schema in scope["schemas"])
-        if schemas:
-            clauses.append("(catalog_name=" + quote(catalog) + " AND schema_name IN (" + schemas + "))")
+        for schema, role in scope['schemas'].items():
+            base = "catalog_name=" + quote(catalog) + " AND schema_name=" + quote(schema)
+            rules = scope.get('named_objects', {}).get(schema, {})
+            if LEVELS.get(role, 0) >= 1 or rules.get('actions'):
+                clauses.append('('+base+')')
+            elif table.get('tableName') == 'table_comments':
+                names = [quote(name) for name,item in rules.get('tables', {}).items() if item.get('actions') or item.get('columns')]
+                if names:
+                    clauses.append('('+base+' AND table_name IN ('+','.join(names)+'))')
     expression = "(" + " OR ".join(clauses) + ")" if clauses else "false"
     if table.get("tableName") == "table_comments":
         for catalog, scope in query.scope.items():

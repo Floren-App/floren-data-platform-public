@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .. import notify
+from .. import permissions, notify
 from ..auth import User, require_admin
 from ..deps import get_actor
 from .. import rbac
@@ -72,6 +72,12 @@ def put_webhook(name: str, body: WebhookIn, db: Session = Depends(get_db), user:
     hook = db.scalar(select(NotificationWebhook).where(NotificationWebhook.name == name))
     if body.name != name and db.scalar(select(NotificationWebhook).where(NotificationWebhook.name == body.name)):
         raise HTTPException(409, f"a webhook named {body.name} already exists")
+    if hook is None:
+        settings_access.require(db,user,"set-alerts","webhooks.create")
+    if hook is None or hook.url!=body.url:
+        settings_access.require(db,user,"set-alerts","webhooks.endpoint.change")
+    if body.secret or body.remove_secret:
+        settings_access.require(db,user,"set-alerts","webhooks.credentials.change")
     if hook is None:
         hook = NotificationWebhook(name=body.name, url=body.url)
         db.add(hook)
@@ -149,14 +155,14 @@ def rule_out(db, rule: AlertRule) -> dict:
             "classifications": rule.classifications or [], "enabled": rule.enabled, "created_by": rule.created_by}
 
 
-def may_manage(db, user, resource_ids) -> bool:
+def may_manage(db, user, resource_ids, action="alerts.rules.update") -> bool:
     """Manager on Alerts manages every rule; owners manage rules on their own objects."""
-    if settings_access.allowed(db, user, "set-alerts", "manage"):
+    if settings_access.allowed(db,user,"set-alerts",action):
         return True
-    return bool(resource_ids) and all(rbac.allowed(db, user, "assign", db.get(Resource, r)) for r in resource_ids)
+    return bool(resource_ids) and all(permissions.domain_allowed(db,user,action,db.get(Resource,r),"assign") for r in resource_ids)
 
 
-def _check(db, body: RuleIn, user) -> None:
+def _check(db, body: RuleIn, user, action="alerts.rules.create") -> None:
     unknown = set(body.events) - set(notify.EVENTS)
     if unknown:
         raise HTTPException(422, "unknown events: " + ", ".join(sorted(unknown)))
@@ -164,7 +170,7 @@ def _check(db, body: RuleIn, user) -> None:
         raise HTTPException(422, "choose an existing channel")
     if any(db.get(Resource, r) is None for r in body.resource_ids):
         raise HTTPException(422, "choose existing objects")
-    if not may_manage(db, user, body.resource_ids):
+    if not may_manage(db,user,body.resource_ids,action):
         raise HTTPException(403, "Manager on Alerts, or owning every object the rule names, required")
 
 
@@ -182,12 +188,12 @@ def alert_channels(db: Session = Depends(get_db), _: User = Depends(get_actor)):
 @router.get("/v1/alerts/rules")
 def list_rules(resource_id: str = "", db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Every rule for Alerts viewers; otherwise the rules on objects you own. With resource_id: rules naming it."""
-    everything = settings_access.allowed(db, user, "set-alerts", "view")
+    everything = settings_access.allowed(db,user,"set-alerts","alerts.rules.read")
     out = []
     for rule in db.scalars(select(AlertRule).order_by(AlertRule.name)):
         if resource_id and resource_id not in (rule.resource_ids or []):
             continue
-        if everything or may_manage(db, user, rule.resource_ids or []):
+        if everything or may_manage(db,user,rule.resource_ids or [],"alerts.rules.read"):
             out.append(rule_out(db, rule))
     return out
 
@@ -208,7 +214,9 @@ def update_rule(rule_id: str, body: RuleIn, db: Session = Depends(get_db), user:
     rule = db.get(AlertRule, rule_id)
     if rule is None or not may_manage(db, user, rule.resource_ids or []):
         raise HTTPException(404, "rule not found")
-    _check(db, body, user)
+    _check(db,body,user,"alerts.rules.update")
+    if rule.enabled!=body.enabled and not may_manage(db,user,body.resource_ids,"alerts.rules.enable"):
+        raise HTTPException(403,"alerts.rules.enable permission required")
     for key, value in body.model_dump().items():
         setattr(rule, key, value)
     audit(db, rbac.resolve_user(db, user).username, "alert.rule_changed", rule.id, name=rule.name, events=rule.events)
@@ -219,7 +227,7 @@ def update_rule(rule_id: str, body: RuleIn, db: Session = Depends(get_db), user:
 @router.delete("/v1/alerts/rules/{rule_id}", status_code=204)
 def delete_rule(rule_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     rule = db.get(AlertRule, rule_id)
-    if rule is None or not may_manage(db, user, rule.resource_ids or []):
+    if rule is None or not may_manage(db,user,rule.resource_ids or [],"alerts.rules.delete"):
         raise HTTPException(404, "rule not found")
     audit(db, rbac.resolve_user(db, user).username, "alert.rule_deleted", rule.id, name=rule.name)
     db.delete(rule)

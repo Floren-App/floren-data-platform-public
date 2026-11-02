@@ -254,8 +254,8 @@ def test_run_program_errors(client):
     r = client.post("/v1/runs", headers=as_("bob"), json={"workspace_id": ws_id, "program": "sales-report"})
     assert r.status_code == 403 and "finance-dw" in r.json()["detail"]["message"]
 
-    ws_ana = start_workspace(client)
     setup_finance_db(client)
+    ws_ana = start_workspace(client)
     put_config(ws_ana)
     r = client.post("/v1/runs", headers=as_("ana"), json={"workspace_id": ws_ana, "program": "sales-report",
                                                           "args": {"top": "many"}})

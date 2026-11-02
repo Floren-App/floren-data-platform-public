@@ -36,15 +36,15 @@ def test_primary_group_owns_new_objects_and_secondary_groups_cannot_authorize_cr
     assert any(a['app_group_id']==alpha and a['role']=='Owner' and not a['inherited'] for a in assignments)
     select_group(client,'ana',beta)
     assert client.get('/v1/me',headers=as_('ana')).json()['active_group_id']==beta
-    # Alpha remains a secondary group, preserving read/edit/assign authority on existing objects.
+    # Inactive group membership cannot authorize mutation or delegation.
     rows = client.get('/v1/rbac/resources',headers=as_('ana')).json()
-    assert 'assign' in next(r for r in rows if r['id']==child.json()['id'])['actions']
+    assert 'assign' not in next(r for r in rows if r['id']==child.json()['id'])['actions']
     denied = client.post('/v1/rbac/folders',headers=as_('ana'),json={'name':'Denied','parent_id':parent['id']})
-    assert denied.status_code==403 and 'Secondary groups' in denied.text
+    assert denied.status_code==403
     assert not any(g['name'].startswith('Personal owners ') for g in client.get('/v1/rbac/groups',headers=as_('admin')).json())
 
 
-def test_browsing_follows_active_group_with_inheritance_and_secondary_actions_remain(client,repo):
+def test_browsing_and_direct_access_follow_active_group_with_inheritance(client,repo):
     folders=[];groups=[];pubs=[];schemas=[]
     for suffix,layer in (('alpha',layers.NON_PROD),('beta',layers.PROD)):
         folder=client.post('/v1/rbac/folders',headers=as_('admin'),json={'name':suffix,'layer_id':layer}).json()
@@ -75,8 +75,8 @@ def test_browsing_follows_active_group_with_inheritance_and_secondary_actions_re
             assert {a['name'] for a in found['items']}=={('alpha','beta')[index]+'_cards'}
             suggestions=client.get('/v1/catalog/suggest',headers=as_(username),params={'q':'cards'}).json()
             assert ('alpha','beta')[1-index]+'_cards' not in str(suggestions)
-            # Filtering discovery does not remove secondary access to an existing workload.
-            assert client.get('/v1/workloads/'+pubs[1-index]['id'],headers=as_(username)).status_code==200
+            # Direct URLs cannot borrow authority from an inactive group.
+            assert client.get('/v1/workloads/'+pubs[1-index]['id'],headers=as_(username)).status_code in (403,404)
     select_group(client,'admin',ownership.GLOBAL_ADMIN)
     assert {p['id'] for p in client.get('/v1/workloads',headers=as_('admin')).json()}=={p['id'] for p in pubs}
     # Revoking selected-group membership never falls back to another group's listings.
@@ -158,7 +158,7 @@ def test_global_admin_is_protected_live_and_has_owner_access_to_future_objects(c
     assert not client.get('/v1/me',headers=as_('bob')).json()['is_admin']
 
 
-def test_primary_sql_creation_is_separate_from_combined_ddl_and_services_keep_direct_grants(client):
+def test_sql_uses_selected_group_and_services_keep_direct_grants(client):
     _,alpha,beta = groups(client)
     client.put('/v1/admin/datasources/primary-db',headers=as_('admin'),json=integration('primary-db','postgres')).raise_for_status()
     schema = client.post('/v1/rbac/sources/primary-db/schemas',headers=as_('admin'),json={'name':'analytics'}).json()
@@ -173,9 +173,9 @@ def test_primary_sql_creation_is_separate_from_combined_ddl_and_services_keep_di
         scope=sql_access.scopes(db,sql_access.SqlActor(user,'human'))
         query=SimpleNamespace(scope=scope,principal_id=user.principal_id)
         table={'table':{'catalogName':'primary_db','schemaName':'analytics','tableName':'cards'}}
-        assert scope['primary_db']['schemas']['analytics']=='Admin'
+        assert scope['primary_db']['schemas']['analytics']=='Reader'
         assert not sql_access.policy_allow(query,{'operation':'CreateTable','resource':table})
-        assert sql_access.policy_allow(query,{'operation':'DropTable','resource':table})
+        assert not sql_access.policy_allow(query,{'operation':'DropTable','resource':table})
         assert sql_access.policy_allow(query,{'operation':'SelectFromColumns','resource':table})
     select_group(client,'ana',alpha)
     with SessionLocal() as db:
@@ -214,6 +214,8 @@ def test_migration_removes_personal_groups_and_preserves_exact_nonadmin_access(c
 
 def test_workspaces_use_existing_primary_group_without_sharing_personal_execution(client):
     _,alpha,_ = groups(client)
+    from tests.rbac_helpers import workspace_permissions
+    workspace_permissions(client,alpha)
     select_group(client,'ana',alpha)
     before=client.get('/v1/rbac/groups',headers=as_('admin')).json()
     ws=client.post('/v1/workspaces',headers=as_('ana'),json={'name':'Private','editor':'vscode'}).json()
@@ -227,6 +229,8 @@ def test_workspaces_use_existing_primary_group_without_sharing_personal_executio
 
 def test_job_keeps_admitted_primary_creation_rights_after_switch_and_revocation(client):
     _,alpha,beta=groups(client)
+    from tests.rbac_helpers import workspace_permissions
+    workspace_permissions(client,alpha)
     client.put('/v1/admin/datasources/snap-db',headers=as_('admin'),json=integration('snap-db','postgres')).raise_for_status()
     schema=client.post('/v1/rbac/sources/snap-db/schemas',headers=as_('admin'),json={'name':'analytics'}).json()
     for group,role in ((alpha,'Admin'),(beta,'Reader')):
@@ -248,3 +252,183 @@ def test_job_keeps_admitted_primary_creation_rights_after_switch_and_revocation(
         fresh=sql_access.scopes(db,sql_access.SqlActor(rbac.resolve_user(db,User('ana')),'human'))
         assert old['snap_db']['schemas']['analytics']=='Admin' and old['snap_db']['create_schemas']==['analytics']
         assert fresh['snap_db']['schemas']['analytics']=='Reader' and not fresh['snap_db']['create_schemas']
+
+
+def test_workspace_functions_are_explicit_layer_scoped_and_private(client):
+    from .rbac_helpers import workspace_permissions
+    _,alpha,_=groups(client)
+    select_group(client,'ana',alpha)
+    body={'name':'Private dev','editor':'sql','layer_id':layers.NON_PROD}
+    assert client.post('/v1/workspaces',headers=as_('ana'),json=body).status_code==403
+    def grant(role,target='workspaces',layer=layers.NON_PROD):
+        response=client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+            'namespace':'workspaces','target_id':target,'layer_id':layer,'app_group_id':alpha,'role':role})
+        assert response.status_code==201,response.text
+        return response.json()['id']
+    grant('Manager')
+    response=client.post('/v1/workspaces',headers=as_('ana'),json=body)
+    assert response.status_code==201,response.text
+    ws=response.json(); path='/v1/workspaces/'+ws['id']
+    assert 'workspaces.object.start' not in ws['capabilities']
+    spoof=client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+        'namespace':'workspaces','target_id':'workspace:'+ws['id'],'layer_id':layers.PROD,
+        'app_group_id':alpha,'role':'Admin'})
+    assert spoof.status_code==422
+    assert client.post(path+'/start',headers=as_('ana')).status_code==403
+    assert client.post('/v1/runs',headers=as_('ana'),json={'workspace_id':ws['id'],'kind':'script','entrypoint':'x.py','pool':'small'}).status_code==403
+    assert client.get(path+'/config',headers=as_('ana')).status_code==403
+    assert client.post('/v1/workspaces',headers=as_('ana'),json={**body,'layer_id':layers.PROD}).status_code==403
+    grant('Executor',target='workspace:'+ws['id'])
+    assert client.post(path+'/start',headers=as_('ana')).status_code==200
+    assert client.post(path+'/open',headers=as_('ana')).status_code==403
+    grant('Contributor',target='workspace:'+ws['id'])
+    assert client.post(path+'/open',headers=as_('ana')).status_code==200
+    assert client.delete(path,headers=as_('ana')).status_code==403
+    bob=client.get('/v1/me',headers=as_('bob')).json()
+    client.post('/v1/rbac/groups/'+alpha+'/bindings',headers=as_('admin'),json={'principal_id':bob['principal_id']}).raise_for_status()
+    select_group(client,'bob',alpha)
+    assert client.post(path+'/open',headers=as_('bob')).status_code==404
+    assert client.get('/v1/workspaces',headers=as_('bob')).json()==[]
+
+
+def test_queued_workspace_start_rechecks_revoked_permission(client):
+    from .rbac_helpers import workspace_permissions
+    from app.models import Workspace, PermissionGrant
+    from app.routes.workspaces import launch_workspace
+    _,alpha,_=groups(client)
+    select_group(client,'ana',alpha)
+    workspace_permissions(client,alpha)
+    response=client.post('/v1/workspaces',headers=as_('ana'),json={'name':'Queued','editor':'sql'})
+    assert response.status_code==201,response.text
+    with SessionLocal() as db:
+        ws=db.get(Workspace,response.json()['id'])
+        ws.status='queued'
+        for assignment in db.scalars(select(PermissionGrant).where(PermissionGrant.app_group_id==alpha)):
+            db.delete(assignment)
+        db.commit()
+        orch=deps.get_orchestrator()
+        before=set(orch.executions)
+        launch_workspace(db,orch,ws)
+        assert ws.status=='failed' and 'revoked' in ws.startup_error
+        assert set(orch.executions)==before
+
+
+def test_run_owner_needs_separate_logs_artifacts_and_cancel_functions(client):
+    from .test_api import start_workspace
+    from app.models import PermissionGrant
+    ws=start_workspace(client)
+    response=client.post('/v1/runs',headers=as_('ana'),json={
+        'workspace_id':ws,'kind':'app','entrypoint':'app.py','pool':'small'})
+    assert response.status_code==201,response.text
+    run=response.json();path='/v1/runs/'+run['id']
+    # Retain workspace and run lifecycle grants; revoke only payload grants.
+    with SessionLocal() as db:
+        for assignment in db.scalars(select(PermissionGrant).where(PermissionGrant.namespace.in_(('artifacts','logs')))):
+            db.delete(assignment)
+        db.commit()
+    assert client.get(path,headers=as_('ana')).status_code==200
+    assert client.get(path+'/logs',headers=as_('ana')).status_code==403
+    assert client.get(path+'/outputs',headers=as_('ana')).status_code==403
+    assert client.post(path+'/open',headers=as_('ana')).status_code==403
+    me=client.get('/v1/me',headers=as_('ana')).json()
+    assignment=client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+        'target_id':'run:'+run['id'],'namespace':'artifacts','role':'Viewer',
+        'layer_id':run['layer_id'],'principal_id':me['principal_id']})
+    assert assignment.status_code==201,assignment.text
+    assert client.get(path+'/outputs',headers=as_('ana')).status_code==200
+    assert client.post(path+'/open',headers=as_('ana')).status_code==403
+    own=client.get(path,headers=as_('ana')).json()
+    assert 'artifacts.list' in own['capabilities'] and 'artifacts.read' not in own['capabilities']
+    body={k:v for k,v in assignment.json().items() if k!='id'}
+    body['role']='Executor'
+    client.put('/v1/permissions/assignments/'+assignment.json()['id'],headers=as_('admin'),json=body).raise_for_status()
+    ticket=client.post(path+'/open',headers=as_('ana'))
+    assert ticket.status_code==200,ticket.text
+    from app.routes.gateway import _allowed
+    with SessionLocal() as db:
+        assert _allowed(db,'apps',run['id'],'ana',[])
+    client.delete('/v1/permissions/assignments/'+assignment.json()['id'],headers=as_('admin')).raise_for_status()
+    with SessionLocal() as db:
+        assert not _allowed(db,'apps',run['id'],'ana',[])
+    with SessionLocal() as db:
+        for item in db.scalars(select(PermissionGrant).where(PermissionGrant.namespace=='runs')):
+            db.delete(item)
+        db.commit()
+    assert client.post(path+'/stop',headers=as_('ana')).status_code==403
+
+
+def test_repository_warehouse_and_secret_allowlists_follow_only_selected_group(client):
+    from app import identity
+    from app.models import GitRepository, ComputePool
+    from app.routes.deploy import _can_deploy_from
+    from app.routes.common import require_warehouse
+    from fastapi import HTTPException
+    import pytest
+    _,alpha,beta=groups(client)
+    select_group(client,'ana',alpha)
+    with SessionLocal() as db:
+        user=rbac.resolve_user(db,User('ana'))
+        repo=GitRepository(name='isolated',url='https://example.com/repo.git',allowed_groups=[beta])
+        assert not _can_deploy_from(repo,user,db)
+        db.add(ComputePool(name='restricted',cpu=1,memory_gb=1,allowed_groups=[beta]));db.commit()
+        with pytest.raises(HTTPException):
+            require_warehouse(db,'restricted',user)
+        assert not identity.can_access(db,'group',beta,user)
+    select_group(client,'ana',beta)
+    with SessionLocal() as db:
+        user=rbac.resolve_user(db,User('ana'))
+        repo=GitRepository(name='isolated',url='https://example.com/repo.git',allowed_groups=[beta])
+        assert _can_deploy_from(repo,user,db)
+        assert require_warehouse(db,'restricted',user).name=='restricted'
+        assert identity.can_access(db,'group',beta,user)
+
+
+def test_run_metadata_and_retry_are_separate_live_permissions(client):
+    from .test_api import start_workspace
+    from app.models import PermissionGrant
+    ws=start_workspace(client)
+    response=client.post('/v1/runs',headers=as_('ana'),json={
+        'workspace_id':ws,'kind':'script','entrypoint':'task.py','pool':'small'})
+    assert response.status_code==201,response.text
+    run=response.json();path='/v1/runs/'+run['id']
+    client.post(path+'/stop',headers=as_('ana')).raise_for_status()
+    with SessionLocal() as db:
+        for assignment in db.scalars(select(PermissionGrant).where(PermissionGrant.namespace=='runs')):
+            db.delete(assignment)
+        db.commit()
+    assert client.get(path,headers=as_('ana')).status_code==403
+    assert client.get('/v1/runs',headers=as_('ana')).json()==[]
+    assert client.post(path+'/retry',headers=as_('ana')).status_code==403
+    pid=client.get('/v1/me',headers=as_('ana')).json()['principal_id']
+    grant=client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+        'target_id':'run:'+run['id'],'namespace':'runs','layer_id':run['layer_id'],
+        'principal_id':pid,'role':'Viewer'})
+    assert grant.status_code==201,grant.text
+    assert client.get(path,headers=as_('ana')).status_code==200
+    assert client.post(path+'/retry',headers=as_('ana')).status_code==403
+    from .rbac_helpers import workspace_permissions
+    group=client.get('/v1/me',headers=as_('ana')).json()['active_group_id']
+    workspace_permissions(client,group)
+    retried=client.post(path+'/retry',headers=as_('ana'))
+    assert retried.status_code==201,retried.text
+    assert retried.json()['id']!=run['id']
+
+
+def test_sql_result_cursors_cannot_be_reused_after_switching_groups(client):
+    from app.models import SqlQuery
+    from app.routes.sql import owned_query
+    from fastapi import HTTPException
+    import pytest
+    _,alpha,beta=groups(client)
+    select_group(client,'ana',alpha)
+    with SessionLocal() as db:
+        who=sql_access.actor(db,'Bearer ana')
+        from app.models import utcnow
+        from datetime import timedelta
+        query=SqlQuery(principal_id=who.user.principal_id,actor=who.user.username,binding=who.binding,scope={},state='RUNNING',expires_at=utcnow()+timedelta(minutes=10))
+        db.add(query);db.flush();ident=query.id;db.commit()
+    select_group(client,'ana',beta)
+    with SessionLocal() as db:
+        with pytest.raises(HTTPException) as denied:
+            owned_query(db,ident,sql_access.actor(db,'Bearer ana'))
+        assert denied.value.status_code==404

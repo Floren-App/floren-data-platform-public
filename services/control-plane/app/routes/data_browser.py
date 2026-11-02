@@ -23,9 +23,20 @@ async def preview(resource_id: str, request: Request, response: Response,
     source, schema = await run_in_threadpool(transaction_call, db, scope, resource_id, user)
     if source.kind not in sql_access.SQL_KINDS:
         raise HTTPException(409, "table preview supports PostgreSQL and Iceberg")
+    from ..object_access import require_action
+    await run_in_threadpool(transaction_call, db, require_action, user, schema, 'data.sql.preview', table)
     def identifier(value):
         return '"' + value.replace('"', '""') + '"'
-    statement = "SELECT * FROM " + ".".join(identifier(v) for v in (sql_access.catalog_name(source), schema.name, table)) + " LIMIT 25"
+    projection = '*'
+    from ..object_access import schema_rules, actions_for
+    rules = await run_in_threadpool(transaction_call, db, schema_rules, user, schema)
+    legacy = await run_in_threadpool(transaction_call, db, rbac.data_scope, user, source)
+    if not legacy.get(schema.name) and 'data.sql.select' not in actions_for(rules,table):
+        columns = [name for name,actions in rules.get('tables',{}).get(table,{}).get('columns',{}).items() if 'data.sql.select' in actions and 'data.sql.preview' in actions]
+        if not columns:
+            raise HTTPException(403, 'no columns available for preview')
+        projection = ','.join(identifier(name) for name in sorted(columns))
+    statement = "SELECT " + projection + " FROM " + ".".join(identifier(v) for v in (sql_access.catalog_name(source), schema.name, table)) + " LIMIT 25"
     result = await query_request(QueryIn(source=source.name, sql=statement, max_rows=25),
         request, db=db, authorization=authorization, x_fdp_viewer="")
     def json_safe(value):
@@ -44,14 +55,15 @@ def scope(db, resource_id, user):
     source = db.get(DataSource, schema.object_id) if schema and schema.kind == "schema" else None
     # Management/recovery authority is not a data-role bypass, even for metadata.
     role = rbac.data_scope(db, user, source).get(schema.name) if source else None
-    if not role:
+    from ..object_access import has_schema
+    if not role and not (schema and source and source.kind in (sql_access.SQL_KINDS | {'s3'}) and has_schema(db, user, schema)):
         raise HTTPException(404, "schema not available with this data identity")
     if schema.config.get("state") != "ready":
         raise HTTPException(409, "set up schema access before browsing its objects")
     return source, schema
 
 
-def storage_client(db, source, schema, store, reserved=frozenset()):
+def storage_client(db, source, schema, store, reserved=frozenset(), user=None, path="", list_only=False):
     """An S3 client with temporary read-only credentials narrowed to this registered namespace, and the namespace's
     root key. reserved: Iceberg table buckets, which are never read as plain files."""
     import boto3
@@ -61,7 +73,17 @@ def storage_client(db, source, schema, store, reserved=frozenset()):
     if cfg.get("bucket") in reserved:
         raise HTTPException(409, "Iceberg buckets are accessible only through governed SQL")
     root = storage_access.prefix_path(cfg.get("prefix", ""), schema.config.get("prefix", schema.name))
-    cred, _ = storage_access.credentials(source, {schema.name: schema}, {schema.name: "Reader"}, store, db=db)
+    policy = None
+    if user is not None and not rbac.data_scope(db, user, source):
+        from ..object_access import schema_rules, file_actions, file_session_policy, directory_list_allowed
+        relative = storage_access.prefix_path('',path)
+        rules = schema_rules(db,user,schema)
+        if list_only and not directory_list_allowed(rules, relative):
+            raise HTTPException(403, 'directory listing permission required')
+        target = Resource(kind='directory' if list_only else 'file', name=relative, config={'path':relative})
+        policy, _ = file_session_policy(source,schema,target,file_actions(rules,relative),'list' if list_only else 'read')
+    options = {'policy_override':policy} if policy is not None else {}
+    cred, _ = storage_access.credentials(source, {schema.name: schema}, {schema.name: "Reader"}, store, db=db, **options)
     client = boto3.client("s3", endpoint_url=cfg.get("endpoint_url"), region_name=cfg.get("region", "us-east-1"),
         aws_access_key_id=cred["access_key_id"], aws_secret_access_key=cred["secret_access_key"],
         aws_session_token=cred["session_token"],
@@ -69,14 +91,28 @@ def storage_client(db, source, schema, store, reserved=frozenset()):
     return client, cfg["bucket"], root
 
 
-def storage_children(db, source, schema, path, after, limit, store, reserved=frozenset()):
+def storage_children(db, source, schema, path, after, limit, store, reserved=frozenset(), user=None):
     """reserved: Iceberg table buckets, which are never listed as plain files."""
     from botocore.exceptions import BotoCoreError, ClientError
     from .. import storage_access
 
     relative = storage_access.prefix_path("", path)
+    if user is not None and not rbac.data_scope(db,user,source):
+        from ..object_access import schema_rules, file_actions, directory_list_allowed
+        rules = schema_rules(db,user,schema)
+        if not directory_list_allowed(rules,relative):
+            # Navigate only known granted descendants; no parent bucket listing is issued.
+            virtual = {}
+            prefix = relative+'/' if relative else ''
+            for key, entry in rules.get('files', {}).items():
+                if key.startswith(prefix) and key != relative:
+                    suffix = key[len(prefix):]
+                    part = suffix.split('/',1)[0]
+                    virtual[part] = {'name':part,'kind':'folder' if '/' in suffix or entry['directory'] else 'file',
+                        'path':storage_access.prefix_path(relative,part)}
+            return {'children':[virtual[k] for k in sorted(virtual)][:limit], 'next_cursor':None}
     try:
-        client, bucket, root = storage_client(db, source, schema, store, reserved)
+        client, bucket, root = storage_client(db, source, schema, store, reserved, user, relative, True)
         prefix = storage_access.prefix_path(root, relative)
         prefix = prefix + "/" if prefix else ""
         result = client.list_objects_v2(Bucket=bucket, Prefix=prefix, Delimiter="/", MaxKeys=limit,
@@ -137,7 +173,7 @@ async def children(resource_id: str, request: Request, response: Response,
             raise HTTPException(422, "storage namespaces contain folders and files")
         from ..storage_types import lake_buckets
         reserved = await run_in_threadpool(transaction_call, db, lake_buckets)
-        result = await run_in_threadpool(transaction_call, db, storage_children, source, schema, path, after, limit, store, reserved)
+        result = await run_in_threadpool(transaction_call, db, storage_children, source, schema, path, after, limit, store, reserved, user)
         from ..catalog import index_children
         await run_in_threadpool(transaction_call, db, index_children, schema, result["children"], None, path)
         return result
@@ -145,8 +181,18 @@ async def children(resource_id: str, request: Request, response: Response,
         raise HTTPException(409, "metadata browsing supports PostgreSQL, Iceberg, and S3 sources")
     if path:
         raise HTTPException(422, "SQL schemas do not have storage paths")
+    from ..object_access import require_action
+    await run_in_threadpool(transaction_call, db, require_action, user, schema,
+                            'storage.objects.describe' if table else 'storage.objects.list', table or '')
     if cached:
-        return await run_in_threadpool(transaction_call, db, indexed_children, schema, table)
+        def filtered(db):
+            result = indexed_children(db, schema, table)
+            if not rbac.data_scope(db, user, source):
+                from ..object_access import schema_rules, visible
+                rules = schema_rules(db, user, schema)
+                result['children'] = [item for item in result['children'] if visible(rules, table or item['name'], item['name'] if table else '')]
+            return result
+        return await run_in_threadpool(transaction_call, db, filtered)
     catalog = '"' + sql_access.catalog_name(source).replace('"', '""') + '"'
     if table is None:
         # Names only: asking information_schema.tables for table_type makes Trino load every Iceberg table's
@@ -199,7 +245,7 @@ async def file_preview(resource_id: str, response: Response, path: str = Query(m
     if source.kind != "s3":
         raise HTTPException(409, "file preview is for S3 files namespaces")
     reserved = await run_in_threadpool(transaction_call, db, lake_buckets)
-    client, bucket, root = await run_in_threadpool(transaction_call, db, storage_client, source, schema, store, reserved)
+    client, bucket, root = await run_in_threadpool(transaction_call, db, storage_client, source, schema, store, reserved, user, path, False)
     result = await run_in_threadpool(preview, client, bucket, root, path)
     def record(db):
         resolved = rbac.resolve_user(db, user)

@@ -40,6 +40,8 @@ def test_missing_paths_are_not_errors():
 
 
 def test_a_sealed_backend_is_a_503_for_api_callers(client, monkeypatch):
+    from .rbac_helpers import secret_permissions
+    secret_permissions(client,'ana')
     from app import deps
     sealed = store_raising(hvac.exceptions.VaultDown('sealed'))
     client.app.dependency_overrides[deps.get_secret_store] = lambda: sealed

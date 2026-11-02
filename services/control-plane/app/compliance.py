@@ -167,6 +167,34 @@ def _subtree(db, resource: Resource) -> List[Resource]:
 def role_level(db, resource: Resource, group_id: Optional[str] = None) -> str:
     """The highest level a role on this object gives: everything under it; table masks that apply to the group count."""
     from .models import DataPolicy
+    if resource.kind in rbac.DATA_OBJECT_KINDS:
+        chain = rbac.ancestors(db, resource)
+        schema = next((r for r in chain if r.kind == 'schema'), None)
+        table = next((r for r in chain if r.kind == 'table'), None)
+        if not schema:
+            return classification.UNCLASSIFIED
+        candidates = list(db.scalars(select(CatalogAsset).where(CatalogAsset.resource_id == schema.id)))
+        values = []
+        for asset in candidates:
+            path = asset.attributes.get('object_path') or asset.name
+            if asset.kind == 'schema':
+                values.append(classification.effective(db, asset)); continue
+            selected = (table and path == table.name) or (resource.kind in ('file','directory') and
+                (path == resource.config['path'] or (resource.kind == 'directory' and path.startswith(resource.config['path']+'/'))))
+            if not selected:
+                continue
+            if resource.kind == 'column':
+                column = classification.column_governance(asset).get(resource.name, {})
+                values.extend([asset.governance.get('classification'), column.get('classification')])
+            else:
+                masked_columns = set()
+                if group_id and table:
+                    for policy in db.scalars(select(DataPolicy).where(DataPolicy.schema_id == schema.id,
+                            DataPolicy.table_name == table.name, DataPolicy.kind == 'column_mask')):
+                        if group_id not in (policy.exempt_groups or []):
+                            masked_columns.add(policy.column_name)
+                values.append(classification.effective(db, asset, masked_columns))
+        return classification.highest(db, values)
     ids = [r.id for r in _subtree(db, resource)]
     masked: Dict[str, set] = {}
     if group_id:
@@ -200,6 +228,8 @@ def owns(db, resource: Resource, group_id: Optional[str]) -> bool:
 
 
 def role_requirement(db, resource: Resource, role: str, group_id: Optional[str]) -> dict:
+    if resource.kind in (*rbac.DATA_OBJECT_KINDS, 'source', 'schema', 'kafka', 'topic') and role in ('Viewer', 'Manager'):
+        return {"layer_id": None, "classification": classification.UNCLASSIFIED, "policy": None}
     # The data's owners do not justify their own use of it; becoming an owner does need a form.
     if "read" not in rbac.roles_for(resource).get(role, set()) or owns(db, resource, group_id):
         return {"layer_id": None, "classification": classification.UNCLASSIFIED, "policy": None}
@@ -228,7 +258,7 @@ def has_role(db, user, role: str, *, resource_id: Optional[str] = None, layer_id
     user = rbac.resolve_user(db, user)
     if user.is_admin and not user.execution_context:
         return True
-    groups = rbac.app_groups(db, user)
+    groups = rbac.effective_app_groups(db, user)
     if not groups:
         return False
     return bool(role_groups(db, role, resource_id=resource_id, layer_id=layer_id, level=level, group_id=group_id, among=groups))
@@ -383,12 +413,12 @@ def apply_role(db, resource_id: str, group_id: str, role: str) -> Optional[str]:
     """Give the role (never lowering one the group has); returns the lower role it replaced, if any."""
     from .models import RoleAssignment
     resource = db.get(Resource, resource_id)
-    roles = list(rbac.roles_for(resource))
+    roles = rbac.roles_for(resource)
     current = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == group_id))
     if current is None:
         db.add(RoleAssignment(resource_id=resource_id, app_group_id=group_id, role=role))
         return None
-    if current.role in roles and role in roles and roles.index(current.role) < roles.index(role):
+    if current.role in roles and role in roles and not roles[role].issubset(roles[current.role]):
         previous, current.role = current.role, role
         return previous  # the lower role the group goes back to when this ends
     return None
@@ -427,7 +457,11 @@ def unapproved_justified(db, user, groups) -> set:
         return set()
     approved = set(db.scalars(select(MembershipApproval.app_group_id).where(MembershipApproval.principal_id == user.principal_id,
                                                                           MembershipApproval.app_group_id.in_(list(groups)))))
-    return {(g.resource_id, g.app_group_id) for g in justified if g.app_group_id not in approved}
+    cases = {c.id:c for c in db.scalars(select(AccessCase).where(AccessCase.id.in_({g.case_id for g in justified})))}
+    def expired(grant):
+        case = cases.get(grant.case_id)
+        return case is None or case.status != 'approved' or (case.approved_until is not None and _aware(case.approved_until) <= utcnow())
+    return {(g.resource_id, g.app_group_id) for g in justified if g.app_group_id not in approved or expired(g)}
 
 
 def pending_members(db) -> List[dict]:

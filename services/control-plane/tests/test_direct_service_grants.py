@@ -43,7 +43,7 @@ def test_direct_service_data_roles_reach_trino_catalog_and_snapshots_without_a_g
     with SessionLocal() as db:
         source = db.get(DataSource, source_id)
         assert rbac.data_scope(db, actor, source) == {'reporting': 'Contributor'}
-        assert sql_access.scopes(db, sql_access.SqlActor(actor, 'test'))['finance']['schemas'] == {'reporting': 'Contributor'}
+        assert sql_access.scopes(db, sql_access.SqlActor(actor, 'test'))['finance']['schemas'] == {'reporting': 'Reader'}
         assert data_access.snapshot(db, actor)[source.id] == {'reporting': 'Contributor'}
         _, actions = catalog.permissions(db, actor)
         assert {'read', 'write'} <= actions[schema_id] and 'create' not in actions[schema_id]
@@ -69,10 +69,10 @@ def test_registered_workload_identity_can_be_granted_data_directly(client, repo)
     assert any(p['id'] == pid and p['name'] == pub['title'] for p in picked)
     first = assign(client, schema['id'], pid, 'Reader')
     assert first.status_code == 200, first.text
-    second = assign(client, schema['id'], pid, 'Contributor')
+    second = assign(client, schema['id'], pid, 'Admin')
     assert second.status_code == 200
     grants = [g for g in second.json() if g['principal_id'] == pid]
-    assert len(grants) == 1 and grants[0]['role'] == 'Contributor' and grants[0]['app_group_id'] is None
+    assert len(grants) == 1 and grants[0]['role'] == 'Admin' and grants[0]['app_group_id'] is None
     repaired = client.post(f"/v1/workloads/{pub['id']}/sync", headers=as_('ana')).json()
     assert repaired['status'] == 'live' and repaired['access_issue'] is None
     with SessionLocal() as db:
@@ -91,7 +91,8 @@ def test_direct_grants_require_resource_owner_and_only_accept_active_users_or_se
     human = next(p for p in directory if p['kind'] == 'user')
     assert assign(client, schema['id'], human['id'], 'Reader').status_code == 200
     assert assign(client, schema['id'], 'missing', 'Reader').status_code == 422
-    assert assign(client, schema['id'], actor.principal_id, 'Executor').status_code == 422
+    assert assign(client, schema['id'], actor.principal_id, 'Executor').status_code == 200
+    assert assign(client, schema['id'], actor.principal_id, 'UndefinedRole').status_code == 422
     assert client.put(f"/v1/rbac/resources/{schema['id']}/assignments", headers=as_('admin'),
                       json={'principal_id': actor.principal_id, 'app_group_id': 'also-set', 'role': 'Reader'}).status_code == 422
     # An object Owner need not be a group owner to discover service identities.
@@ -110,13 +111,13 @@ def test_revocation_blocks_new_jobs_but_retains_running_job_snapshot(client, rep
     pub = deploy(client, repo, program='sales-report', slug='direct-report', execution_mode='fixed').json()
     pid = pub['service_principal_id']
     schema = next(r for r in client.get('/v1/rbac/resources', headers=as_('admin')).json() if r['kind'] == 'schema')
-    assert assign(client, schema['id'], pid, 'Contributor').status_code == 200
+    assert assign(client, schema['id'], pid, 'Admin').status_code == 200
     first = client.post(f"/v1/workloads/{pub['id']}/runs", headers=as_('ana'), json={})
     assert first.status_code == 201, first.text
     with SessionLocal() as db:
         run = db.get(Run, first.json()['id'])
         snapshot = run.access_snapshot
-        assert snapshot[schema['object_id']]['public'] == 'Contributor'
+        assert snapshot[schema['object_id']]['public'] == 'Admin'
     assert client.delete(f"/v1/rbac/resources/{schema['id']}/assignments/services/{pid}", headers=as_('admin')).status_code == 204
     assert client.post(f"/v1/workloads/{pub['id']}/runs", headers=as_('ana'), json={}).status_code == 403
     with SessionLocal() as db:

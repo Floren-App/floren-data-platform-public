@@ -18,6 +18,7 @@ export const TAB_PAGES: Record<TabKind, string> = {
   "source": "storage",
   "schema": "storage",
   "data-object": "storage",
+  "data-permissions": "storage",
   "admin-sources": "storage",
   "kafka": "kafka",
   "kafka-clusters": "kafka",
@@ -59,6 +60,7 @@ export const TAB_PAGES: Record<TabKind, string> = {
   "package": "packages",
   "package-imports": "imports",
   "admin-audit": "set-auditlog",
+  "admin-backups": "set-backups",
   "deadlines": "deadlines",
 };
 
@@ -70,6 +72,9 @@ export function can(me: Me | null, action: string, target: string, layer?: strin
   if (me?.acting_admin) return true;
   if (me?.permission_grants?.some((g) => g.target_id === target &&
       ((g.layer_id === "*" && !!layer) || (g.layer_id ?? null) === (layer || null)) && g.actions.includes(action))) return true;
-  // Explicit legacy page assignments remain broad global grants during migration.
+  if (me?.settings_capabilities) return !layer && !!me.settings_capabilities[target]?.includes(action);
+  // Compatibility for older servers.
   return !layer && me?.settings?.[target] === "manage" && !action.endsWith("ceiling.change");
 }
+
+export const workspaceCreateLayers = (hub: import("./hub").Hub) => hub.layers.filter((l) => l.workspaces && can(hub.me, "workspaces.collection.create", "workspaces", l.id));

@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import package_imports, packages as repo, rbac
+from .. import permissions, package_imports, packages as repo, rbac
 from ..auth import User
 from ..db import SessionLocal, get_db
 from ..models import AppGroup, Package, PackageFile, PackageImport, Resource
@@ -104,7 +104,8 @@ def _package(db: Session, kind: str, name: str) -> Package:
 
 def _owner(db: Session, package: Package) -> Optional[str]:
     resource = db.get(Resource, package.resource_id) if package.resource_id else None
-    group = db.get(AppGroup, (resource.config or {}).get("owner_group_id")) if resource else None
+    group_id = (resource.config or {}).get("owner_group_id") if resource else None
+    group = db.get(AppGroup, group_id) if group_id else None
     return group.name if group else None
 
 
@@ -141,7 +142,7 @@ def list_packages(kind: Optional[Literal["python", "r"]] = None, q: str = "", db
     query = select(Package).order_by(Package.kind, Package.key)
     if kind:
         query = query.where(Package.kind == kind)
-    rows = [p for p in db.scalars(query) if q.lower() in p.key or q.lower() in p.name.lower()]
+    rows = [p for p in db.scalars(query) if (q.lower() in p.key or q.lower() in p.name.lower()) and repo.permitted(db,user,p)]
     from ..config import get_settings
     s = get_settings()
     root = rbac.packages_root(db)
@@ -172,8 +173,7 @@ def package_allowlist(db: Session = Depends(get_db), _: User = Depends(package_u
 @router.put("/allowlist")
 def set_package_allowlist(body: PackageAllowlistIn, db: Session = Depends(get_db), user: User = Depends(package_user)):
     from .. import package_allowlist as allow
-    if not (user.is_admin and not user.execution_context):
-        raise HTTPException(403, "administrators manage the package allowlist")
+    permissions.require(db,user,"packages.imports.allowlist.set","packages")
     entries = {}
     for kind in ("python", "r"):
         seen, rows = set(), []
@@ -199,8 +199,7 @@ def reset_package_allowlist(db: Session = Depends(get_db), user: User = Depends(
     """Off and empty: Publishers may import any public package."""
     from ..models import PlatformSetting
     from .. import package_allowlist as allow
-    if not (user.is_admin and not user.execution_context):
-        raise HTTPException(403, "administrators manage the package allowlist")
+    permissions.require(db,user,"packages.imports.allowlist.reset","packages")
     row = db.get(PlatformSetting, allow.KEY)
     if row:
         db.delete(row)
@@ -233,12 +232,14 @@ def request_import(body: ImportIn, db: Session = Depends(get_db), user: User = D
 
 
 @router.get("/imports")
-def list_imports(db: Session = Depends(get_db), _: User = Depends(package_user)):
+def list_imports(db: Session = Depends(get_db), user: User = Depends(package_user)):
+    permissions.require_domain(db,user,"packages.imports.list",rbac.packages_root(db),"read")
     return [import_out(j) for j in db.scalars(select(PackageImport).order_by(PackageImport.created_at.desc()).limit(50))]
 
 
 @router.get("/imports/{job_id}")
-def get_import(job_id: str, db: Session = Depends(get_db), _: User = Depends(package_user)):
+def get_import(job_id: str, db: Session = Depends(get_db), user: User = Depends(package_user)):
+    permissions.require_domain(db,user,"packages.imports.read",rbac.packages_root(db),"read")
     job = db.get(PackageImport, job_id)
     if job is None:
         raise HTTPException(404, "import not found")
@@ -270,6 +271,7 @@ def upload(kind: Literal["python", "r"], file: UploadFile = File(...), user: Use
 @router.get("/{kind}/{name}")
 def get_package(kind: str, name: str, db: Session = Depends(get_db), user: User = Depends(package_user)):
     package = _package(db, kind, name)
+    repo.require_permitted(db,user,package)
     versions = [{"version": v, "yanked": all(f.yanked for f in files), "requires": files[0].requires,
                  "install": install_hint(package, v), "files": [file_out(f) for f in sorted(files, key=lambda f: f.filename)]}
                 for v, files in repo.versions(db, package)]
@@ -285,7 +287,7 @@ class YankIn(BaseModel):
 def yank(kind: str, name: str, version: str, body: YankIn, db: Session = Depends(get_db), user: User = Depends(package_user)):
     """Installs no longer pick this version unless it is asked for exactly; nothing is removed."""
     package = _package(db, kind, name)
-    rbac.require(db, user, "yank", repo.guard(db, package))
+    permissions.require_domain(db,user,"packages.yank",repo.guard(db,package),"yank")
     try:
         repo.mark_yanked(db, package, version, body.reason)
     except repo.PackageError as exc:
@@ -298,7 +300,7 @@ def yank(kind: str, name: str, version: str, body: YankIn, db: Session = Depends
 @router.delete("/{kind}/{name}/versions/{version}/yank")
 def unyank(kind: str, name: str, version: str, db: Session = Depends(get_db), user: User = Depends(package_user)):
     package = _package(db, kind, name)
-    rbac.require(db, user, "yank", repo.guard(db, package))
+    permissions.require_domain(db,user,"packages.unyank",repo.guard(db,package),"yank")
     try:
         repo.mark_yanked(db, package, version, None)
     except repo.PackageError as exc:
@@ -312,7 +314,7 @@ def unyank(kind: str, name: str, version: str, db: Session = Depends(get_db), us
 def delete_version(kind: str, name: str, version: str, db: Session = Depends(get_db), user: User = Depends(package_user)):
     """Removes the files for good; programs pinned to this version stop installing. Prefer yanking."""
     package = _package(db, kind, name)
-    rbac.require(db, user, "delete", repo.guard(db, package))
+    permissions.require_domain(db,user,"packages.version.delete",repo.guard(db,package),"delete")
     rows = [f for f in repo.files_of(db, package) if f.version == version]
     if not rows:
         raise HTTPException(404, f"{package.name} has no version {version}")
@@ -340,8 +342,8 @@ def _wants_json(accept: str) -> bool:
 @router.get("/python/simple/", include_in_schema=False)
 def simple_index(db: Session = Depends(get_db), _: User = Depends(package_user), accept: str = Header(default="")):
     if _wants_json(accept):
-        return JSONResponse(repo.python_index_json(db), media_type=SIMPLE_JSON)
-    return HTMLResponse(repo.python_index_html(db))
+        return JSONResponse(repo.python_index_json(db, _), media_type=SIMPLE_JSON)
+    return HTMLResponse(repo.python_index_html(db, _))
 
 
 @router.get("/python/simple/{name}/", include_in_schema=False)
@@ -349,6 +351,7 @@ def simple_project(name: str, db: Session = Depends(get_db), _: User = Depends(p
     package = repo.find(db, "python", repo.key_of("python", name))
     if package is None:
         raise HTTPException(404, f"no package {name} in the repository; ask a Publisher to import it")
+    repo.require_permitted(db,_,package)
     if _wants_json(accept):
         return JSONResponse(repo.python_project_json(db, package), media_type=SIMPLE_JSON)
     return HTMLResponse(repo.python_project_html(db, package))
@@ -367,6 +370,7 @@ def python_file(package_key: str, filename: str, db: Session = Depends(get_db), 
     row = package and db.scalar(select(PackageFile).where(PackageFile.package_id == package.id, PackageFile.filename == filename))
     if not package or not row:
         raise HTTPException(404, "file not found")
+    repo.require_permitted(db,_,package,"download")
     return _serve(package, row)
 
 
@@ -388,12 +392,12 @@ async def twine_upload(request: Request, user: User = Depends(package_user)):
 
 @router.get("/r/src/contrib/PACKAGES", include_in_schema=False)
 def r_packages(db: Session = Depends(get_db), _: User = Depends(package_user)):
-    return PlainTextResponse(repo.r_packages_index(db))
+    return PlainTextResponse(repo.r_packages_index(db, _))
 
 
 @router.get("/r/src/contrib/PACKAGES.gz", include_in_schema=False)
 def r_packages_gz(db: Session = Depends(get_db), _: User = Depends(package_user)):
-    return Response(repo.r_packages_gz(db), media_type="application/x-gzip")
+    return Response(repo.r_packages_gz(db, _), media_type="application/x-gzip")
 
 
 @router.get("/r/src/contrib/Archive/{name}/{filename}", include_in_schema=False)
@@ -401,6 +405,7 @@ def r_archive_file(name: str, filename: str, db: Session = Depends(get_db), _: U
     found = repo.r_file(db, filename)
     if not found or found[0].name != name:
         raise HTTPException(404, "file not found")
+    repo.require_permitted(db,_,found[0],"download")
     return _serve(*found)
 
 
@@ -409,6 +414,7 @@ def r_source_file(filename: str, db: Session = Depends(get_db), _: User = Depend
     found = repo.r_file(db, filename)   # PACKAGES.rds and the like: 404, R falls back to PACKAGES.gz
     if not found:
         raise HTTPException(404, "file not found")
+    repo.require_permitted(db,_,found[0],"download")
     return _serve(*found)
 
 

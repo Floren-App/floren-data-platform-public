@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import catalog as c, catalog_ingest, catalog_search, rbac
+from .. import asset_access, catalog as c, catalog_ingest, catalog_search, rbac
 from ..auth import User, Execution, get_execution
 from ..db import get_db
 from ..deps import get_actor
@@ -152,12 +152,12 @@ def search(q: str = Query(default="", max_length=300), kind: str = "", domain: s
     c.harvest_artifacts(db)
     groups = {g.id: g.name for g in db.scalars(select(AppGroup))}
     condition = catalog_search.fulltext_condition(db, q, groups)
-    candidates, resources = c.visible_assets(db, user, condition=condition)
+    candidates, resources = c.visible_assets(db,user,condition=condition,function="catalog.search")
     ranked = catalog_search.ranked(candidates, q, groups, False)
     # Typos and punctuation variants can miss the native term index. Broaden only
     # within the authorized metadata set, never a global suggestion dictionary.
     if q and not ranked:
-        candidates, resources = c.visible_assets(db, user)
+        candidates, resources = c.visible_assets(db,user,function="catalog.search")
         ranked = catalog_search.ranked(candidates, q, groups, fuzzy)
     rank = {asset.id: (score, fields, approximate) for asset, score, fields, approximate in ranked}
     # Files and folders are storage and workload organization: Storage and Workloads show them, the catalog does not.
@@ -197,7 +197,7 @@ def search(q: str = Query(default="", max_length=300), kind: str = "", domain: s
 def suggest(q: str = Query(default="", max_length=300), db: Session = Depends(get_db), user: User = Depends(get_actor)):
     if not q.strip():
         return {"items": []}
-    assets, _ = c.visible_assets(db, user)
+    assets, _ = c.visible_assets(db,user,function="catalog.suggest")
     groups = {g.id: g.name for g in db.scalars(select(AppGroup))}
     return {"items": catalog_search.suggestions([a for a in assets if a.kind not in HIDDEN_KINDS], q, groups)}
 
@@ -214,6 +214,7 @@ def resource_asset(resource_id: str, object_path: Optional[str] = None,
     # Never enumerate or query a data source just to open its lineage.
     ident = c.asset_id(resource.id, "object:" + object_path if object_path is not None else "")
     asset, boundary = c.require_asset(db, ident, user)
+    asset_access.require(db,user,"catalog.view",asset,boundary,("read",))
     db.commit()
     return c.asset_out(db, asset, boundary, user)
 
@@ -221,6 +222,7 @@ def resource_asset(resource_id: str, object_path: Optional[str] = None,
 @router.get("/assets/{ident}")
 def detail(ident: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     asset, resource = c.require_asset(db, ident, user)
+    asset_access.require(db,user,"catalog.view",asset,resource,("read",))
     result = c.asset_out(db, asset, resource, user)
     result["imports"] = [{"origin": i.origin, "scope": i.scope, "revision": i.revision,
         "nodes": i.nodes, "edges": i.edges, "observed_at": i.observed_at} for i in db.scalars(
@@ -232,8 +234,7 @@ def detail(ident: str, db: Session = Depends(get_db), user: User = Depends(get_a
 def governance(ident: str, body: Governance, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     asset, resource = c.require_asset(db, ident, user)
     owner = rbac.allowed(db, user, "assign", resource)
-    if not owner and not any(rbac.allowed(db, user, action, resource) for action in ("edit", "write", "ddl")):
-        raise HTTPException(403, "Contributor or higher required to document this object")
+    asset_access.require(db,user,"governance.edit",asset,resource,("edit","write","ddl","assign"))
     before, after = asset.governance or {}, body.model_dump()
     from .. import classification as levels
     levels.require_level(db, after["classification"])
@@ -244,8 +245,16 @@ def governance(ident: str, body: Governance, db: Session = Depends(get_db), user
         raise HTTPException(422, f"{asset.name} is at least {inherited} because of its columns: an object is never classified lower than its columns")
     protected = {"owner_group_id", "steward", "classification", "status", "lineage_role"}
     defaults = Governance().model_dump()
-    if not owner and any(before.get(k, defaults[k]) != after[k] for k in protected):
-        raise HTTPException(403, "Owner required to change stewardship, classification or certification")
+    for field in protected:
+        if before.get(field,defaults[field])==after[field]:
+            continue
+        action=('classification.binding.apply' if field=='classification' else
+            'governance.owner.change' if field in ('owner_group_id','steward') else 'governance.status.set')
+        asset_access.require(db,user,action,asset,resource,('assign',))
+        if field=='classification':
+            previous=before.get(field,defaults[field])
+            if levels.ranks(db)[after[field]]<levels.ranks(db)[previous]:
+                asset_access.require(db,user,'classification.binding.downgrade',asset,resource,('assign',))
     if after["owner_group_id"] and not db.get(AppGroup, after["owner_group_id"]):
         raise HTTPException(422, "accountable owner must be an existing app group")
     changed = any(before.get(k, defaults[k]) != after[k] for k in ("description", "domain", "tags"))
@@ -264,7 +273,8 @@ def governance(ident: str, body: Governance, db: Session = Depends(get_db), user
 
 @router.put("/assets/{ident}/sla")
 def sla(ident: str, body: ServiceLevel, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    asset, resource = c.require_asset(db, ident, user, "assign")
+    asset, resource = c.require_asset(db, ident, user)
+    asset_access.require(db,user,"slas.activate",asset,resource,("assign",))
     if body.success_rate_percent is not None and (resource.kind != "service" or asset.id != c.asset_id(resource.id)):
         raise HTTPException(422, "successful-run SLA applies to deployed programs; datasets support freshness")
     if body.required_assets:
@@ -435,7 +445,8 @@ def put_classifications(body: LevelsIn, db: Session = Depends(get_db), user: Use
 def put_columns(ident: str, body: ColumnsIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Classify and tag columns (object Owners). The object's level follows; it is never below its columns."""
     from .. import classification as levels
-    asset, resource = c.require_asset(db, ident, user, action="assign")
+    asset, resource = c.require_asset(db, ident, user)
+    asset_access.require(db,user,"classification.binding.apply",asset,resource,("assign",))
     governance = dict(asset.governance or {})
     columns = dict(governance.get("columns") or {})
     for name, item in body.columns.items():
@@ -443,6 +454,9 @@ def put_columns(ident: str, body: ColumnsIn, db: Session = Depends(get_db), user
         if not key or len(key) > 256:
             raise HTTPException(422, "column names must have 1 to 256 characters")
         levels.require_level(db, item.classification)
+        previous=columns.get(key,{}).get('classification',levels.UNCLASSIFIED)
+        if levels.highest(db,[previous,item.classification])==previous and previous!=item.classification:
+            asset_access.require(db,user,'classification.binding.downgrade',asset,resource,('assign',))
         tags = sorted({t.strip().lower() for t in item.tags if t.strip()})
         if any(len(t) > 64 for t in tags):
             raise HTTPException(422, "tags have at most 64 characters")

@@ -110,6 +110,7 @@ resource "fdp_workload" "job" {
   execution_mode = each.key == "explorer" ? "caller" : "fixed"
   auto_update    = true
   managed_identity_grants = merge(
+    { packages = "Executor" },
     { for grant in local.data_grants : grant.resource => grant.role if grant.job == each.key },
     each.key == "extract" ? { (fdp_api.tcgdex.resource_id) = "Consumer" } : {},
     { for grant in local.price_grants : grant.resource => grant.role if grant.job == each.key }
@@ -127,9 +128,9 @@ resource "fdp_workload" "pipelines" {
   folder_id      = fdp_folder.this.id
   execution_mode = "fixed"
   env            = { POKEMON_STREAMING_ENABLED = !var.streaming_enabled ? "false" : "true" }
-  managed_identity_grants = {
+  managed_identity_grants = merge({ packages = "Executor" }, {
     for name in concat(["extract", "load", "models", "process-event"], !var.streaming_enabled ? [] : ["price-publish", "price-await", "price-models"]) : fdp_workload.job[name].resource_id => "Executor"
-  }
+  })
 }
 resource "fdp_role_assignment" "analysts_dashboard" {
   resource_id  = fdp_workload.job["explorer"].resource_id

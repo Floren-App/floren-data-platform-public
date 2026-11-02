@@ -45,6 +45,9 @@ class FakeVerifier:
 @pytest.fixture()
 def client(monkeypatch):
     Base.metadata.drop_all(engine)
+    from sqlalchemy import text
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
     import shutil
     shutil.rmtree(os.path.join(_tmp, "packages"), ignore_errors=True)  # files of packages from earlier tests
     deps._orchestrator = None  # fresh fake orchestrator (and simulated volumes) per test

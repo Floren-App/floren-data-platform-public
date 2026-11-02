@@ -34,7 +34,7 @@ def session_policy(source, schemas, scope):
     return {'Version': '2012-10-17', 'Statement': statements}
 
 
-def credentials(source, schemas, scope, store, db=None):
+def credentials(source, schemas, scope, store, db=None, policy_override=None):
     import boto3
     from botocore.config import Config
     from botocore.exceptions import BotoCoreError, ClientError
@@ -52,7 +52,7 @@ def credentials(source, schemas, scope, store, db=None):
     role_arn = cfg.get('role_arn')
     if not role_arn:
         raise HTTPException(409, 'configure an STS role_arn for this source')
-    policy = session_policy(source, schemas, scope)
+    policy = policy_override if policy_override is not None else session_policy(source, schemas, scope)
     try:
         client = boto3.client('sts', endpoint_url=cfg.get('sts_endpoint_url'),
                               verify=os.environ.get('SSL_CERT_FILE') or True,

@@ -275,12 +275,16 @@ def _dbt_docs_job(db: Session, orch: Orchestrator, pub: Workload, ident: User, s
     plan.workload_id, plan.commit_sha, plan.image, plan.secret_env = pub.id, sha, image, secret_env
     plan.label = f"docs for deployed dbt project {pub.slug} at {sha[:12]}"
     from .data_access import snapshot
+    from .object_access import snapshot as named_snapshot
     from .ownership import creation_data_snapshot
     run = Run(owner=ident.username, principal_id=ident.principal_id, initiator_id=pub.owner_principal_id, initiated_by=pub.owner, access_snapshot=snapshot(db, ident), environment_id=ident.environment_id or None, workload_id=pub.id, commit_sha=sha, pool_id=pool.id, kind="dbt",
+              named_access_snapshot=named_snapshot(db,ident),
               primary_create_snapshot=creation_data_snapshot(db,ident),
               primary_group_id=ident.active_group_id or None,
               entrypoint=program.entrypoint, program=pub.program, args=plan.args, runtime="dbt",
               runtime_version=plan.version)
+    from .data_policies import admission_snapshot
+    run.sql_policy_snapshot = admission_snapshot(db,ident,run.access_snapshot,run.named_access_snapshot)
     run.pool = pool
     db.add(run)
     db.flush()

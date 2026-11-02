@@ -7,7 +7,7 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.models import Workload
 from .conftest import as_
-from .rbac_helpers import grant_group
+from .rbac_helpers import grant_group, select_group
 from .test_catalog import register
 from .test_deploying import repo  # noqa: F401
 
@@ -55,7 +55,8 @@ def test_history_never_merges_workloads_and_checks_access_before_opening_metadat
     for group in client.get('/v1/rbac/groups', headers=as_('admin')).json():
         if group['name'] == 'Deployed executors':
             client.delete(f"/v1/rbac/resources/workloads/assignments/{group['id']}", headers=as_('admin'))
-    grant_group(client, test_rid, 'Test pipeline viewers', 'Executor', users=['bob'])
+    group = grant_group(client, test_rid, 'Test pipeline viewers', 'Executor', users=['bob'])
+    select_group(client, 'bob', group)
     assert client.get(f'/v1/workloads/{test_id}/orchestrator-runs', headers=as_('bob')).status_code == 200
     # The inaccessible Prod database does not even exist: authorization must win over I/O.
     assert client.get(f'/v1/workloads/{prod_id}/orchestrator-runs', headers=as_('bob')).status_code == 404

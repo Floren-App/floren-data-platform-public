@@ -25,6 +25,10 @@ def principal_environment(db, principal_id):
 
 
 def permits(db, user, resource):
+    if resource and resource.kind in ('package-root', 'package'):
+        from .layers import explicit_layer
+        if not explicit_layer(db, resource):
+            return True  # The shared repository is global; package grants still apply.
     from .platform_metadata import is_resource, authorized
     if is_resource(resource):
         from .config import get_settings

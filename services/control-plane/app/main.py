@@ -21,6 +21,9 @@ from .routes import layers, admin, apis, connect, gateway, identity, deploy, run
 from .app_profiles import feature_gate
 from . import workload_logs  # noqa: F401 -- records run and deploy events in the central log
 from .routes import permissions as permission_routes
+from .routes import backups as backup_routes
+from .routes import data_objects as data_object_routes
+from .backups import recovery_gate, recovery_blocked
 
 logging.basicConfig(level=logging.INFO)
 
@@ -76,15 +79,15 @@ def seed() -> None:
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.initialized = False
-    # Dev convenience; production should run migrations (Alembic) instead.
-    Base.metadata.create_all(engine)
-    add_missing_columns()
+    from .schema_migrations import require_current, upgrade as upgrade_schema
+    if get_settings().orchestrator == "fake":  # isolated tests and offline development
+        upgrade_schema(engine, adopt_legacy=True)
+    require_current(engine)
     from .catalog_search import ensure_index
     ensure_index(engine)
-    from .migrations import upgrade, upgrade_git_credentials
-    upgrade()
-    upgrade_git_credentials()
     seed()
+    with SessionLocal() as db:
+        app.state.recovery_quarantine = recovery_blocked(db)
     with SessionLocal() as db:  # create well-known roots up front rather than racing on first use
         from .rbac import api_root, packages_root, root
         from .settings_access import ensure as settings_objects
@@ -95,7 +98,7 @@ async def lifespan(app: FastAPI):
         db.commit()
     tasks = []
     leadership = None
-    if get_settings().orchestrator != "fake":
+    if get_settings().orchestrator != "fake" and not app.state.recovery_quarantine:
         s = get_settings()
         orch, secrets = get_orchestrator(), get_secret_store()
         if s.query_executor == "trino":
@@ -114,6 +117,8 @@ async def lifespan(app: FastAPI):
                  lambda: gitops_loop(SessionLocal, orch, secrets, s),
                  lambda: import_loop(SessionLocal)]
         from .query_log import retention_loop
+        from .backups import backup_loop
+        loops.append(lambda: backup_loop(SessionLocal, secrets, s))
         loops.append(lambda: retention_loop(SessionLocal))
         loops.append(lambda: workload_logs.retention_loop(SessionLocal))
         from .siem import siem_loop, sinks_safe
@@ -151,7 +156,7 @@ async def lifespan(app: FastAPI):
 
 
 # Every route passes the app-profile gate: it refuses actions of features the caller's profile does not include.
-app = FastAPI(title="Floren Data Platform control plane", version="0.1.0", lifespan=lifespan, dependencies=[Depends(feature_gate)])
+app = FastAPI(title="Floren Data Platform control plane", version="0.1.0", lifespan=lifespan, dependencies=[Depends(recovery_gate), Depends(feature_gate)])
 from .secrets import SecretBackendError
 
 
@@ -182,6 +187,8 @@ for module in (workspaces, workspace_templates, git_credentials, packages, query
     app.include_router(module.router)
 app.include_router(gateway.docs_router)
 app.include_router(permission_routes.router)
+app.include_router(backup_routes.router)
+app.include_router(data_object_routes.router)
 
 
 @app.exception_handler(OperationalError)

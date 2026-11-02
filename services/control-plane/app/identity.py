@@ -47,9 +47,10 @@ def may_use(sa: ServiceAccount, user: User) -> bool:
     if user.username == f"{SA_PREFIX}{sa.name}":
         return True
     from sqlalchemy.orm import object_session
-    from .rbac import allowed, service_account_resource
+    from .rbac import service_account_resource
+    from .permissions import domain_allowed
     db = object_session(sa)
-    return bool(db and allowed(db, user, "execute", service_account_resource(db, sa)))
+    return bool(db and domain_allowed(db, user, 'identities.execution.use', service_account_resource(db, sa), 'execute'))
 
 
 def as_user(sa: ServiceAccount) -> User:
@@ -117,7 +118,8 @@ def can_access(db: Session, scope: str, owner: str, identity: User) -> bool:
     if scope == "user":
         return identity.username == owner
     if scope == "group":
-        return owner in identity.groups or identity.is_admin
+        from .rbac import effective_allowlist_groups
+        return owner in effective_allowlist_groups(db,identity) or identity.is_admin
     sa = get_sa(db, owner)
     if sa is None or sa.disabled:
         return False
@@ -140,7 +142,8 @@ def authorize_secrets(db: Session, store: SecretStore, identity: User, refs: Dic
         except SecretAccessError as exc:
             problems.append(f"{var}: {exc}")
             continue
-        if not can_access(db, scope, owner, identity):
+        from .secret_access import allowed
+        if not allowed(db,identity,'secrets.use',scope,owner,name):
             problems.append(f"{var}: {identity.username} may not use secret {ref}")
             continue
         path = secret_path(scope, owner, name)
@@ -177,18 +180,30 @@ def resolve_secret_env(db: Session, store: SecretStore, identity: User,
 
 
 def put_secret(db: Session, store: SecretStore, scope: str, owner: str, name: str, value,
-               by: str, description: str = "") -> SecretEntry:
+               by: str, description: str = "", owner_principal_id: Optional[str] = None) -> SecretEntry:
     """value: a string, or a certificate bundle {certificate, private_key?, ca_chain?}."""
     certificate = isinstance(value, dict)
-    store.put(secret_path(scope, owner, name), value if certificate else {"value": value})
     entry = db.scalar(select(SecretEntry).where(SecretEntry.scope == scope, SecretEntry.owner == owner,
                                                 SecretEntry.name == name)) or SecretEntry(scope=scope, owner=owner, name=name)
+    if scope in ('user','sa'):
+        from . import rbac
+        if scope=='user':
+            principal_id=owner_principal_id
+            if not principal_id:
+                raise SecretAccessError("stable private secret owner required")
+        else:
+            sa=get_sa(db,owner)
+            principal_id=rbac.service_account_resource(db,sa).config['principal_id'] if sa else None
+        if entry.owner_principal_id and entry.owner_principal_id!=principal_id:
+            raise SecretAccessError('secret belongs to a different directory identity')
+        entry.owner_principal_id=principal_id
     entry.kind = "certificate" if certificate else "string"
     if certificate:
         from .certificates import describe
         entry.meta = describe(value)
     else:
         entry.meta = None
+    store.put(secret_path(scope, owner, name), value if certificate else {"value": value})
     entry.description = description or entry.description or ""
     entry.updated_by, entry.updated_at = by, utcnow()
     db.add(entry)

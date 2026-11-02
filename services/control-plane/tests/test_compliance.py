@@ -5,7 +5,7 @@ from app import layers, rbac
 from app.db import SessionLocal
 from app.models import AppGroup, JustifiedGrant, Resource, RoleAssignment
 from .conftest import USERS, as_
-from .rbac_helpers import grant_group
+from .rbac_helpers import grant_group, select_group
 from .test_classification_options import classify
 from .test_deploying import repo  # noqa: F401
 from .test_products import setup_products
@@ -27,6 +27,18 @@ def can_read(user, resource_id):
 
 
 def set_up_policy(client, schema_id, steps=None):
+    with SessionLocal() as db:
+        layer = layers.info(db, db.get(Resource, schema_id))["layer_id"]
+    # Function authority is independent of the review duties exercised below.
+    for username in ('ana','bob'):
+        pid=client.get('/v1/me',headers=as_(username)).json()['principal_id']
+        client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+            'target_id':'cases','namespace':'compliance.cases','principal_id':pid,
+            'layer_id':'*','role':'Admin'}).raise_for_status()
+        for namespace,target in (("compliance.register","set-register"),("compliance.deadlines",schema_id)):
+            client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+                'target_id':target,'namespace':namespace,'principal_id':pid,
+                'layer_id':layer if target==schema_id else '*','role':'Admin'}).raise_for_status()
     with SessionLocal() as db:
         layer = layers.info(db, db.get(Resource, schema_id))["layer_id"]
     form = client.put("/v1/compliance/forms/Privacy impact", headers=as_("admin"), json={"name": "Privacy impact", "definition": FORM})
@@ -62,6 +74,7 @@ def test_role_grants_need_an_approved_case_reviewed_by_someone_else(client, repo
     layer, _ = set_up_policy(client, ids["public"])
     marketing = grant_group(client, "workloads", "Marketing readers", "Executor")   # no members yet
     privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
+    select_group(client, "bob", privacy)
     assert client.post("/v1/compliance/roles", headers=as_("ana"), json={"role": "compliance_reviewer", "app_group_id": privacy}).status_code == 403
     role = client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_reviewer", "app_group_id": privacy,
                                                                              "scope": {"layers": [layer], "classifications": ["restricted"]}})
@@ -109,6 +122,7 @@ def test_role_grants_need_an_approved_case_reviewed_by_someone_else(client, repo
     with SessionLocal() as db:
         bob = rbac.resolve_user(db, USERS["bob"]).principal_id
     assert client.post(f"/v1/compliance/memberships/{marketing}/{bob}", headers=as_("admin"), json={"approve": True}).status_code == 200
+    select_group(client, "bob", marketing)
     assert can_read("bob", ids["public"])
 
 
@@ -158,6 +172,7 @@ def test_product_requests_under_a_policy_carry_the_form_and_go_through_the_steps
 
 def test_legacy_compliance_admin_needs_explicit_page_grants(client):
     privacy = grant_group(client, "workloads", "Privacy admins", "Executor", users=["bob"])
+    select_group(client, "bob", privacy)
     levels = client.get("/v1/catalog/classifications", headers=as_("bob")).json()["levels"]
     assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 403
     assert client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": privacy}).status_code == 201
@@ -166,7 +181,7 @@ def test_legacy_compliance_admin_needs_explicit_page_grants(client):
     assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 403
     assert client.put("/v1/compliance/forms/Privacy impact", headers=as_("bob"), json={"name": "Privacy impact", "definition": FORM}).status_code == 403
     grant_group(client, "set-classes", "Privacy admins", "Manager", users=["bob"])
-    grant_group(client, "set-forms", "Privacy admins", "Manager", users=["bob"])
+    grant_group(client, "set-forms", "Privacy admins", "Admin", users=["bob"])
     assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 200
     assert client.put("/v1/compliance/forms/Privacy impact", headers=as_("bob"), json={"name": "Privacy impact", "definition": FORM}).status_code == 200
     # Only platform administrators make compliance administrators.
@@ -214,6 +229,7 @@ def test_reviews_notify_by_email_and_land_in_the_register(client, repo, monkeypa
     layer, _ = set_up_policy(client, ids["public"])
     marketing = grant_group(client, "workloads", "=Marketing", "Executor")
     privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
+    select_group(client, "bob", privacy)
     client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_reviewer", "app_group_id": privacy,
                                                                     "scope": {"layers": [layer]}}).raise_for_status()
     set_email("ana", "ana@example.test")
@@ -314,6 +330,7 @@ def test_access_ends_renews_and_existing_access_gets_a_deadline(client, repo, mo
     layer, _ = set_up_policy(client, ids["public"])
     marketing = grant_group(client, "workloads", "Marketing readers", "Executor")
     privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
+    select_group(client, "bob", privacy)
     client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_reviewer", "app_group_id": privacy}).raise_for_status()
     client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": privacy}).raise_for_status()
     set_email("ana", "ana@example.test")
@@ -366,6 +383,7 @@ def test_justifying_existing_access_clears_its_deadline_and_overdue_reviews_esca
     client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": legacy, "role": "Reader"}).raise_for_status()
     set_up_policy(client, ids["public"])
     privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
+    select_group(client, "bob", privacy)
     client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": privacy}).raise_for_status()
     set_email("bob", "bob@example.test")
     now = utcnow()

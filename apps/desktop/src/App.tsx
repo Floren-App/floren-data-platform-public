@@ -205,7 +205,7 @@ function Shell({ user }: { user: User }) {
       const can = accessSections(hub);
       const first = ([["set-layers", "admin-layers", "Layers"], ["set-pools", "admin-pools", "Compute pools"], ["set-runtimes", "admin-runtimes", "Runtimes (versions)"],
         ["set-template", "admin-workspace-templates", "Workspace templates"], ["set-alerts", "admin-notifications", "Alerts"], ["set-profiles", "app-profiles", "App profiles"],
-        ["set-network", "admin-network", "Network allowlist"], ["set-classes", "privacy-classifications", "Classifications"], ["set-policies", "privacy-policies", "Access policies"],
+        ["set-backups", "admin-backups", "Backup and recovery"], ["set-network", "admin-network", "Network allowlist"], ["set-classes", "privacy-classifications", "Classifications"], ["set-policies", "privacy-policies", "Access policies"],
         ["set-forms", "privacy-forms", "Compliance forms"], ["set-duties", "privacy-roles", "Review duties"]] as const).find(([id]) => can.page(id));
       if (first) defaults.admin = { kind: first[1], title: first[2] };
     }

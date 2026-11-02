@@ -10,6 +10,7 @@ const STATUS: Record<AccessCaseItem["status"], [string, string]> = {
   draft: ["Draft", "stopped"], in_review: ["In review", "queued"], changes_requested: ["Changes asked", "queued"],
   approved: ["Approved", "succeeded"], declined: ["Declined", "failed"], withdrawn: ["Withdrawn", "stopped"], expired: ["Expired", "stopped"] };
 const STEP = { data_owner: "data owners", compliance_reviewer: "compliance reviewers" } as Record<string, string>;
+const caseCan = (c: AccessCaseItem, action: string) => c.capabilities?.includes(`compliance.cases.${action}`) ?? true;
 const day = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString() : "";
 
 /** What a case gives, in a few words. */
@@ -75,7 +76,7 @@ export function CaseView({ id, hub, openTab }: { id: string; hub: Hub; openTab: 
   const caseTab = (ref: string, title: string) => openTab({ kind: "privacy-case", ref, title });
   const renew = () => { setBusy(true); setError("");
     api.compliance.renew(c.id).then((r) => caseTab(r.id, caseWhat(r))).catch((e: Error) => setError(e.message)).finally(() => setBusy(false)); };
-  const download = (fileId: string, name: string) => void api.compliance.caseFile(c.id, fileId).then((b) => saveFile(b, name)).catch((e: Error) => setError(e.message));
+  const download = (fileId: string, name: string) => caseCan(c,"attachment.read") && void api.compliance.caseFile(c.id, fileId).then((b) => saveFile(b, name)).catch((e: Error) => setError(e.message));
   const history = [...(c.submitted_at ? [{ at: c.submitted_at, by: c.requester, text: "sent the form" }] : []),
     ...c.decisions.map((d) => ({ at: d.at, by: d.by, text: `${d.decision === "approve" ? "approved" : d.decision === "changes" ? "asked for changes" : "declined"} as ${STEP[d.role] ?? d.role}${d.note ? `: ${d.note}` : ""}` })),
     ...(c.comments ?? []).map((x) => ({ at: x.at, by: x.by, text: `commented: ${x.text}` }))].sort((a, b) => a.at.localeCompare(b.at));
@@ -98,7 +99,7 @@ export function CaseView({ id, hub, openTab }: { id: string; hub: Hub; openTab: 
     </section>
     {c.definition && (editing ? <section className="card"><FormRenderer definition={c.definition} answers={answers} onChange={setAnswers} files={files} onComplete={setComplete}
         onFile={(f, file) => setFiles((all) => { const next = { ...all }; if (file) next[f] = file; else delete next[f]; return next; })} />
-        <div className="form-actions"><button className="btn" disabled={busy || !complete} onClick={() => void resubmit()}>{c.status === "draft" ? "Send for review" : "Send again"}</button>
+        <div className="form-actions"><button className="btn" disabled={busy || !complete || !caseCan(c,"submit") || !caseCan(c,"answers.edit")} onClick={() => void resubmit()}>{c.status === "draft" ? "Send for review" : "Send again"}</button>
           <button className="btn secondary" onClick={() => { setEditing(false); setAnswers(c.answers ?? {}); }}>Cancel</button></div></section>
       : <FormAnswers definition={c.definition} answers={c.answers ?? {}} files={c.files ?? []} onFile={download} />)}
     {c.can_review && <section className="card decision-panel" aria-label="Decide">
@@ -109,24 +110,24 @@ export function CaseView({ id, hub, openTab }: { id: string; hub: Hub; openTab: 
         <input id="decision-until" type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
         <span className="hint">Shorter than asked if you choose an earlier date; never longer than the policy allows.</span></div>
       <div className="form-actions">
-        <button className="btn" disabled={busy} onClick={() => void decide("approve")}>Approve</button>
-        <button className="btn secondary" disabled={busy || !note.trim()} onClick={() => void decide("changes")}>Ask for changes</button>
-        <button className="btn danger" disabled={busy || !note.trim()} onClick={() => void decide("decline")}>Decline</button></div>
+        <button className="btn" disabled={busy || !caseCan(c,"approve")} onClick={() => void decide("approve")}>Approve</button>
+        <button className="btn secondary" disabled={busy || !note.trim() || !caseCan(c,"changes.request")} onClick={() => void decide("changes")}>Ask for changes</button>
+        <button className="btn danger" disabled={busy || !note.trim() || !caseCan(c,"reject")} onClick={() => void decide("decline")}>Decline</button></div>
     </section>}
     {c.renewal_of && <p className="hint">Renews <button className="text-button" onClick={() => caseTab(c.renewal_of!, "Earlier case")}>the earlier case</button>; the answers were filled in from it.</p>}
     {(c.status === "approved" || c.status === "expired") && c.kind !== "membership" && <div className="form-actions">
       {c.renewal ? <button className="btn secondary" onClick={() => caseTab(c.renewal!, "Renewal")}>Open the renewal</button>
-        : <button className="btn secondary" disabled={busy} onClick={renew}>Renew</button>}
+        : <button className="btn secondary" disabled={busy || !caseCan(c,"renew")} onClick={renew}>Renew</button>}
       {c.status === "approved" && c.approved_until && <span className="muted">Access ends {day(c.approved_until)}.</span>}</div>}
     {c.is_requester && open && !editing && <div className="form-actions">
-      {c.status === "changes_requested" && <button className="btn" onClick={() => setEditing(true)}>Change answers</button>}
-      {c.status === "draft" && <button className="btn" onClick={() => setEditing(true)}>Check answers and send</button>}
-      <button className="btn secondary" disabled={busy} onClick={() => void act(api.compliance.withdraw(c.id), "Withdrawn.")}>Withdraw</button></div>}
+      {c.status === "changes_requested" && caseCan(c,"answers.edit") && <button className="btn" onClick={() => setEditing(true)}>Change answers</button>}
+      {c.status === "draft" && caseCan(c,"answers.edit") && <button className="btn" onClick={() => setEditing(true)}>Check answers and send</button>}
+      <button className="btn secondary" disabled={busy || !caseCan(c,"withdraw")} onClick={() => void act(api.compliance.withdraw(c.id), "Withdrawn.")}>Withdraw</button></div>}
     <h2>History</h2>
     <ol className="case-history">{history.map((h, i) => <li key={i}><span className="muted" title={new Date(h.at).toLocaleString()}>{new Date(h.at).toLocaleString()}</span> <strong>{h.by}</strong> {h.text}</li>)}
       {!history.length && <li className="muted">Not sent yet.</li>}</ol>
     <form className="row" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); void act(api.compliance.comment(c.id, comment.trim()), "Comment added."); }}>
       <input aria-label="Comment" value={comment} maxLength={4000} onChange={(e) => setComment(e.target.value)} placeholder="Ask or answer a question" style={{ flex: 1 }} />
-      <button className="btn secondary" disabled={busy || !comment.trim()}>Comment</button></form>
+      <button className="btn secondary" disabled={busy || !comment.trim() || !caseCan(c,"comment")}>Comment</button></form>
   </>;
 }

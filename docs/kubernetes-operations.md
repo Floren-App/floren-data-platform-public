@@ -4,6 +4,10 @@ Upgrades, rollback, backup and restore, key rotation, retiring layers and diagno
 procedure here is exercised by `make test-e2e-install` on a disposable cluster, as noted.
 Installation is in [kubernetes-install.md](kubernetes-install.md).
 
+For encrypted S3 metadata archives, customer backup responsibilities and quarantined
+empty-target recovery, see [platform recovery](platform-recovery.md). Production
+schema upgrades use [versioned metadata migrations](metadata-upgrades.md).
+
 ## Upgrade and rollback
 
 ```sh
@@ -24,10 +28,9 @@ helm rollback fdp <revision> -n fdp --wait --timeout 10m
 ```
 
 Rollback restores the previous chart and images; the test confirms secrets, metadata and
-deployed apps are unchanged and OpenTofu sees no drift. **Database migrations are additive**
-(new tables and nullable columns), so the previous version runs against the newer schema. If a
-release notes a non-additive migration, take a metadata backup first and restore it after a
-rollback.
+deployed apps are unchanged and OpenTofu sees no drift. Image rollback requires the release-specific schema compatibility checks; it is not
+a guarantee for arbitrary older releases. Take a metadata/key backup before upgrading.
+For incompatible schemas, recover into a separate empty target following the recovery runbook.
 
 ## Backup and restore
 

@@ -1,4 +1,4 @@
-"""Primary group ownership, secondary group access, and protected global administration."""
+"""Selected-group authority, creation ownership, and protected global administration."""
 import re
 
 from fastapi import HTTPException
@@ -159,8 +159,14 @@ def browsing_scope(db, user):
 
 def browsing_allowed(db, user, resource):
     from .rbac import roles_for
-    return bool(resource and any("read" in roles_for(resource).get(role,set())
-                                 for role in browsing_scope(db,user).get(resource.id,set())))
+    from .object_access import metadata_visible
+    if resource and resource.kind == 'service' and not resource.config.get('service_account'):
+        from .permissions import allowed
+        if allowed(db, user, 'workloads.settings.read', resource.id):
+            return True
+    return bool(resource and (any("read" in roles_for(resource).get(role,set())
+                                 for role in browsing_scope(db,user).get(resource.id,set()))
+                              or metadata_visible(db, user, resource)))
 
 
 def creation_data_snapshot(db,user):

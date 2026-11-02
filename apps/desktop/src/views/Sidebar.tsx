@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { pageVisible, TAB_PAGES } from "../permissions";
-import { accessibleSchemas, accessibleSources, ago, api, AccessResource, inGroup, shortSha, inLayer, poolDot, poolInLayer, rEnabled, EDITOR_LABEL, EDITOR_NAME, Editor, openInWindow, Run, RunKind, RunScope, startingPool, usablePools, workloadDot, workloadStatus } from "../api";
+import { can, workspaceCreateLayers, pageVisible, TAB_PAGES } from "../permissions";
+import { workspaceCan, accessibleSchemas, accessibleSources, ago, api, AccessResource, inGroup, shortSha, inLayer, poolDot, poolInLayer, rEnabled, EDITOR_LABEL, EDITOR_NAME, Editor, openInWindow, Run, RunKind, RunScope, startingPool, usablePools, workloadDot, workloadStatus } from "../api";
 import { ProductIcon } from "../components/ProductIcon";
 import { resourceTab } from "../components/Permissions";
 import { SchemaTreeNode } from "../components/DataBrowser";
@@ -101,7 +101,7 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
   useEffect(() => { if (activeKey === "workspaces:" && activeIntent === "create") { setAdding(true); openTab({ kind: "workspaces", title: "Workspaces" }); } }, [activeKey, activeIntent, openTab]);
   const [name, setName] = useState("");
   const [editor, setEditor] = useState<Editor>("vscode");
-  const environments = hub.layers.filter((layer) => layer.workspaces);
+  const environments = workspaceCreateLayers(hub);
   const [environment, setEnvironment] = useState("");
   const selectedEnvironment = environment || environments.find((l) => l.id === hub.layerId)?.id || environments[0]?.id || "";
   const shown = hub.workspaces.filter((w) => inLayer(hub.layerId, w.layer_id ?? w.environment_id) && inGroup(hub.me?.active_group_id, w.owner_group_id));
@@ -116,7 +116,7 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
       // fails (e.g. the running-workspace limit). The error stays visible above the list.
       setAdding(false);
       setName("");
-      if (await ensureGitChoice(ws)) await api.startWorkspace(ws.id);   // cancelled: created, not started
+      if (workspaceCan(ws, "object.start") && await ensureGitChoice(ws)) await api.startWorkspace(ws.id);   // cancelled: created, not started
       openTab({kind:"workspace",ref:ws.id,title:ws.name});
     });
     setBusy(false);
@@ -126,9 +126,9 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
     <>
       <div className="section-title">
         My workspaces
-        <button className="icon-btn" title="New workspace" aria-label="New workspace" aria-expanded={adding} onClick={() => setAdding(!adding)}><IconPlus /></button>
+        {environments.length > 0 && <button className="icon-btn" title="New workspace" aria-label="New workspace" aria-expanded={adding} onClick={() => setAdding(!adding)}><IconPlus /></button>}
       </div>
-      {adding && (
+      {adding && environments.length > 0 && (
         <form className="form" onSubmit={(e) => { e.preventDefault(); void create(); }}>
           <div className="field">
             <label htmlFor="ws-name">Name</label>
@@ -147,7 +147,7 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
               {environments.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select><small>Access requires this layer and your own object permissions. No workspace security group is created.</small></div>}
           <div className="form-actions">
-            <button className="btn sm" disabled={!name.trim() || busy || !selectedEnvironment}>{busy ? "Starting…" : "Create & start"}</button>
+            <button className="btn sm" disabled={!name.trim() || busy || !selectedEnvironment}>{busy ? "Creating…" : can(hub.me, "workspaces.object.start", "workspaces", selectedEnvironment) ? "Create & start" : "Create workspace"}</button>
             <button type="button" className="btn sm secondary" onClick={() => setAdding(false)}>Cancel</button>
           </div>
         </form>
@@ -164,16 +164,16 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
             <span className="actions">
               {w.status === "running" || w.status === "starting" || w.status === "queued" ? (
                 <>
-                  <button className="icon-btn" disabled={w.status !== "running"} title={w.status === "queued" ? "Waiting for a free workspace slot" : w.status === "starting" ? "Editor is starting" : "Open editor"} aria-label="Open editor" onClick={() => openEditor(hub, w.id, w.name)}><IconOpen /></button>
-                  <button className="icon-btn" title="Stop" aria-label="Stop" onClick={() => hub.act(() => api.stopWorkspace(w.id))}><IconStop /></button>
+                  <button className="icon-btn" disabled={w.status !== "running" || !workspaceCan(w, "object.editor.open")} title={w.status === "queued" ? "Waiting for a free workspace slot" : w.status === "starting" ? "Editor is starting" : "Open editor"} aria-label="Open editor" onClick={() => openEditor(hub, w.id, w.name)}><IconOpen /></button>
+                  <button className="icon-btn" title="Stop" aria-label="Stop" disabled={!workspaceCan(w, "object.stop")} onClick={() => hub.act(() => api.stopWorkspace(w.id))}><IconStop /></button>
                 </>
               ) : (
-                <button className="icon-btn" title="Start" aria-label="Start" onClick={() => void ensureGitChoice(w).then((go) => go && hub.act(() => api.startWorkspace(w.id)))}><IconPlay /></button>
+                <button className="icon-btn" title="Start" aria-label="Start" disabled={!workspaceCan(w, "object.start")} onClick={() => void ensureGitChoice(w).then((go) => go && hub.act(() => api.startWorkspace(w.id)))}><IconPlay /></button>
               )}
             </span>
           </li>
         ))}
-        {!shown.length && !adding && <li className="empty"><button className="text-button" onClick={() => setAdding(true)}>{hub.workspaces.length ? "Create a workspace in this layer…" : "Create your first workspace…"}</button></li>}
+        {!shown.length && !adding && environments.length > 0 && <li className="empty"><button className="text-button" onClick={() => setAdding(true)}>{hub.workspaces.length ? "Create a workspace in this layer…" : "Create your first workspace…"}</button></li>}
       </ul>
       <OtherLayers count={hub.workspaces.length - shown.length} groups />
       <div className="sidebar-section-divider" />
@@ -186,10 +186,10 @@ function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {
 }
 
 export function NewRunForm({ hub, workspaceId, onDone }: { hub: Hub; workspaceId?: string; onDone?: () => void }) {
-  const [ws, setWs] = useState(workspaceId ?? hub.workspaces[0]?.id ?? "");
+  const [ws, setWs] = useState(workspaceId ?? hub.workspaces.find((w) => workspaceCan(w, "runs.create"))?.id ?? "");
   const [entrypoint, setEntrypoint] = useState("");
   const [kind, setKind] = useState<RunKind>("script");
-  const [pool, setPool] = useState(startingPool(hub.me?.pools, undefined, hub.workspaces.find((w) => w.id === (workspaceId ?? hub.workspaces[0]?.id))?.layer_id, "script"));
+  const [pool, setPool] = useState(startingPool(hub.me?.pools, undefined, hub.workspaces.find((w) => w.id === (workspaceId ?? hub.workspaces.find((w) => workspaceCan(w, "runs.create"))?.id))?.layer_id, "script"));
   const layerId = hub.workspaces.find((w) => w.id === ws)?.layer_id;
 
   const submit = async () => {
@@ -205,7 +205,7 @@ export function NewRunForm({ hub, workspaceId, onDone }: { hub: Hub; workspaceId
         <div className="field">
           <label htmlFor="run-ws">Workspace (files)</label>
           <select id="run-ws" value={ws} onChange={(e) => setWs(e.target.value)}>
-            {hub.workspaces.map((w) => <option key={w.id} value={w.id}>{w.name} · {w.owner}</option>)}
+            {hub.workspaces.filter((w) => workspaceCan(w, "runs.create")).map((w) => <option key={w.id} value={w.id}>{w.name} · {w.owner}</option>)}
           </select>
         </div>
       )}
@@ -428,7 +428,7 @@ export function accessSections(hub: Hub) {
     register: page("set-register"),
     audit: page("set-auditlog"), queries: page("set-querylog"),
     secrets: page("secrets"),
-    platform: ["set-layers", "set-pools", "set-runtimes", "set-template", "set-alerts"].some(page),
+    platform: ["set-layers", "set-pools", "set-runtimes", "set-template", "set-alerts", "set-backups"].some(page),
     security: ["set-profiles", "set-network"].some(page),
     privacy: ["set-classes", "set-policies", "set-forms", "set-duties"].some(page),
   };
@@ -480,7 +480,8 @@ function AdminPanel({ hub, openTab, activeKey }: Props) {
     <NavList label="Platform" activeKey={activeKey} openTab={openTab} items={[
       can.page("set-layers") && { kind: "admin-layers", title: "Layers" }, can.page("set-pools") && { kind: "admin-pools", title: "Compute pools" },
       can.page("set-runtimes") && { kind: "admin-runtimes", title: "Runtimes (versions)" }, can.page("set-template") && { kind: "admin-workspace-templates", title: "Workspace templates" },
-      can.page("set-alerts") && { kind: "admin-notifications", title: "Alerts" }]} />
+      can.page("set-alerts") && { kind: "admin-notifications", title: "Alerts" },
+      can.page("set-backups") && { kind: "admin-backups", title: "Backup and recovery" }]} />
     <NavList label="Security" activeKey={activeKey} openTab={openTab} items={[
       can.page("set-profiles") && { kind: "app-profiles", title: "App profiles" }, can.page("set-network") && { kind: "admin-network", title: "Network allowlist" }]} />
     <NavList label="Privacy" activeKey={activeKey} openTab={openTab} items={[

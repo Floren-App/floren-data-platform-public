@@ -65,6 +65,13 @@ def authorize_grant(db, user, body):
         actions = policy.validate_actions(body.actions)
     if any(not action.startswith(body.namespace + ".") for action in actions):
         raise HTTPException(422, "every action must belong to the declared namespace")
+    if any(action.startswith(('data.sql.','data.files.','data.iceberg.')) for action in actions):
+        resource = db.get(Resource, body.target_id)
+        if resource:
+            from ..compliance import role_requirement
+            role = 'Executor' if resource.kind in rbac.DATA_OBJECT_KINDS else 'Reader'
+            if role_requirement(db, resource, role, body.app_group_id)['policy'] is not None:
+                raise HTTPException(409, 'this data requires reviewed access; use an approved object-role case or a governed product')
     if not policy.can_delegate(db, user, body.namespace, body.target_id, body.layer_id, actions):
         raise HTTPException(403, "Owner of this capability scope required; cannot delegate permissions you do not hold")
     return actions
@@ -135,15 +142,13 @@ def role_output(row):
     return {"id": row.id, "name": row.name, "actions": row.actions}
 
 
-def role_admin(db, user):
-    # Definitions affect every grantee. Per-scope Owners delegate explicit actions instead.
-    if not acting_as_admin(rbac.resolve_user(db, user)):
-        raise HTTPException(403, "Global Admin must be active to change shared role definitions")
+def role_admin(db,user,action,ident=None):
+    policy.require(db,user,action,'custom-role:'+ident if ident else 'roles')
 
 
 @router.post("/roles", status_code=201)
 def create_role(body: RoleIn, db=Depends(get_db), user=Depends(get_actor)):
-    role_admin(db, user)
+    role_admin(db,user,"roles.custom.create")
     if body.name in policy.ROLES or db.scalar(select(CustomPermissionRole).where(CustomPermissionRole.name == body.name)):
         raise HTTPException(409, "role name is reserved or already exists")
     row = CustomPermissionRole(name=body.name, actions=policy.validate_actions(body.actions))
@@ -156,7 +161,7 @@ def create_role(body: RoleIn, db=Depends(get_db), user=Depends(get_actor)):
 
 @router.get("/roles/{ident}")
 def read_role(ident: str, db=Depends(get_db), user=Depends(get_actor)):
-    role_admin(db, user)
+    role_admin(db,user,"roles.custom.read",ident)
     row = db.get(CustomPermissionRole, ident)
     if not row:
         raise HTTPException(404, "role not found")
@@ -165,7 +170,7 @@ def read_role(ident: str, db=Depends(get_db), user=Depends(get_actor)):
 
 @router.put("/roles/{ident}")
 def update_role(ident: str, body: RoleIn, db=Depends(get_db), user=Depends(get_actor)):
-    role_admin(db, user)
+    role_admin(db,user,"roles.custom.update",ident)
     row = db.get(CustomPermissionRole, ident)
     if not row:
         raise HTTPException(404, "role not found")
@@ -175,6 +180,8 @@ def update_role(ident: str, body: RoleIn, db=Depends(get_db), user=Depends(get_a
     before = role_output(row)
     actions = policy.validate_actions(body.actions)
     for assignment in db.scalars(select(PermissionGrant).where(PermissionGrant.custom_role_id == ident)):
+        if not policy.can_delegate(db,user,assignment.namespace,assignment.target_id,assignment.layer_id,actions):
+            raise HTTPException(403,'Updating a bound role requires Owner of every affected scope and all resulting actions')
         if any(not action.startswith(assignment.namespace + ".") for action in actions):
             raise HTTPException(422, "role changes must stay within every assignment's declared namespace")
     row.name, row.actions = body.name, actions
@@ -185,7 +192,7 @@ def update_role(ident: str, body: RoleIn, db=Depends(get_db), user=Depends(get_a
 
 @router.delete("/roles/{ident}", status_code=204)
 def remove_role(ident: str, db=Depends(get_db), user=Depends(get_actor)):
-    role_admin(db, user)
+    role_admin(db,user,"roles.custom.delete",ident)
     row = db.get(CustomPermissionRole, ident)
     if not row:
         raise HTTPException(404, "role not found")

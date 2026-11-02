@@ -139,7 +139,7 @@ def attach(db, user, scope: dict) -> dict:
     """Add the masks and filters of the caller's product options to an admitted SQL scope (see module docstring)."""
     if user.is_admin and not user.execution_context:
         return scope
-    groups = rbac.app_groups(db, user)
+    groups = rbac.effective_app_groups(db, user)
     accesses = list(db.scalars(select(ProductAccess).where(ProductAccess.app_group_id.in_(groups)))) if groups else []
     grants = rbac.role_grants(db, user)
     product_resources = {g.product_resource_id for g in grants if isinstance(g, rbac.ProductGrant)}
@@ -151,7 +151,7 @@ def attach(db, user, scope: dict) -> dict:
         if isinstance(g, rbac.ProductGrant):
             continue
         target = db.get(Resource, g.resource_id)
-        if target is not None and "read" in rbac.roles_for(target).get(g.role, set()):
+        if target is not None and target.kind in ('source','schema') and g.role in ('Reader','Executor','Admin','Owner'):
             direct.add(g.resource_id)
     # Every path (product option) through which the caller reaches each table.
     paths: Dict[str, List[ProductOption]] = {}

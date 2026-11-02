@@ -32,7 +32,7 @@ locals {
       coordinator = { cpu = 2, memory = "8Gi" }
       workers     = { warehouse = fdp_compute_pool.sql.name, min = 1, max = 4 }
     }
-    quota   = { cpu = 32, memory = "128Gi", pods = 100 }
+    quota = { cpu = 32, memory = "128Gi", pods = 100 }
   }
 }
 
@@ -71,10 +71,10 @@ resource "fdp_compute_pool" "sql" {
 }
 
 resource "fdp_data_source" "warehouse" {
-  name     = "sales-dw"
-  kind     = "postgres"
-  layer_id = fdp_layer.nonprod.id
-  config   = jsonencode({ host = "pg.internal", port = 5432, database = "sales", catalog = "sales" })
+  name                   = "sales-dw"
+  kind                   = "postgres"
+  layer_id               = fdp_layer.nonprod.id
+  config                 = jsonencode({ host = "pg.internal", port = 5432, database = "sales", catalog = "sales" })
   provisioner_secret_wo  = { username = "governance_admin", password = var.warehouse_password }
   credentials_wo_version = 1 # bump to send a rotated password
 }
@@ -85,7 +85,7 @@ resource "fdp_schema" "reporting" {
 }
 
 data "fdp_principal" "finance" {
-  name = "/Finance"   # an IdP group provisioned by SCIM
+  name = "/Finance" # an IdP group provisioned by SCIM
   kind = "group"
 }
 

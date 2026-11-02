@@ -23,7 +23,10 @@ def setup_finance_db(client):
     schema = client.post("/v1/rbac/sources/finance-dw/schemas", headers=as_("admin"), json={"name": "public"})
     assert schema.status_code == 201, schema.text
     grant_group(client, schema.json()["id"], "Finance data", "Reader", external_groups=["finance"])
-    grant_group(client, "workloads", "Finance data", "Owner", external_groups=["finance"])
+    finance_group=grant_group(client, "workloads", "Finance data", "Owner", external_groups=["finance"])
+    from .rbac_helpers import secret_permissions
+    secret_permissions(client,'ana')
+    secret_permissions(client,'ana',scope='group',owner='finance',group_id=finance_group)
     grant_group(client, "workloads", "Deployed executors", "Executor", users=["bob"])
     assert deps.get_orchestrator().egress["finance-dw"] == ["10.0.0.5/32"]
 
@@ -40,8 +43,14 @@ def start_workspace(client, user="ana", editor="vscode"):
 
 def onboard_workspace_group(client,user):
     """Explicit admin onboarding, shared across fixture workspaces; the app creates no groups."""
+    from .rbac_helpers import secret_permissions, git_permissions
+    secret_permissions(client,user)
+    git_permissions(client,user)
     me = client.get('/v1/me',headers=as_(user)).json()
     if me.get('available_groups'):
+        from .rbac_helpers import workspace_permissions
+        if not me.get('acting_admin'):
+            workspace_permissions(client,me['active_group_id'])
         return
     admin = client.get('/v1/me',headers=as_('admin')).json()
     groups = client.get('/v1/rbac/groups',headers=as_('admin')).json()
@@ -53,6 +62,8 @@ def onboard_workspace_group(client,user):
         group = response.json()
     response = client.post('/v1/rbac/groups/'+group['id']+'/bindings',headers=as_('admin'),json={'principal_id':me['principal_id']})
     assert response.status_code == 201,response.text
+    from .rbac_helpers import workspace_permissions
+    workspace_permissions(client,group['id'])
 
 
 def execution_token(ws_id):
@@ -61,7 +72,7 @@ def execution_token(ws_id):
 
 
 def test_non_admin_cannot_manage_catalog(client):
-    r = client.put("/v1/admin/datasources/x", headers=as_("ana"), json={"name": "xx", "kind": "postgres"})
+    r = client.put("/v1/admin/datasources/xx", headers=as_("ana"), json={"name": "xx", "kind": "postgres"})
     assert r.status_code == 403
 
 
@@ -278,6 +289,9 @@ def test_the_platform_creates_no_warehouses_by_itself(monkeypatch):
     from app.models import ComputePool
     from .conftest import FakeVerifier
     Base.metadata.drop_all(engine)
+    from sqlalchemy import text
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
     deps._orchestrator = None
     monkeypatch.setattr(auth, "_verifier", FakeVerifier())
     with TestClient(app):

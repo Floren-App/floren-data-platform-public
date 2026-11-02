@@ -11,6 +11,11 @@ from .test_deploying import repo  # noqa: F401
 
 
 def setup_products(client, repo):  # noqa: F811
+    for username in ('ana','bob'):
+        pid=client.get('/v1/me',headers=as_(username)).json()['principal_id']
+        for namespace,role in (('products.collection','Viewer'),('products.object','Viewer'),('products.requests.own','Executor')):
+            client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+                'target_id':'products','namespace':namespace,'principal_id':pid,'layer_id':'*','role':role}).raise_for_status()
     staging = client.post("/v1/rbac/sources/finance-dw/schemas", headers=as_("admin"), json={"name": "staging"})
     assert staging.status_code == 201, staging.text
     with SessionLocal() as db:
@@ -48,7 +53,7 @@ def test_bundle_publish_browse_lineage_request_and_approve(client, repo):  # noq
     product = published.json()
     assert product["title"] == "Sales" and product["kind"] == "app" and product["domain"] == "Finance" and product["can_manage"]
     assert [(m["name"], m["kind"]) for m in product["members"]] == [("dash", "app"), ("sales", "table")]
-    assert {(g["kind"], g["name"], g["role"]) for g in product["grants"]} == {("service", "dash", "Executor"), ("schema", "public", "Reader")}
+    assert {(g["kind"], g["name"], g["role"]) for g in product["grants"]} == {("service", "dash", "Executor"), ("table", "sales", "Executor")}
     # The lead leads one product; an object may still be in others.
     assert client.post("/v1/catalog/products", headers=as_("ana"), json={"asset_ids": [ids["dash"]], "title": "again"}).status_code == 409
     in_products = client.get(f"/v1/catalog/assets/{ids['sales']}/product", headers=as_("ana")).json()["products"]
@@ -83,7 +88,7 @@ def test_bundle_publish_browse_lineage_request_and_approve(client, repo):  # noq
     assert client.get("/v1/catalog/products", headers=as_("bob")).json()["items"][0]["access"] == "requested"
     inbox = client.get("/v1/catalog/requests", headers=as_("ana")).json()
     assert [(r["product"], r["group"], r["status"]) for r in inbox] == [("Sales", "Deployed executors", "pending")]
-    assert {g["name"] for g in inbox[0]["grants"]} == {"dash", "public"}
+    assert {g["name"] for g in inbox[0]["grants"]} == {"dash", "sales"}
     assert client.get("/v1/catalog/requests", headers=as_("bob")).json() == []          # not an owner
     assert client.post(f"/v1/catalog/requests/{request.json()['id']}/decision", headers=as_("bob"), json={"approve": True}).status_code == 404
     decided = client.post(f"/v1/catalog/requests/{request.json()['id']}/decision", headers=as_("ana"), json={"approve": True, "note": "Welcome"})

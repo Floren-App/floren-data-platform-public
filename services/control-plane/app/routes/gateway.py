@@ -236,10 +236,19 @@ def _allowed(db: Session, kind: str, item_id: str, username: str, groups: list, 
         return False
     if kind == "p":
         pub = db.scalar(select(Workload).where(Workload.slug == item_id, Workload.status == "live"))
-        return pub is not None and allowed(db, user, "execute", workload_resource(db, pub))
+        from ..permissions import domain_allowed
+        return pub is not None and domain_allowed(db, user,
+            "workloads.execution.docs.open" if pub.kind == "dbt" else "workloads.execution.app.open",
+            workload_resource(db, pub), "execute")
     item = db.get(Workspace if kind == "ws" else Run, item_id)
     from ..rbac import same_identity
-    return item is not None and (same_identity(item, user) or user.is_admin)
+    if item is None or not (same_identity(item,user) or user.is_admin):
+        return False
+    if kind=='ws':
+        from ..workspace_access import allowed as workspace_allowed
+        return workspace_allowed(db,user,'workspaces.object.editor.open',item)
+    from ..run_access import allowed as run_allowed
+    return run_allowed(db,user,'artifacts.open',item)
 
 
 @router.get("/auth/forward")

@@ -44,18 +44,18 @@ def owned(db: Session, owner: str) -> List[GitCredential]:
 
 
 def token(store: SecretStore, row: GitCredential) -> Optional[str]:
-    return store.read(path(row.owner, row.id)).get("token") or store.read(legacy_path(row.owner, row.host)).get("token")
+    return store.read(path(row.owner,row.id)).get("token") or (store.read(legacy_path(row.owner,row.host)).get("token") if row.legacy_token_allowed else None)
 
 
 def for_workspace(db: Session, ws: Workspace, host: str) -> Tuple[Optional[GitCredential], str]:
     """(credential, reason when none): the workspace's chosen credential for its host; for another host, the
     owner's only credential for it. A workspace whose owner chose no Git gets nothing."""
     chosen = db.get(GitCredential, ws.git_credential_id) if ws.git_credential_id else None
-    if chosen is not None and chosen.owner == ws.owner and chosen.host == host:
+    if chosen is not None and chosen.owner == ws.owner and chosen.principal_id==ws.principal_id and chosen.host == host:
         return chosen, ""
     if ws.git_asked and chosen is None:
         return None, "this workspace uses no Git credential; choose one on the workspace's page in the app"
-    candidates = [c for c in owned(db, ws.owner) if c.host == host]
+    candidates = [c for c in owned(db, ws.owner) if c.host == host and c.principal_id==ws.principal_id]
     if len(candidates) == 1:
         return candidates[0], ""
     if candidates:
@@ -66,6 +66,6 @@ def for_workspace(db: Session, ws: Workspace, host: str) -> Tuple[Optional[GitCr
 def identity(db: Session, ws: Workspace) -> Tuple[str, str]:
     """(name, email) to commit as in this workspace, from its credential; empty when not set."""
     chosen = db.get(GitCredential, ws.git_credential_id) if ws.git_credential_id else None
-    if chosen is None or chosen.owner != ws.owner:
+    if chosen is None or chosen.owner != ws.owner or chosen.principal_id!=ws.principal_id:
         return "", ""
     return chosen.commit_name, chosen.commit_email

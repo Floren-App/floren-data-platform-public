@@ -24,14 +24,14 @@ def sql_mode(client, monkeypatch):
         client.put('/v1/admin/datasources/' + name, headers=as_('admin'),
                    json=integration(name, kind)).raise_for_status()
         schema = client.post('/v1/rbac/sources/' + name + '/schemas', headers=as_('admin'), json={'name': 'reporting'}).json()
-        grant_group(client, schema['id'], name + '-readers', 'Reader', users=('ana',))
+        grant_group(client, schema['id'], 'finance-readers', 'Reader', users=('ana',))
         with SessionLocal() as db:
             resource = db.get(Resource, schema['id'])
             resource.config = {**resource.config, 'state': 'ready'}
             db.commit()
     with SessionLocal() as db:
         ana = rbac.resolve_user(db, User('ana'))
-        ws = Workspace(name='SQL test', owner='ana', principal_id=ana.principal_id, editor='vscode', status='running')
+        ws = Workspace(name='SQL test', owner='ana', principal_id=ana.principal_id, owner_group_id=ana.active_group_id, editor='vscode', status='running')
         db.add(ws)
         db.commit()
         execution = mint_token('execution', 'ana', 3600, ws=ws.id, pid=ana.principal_id)
@@ -197,7 +197,7 @@ def test_schema_must_be_ready_and_system_metadata_is_bounded(sql_mode):
     query = SqlQuery(scope={'finance': {'schemas': {'reporting': 'Reader'}, 'blocked_relations': []}})
     expression = sql_access.metadata_filters(query, {'catalogName': 'system', 'schemaName': 'metadata',
                                                     'tableName': 'table_comments'})[0]['expression']
-    assert "catalog_name='finance'" in expression and "schema_name IN ('reporting')" in expression
+    assert "catalog_name='finance'" in expression and "schema_name='reporting'" in expression
     assert not sql_access.policy_allow(query, {'operation': 'SelectFromColumns', 'resource': {'table': {
         'catalogName': 'system', 'schemaName': 'runtime', 'tableName': 'queries'}}})
 
@@ -238,8 +238,8 @@ def test_batch_scope_matches_additive_parent_and_schema_grants(sql_mode):
         source = db.scalar(select(DataSource).where(DataSource.name == 'finance'))
         parent_id = rbac.source_resource(db, source).id
         child_id = db.scalar(select(Resource.id).where(Resource.object_id == source.id, Resource.kind == 'schema'))
-    grant_group(client, parent_id, 'Source writers', 'Contributor', users=('ana',))
-    grant_group(client, child_id, 'Schema administrators', 'Admin', users=('ana',))
+    grant_group(client, parent_id, 'finance-readers', 'Contributor', users=('ana',))
+    grant_group(client, child_id, 'finance-readers', 'Admin', users=('ana',))
     with SessionLocal() as db:
         who = sql_access.actor(db, headers['Authorization'])
         scope = sql_access.scopes(db, who)

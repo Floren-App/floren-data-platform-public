@@ -1,3 +1,4 @@
+import { can } from "../permissions";
 import { ObjectLineage } from "../components/ObjectLineage";
 import { AlertRules } from "./Alerts";
 import { objectKindLabel } from "../objectKinds";
@@ -354,6 +355,8 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
   const resource = hub.resources.find((r) => r.id === pub.resource_id);
   const parent = hub.resources.find((r) => r.id === resource?.parent_id);
   const section = tab.section ?? "overview";
+  const can = (action: string, legacy: boolean) => pub.capabilities ? pub.capabilities.includes(action) : legacy;
+
 
   return (
     <>
@@ -367,20 +370,20 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
           {pub.run_as && ` · runs as sa:${pub.run_as}`}
         </>}
         actions={<>
-          {pub.can_manage && pub.actions.includes("delete") && <>
+          {can("workloads.settings.undeploy", pub.can_manage && pub.actions.includes("delete")) && <>
             <button className="btn ghost danger" disabled={busy} onClick={() => confirm(`Undeploy ${pub.title}? ${pub.kind === "app" ? "The app stops and its address stops working." : "Nobody can run it any more."}`)
               && act(() => api.undeploy(pub.id))}><IconTrash size={14} />Undeploy</button>
             <span className="divider" />
           </>}
           {pub.kind === "app" && <PublishButton resourceId={pub.resource_id} openTab={openTab} hub={hub} />}
-          {pub.can_manage && <button className="btn secondary" disabled={busy} title="Check the branch for new commits now"
+          {can("workloads.code.sync", pub.can_manage) && <button className="btn secondary" disabled={busy} title="Check the branch for new commits now"
                   onClick={() => act(() => api.syncWorkload(pub.id))}><IconRefresh size={14} />Check for updates</button>}
-          {(pub.kind === "app" || pub.kind === "airflow" || pub.kind === "dbt") && pub.status === "live" && (
+          {(pub.kind === "app" || pub.kind === "airflow" || pub.kind === "dbt") && pub.status === "live" && can(pub.kind === "dbt" ? "workloads.execution.docs.open" : "workloads.execution.app.open", pub.actions.includes("execute")) && (
             <button className="btn" onClick={() => act(() => openInWindow(api.openWorkload(pub.id).then((r) => r.url), pub.title, `pub-${pub.slug}`))}><IconOpen size={14} />{pub.kind === "airflow" ? "Open Airflow" : pub.kind === "dbt" ? "Open docs" : "Open app"}</button>
           )}
         </>} />
 
-      <ObjectTabs active={section} lineage={!!resource} versions logs settings={pub.actions.includes("identity") || !!parent?.actions.includes("delete")}
+      <ObjectTabs active={section} lineage={!!resource} versions={can("workloads.code.versions.read", true)} logs={can("logs.read", pub.actions.includes("execute"))} settings={can("workloads.settings.identity.change", pub.actions.includes("identity")) || can("workloads.settings.execution_mode.change", pub.actions.includes("identity")) || can("workloads.settings.secret.bind", pub.actions.includes("identity")) || !!parent?.actions.includes("delete")}
         alerts={!!resource?.actions.includes("assign")} onChange={(s) => openTab({ ...tab, section: s })} />
       {section === "alerts" && resource && <AlertRules hub={hub} resource={resource} />}
       {error && <AccessError error={error} openTab={openTab} />}
@@ -391,7 +394,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
       {section === "versions" && <VersionsPanel pub={pub} />}
       {section === "logs" && <LogView scope={{ workload_id: pub.id }} openTab={openTab} showWorkload={false} label={`Log of ${pub.title}`} />}
       {section === "settings" && <>
-        {pub.actions.includes("identity") && <ProductionSettings pub={pub} onSave={(patch) => act(() => api.updateWorkload(pub.id, patch))} />}
+        {(can("workloads.settings.identity.change", pub.actions.includes("identity")) || can("workloads.settings.execution_mode.change", pub.actions.includes("identity")) || can("workloads.settings.secret.bind", pub.actions.includes("identity"))) && <ProductionSettings pub={pub} onSave={(patch) => act(() => api.updateWorkload(pub.id, patch))} />}
         {resource && parent?.actions.includes("delete") && <OrganizationSettings resource={resource} hub={hub} openTab={openTab} />}
       </>}
       {section === "overview" && <>
@@ -425,7 +428,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
           {Object.keys(pub.env).length > 0 && <><dt>Variables</dt><dd className="mono" style={{ whiteSpace: "pre-wrap" }}>{toLines(pub.env)}</dd></>}
           {Object.keys(pub.secrets).length > 0 && <><dt>Secrets</dt><dd className="mono" style={{ whiteSpace: "pre-wrap" }}>{Object.entries(pub.secrets).map(([k, v]) => `${k} ← ${v}`).join("\n")}</dd></>}
         </dl>
-        {pub.can_manage && (
+        {can("workloads.code.auto_update.set", pub.can_manage) && (
           <label className="row" style={{ marginTop: 16 }}>
             <input type="checkbox" checked={pub.auto_update} disabled={busy}
                    onChange={(e) => act(() => api.updateWorkload(pub.id, { auto_update: e.target.checked }))} />
@@ -434,7 +437,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
         )}
       </div>
 
-      {(pub.kind === "script" || pub.kind === "notebook" || pub.kind === "dbt") && pub.status === "live" && (
+      {(pub.kind === "script" || pub.kind === "notebook" || pub.kind === "dbt") && pub.status === "live" && can("workloads.execution.run", pub.actions.includes("execute")) && (
         <div className="card">
           <h2>Run</h2>
           <p className="muted">Runs version {short(pub.deployed_sha)} on a warehouse with <b>{pub.execution_mode === "caller" ? "your" : "the configured service’s"}</b> data access. Only you see your runs.</p>
@@ -486,6 +489,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
 
 /** Deployer: run-as identity and production environment. Saving redeploys long-running kinds. */
 function ProductionSettings({ pub, onSave }: { pub: Workload; onSave: (patch: Parameters<typeof api.updateWorkload>[1]) => Promise<boolean> }) {
+  const can = (action: string) => pub.capabilities ? pub.capabilities.includes(action) && pub.capabilities.includes("workloads.code.deploy") : pub.actions.includes("identity");
   const [accounts, setAccounts] = useState<ServiceAccount[]>([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -494,33 +498,39 @@ function ProductionSettings({ pub, onSave }: { pub: Workload; onSave: (patch: Pa
   const [runAs, setRunAs] = useState(pub.run_as ?? "");
   const [env, setEnv] = useState(toLines(pub.env));
   const [secrets, setSecrets] = useState(toLines(pub.secrets));
-  useEffect(() => { api.serviceAccounts().then(setAccounts).catch((e: Error) => setError(e.message)); }, []);
+  useEffect(() => { if (!can("workloads.settings.identity.change")) return; api.serviceAccounts().then(setAccounts).catch((e: Error) => setError(e.message)); }, []);
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setMessage("");
     try {
-      if (await onSave({ execution_mode: mode, run_as: mode === "fixed" ? runAs : "", env: parseLines(env), secrets: parseLines(secrets) })) setMessage("Production settings saved.");
+      const patch: Parameters<typeof api.updateWorkload>[1] = {};
+      if (mode !== pub.execution_mode) patch.execution_mode = mode;
+      const identity = mode === "fixed" ? runAs : "";
+      if (identity !== (pub.run_as ?? "")) patch.run_as = identity;
+      if (env !== toLines(pub.env)) patch.env = parseLines(env);
+      if (secrets !== toLines(pub.secrets)) patch.secrets = parseLines(secrets);
+      if (Object.keys(patch).length && await onSave(patch)) setMessage("Production settings saved.");
     } finally { setSaving(false); }
   };
   return (
     <form className="card" onSubmit={save}>
       <h2>Production settings</h2>
-      <p className="muted">Choose whose data access applies when this program runs. Only Owners can change execution identities and secret bindings.</p>
+      <p className="muted">Choose whose data access applies when this program runs. Each execution identity, execution mode and secret binding control requires its own permission. Saving runtime changes also requires deployment permission.</p>
       {error && <p className="error" role="alert">{error}</p>}
       {message && <p className="success-message" role="status">{message}</p>}
       <div className="arg-grid">
         <div className="field"><label htmlFor="ps-mode">Data identity</label>
-          <select id="ps-mode" disabled={pub.kind === "stream"} value={mode} onChange={(e) => setMode(e.target.value as "caller" | "fixed")}>
+          <select id="ps-mode" disabled={pub.kind === "stream" || !can("workloads.settings.execution_mode.change")} value={mode} onChange={(e) => setMode(e.target.value as "caller" | "fixed")}>
             <option value="caller">Caller / logged-in viewer</option><option value="fixed">Fixed service identity</option>
           </select></div>
         <div className="field"><label htmlFor="ps-runas">Run as</label>
-          <select id="ps-runas" value={runAs} disabled={mode !== "fixed"} onChange={(e) => setRunAs(e.target.value)}>
+          <select id="ps-runas" value={runAs} disabled={mode !== "fixed" || !can("workloads.settings.identity.change")} onChange={(e) => setRunAs(e.target.value)}>
             <option value="">This workload’s registered service</option>
             {accounts.filter((a) => !a.disabled || a.name === runAs).map((a) => <option key={a.name} value={a.name}>{a.principal}{a.disabled ? " (disabled)" : ""}</option>)}
           </select></div>
         <div className="field"><label htmlFor="ps-env">Variables (KEY=value)</label>
-          <textarea id="ps-env" className="short" value={env} onChange={(e) => setEnv(e.target.value)} /></div>
+          <textarea id="ps-env" disabled={!can("workloads.settings.secret.bind")} className="short" value={env} onChange={(e) => setEnv(e.target.value)} /></div>
         <div className="field"><label htmlFor="ps-sec">Secrets (VAR=reference)</label>
-          <textarea id="ps-sec" className="short" value={secrets} onChange={(e) => setSecrets(e.target.value)} /></div>
+          <textarea id="ps-sec" disabled={!can("workloads.settings.secret.bind")} className="short" value={secrets} onChange={(e) => setSecrets(e.target.value)} /></div>
       </div>
       <div className="form-actions">
         <button className="btn" disabled={saving}>
@@ -534,13 +544,16 @@ function ProductionSettings({ pub, onSave }: { pub: Workload; onSave: (patch: Pa
 }
 
 /** Admin: git repositories people may deploy from (read credentials go to OpenBao). */
-export function AdminRepos() {
+export function AdminRepos({hub}:{hub:Hub}) {
+  const canCreate=can(hub.me,"repositories.register","repositories");
   const [repos, setRepos] = useState<Repo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const empty = { name: "", url: "", default_branch: "main", description: "", groups: "", username: "", token: "" };
   const [form, setForm] = useState(empty);
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState(false);
+  const current=repos.find(r=>r.name===form.name);
+  const capability=(action:string)=>editing ? (current?.capabilities?.includes(action) ?? hub.me?.acting_admin) : can(hub.me,action,'repositories');
   const close = () => { setForm(empty); setEditing(false); setOpen(false); };
   const load = () => api.admin.repos().then(setRepos).catch((e: Error) => setError(e.message));
   useEffect(() => { load(); }, []);
@@ -560,7 +573,7 @@ export function AdminRepos() {
     <>
       <PageHeader icon={<IconBranch size={22} />} title="Git repositories"
         subtitle={<>Repositories people may deploy from. Floren Data Platform only ever reads from them: use a <b>read-only</b> token of a service account (GitHub: a fine-grained token with Contents read-only), so it cannot rewrite history. It is stored in the secret store and never shown again. People push from their workspaces with their own tokens (Account → Git credentials).</>}
-        actions={<button className="btn" aria-expanded={open && !editing} onClick={() => open && !editing ? close() : (setForm(empty), setEditing(false), setOpen(true))}><IconPlus size={14} />Add repository</button>} />
+        actions={canCreate && <button className="btn" aria-expanded={open && !editing} onClick={() => open && !editing ? close() : (setForm(empty), setEditing(false), setOpen(true))}><IconPlus size={14} />Add repository</button>} />
       {error && <p className="error" role="alert">{error}</p>}
       {open && <form className="card" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <h3>{editing ? `Edit ${form.name}` : "Add repository"}</h3>
@@ -568,9 +581,9 @@ export function AdminRepos() {
           <div className="field"><label htmlFor="r-name">Name</label><input id="r-name" className="mono" autoFocus={!editing} value={form.name} disabled={editing} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="analytics" /></div>
           <div className="field"><label htmlFor="r-url">Clone URL (https)</label><input id="r-url" className="mono" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://git.example.com/team/analytics.git" /></div>
           <div className="field"><label htmlFor="r-branch">Default branch</label><input id="r-branch" className="mono" value={form.default_branch} onChange={(e) => setForm({ ...form, default_branch: e.target.value })} /></div>
-          <div className="field"><label htmlFor="r-groups">Who may deploy (groups, empty = everyone)</label><input id="r-groups" value={form.groups} onChange={(e) => setForm({ ...form, groups: e.target.value })} /></div>
-          <div className="field"><label htmlFor="r-user">Read-only user</label><input id="r-user" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="fdp-bot" /></div>
-          <div className="field"><label htmlFor="r-token">Token{editing ? " (empty = keep)" : ""}</label><input id="r-token" type="password" autoComplete="off" value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} /></div>
+          <div className="field"><label htmlFor="r-groups">Who may deploy (groups, empty = everyone)</label><input id="r-groups" disabled={!capability("repositories.trust.change")} value={form.groups} onChange={(e) => setForm({ ...form, groups: e.target.value })} /></div>
+          <div className="field"><label htmlFor="r-user">Read-only user</label><input id="r-user" disabled={!capability("repositories.credential.bind")} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="fdp-bot" /></div>
+          <div className="field"><label htmlFor="r-token">Token{editing ? " (empty = keep)" : ""}</label><input id="r-token" disabled={!capability("repositories.credential.bind")} type="password" autoComplete="off" value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} /></div>
         </div>
         <div className="field"><label htmlFor="r-desc">Description</label><input id="r-desc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
         <div className="form-actions">
@@ -586,8 +599,8 @@ export function AdminRepos() {
             <td className="mono">{r.default_branch}</td><td>{r.allowed_groups.join(", ") || "everyone"}</td>
             <td>{r.has_credentials ? "stored" : <span className="muted">none (public)</span>}</td>
             <td className="table-actions"><div className="row">
-              <button className="btn sm secondary" onClick={() => { setEditing(true); setOpen(true); setForm({ ...empty, name: r.name, url: r.url, default_branch: r.default_branch, description: r.description, groups: r.allowed_groups.join(", ") }); requestAnimationFrame(() => document.getElementById("r-url")?.focus()); }}>Edit</button>
-              <button className="icon-btn" aria-label={`Remove ${r.name}`} title="Remove repository" onClick={() => confirm(`Remove ${r.name}?`) && api.admin.deleteRepo(r.name).then(load).catch((e: Error) => setError(e.message))}><IconTrash /></button>
+              <button className="btn sm secondary" disabled={!(r.capabilities?.includes("repositories.apply") ?? hub.me?.acting_admin)} onClick={() => { setEditing(true); setOpen(true); setForm({ ...empty, name: r.name, url: r.url, default_branch: r.default_branch, description: r.description, groups: r.allowed_groups.join(", ") }); requestAnimationFrame(() => document.getElementById("r-url")?.focus()); }}>Edit</button>
+              <button className="icon-btn" disabled={!(r.capabilities?.includes("repositories.remove") ?? hub.me?.acting_admin)} aria-label={`Remove ${r.name}`} title="Remove repository" onClick={() => confirm(`Remove ${r.name}?`) && api.admin.deleteRepo(r.name).then(load).catch((e: Error) => setError(e.message))}><IconTrash /></button>
             </div></td>
           </tr>))}
           {!repos.length && <tr><td colSpan={6}>No repositories registered yet.</td></tr>}

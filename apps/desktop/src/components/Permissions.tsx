@@ -26,6 +26,8 @@ export function resourceChain(resource: AccessResource, resources: AccessResourc
 const API_KINDS = ["api-root", "api", "api-group", "api-operation"];
 
 export function resourceTab(resource: AccessResource, section?: ObjectSection): TabRef {
+  if (["table", "column", "file", "directory"].includes(resource.kind))
+    return { kind:"data-permissions", ref:resource.id, title:resource.name, section:section ?? "permissions" };
   if (resource.kind === "kafka" || resource.kind === "topic") return { kind: "kafka", kafkaKind: resource.kind === "kafka" ? "cluster" : "topic", ref: resource.id, title: resource.name, section };
   if (resource.kind === "api-root") return { kind: "apis", title: "API management" };
   if (API_KINDS.includes(resource.kind)) {
@@ -61,14 +63,16 @@ export function ObjectBreadcrumbs({ resource, resources, openTab, trailing = [] 
 
 /** The roles an object offers (with what each allows), and the one to suggest first. */
 export function rolesFor(resource: Pick<AccessResource, "kind">) {
+  const isDataObject = ["table", "column", "file", "directory"].includes(resource.kind);
   const isKafka = resource.kind === "kafka" || resource.kind === "topic";
-  const isData = resource.kind === "source" || resource.kind === "schema" || isKafka;
+  const isData = resource.kind === "source" || resource.kind === "schema" || isKafka || isDataObject;
+  if (isDataObject) return { roles: { Viewer:"Read object metadata", Executor:"Read permitted content", Contributor:"Write content; reading is separate", Manager:"Manage object metadata", Admin:"Execute, edit and administer", Owner:"Administer and delegate" } as Record<string,string>, initial:"Viewer", isData, isProduct:false, isApi:false, isPackage:false, isKafka:false };
   const isApi = API_KINDS.includes(resource.kind);
   const isPackage = PACKAGE_KINDS.includes(resource.kind);
   const isProduct = resource.kind === "product";
   if (["setting", "settings-section", "settings-root"].includes(resource.kind))
-    return { roles: { Viewer: "See this page", Manager: "Also change it" } as Record<string, string>, initial: "Viewer", isData, isProduct, isApi, isPackage, isKafka };
-  const roles: Record<string, string> = isProduct ? PRODUCT_ROLES : isKafka ? { Reader: "Consume and commit offsets for own groups", Contributor: "Also produce messages", Admin: "Also create, alter and delete topics", Owner: "All topic permissions and role assignments" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
+    return { roles: { Viewer: "Read permitted metadata", Contributor: "Edit drafts and content", Executor: "Use permitted functions and exports", Manager: "Apply operational configuration", Admin: "Execute, edit and administer", Owner: "Administer and delegate" } as Record<string, string>, initial: "Viewer", isData, isProduct, isApi, isPackage, isKafka };
+  const roles: Record<string, string> = isProduct ? PRODUCT_ROLES : isKafka ? { Viewer: "View topic metadata", Executor: "Consume and commit offsets for own groups", Contributor: "Produce messages; consuming is separate", Manager: "Configure topic lifecycle without reading messages", Admin: "Payload and topic administration", Owner: "All topic permissions and role assignments", Reader: "Legacy alias for Executor" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
   const initial = isProduct ? "Consumer" : isData ? "Reader" : isApi ? "Consumer" : isPackage ? (resource.kind === "package" ? "Maintainer" : "Publisher") : "Executor";
   return { roles, initial, isData, isProduct, isApi, isPackage, isKafka };
 }
@@ -93,30 +97,48 @@ export function ObjectTabs({ active, onChange, settings = false, overview = "Ove
 }
 
 const DATA_ROLES = {
+  Viewer: "Discover schema metadata without row or file access.",
+  Executor: "Read data in this scope.",
+  Manager: "Edit descriptive metadata without data access.",
   Reader: "Read data in this scope.",
-  Contributor: "Read and write data. Cannot create or alter tables.",
+  Contributor: "Write data; reading requires Executor. Cannot create or alter tables.",
   Admin: "Read, write, create, alter, and remove data objects. Cannot assign Floren Data Platform permissions.",
   Owner: "Full control, including assigning permissions to app groups.",
 };
 const API_ROLES = {
+  Viewer: "Read API metadata without calling operations.",
+  Executor: "Call authorized API operations.",
+  Manager: "Configure endpoints without calling them.",
   Consumer: "Call the API's operations from programs, or try them out. Internal APIs are called with their own JWT or mTLS.",
-  Contributor: "Call and change configuration, operations and endpoints.",
+  Contributor: "Edit draft configuration; calling and applying require separate permissions.",
   Admin: "Create and remove operations and endpoint groups. Cannot assign permissions.",
   Owner: "Full control, including permissions and the API's managed identity.",
 };
 const PACKAGE_ROLES = {
+  Viewer: "Read package metadata.",
+  Executor: "Download and install permitted packages.",
+  Contributor: "Upload new packages; publishing and imports require Manager.",
+  Manager: "Publish versions, manage availability and request imports.",
+  Admin: "Publish, import and administer packages.",
   Publisher: "Publish new packages (their group becomes the package's Owner) and import packages from PyPI or CRAN.",
   Maintainer: "Also publish new versions of packages and yank versions.",
   Owner: "Full control, including deleting versions and assigning permissions.",
 };
 const PACKAGE_KINDS = ["package-root", "package"];
 const PRODUCT_ROLES = {
+  Viewer: "Read product metadata without accessing its data.",
+  Executor: "Use the objects covered by approved product access.",
+  Contributor: "Edit descriptive metadata without data access.",
+  Manager: "Manage product metadata without data access.",
+  Admin: "Administer and use the product without delegating permissions.",
   Consumer: "Use everything in this data product: read its tables and topics, open its dashboards, call its APIs.",
   Owner: "Also change the product, decide access requests and assign permissions.",
 };
 const PROGRAM_ROLES = {
+  Viewer: "View workload metadata without running programs or opening apps.",
   Executor: "Run programs and open apps.",
-  Contributor: "Run and update existing programs and apps, including deployment.",
+  Contributor: "Edit permitted settings and drafts; running and deploying are separate.",
+  Manager: "Configure and deploy workloads and create folders; no execution or delegation.",
   Admin: "Create and remove programs, apps, and folders. Cannot assign permissions.",
   Owner: "Full control, including permissions and execution identity settings.",
 };
@@ -145,7 +167,7 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
   const [search, setSearch] = useState("");
   const { roles, initial } = rolesFor(resource);
   const [role, setRole] = useState(initial);
-  const canRead = resource.actions.includes("read");
+  const canRead = resource.capabilities ? resource.capabilities.includes("permissions.bindings.read") : resource.actions.includes("assign");
   const canAssign = resource.actions.includes("assign");
 
   useEffect(() => {
@@ -246,7 +268,7 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
     {justify && <JustifyPanel target={justify.target} requirement={justify.requirement} onCancel={() => setJustify(null)}
       onDone={(text) => { setJustify(null); setError(""); setMessage(text); }} />}
     {message && <p className="success-message" role="status">{message}</p>}
-    {!canRead ? <p className="muted">You can browse this object's children. Permission details require access to this object.</p>
+    {!canRead ? <p className="muted">You can browse this object's children. Permission bindings require explicit inspection permission.</p>
       : loading ? <p className="muted" role="status">Loading permissions…</p> : <>
         <div className="table-scroll"><table>
           <thead><tr><th>App group or service</th><th>Role</th><th>Granted on</th><th /></tr></thead>

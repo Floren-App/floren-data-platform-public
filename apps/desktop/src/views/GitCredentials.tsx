@@ -1,5 +1,7 @@
+import type { Hub } from "../hub";
+import { can } from "../permissions";
 import { useCallback, useEffect, useState } from "react";
-import { api, GitCredential, GitCredentialInput, usesGit, Workspace } from "../api";
+import { workspaceCan, api, GitCredential, GitCredentialInput, usesGit, Workspace } from "../api";
 import { PageHeader } from "../components/Page";
 import { IconKey, IconPlus, IconTrash } from "../components/Icons";
 
@@ -26,7 +28,8 @@ function CredentialFields({ value, onChange, editing, idPrefix }: { value: GitCr
 const valid = (v: GitCredentialInput, editing: boolean) => !!v.host.trim() && !!v.username.trim() && (editing || !!v.token);
 
 /** Your own Git credentials: git in your VS Code and RStudio workspaces gets the token from the platform. */
-export function GitCredentialsTab({ sections }: { sections?: React.ReactNode }) {
+export function GitCredentialsTab({ sections, hub }: { sections?: React.ReactNode; hub: Hub }) {
+  const canCreate=can(hub.me,"git.credentials.create","git-credentials");
   const [rows, setRows] = useState<GitCredential[]>([]), [error, setError] = useState("");
   const [draft, setDraft] = useState<(GitCredentialInput & { id?: string }) | null>(null), [busy, setBusy] = useState(false);
   const reload = useCallback(() => api.gitCredentials.list().then(setRows).catch((e: Error) => setError(e.message)), []);
@@ -44,7 +47,7 @@ export function GitCredentialsTab({ sections }: { sections?: React.ReactNode }) 
   return <>
     <PageHeader icon={<IconKey size={22} />} title="Git credentials"
       subtitle="Your own Git tokens, for example one for work and one for personal repositories. Each VS Code or RStudio workspace uses the one you choose for it (asked at its first start): git gets the token from the platform when it needs it, so it is never saved in a workspace, and your commits carry the name and email set here. Deployments read repositories with the administrators' read-only credentials, never yours."
-      actions={<button className="btn" onClick={() => setDraft(blank())}><IconPlus size={14} />Add credential</button>} />
+      actions={canCreate && <button className="btn" onClick={() => setDraft(blank())}><IconPlus size={14} />Add credential</button>} />
     {sections}
     {error && <p className="error" role="alert">{error}</p>}
     {draft && <form className="card" aria-label="Git credential" onSubmit={(e) => void save(e)}>
@@ -57,8 +60,8 @@ export function GitCredentialsTab({ sections }: { sections?: React.ReactNode }) 
       {rows.map((r) => <tr key={r.id}><td><strong>{r.label}</strong></td><td className="mono">{r.host}</td><td>{r.username}</td>
         <td>{r.commit_name || r.commit_email ? <>{r.commit_name}{r.commit_email && <span className="muted"> &lt;{r.commit_email}&gt;</span>}</> : <span className="muted">your platform name</span>}</td>
         <td className="table-actions"><div className="row">
-          <button className="btn sm secondary" onClick={() => setDraft({ id: r.id, label: r.label, host: r.host, username: r.username, token: "", commit_name: r.commit_name, commit_email: r.commit_email })}>Edit</button>
-          <button className="icon-btn" aria-label={`Remove ${r.label}`} onClick={() => void remove(r)}><IconTrash size={14} /></button></div></td></tr>)}
+          <button className="btn sm secondary" disabled={!(r.capabilities?.includes("git.credentials.update") ?? false)} onClick={() => setDraft({ id: r.id, label: r.label, host: r.host, username: r.username, token: "", commit_name: r.commit_name, commit_email: r.commit_email })}>Edit</button>
+          <button className="icon-btn" disabled={!(r.capabilities?.includes("git.credentials.delete") ?? false)} aria-label={`Remove ${r.label}`} onClick={() => void remove(r)}><IconTrash size={14} /></button></div></td></tr>)}
     </tbody></table>}
   </>;
 }
@@ -71,7 +74,7 @@ let ask: ((p: Pending) => void) | null = null;
 /** Before a VS Code or RStudio workspace starts for the first time: which Git credential it uses. Resolves
  * false when the person cancels (do not start). Workspaces that already have a choice pass straight through. */
 export function ensureGitChoice(ws: Workspace): Promise<boolean> {
-  if (!usesGit(ws) || ws.git_asked || !ask) return Promise.resolve(true);
+  if (!workspaceCan(ws, "git.credentials.binding.change") || !workspaceCan(ws, "object.settings.edit") || !usesGit(ws) || ws.git_asked || !ask) return Promise.resolve(true);
   return new Promise((resolve) => ask!({ ws, resolve }));
 }
 

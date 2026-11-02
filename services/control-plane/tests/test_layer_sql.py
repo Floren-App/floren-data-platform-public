@@ -29,7 +29,7 @@ def layered(sql_mode, monkeypatch):  # noqa: F811
     client.put('/v1/admin/datasources/prodlake', headers=as_('admin'),
                json=integration('prodlake', 'postgres', layer_id=layers.PROD)).raise_for_status()
     schema = client.post('/v1/rbac/sources/prodlake/schemas', headers=as_('admin'), json={'name': 'reporting'}).json()
-    grant_group(client, schema['id'], 'prodlake-readers', 'Reader', users=('ana',))
+    grant_group(client, schema['id'], 'finance-readers', 'Reader', users=('ana',))
     with SessionLocal() as db:
         resource = db.get(Resource, schema['id'])
         resource.config = {**resource.config, 'state': 'ready'}

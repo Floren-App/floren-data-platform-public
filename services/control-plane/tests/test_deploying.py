@@ -46,6 +46,12 @@ def repo(tmp_path, client):
         "secret": {"username": "bot", "token": "s3cret-token"}})
     assert r.status_code == 200, r.text
     assert r.json()["has_credentials"] and "token" not in r.text
+    # Repository discovery is explicit; deploying roles do not expose every repository.
+    for username in ('ana','bob'):
+        pid=client.get('/v1/me',headers=as_(username)).json()['principal_id']
+        client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+            'target_id':'repository:'+r.json()['id'],'namespace':'repositories',
+            'principal_id':pid,'role':'Executor'}).raise_for_status()
     return {"id": r.json()["id"], "work": work}
 
 
@@ -79,7 +85,16 @@ def test_pick_repo_branch_and_pull(client, repo):
 
 def test_repository_can_be_restricted_to_an_application_security_group(client, repo):
     from .rbac_helpers import grant_group
+    from app.models import PermissionGrant
+    from app.db import SessionLocal
+    from sqlalchemy import select
+    with SessionLocal() as db:
+        for grant in db.scalars(select(PermissionGrant).where(PermissionGrant.namespace=='repositories')):
+            db.delete(grant)
+        db.commit()
     group_id = grant_group(client,'workloads','Pokemon engineers','Admin',users=('ana',))
+    from .rbac_helpers import select_group
+    select_group(client,'ana',group_id)
     response = client.put('/v1/admin/repos/analytics',headers=as_('admin'),json={
         'name':'analytics','url':'file://'+str(repo['work'].parent/'analytics.git'),
         'allowed_groups':[group_id]})

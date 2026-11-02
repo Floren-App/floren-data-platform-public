@@ -5,9 +5,45 @@ import os
 from pathlib import Path
 import sys
 import warnings
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'docs/reference'
+
+
+def route_inventory(app):
+    """Include mounted native aliases and callbacks, even when excluded from OpenAPI."""
+    lines = ['# Route and page inventory\n\nGenerated from mounted FastAPI routes and desktop page mappings. '
+        'Entry-point inventory is not proof of authorization coverage; consult the '
+        '[matrix](permission-matrix.md) and [migration status](scoped-permissions.md).\n\n## HTTP entry points\n']
+    groups = {}
+    for route in app.routes:
+        endpoint = getattr(route, 'endpoint', None)
+        module = getattr(endpoint, '__module__', '')
+        if not module.startswith('app.'):
+            continue
+        methods = sorted(getattr(route, 'methods', set()) - {'HEAD', 'OPTIONS'})
+        if methods:
+            groups.setdefault(module.rsplit('.', 1)[-1], []).append((route, endpoint, module, methods))
+    for group, entries in sorted(groups.items()):
+        lines += [f'\n### {group}\n\n| Method | Path | Handler / source |\n|---|---|---|\n']
+        for route, endpoint, module, methods in sorted(entries, key=lambda entry:(entry[0].path, entry[3])):
+            source = module.replace('.', '/') + '.py'
+            code = getattr(endpoint, '__code__', None)
+            anchor = '#L'+str(code.co_firstlineno) if code else ''
+            lines.append(f'| {", ".join(methods)} | `{route.path}` | '
+                f'[`{endpoint.__name__}`](../services/control-plane/{source}{anchor}) |\n')
+    lines += ['\n## Desktop pages and aliases\n\nEvery tab below requires its page gate before mounting. '
+        'Page visibility and object/function authority are separate.\n\n| Tab kind | Page gate |\n|---|---|\n']
+    mapping = (ROOT/'apps/desktop/src/permissions.ts').read_text().split('export const TAB_PAGES', 1)[1].split('};', 1)[0]
+    for tab, page in re.findall(r'"([a-z-]+)":\s*"([a-z-]+)"', mapping):
+        lines.append(f'| `{tab}` | `{page}` |\n')
+    lines += ['\n## Other entry points\n\nGateway forward authentication, broker policy callbacks, SQL policy callbacks, '
+        'native package indexes and keyed aliases are included above. They require their '
+        'own admission, service authentication and live object checks. Framework documentation '
+        'routes, startup/leader controllers and offline recovery/migration commands are additional '
+        'boundaries; controller entry points must preserve the authority captured at admission.\n']
+    (ROOT/'docs/permission-route-inventory.md').write_text(''.join(lines))
 
 
 def generate():
@@ -19,6 +55,7 @@ def generate():
     from app.main import app
     from app.programs import json_schema
     OUT.mkdir(parents=True, exist_ok=True)
+    route_inventory(app)
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='Duplicate Operation ID .*', category=UserWarning)
         spec = app.openapi()

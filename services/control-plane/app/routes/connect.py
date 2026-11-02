@@ -44,7 +44,8 @@ def connect(
         from ..sql_access import actor
         from ..rbac import data_scope
         who = actor(db, authorization, x_fdp_viewer)
-        scope = data_scope(db, who.user, ds)
+        from ..object_access import snapshot as named_snapshot
+        scope = {**{name:'Named' for name in named_snapshot(db, who.user).get(ds.id, {})}, **data_scope(db, who.user, ds)}
     if schema:
         scope = ({schema: scope[schema], **{k: v for k, v in scope.items() if k != schema and v in ("Reader", "Contributor")}}
                  if schema in scope else {})

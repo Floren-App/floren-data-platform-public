@@ -10,7 +10,9 @@ from .conftest import as_
 
 
 def test_recent_updates_find_older_jobs_that_finish_now_without_exposing_other_users(client):
-    client.get('/v1/me', headers=as_('ana'))
+    pid=client.get('/v1/me', headers=as_('ana')).json()['principal_id']
+    client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+        'target_id':'runs','namespace':'runs','role':'Viewer','layer_id':'*','principal_id':pid}).raise_for_status()
     with SessionLocal() as db:
         ana = rbac.resolve_user(db, User('ana'))
         pool = db.scalar(select(ComputePool).limit(1))

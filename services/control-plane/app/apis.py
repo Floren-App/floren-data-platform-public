@@ -131,7 +131,7 @@ def _url_ok(url: str) -> bool:
 
 
 def check_secret(db: Session, user: User, ref: str, field: str, errors: Dict[str, str], certificate: bool = False,
-                 key: bool = False) -> None:
+                 key: bool = False, already_bound: bool = False) -> None:
     """Shared configuration may only use group or service-account secrets the editor can use."""
     from .identity import SECRET_REF, can_access, parse_ref
     if not ref:
@@ -140,7 +140,8 @@ def check_secret(db: Session, user: User, ref: str, field: str, errors: Dict[str
         errors[field] = "use a group:<group>/<name> or sa:<account>/<name> secret; personal secrets cannot be shared"
         return
     scope, owner, name = parse_ref(ref, user)
-    if not can_access(db, scope, owner, user):
+    from .secret_access import allowed
+    if not already_bound and not allowed(db,user,'secrets.use',scope,owner,name):
         errors[field] = f"you may not use secret {ref}"
         return
     entry = db.scalar(select(SecretEntry).where(SecretEntry.scope == scope, SecretEntry.owner == owner, SecretEntry.name == name))
@@ -154,7 +155,7 @@ def check_secret(db: Session, user: User, ref: str, field: str, errors: Dict[str
         errors[field] = "this certificate has no private key"
 
 
-def validate_inbound(db: Session, user: User, cfg: InboundConfig) -> dict:
+def validate_inbound(db: Session, user: User, cfg: InboundConfig, unchanged=False) -> dict:
     errors: Dict[str, str] = {}
     if cfg.anonymous and (cfg.jwt.enabled or cfg.mtls.enabled):
         errors["inbound.auth"] = "anonymous access means no JWT or mTLS; turn those off, or turn anonymous access off"
@@ -171,7 +172,7 @@ def validate_inbound(db: Session, user: User, cfg: InboundConfig) -> dict:
     if cfg.mtls.enabled:
         if not cfg.mtls.ca_secret:
             errors["inbound.mtls.ca_secret"] = "choose the certificate secret of the CA that issues client certificates"
-        check_secret(db, user, cfg.mtls.ca_secret, "inbound.mtls.ca_secret", errors, certificate=True)
+        check_secret(db, user, cfg.mtls.ca_secret, "inbound.mtls.ca_secret", errors, certificate=True, already_bound=unchanged)
     if errors:
         invalid(errors)
     out = cfg.model_dump()
@@ -179,7 +180,7 @@ def validate_inbound(db: Session, user: User, cfg: InboundConfig) -> dict:
     return out
 
 
-def validate_outbound(db: Session, user: User, cfg: OutboundConfig) -> dict:
+def validate_outbound(db: Session, user: User, cfg: OutboundConfig, unchanged=False) -> dict:
     errors: Dict[str, str] = {}
     if not _url_ok(cfg.base_url) or urlsplit(cfg.base_url).query:
         errors["outbound.base_url"] = "enter an http(s) base URL without credentials, query parameters or a fragment"
@@ -188,12 +189,12 @@ def validate_outbound(db: Session, user: User, cfg: OutboundConfig) -> dict:
             if kind == "headers" and not HEADER_NAME.fullmatch(v.name):
                 errors[f"outbound.{kind}.{i}.name"] = "invalid header name"
             if v.secret:
-                check_secret(db, user, v.secret, f"outbound.{kind}.{i}.secret", errors)
+                check_secret(db, user, v.secret, f"outbound.{kind}.{i}.secret", errors, already_bound=unchanged)
     a = cfg.auth
     if a.type != "none":
         if not a.secret:
             errors["outbound.auth.secret"] = "choose the secret holding the credential"
-        check_secret(db, user, a.secret, "outbound.auth.secret", errors)
+        check_secret(db, user, a.secret, "outbound.auth.secret", errors, already_bound=unchanged)
     if a.type == "api_key" and not HEADER_NAME.fullmatch(a.name):
         errors["outbound.auth.name"] = "enter the header or query parameter name"
     if a.type == "basic" and not a.username.strip():
@@ -203,8 +204,8 @@ def validate_outbound(db: Session, user: User, cfg: OutboundConfig) -> dict:
             errors["outbound.auth.token_url"] = "enter the token endpoint URL"
         if not a.client_id.strip():
             errors["outbound.auth.client_id"] = "required"
-    check_secret(db, user, cfg.client_certificate, "outbound.client_certificate", errors, certificate=True, key=True)
-    check_secret(db, user, cfg.server_ca, "outbound.server_ca", errors, certificate=True)
+    check_secret(db, user, cfg.client_certificate, "outbound.client_certificate", errors, certificate=True, key=True, already_bound=unchanged)
+    check_secret(db, user, cfg.server_ca, "outbound.server_ca", errors, certificate=True, already_bound=unchanged)
     for i, h in enumerate(cfg.pass_request_headers):
         if h.lower() in HOP_BY_HOP:
             errors[f"outbound.pass_request_headers.{i}"] = f"{h} is never passed through"

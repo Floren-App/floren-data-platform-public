@@ -111,6 +111,8 @@ def finish_response(db, query, response, request):
         body = response.json()
     except ValueError:
         raise HTTPException(502, "invalid SQL engine response") from None
+    if body.get("data") is not None and not body.get("updateType"):
+        sql.require_query_function(query,"data.queries.results.read")
     query.engine_query_id = body.get("id", query.engine_query_id)
     query.state = ("FAILED" if body.get("error") else
                    body.get("stats", {}).get("state", "RUNNING"))
@@ -199,6 +201,7 @@ async def page(token: str, request: Request, db=Depends(get_db), authorization: 
     path = claims.get("path", "")
     if not path.startswith("/v1/statement/"):
         raise HTTPException(403, "invalid continuation path")
+    sql.require_query_function(query,"data.queries.cancel_own" if request.method == "DELETE" else "data.queries.status.read")
     # resolve_user takes a directory row lock. Release it before awaiting Trino;
     # another viewer request must never block this event loop behind that lock.
     db.commit()
@@ -211,6 +214,7 @@ def query_status(query_id: str, db=Depends(get_db), authorization: Optional[str]
                  x_fdp_viewer: str = Header(default="")):
     enabled()
     query = owned_query(db, query_id, sql.actor(db, authorization, x_fdp_viewer))
+    sql.require_query_function(query,"data.queries.status.read")
     db.commit()
     return {"id": query.id, "engine_query_id": query.engine_query_id, "state": query.state,
             "created_at": query.created_at, "principal_id": query.principal_id}
@@ -389,9 +393,8 @@ def policy_batch(body, db, layer=""):
         items = action.get("filterResources") or []
         if action.get("operation") == "FilterColumns" and len(items) == 1:
             table = items[0].get("table") or {}
-            if sql.policy_allow(query, {**action, "resource": items[0]}):
-                return {"result": list(range(len(table.get("columns", []))))}
-            return {"result": []}
+            return {"result": [index for index,column in enumerate(table.get("columns", []))
+                if sql.policy_allow(query, {**action, "resource": {"table":{**table, "columns":[column]}}})]}
         return {"result": [i for i, item in enumerate(items)
                            if sql.policy_allow(query, {**action, "resource": item})]}
     except (HTTPException, TypeError, AttributeError, KeyError):

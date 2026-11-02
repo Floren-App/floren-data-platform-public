@@ -67,6 +67,7 @@ def list_templates(db: Session = Depends(get_db), _: User = Depends(settings_acc
 def create_template(body: TemplateIn, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-template", "workspace_templates.create")),
                     orch: Orchestrator = Depends(get_orchestrator)):
     _validate(db, body)
+    settings_access.require(db,admin,"set-template","workspace_templates.group.bind")
     template = WorkspaceTemplate(**{**body.model_dump(), "name": body.name.strip()})
     db.add(template)
     db.flush()
@@ -91,6 +92,8 @@ def update_template(template_id: str, body: TemplateIn, db: Session = Depends(ge
     if template is None:
         raise HTTPException(404, "workspace template not found")
     _validate(db, body, template_id)
+    if template.group_id!=body.group_id:
+        settings_access.require(db,admin,"set-template","workspace_templates.group.bind")
     for field, value in {**body.model_dump(), "name": body.name.strip()}.items():
         setattr(template, field, value)
     audit(db, admin.username, "workspace_template.update", template.id, group=body.group_id, editor=body.editor)

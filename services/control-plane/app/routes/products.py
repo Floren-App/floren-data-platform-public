@@ -16,10 +16,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .. import catalog as c, layers, rbac
+from .. import permissions, catalog as c, layers, rbac
 from ..auth import User
 from ..db import get_db
 from ..deps import get_actor
+from ..models import DataSource
 from ..models import (AccessCase, AccessRequest, AppGroup, CatalogAsset, CatalogProduct, CatalogProductMember, LineageEdge, ProductOption,
                       Resource, RoleAssignment, Workload, utcnow)
 from .common import audit
@@ -159,10 +160,30 @@ class _Viewer:
     def __init__(self, db: Session, user: User):
         self.db, self.user = db, rbac.resolve_user(db, user)
         _, self.actions = c.permissions(db, self.user)
-        self.groups = rbac.app_groups(db, self.user)
+        self.groups = rbac.effective_app_groups(db, self.user)
 
     def can(self, resource_id: str, action: str) -> bool:
         return action in self.actions.get(resource_id, set())
+
+    def asset_can(self, asset, resource, action='read'):
+        from ..object_access import asset_visible, target_for_asset
+        target = target_for_asset(self.db, asset, resource) if resource.kind == 'schema' else None
+        if action == 'assign':
+            return self.can(resource.id, action) or bool(target and self.can(target.id, action))
+        return self.can(resource.id, action) and asset_visible(self.db, self.user, asset, resource)
+
+    def uses(self, asset, resource):
+        if resource.kind == 'schema':
+            source = self.db.get(DataSource, resource.object_id)
+            if rbac.data_scope(self.db, self.user, source):
+                return True
+            from ..object_access import schema_rules, actions_for, file_actions
+            rules = schema_rules(self.db, self.user, resource)
+            path = asset.attributes.get('object_path') or asset.name
+            return ('data.files.read' in file_actions(rules,path)) if source.kind == 's3' else ('data.sql.select' in actions_for(rules,path))
+        if resource.kind == 'service':
+            return self.can(resource.id,'execute')
+        return self.can(resource.id,'read')
 
 
 def members(db: Session, product: CatalogProduct) -> List[tuple]:
@@ -177,14 +198,17 @@ def members(db: Session, product: CatalogProduct) -> List[tuple]:
     return out
 
 
-def _grants(parts) -> List[dict]:
-    """What Consumer on the product gives: one role per distinct resource (tables share their schema's)."""
+def _grants(db, parts) -> List[dict]:
+    """Consumer access on each actual object, never an implied whole-schema grant."""
     seen, out = set(), []
     for asset, resource in parts:
+        from ..object_access import target_for_asset
+        if resource.kind == 'schema':
+            resource = target_for_asset(db, asset, resource, create=True) or resource
         if resource.id not in seen:
             seen.add(resource.id)
             out.append({"resource_id": resource.id, "kind": resource.kind, "name": resource.name,
-                        "role": READER_ROLE.get(resource.kind, "Reader"), "object": asset.name})
+                        "role": "Executor" if resource.kind in rbac.DATA_OBJECT_KINDS else READER_ROLE.get(resource.kind, "Reader"), "object": asset.name})
     return out
 
 
@@ -198,15 +222,15 @@ def card(db: Session, product: CatalogProduct, viewer: _Viewer) -> dict:
     lead_asset, lead_resource = parts[0] if parts else (db.get(CatalogAsset, product.asset_id), db.get(Resource, product.resource_id))
     governance = lead_asset.governance or {}
     pending = db.scalar(select(AccessRequest).where(AccessRequest.product_id == product.id, AccessRequest.status == "pending",
-                                                    AccessRequest.requester == viewer.user.username))
-    readable = [viewer.can(r.id, "read") for _, r in parts]
+                                                    AccessRequest.requester_principal_id == viewer.user.principal_id))
+    readable = [viewer.uses(a, r) for a, r in parts]
     access = "granted" if parts and all(readable) else "requested" if pending else "partial" if any(readable) else "none"
     fresh = [_aware(_freshness(db, a, r)) for a, r in parts]
     fresh = [f for f in fresh if f]
     level = c.service_level(db, lead_asset, lead_resource)
     member_out = []
     for asset, resource in parts:
-        can = viewer.can(resource.id, "read")
+        can = viewer.uses(asset, resource)
         member_out.append({"asset_id": asset.id, "name": asset.name, "kind": asset.kind, "runtime": _runtime(db, resource),
                            "resource_id": resource.id, "object_path": (asset.attributes or {}).get("object_path") if asset.kind in TABLE_KINDS else None,
                            "access": "granted" if can else "none", "updated_at": _freshness(db, asset, resource),
@@ -233,9 +257,9 @@ def card(db: Session, product: CatalogProduct, viewer: _Viewer) -> dict:
             "published_at": product.published_at, "published_by": product.published_by,
             "access": access, "members": member_out,
             "can_manage": bool(product.access_resource_id) and viewer.can(product.access_resource_id, "assign"),
-            "grants": _grants(parts),
+            "grants": _grants(db, parts),
             # Where to open the lead object itself: only for people who may.
-            "open": _open(lead_asset, lead_resource) if viewer.can(lead_resource.id, "read") else None}
+            "open": _open(lead_asset, lead_resource) if viewer.uses(lead_asset, lead_resource) else None}
 
 
 def _visible_products(db: Session, viewer: _Viewer, layer_id: str = ""):
@@ -245,7 +269,8 @@ def _visible_products(db: Session, viewer: _Viewer, layer_id: str = ""):
     out = []
     for product in db.scalars(stmt.order_by(CatalogProduct.title)):
         resource = db.get(Resource, product.resource_id)
-        if _live(db, resource) and _in_layer(db, viewer.user, resource) and members(db, product):
+        access=db.get(Resource,product.access_resource_id)
+        if _live(db, resource) and _in_layer(db, viewer.user, resource) and members(db, product) and permissions.domain_allowed(db,viewer.user,"products.collection.list",access,"read"):
             out.append(product)
     return out
 
@@ -279,7 +304,7 @@ def publish_candidates(layer_id: str = "", q: str = Query(default="", max_length
     out = []
     for asset in db.scalars(select(CatalogAsset).where(CatalogAsset.kind.in_(PUBLISHABLE))):
         resource = db.get(Resource, asset.resource_id)
-        if not _live(db, resource) or not viewer.can(resource.id, "assign"):
+        if not _live(db, resource) or not viewer.asset_can(asset, resource, "assign"):
             continue
         where = layers.info(db, resource)
         if layer_id and where["layer_id"] not in (layer_id, None):
@@ -322,7 +347,7 @@ def asset_product(ident: str, db: Session = Depends(get_db), user: User = Depend
             res = db.get(Resource, other.resource_id)
             if _live(db, res) and viewer.can(res.id, "assign") and layers.info(db, res)["layer_id"] == layers.info(db, resource)["layer_id"]:
                 uses.append({"asset_id": other.id, "name": other.name, "kind": other.kind})
-    return {"publishable": asset.kind in PUBLISHABLE, "can_publish": viewer.can(resource.id, "assign"),
+    return {"publishable": asset.kind in PUBLISHABLE, "can_publish": viewer.asset_can(asset, resource, "assign"),
             "products": products, "uses": uses, "name": asset.name, "kind": asset.kind,
             "domain": (asset.governance or {}).get("domain") or "",
             "classification": (asset.governance or {}).get("classification", "unclassified")}
@@ -334,11 +359,11 @@ def _checked_members(db, viewer, asset_ids) -> List[tuple]:
     for ident in dict.fromkeys(asset_ids):
         asset = db.get(CatalogAsset, ident)
         resource = db.get(Resource, asset.resource_id) if asset else None
-        if not asset or not _live(db, resource) or not viewer.can(resource.id, "read"):
+        if not asset or not _live(db, resource) or not viewer.asset_can(asset, resource):
             raise HTTPException(404, "catalog object not available")
         if asset.kind not in PUBLISHABLE:
             raise HTTPException(422, f"{asset.name}: products hold tables and views, dashboards, APIs or Kafka topics")
-        if not viewer.can(resource.id, "assign"):
+        if not viewer.asset_can(asset, resource, 'assign'):
             raise HTTPException(403, f"only the owners of {asset.name} can publish it")
         where = layers.info(db, resource)["layer_id"]
         if parts and where != layer:
@@ -424,6 +449,8 @@ def publish(body: PublishIn, db: Session = Depends(get_db), user: User = Depends
     """Publish one or more objects you own as a data product."""
     viewer = _Viewer(db, user)
     parts = _checked_members(db, viewer, _resolve(db, viewer, body.asset_ids, body.members))
+    for action in ("products.collection.create","products.object.publish"):
+        permissions.require_domain(db,viewer.user,action,parts[0][1],"assign")
     lead = parts[0][0]
     if db.scalar(select(CatalogProduct).where(CatalogProduct.asset_id == lead.id)):
         raise HTTPException(409, f"{lead.name} already leads a product: add to that one, or lead with another object")
@@ -461,8 +488,9 @@ def _product(db, product_id, viewer) -> CatalogProduct:
     return product
 
 
-def _require_manager(db, product, viewer, what):
-    if not _manages(db, viewer, product):
+def _require_manager(db, product, viewer, what, action):
+    resource=db.get(Resource,product.access_resource_id) if product.access_resource_id else None
+    if not permissions.domain_allowed(db,viewer.user,action,resource,"assign"):
         raise HTTPException(403, f"only the product's owners can {what}")
 
 
@@ -470,7 +498,15 @@ def _require_manager(db, product, viewer, what):
 def update_product(product_id: str, body: ProductPatch, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     viewer = _Viewer(db, user)
     product = _product(db, product_id, viewer)
-    _require_manager(db, product, viewer, "change it")
+    _require_manager(db, product, viewer, "change it", "products.object.live.update")
+    if body.options is not None:
+        from .. import product_options
+        access=db.get(Resource,product.access_resource_id)
+        permissions.require_domain(db,viewer.user,"products.options.activate",access,"assign")
+        before={o.name:{'masks':o.masks or [],'filters':o.filters or []} for o in product_options.options(db,product.id)}
+        after={o.name:{'masks':[m.model_dump() for m in o.masks],'filters':[f.model_dump() for f in o.filters]} for o in body.options}
+        if before != after:
+            permissions.require_domain(db,viewer.user,"products.options.privileges.widen",access,"assign")
     if body.title is not None:
         product.title = body.title.strip()
         access = db.get(Resource, product.access_resource_id) if product.access_resource_id else None
@@ -488,6 +524,7 @@ def update_product(product_id: str, body: ProductPatch, db: Session = Depends(ge
         _options_for(db, product, parts, body.options)
         _hold_new_objects(db, product, before)
     elif body.options is not None:
+        permissions.require_domain(db,viewer.user,"products.options.activate",db.get(Resource,product.access_resource_id),"assign")
         _options_for(db, product, members(db, product), body.options)
     product.updated_at = utcnow()
     audit(db, viewer.user.username, "catalog.product_update", product.resource_id, product=product.id)
@@ -499,7 +536,7 @@ def update_product(product_id: str, body: ProductPatch, db: Session = Depends(ge
 def unpublish(product_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     viewer = _Viewer(db, user)
     product = _product(db, product_id, viewer)
-    _require_manager(db, product, viewer, "unpublish it")
+    _require_manager(db, product, viewer, "unpublish it", "products.object.unpublish")
     for request in db.scalars(select(AccessRequest).where(AccessRequest.product_id == product.id, AccessRequest.status == "pending")):
         request.status, request.decided_by, request.decided_at = "withdrawn", viewer.user.username, utcnow()
         request.decision_note = "The product was unpublished."
@@ -525,6 +562,7 @@ def product_detail(product_id: str, db: Session = Depends(get_db), user: User = 
     Steps you may not open show only their name, kind and owner."""
     viewer = _Viewer(db, user)
     product = _product(db, product_id, viewer)
+    permissions.require_domain(db,viewer.user,"products.object.read",db.get(Resource,product.access_resource_id),"read")
     parts = members(db, product)
     own = [a.id for a, _ in parts]
     layer = product.layer_id
@@ -621,7 +659,7 @@ def request_out(db, r: AccessRequest) -> dict:
             "case_id": r.case_id, "case_status": (lambda c: c.status if c else None)(db.get(AccessCase, r.case_id) if r.case_id else None),
             "with_owners": (lambda c: c is None or (c.status == "in_review" and c.steps[c.step]["role"] == "data_owner"))(
                 db.get(AccessCase, r.case_id) if r.case_id else None),
-            "grants": _grants(members(db, product)) if product else []}
+            "grants": _grants(db, members(db, product)) if product else []}
 
 
 def _group_has(db, resource, group_id) -> bool:
@@ -645,6 +683,9 @@ def request_access(product_id: str, body: RequestIn, db: Session = Depends(get_d
         raise HTTPException(403, "people request access; service identities are granted by owners")
     if body.app_group_id not in viewer.groups:
         raise HTTPException(422, "choose one of your own groups")
+    permissions.require_domain(db,viewer.user,"products.requests.own.create",db.get(Resource,product.access_resource_id),"use")
+    if body.submit:
+        permissions.require_domain(db,viewer.user,"products.requests.own.submit",db.get(Resource,product.access_resource_id),"use")
     parts = members(db, product)
     from ..models import ProductAccess
     held = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == body.app_group_id))
@@ -690,9 +731,9 @@ def list_requests(box: Literal["approve", "mine"] = "approve", status: str = "",
     out = []
     for r in db.scalars(stmt.limit(500)):
         if box == "mine":
-            if r.requester == viewer.user.username:
+            if r.requester_principal_id == viewer.user.principal_id and permissions.domain_allowed(db,viewer.user,"products.requests.own.read",db.get(Resource,db.get(CatalogProduct,r.product_id).access_resource_id),"read"):
                 out.append(request_out(db, r))
-        elif _manages(db, viewer, db.get(CatalogProduct, r.product_id)):
+        elif _manages(db, viewer, db.get(CatalogProduct, r.product_id)) and permissions.domain_allowed(db,viewer.user,"products.requests.review.read",db.get(Resource,db.get(CatalogProduct,r.product_id).access_resource_id),"read"):
             out.append(request_out(db, r))
     return out
 
@@ -705,6 +746,7 @@ def decide(request_id: str, body: DecisionIn, db: Session = Depends(get_db), use
     product = db.get(CatalogProduct, r.product_id) if r else None
     if not r or not _manages(db, viewer, product):
         raise HTTPException(404, "request not found")
+    permissions.require_domain(db,viewer.user,"products.requests.review.approve" if body.approve else "products.requests.review.reject",db.get(Resource,product.access_resource_id),"assign")
     if r.status != "pending":
         raise HTTPException(409, f"this request was already {r.status}")
     if r.case_id:  # under an access policy: the owners' decision is the case's data owner step
@@ -749,8 +791,10 @@ def decide(request_id: str, body: DecisionIn, db: Session = Depends(get_db), use
 def withdraw(request_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     viewer = _Viewer(db, user)
     r = db.get(AccessRequest, request_id)
-    if not r or r.requester != viewer.user.username:
+    if not r or r.requester_principal_id != viewer.user.principal_id:
         raise HTTPException(404, "request not found")
+    product=db.get(CatalogProduct,r.product_id)
+    permissions.require_domain(db,viewer.user,"products.requests.own.withdraw",db.get(Resource,product.access_resource_id),"use")
     if r.status == "pending":
         r.status, r.decided_at = "withdrawn", utcnow()
         audit(db, viewer.user.username, "catalog.access_withdrawn", r.product_id, request=r.id)
@@ -763,7 +807,7 @@ def put_consumer(product_id: str, group_id: str, body: ConsumerIn, db: Session =
     from .. import product_options
     viewer = _Viewer(db, user)
     product = _product(db, product_id, viewer)
-    _require_manager(db, product, viewer, "give access")
+    _require_manager(db, product, viewer, "give access", "products.requests.review.consumer.grant")
     if not db.get(AppGroup, group_id):
         raise HTTPException(422, "choose an existing app group")
     option = db.get(ProductOption, body.option_id) if body.option_id else product_options.default_option(db, product.id)
@@ -794,7 +838,7 @@ def delete_consumer(product_id: str, group_id: str, db: Session = Depends(get_db
     from ..models import ProductAccess
     viewer = _Viewer(db, user)
     product = _product(db, product_id, viewer)
-    _require_manager(db, product, viewer, "take access away")
+    _require_manager(db, product, viewer, "take access away", "products.requests.review.consumer.revoke")
     db.execute(delete(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id,
                                             RoleAssignment.app_group_id == group_id, RoleAssignment.role == "Consumer"))
     db.execute(delete(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == group_id))

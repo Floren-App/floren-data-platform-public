@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from .. import apis as core
-from .. import rbac
+from .. import rbac, permissions
 from ..auth import User
 from ..config import get_settings
 from ..db import SessionLocal, get_db
@@ -78,6 +78,10 @@ def _api_out(db: Session, user: User, api: ApiDefinition, operations: bool = Tru
            "description": api.description, "config": api.config or {}, "resource_id": resource.id,
            "actions": _actions(db, user, resource), "endpoint": _endpoint(api), "operation_count": len(visible),
            "updated_at": api.updated_at, "created_by": api.created_by}
+    out['capabilities'] = [action for action,legacy in {
+        'apis.object.apply':'edit', 'apis.object.delete':'delete',
+        'apis.object.trust.change':'identity', 'apis.object.credentials.change':'identity',
+        'apis.calls.details.read':'call'}.items() if permissions.domain_allowed(db,user,action,resource,legacy)]
     if api.direction == "internal" and api.principal_id:
         from ..models import DirectoryPrincipal
         p = db.get(DirectoryPrincipal, api.principal_id)
@@ -120,18 +124,33 @@ def list_apis(db: Session = Depends(get_db), user: User = Depends(get_actor)):
            if _visible(db, user, a)]
     root_actions = _actions(db, user, db.get(Resource, "apis"))
     db.commit()
-    return {"apis": out, "can_create": "create" in root_actions}
+    from ..layers import all_layers
+    return {"apis": out, "can_create": "create" in root_actions or any(permissions.allowed(db,user,"apis.collection.register","apis",layer.id) for layer in all_layers(db))}
 
 
 def _configure(db: Session, user: User, api: ApiDefinition, body: ApiIn) -> None:
     if not body.name.strip():
         core.invalid({"name": "enter a name"})
     previous_config = api.config or {}
+    inbound = body.inbound.model_dump()
+    outbound = body.outbound.model_dump()
+    if api.id:
+        resource = core.api_resource(db,api)
+        if api.protocol != body.protocol or (api.direction == 'internal' and inbound != previous_config.get('inbound')):
+            permissions.require_domain(db,user,'apis.object.trust.change',resource,'identity')
+        if api.direction == 'external':
+            previous = previous_config.get('outbound') or {}
+            if any(outbound.get(key) != previous.get(key) for key in
+                ('base_url','verify_tls','server_ca','client_certificate')) or (
+                outbound['auth']['token_url'] != (previous.get('auth') or {}).get('token_url','')):
+                permissions.require_domain(db,user,'apis.object.trust.change',resource,'identity')
+            if any(outbound.get(key) != previous.get(key) for key in ('auth','headers','query','client_certificate')):
+                permissions.require_domain(db,user,'apis.object.credentials.change',resource,'identity')
     api.name, api.description, api.protocol = body.name.strip(), body.description, body.protocol
     if api.direction == "internal":
-        api.config = {"inbound": core.validate_inbound(db, user, body.inbound)}
+        api.config = {"inbound": core.validate_inbound(db, user, body.inbound, unchanged=bool(api.id and inbound == previous_config.get('inbound')))}
     else:
-        api.config = {"outbound": core.validate_outbound(db, user, body.outbound)}
+        api.config = {"outbound": core.validate_outbound(db, user, body.outbound, unchanged=bool(api.id and outbound == previous_config.get('outbound')))}
     from ..layers import canonical, require_layer
     chosen = require_layer(db, body.layer_id or body.environment_id or previous_config.get("layer_id")).id
     previous = previous_config.get("layer_id") or previous_config.get("environment_id")
@@ -152,8 +171,14 @@ def _configure(db: Session, user: User, api: ApiDefinition, body: ApiIn) -> None
 @router.post("/v1/apis", status_code=201)
 def create_api(body: ApiIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     user = rbac.resolve_user(db, user)
-    from ..ownership import require_create
-    require_create(db,user,rbac.api_root(db))
+    from ..ownership import require_create,owner_group
+    from ..layers import require_layer
+    layer=require_layer(db,body.layer_id or body.environment_id).id
+    if permissions.allowed(db,user,"apis.collection.register","apis",layer):
+        owner_group(db,user)
+    else:
+        require_create(db,user,rbac.api_root(db))
+        permissions.require_domain(db,user,"apis.collection.register",rbac.api_root(db),"create")
     if not core.SLUG.fullmatch(body.slug):
         core.invalid({"slug": "lowercase letters, digits and dashes, starting with a letter"})
     if db.scalar(select(ApiDefinition).where(ApiDefinition.slug == body.slug)):
@@ -185,7 +210,8 @@ def get_api(api_id: str, db: Session = Depends(get_db), user: User = Depends(get
 @router.put("/v1/apis/{api_id}")
 def update_api(api_id: str, body: ApiIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     user = rbac.resolve_user(db, user)
-    api = _api(db, api_id, user, "edit")
+    api = _api(db, api_id, user)
+    permissions.require_domain(db,user,'apis.object.apply',core.api_resource(db,api),'edit')
     if body.slug != api.slug or body.direction != api.direction:
         raise HTTPException(409, "an API's address and direction are fixed; create a new API instead")
     _configure(db, user, api, body)
@@ -200,7 +226,8 @@ def update_api(api_id: str, body: ApiIn, db: Session = Depends(get_db), user: Us
 @router.delete("/v1/apis/{api_id}", status_code=204)
 def delete_api(api_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     user = rbac.resolve_user(db, user)
-    api = _api(db, api_id, user, "delete")
+    api = _api(db, api_id, user)
+    permissions.require_domain(db,user,'apis.object.delete',core.api_resource(db,api),'delete')
     for op in db.scalars(select(ApiOperation).where(ApiOperation.api_id == api.id)):
         core.delete_resource(db, op.resource_id)
         db.delete(op)
@@ -281,8 +308,12 @@ def create_operation(api_id: str, body: OperationIn, db: Session = Depends(get_d
     user = rbac.resolve_user(db, user)
     api = _api(db, api_id, user)
     target = core.find_group(db, api, body.group.strip()) or core.api_resource(db, api)
-    from ..ownership import require_create
-    require_create(db,user,target)
+    from ..ownership import require_create,owner_group
+    permissions.require_domain(db,user,"apis.operations.create",target,"create")
+    if permissions.allowed(db,user,"apis.operations.create",target.id):
+        owner_group(db,user)
+    else:
+        require_create(db,user,target)
     op = ApiOperation(api_id=api.id, name=body.name, group=body.group.strip(), method=body.method,
                       path=body.path, soap_action=body.soap_action, description=body.description)
     op.config = _validate_operation(db, user, api, body, None)
@@ -306,11 +337,12 @@ def update_operation(api_id: str, op_id: str, body: OperationIn, db: Session = D
     op = db.get(ApiOperation, op_id)
     if op is None or op.api_id != api.id:
         raise HTTPException(404, "operation not found")
-    rbac.require(db, user, "edit", core.operation_resource(db, api, op))
+    permissions.require_domain(db,user,'apis.operations.apply',core.operation_resource(db,api,op),'edit')
     if body.group.strip() != op.group:
+        permissions.require_domain(db,user,'apis.operations.move',core.operation_resource(db,api,op),'edit')
         # Moving into another group changes inherited access: require create rights there, like folders.
         target = core.find_group(db, api, body.group.strip()) or core.api_resource(db, api)
-        rbac.require(db, user, "create", target)
+        permissions.require_domain(db,user,"apis.operations.create",target,"create")
     op.config = _validate_operation(db, user, api, body, op)
     op.name, op.group, op.method, op.path = body.name, body.group.strip(), body.method, body.path
     op.soap_action, op.description = body.soap_action, body.description
@@ -329,7 +361,7 @@ def delete_operation(api_id: str, op_id: str, db: Session = Depends(get_db), use
     op = db.get(ApiOperation, op_id)
     if op is None or op.api_id != api.id:
         raise HTTPException(404, "operation not found")
-    rbac.require(db, user, "delete", core.operation_resource(db, api, op))
+    permissions.require_domain(db,user,'apis.operations.delete',core.operation_resource(db,api,op),'delete')
     core.delete_resource(db, op.resource_id)
     db.delete(op)
     db.flush()
@@ -344,8 +376,9 @@ def list_calls(api_id: str, db: Session = Depends(get_db), user: User = Depends(
     api = _api(db, api_id, user)
     calls = db.scalars(select(ApiCall).where(ApiCall.api_id == api.id).order_by(ApiCall.created_at.desc()).limit(100))
     ops = list(db.scalars(select(ApiOperation).where(ApiOperation.api_id == api.id)))
-    names = {o.id: o.name for o in ops if rbac.allowed(db, user, "read", core.operation_resource(db, api, o))}
-    full_access = rbac.allowed(db, user, "read", core.api_resource(db, api))
+    names = {o.id: o.name for o in ops if permissions.domain_allowed(db,user,
+        'apis.calls.details.read',core.operation_resource(db,api,o),'call')}
+    full_access = permissions.domain_allowed(db,user,'apis.calls.details.read',core.api_resource(db,api),'call')
     out = []
     for c in calls:
         if c.operation_id not in names and not full_access:
@@ -535,7 +568,7 @@ def _egress(slug: str, path: str, method: str, headers: Dict[str, str], query, b
         if op is None:
             raise HTTPException(404, f"{api.name} has no operation for {method} /{path}")
         resource = core.operation_resource(db, api, op)
-        if not rbac.allowed(db, user, "call", resource):
+        if not permissions.domain_allowed(db,user,'apis.calls.invoke',resource,'call'):
             audit(db, user.username, "api.egress.denied", api.id, operation=op.name)
             db.commit()
             raise HTTPException(403, f"{user.username} may not call {api.name} {op.name}; ask for the Consumer role")

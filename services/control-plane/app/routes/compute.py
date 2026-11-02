@@ -93,7 +93,8 @@ def _run_visible(db, user, run, browsable) -> bool:
     from .runs import owned_run
     try:
         owned_run(db, run.id, user)
-        return True
+        from ..run_access import allowed
+        return allowed(db,user,'runs.read',run)
     except HTTPException:
         return False
 
@@ -103,7 +104,7 @@ def warehouses(db: Session = Depends(get_db), user: User = Depends(get_current_u
     user = rbac.resolve_user(db, user)
     from ..layers import info
     from ..ownership import browsing_allowed
-    pools = list(db.scalars(select(ComputePool).order_by(ComputePool.cpu))) if user.is_admin else pools_for(db, user.groups)
+    pools = list(db.scalars(select(ComputePool).order_by(ComputePool.cpu))) if user.is_admin else pools_for(db,rbac.effective_allowlist_groups(db,user),user=user)
     names = {p.name for p in pools}
     workloads = list(db.scalars(select(Workload)))
     resources = {w.id: rbac.workload_resource(db, w) for w in workloads}

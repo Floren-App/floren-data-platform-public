@@ -273,6 +273,81 @@
         "title": "AssignmentIn",
         "type": "object"
       },
+      "BackupConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "bucket": {
+            "default": "",
+            "maxLength": 63,
+            "title": "Bucket",
+            "type": "string"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "endpoint_url": {
+            "default": "",
+            "maxLength": 2048,
+            "title": "Endpoint Url",
+            "type": "string"
+          },
+          "interval_hours": {
+            "default": 24,
+            "maximum": 720.0,
+            "minimum": 1.0,
+            "title": "Interval Hours",
+            "type": "integer"
+          },
+          "kms_key_id": {
+            "default": "",
+            "maxLength": 2048,
+            "title": "Kms Key Id",
+            "type": "string"
+          },
+          "object_lock_days": {
+            "default": 0,
+            "maximum": 36500.0,
+            "minimum": 0.0,
+            "title": "Object Lock Days",
+            "type": "integer"
+          },
+          "prefix": {
+            "default": "fdp-recovery",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Prefix",
+            "type": "string"
+          },
+          "recovery_public_key": {
+            "default": "",
+            "maxLength": 8192,
+            "title": "Recovery Public Key",
+            "type": "string"
+          },
+          "region": {
+            "default": "us-east-1",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Region",
+            "type": "string"
+          },
+          "server_side_encryption": {
+            "default": "",
+            "title": "Server Side Encryption",
+            "type": "string"
+          },
+          "source_id": {
+            "default": "",
+            "maxLength": 12,
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "title": "BackupConfig",
+        "type": "object"
+      },
       "BindingIn": {
         "additionalProperties": false,
         "properties": {
@@ -815,6 +890,13 @@
       },
       "DataSourceOut": {
         "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
           "config": {
             "additionalProperties": true,
             "title": "Config",
@@ -2568,6 +2650,16 @@
             "title": "Settings",
             "type": "object"
           },
+          "settings_capabilities": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Settings Capabilities",
+            "type": "object"
+          },
           "username": {
             "title": "Username",
             "type": "string"
@@ -2775,6 +2867,40 @@
           }
         },
         "title": "MtlsAuth",
+        "type": "object"
+      },
+      "ObjectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "table",
+              "column",
+              "file",
+              "directory"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_id": {
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "Parent Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parent_id",
+          "kind",
+          "name"
+        ],
+        "title": "ObjectIn",
         "type": "object"
       },
       "ObservationIn": {
@@ -4219,6 +4345,13 @@
             "title": "Allowed Groups",
             "type": "array"
           },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
           "default_branch": {
             "title": "Default Branch",
             "type": "string"
@@ -4375,6 +4508,35 @@
         "title": "ResourceIn",
         "type": "object"
       },
+      "ResumeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "directory_reconciled": {
+            "title": "Directory Reconciled",
+            "type": "boolean"
+          },
+          "expired_access_reconciled": {
+            "title": "Expired Access Reconciled",
+            "type": "boolean"
+          },
+          "permissions_reviewed": {
+            "title": "Permissions Reviewed",
+            "type": "boolean"
+          },
+          "secrets_and_data_verified": {
+            "title": "Secrets And Data Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "directory_reconciled",
+          "permissions_reviewed",
+          "expired_access_reconciled",
+          "secrets_and_data_verified"
+        ],
+        "title": "ResumeIn",
+        "type": "object"
+      },
       "RuleIn": {
         "additionalProperties": false,
         "properties": {
@@ -4518,6 +4680,13 @@
             "additionalProperties": true,
             "title": "Args",
             "type": "object"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
           },
           "commit_sha": {
             "anyOf": [
@@ -4960,6 +5129,13 @@
       },
       "SecretOut": {
         "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
           "certificate": {
             "anyOf": [
               {
@@ -5087,6 +5263,13 @@
             "default": false,
             "title": "Can Manage",
             "type": "boolean"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
           },
           "created_at": {
             "format": "date-time",
@@ -5307,31 +5490,6 @@
           }
         },
         "title": "ServiceLevel",
-        "type": "object"
-      },
-      "SessionIn": {
-        "additionalProperties": false,
-        "properties": {
-          "group": {
-            "default": "",
-            "maxLength": 180,
-            "pattern": "^[A-Za-z0-9._-]*$",
-            "title": "Group",
-            "type": "string"
-          },
-          "mode": {
-            "enum": [
-              "produce",
-              "consume"
-            ],
-            "title": "Mode",
-            "type": "string"
-          }
-        },
-        "required": [
-          "mode"
-        ],
-        "title": "SessionIn",
         "type": "object"
       },
       "StepIn": {
@@ -6207,6 +6365,13 @@
             "title": "Can Manage",
             "type": "boolean"
           },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -6773,6 +6938,13 @@
       },
       "WorkspaceOut": {
         "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -7190,6 +7362,25 @@
         "title": "RoleIn",
         "type": "object"
       },
+      "app__routes__data_objects__SessionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "default": "read",
+            "enum": [
+              "read",
+              "write",
+              "read_write",
+              "delete",
+              "list"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "title": "SessionIn",
+        "type": "object"
+      },
       "app__routes__data_policies__PolicyIn": {
         "properties": {
           "column": {
@@ -7331,6 +7522,31 @@
           "sql"
         ],
         "title": "QueryIn",
+        "type": "object"
+      },
+      "app__routes__kafka__SessionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "group": {
+            "default": "",
+            "maxLength": 180,
+            "pattern": "^[A-Za-z0-9._-]*$",
+            "title": "Group",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "produce",
+              "consume"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "SessionIn",
         "type": "object"
       },
       "app__routes__permissions__GrantIn": {
@@ -8789,6 +9005,78 @@
           }
         },
         "summary": "Delete Source",
+        "tags": [
+          "admin"
+        ]
+      },
+      "get": {
+        "operationId": "get_v1_admin_datasources_name",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSourceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Source",
         "tags": [
           "admin"
         ]
@@ -13464,6 +13752,466 @@
         "summary": "List Profiles",
         "tags": [
           "app profiles"
+        ]
+      }
+    },
+    "/v1/backups": {
+      "get": {
+        "operationId": "get_v1_backups",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "History",
+        "tags": [
+          "platform recovery"
+        ]
+      },
+      "post": {
+        "operationId": "post_v1_backups",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "platform recovery"
+        ]
+      }
+    },
+    "/v1/backups/configuration": {
+      "delete": {
+        "operationId": "delete_v1_backups_configuration",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disable",
+        "tags": [
+          "platform recovery"
+        ]
+      },
+      "get": {
+        "operationId": "get_v1_backups_configuration",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read",
+        "tags": [
+          "platform recovery"
+        ]
+      },
+      "put": {
+        "operationId": "put_v1_backups_configuration",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Configure",
+        "tags": [
+          "platform recovery"
+        ]
+      }
+    },
+    "/v1/backups/recovery": {
+      "get": {
+        "operationId": "get_v1_backups_recovery",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recovery",
+        "tags": [
+          "platform recovery"
+        ]
+      }
+    },
+    "/v1/backups/recovery/resume": {
+      "post": {
+        "operationId": "post_v1_backups_recovery_resume",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume",
+        "tags": [
+          "platform recovery"
         ]
       }
     },
@@ -19269,6 +20017,298 @@
         ]
       }
     },
+    "/v1/data-objects": {
+      "post": {
+        "operationId": "post_v1_data-objects",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register",
+        "tags": [
+          "object permissions"
+        ]
+      }
+    },
+    "/v1/data-objects/{ident}": {
+      "delete": {
+        "operationId": "delete_v1_data-objects_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unregister",
+        "tags": [
+          "object permissions"
+        ]
+      },
+      "get": {
+        "operationId": "get_v1_data-objects_ident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read",
+        "tags": [
+          "object permissions"
+        ]
+      }
+    },
+    "/v1/data-objects/{ident}/session": {
+      "post": {
+        "operationId": "post_v1_data-objects_ident_session",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ident",
+            "required": true,
+            "schema": {
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routes__data_objects__SessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "File Session",
+        "tags": [
+          "object permissions"
+        ]
+      }
+    },
     "/v1/data-policies": {
       "get": {
         "operationId": "get_v1_data-policies",
@@ -21651,7 +22691,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SessionIn"
+                "$ref": "#/components/schemas/app__routes__kafka__SessionIn"
               }
             }
           },
@@ -21733,7 +22773,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SessionIn"
+                "$ref": "#/components/schemas/app__routes__kafka__SessionIn"
               }
             }
           },
@@ -27240,6 +28280,81 @@
           }
         },
         "summary": "Run Output",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/v1/runs/{run_id}/retry": {
+      "post": {
+        "description": "Retry under current parent execution, code, data, secret and capacity checks.",
+        "operationId": "post_v1_runs_run_id_retry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Run",
         "tags": [
           "runs"
         ]

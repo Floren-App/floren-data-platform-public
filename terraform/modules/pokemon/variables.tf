@@ -106,3 +106,10 @@ variable "stream_operators_enabled" {
     error_message = "Supply stream_operator_group_id when enabling operator grants."
   }
 }
+
+variable "developer_workspaces" {
+  type        = bool
+  default     = null
+  nullable    = true
+  description = "Explicit private workspace and job-submission grants for engineers in this layer. Defaults to enabled in test and disabled in prod. Does not grant deletion or permission delegation."
+}

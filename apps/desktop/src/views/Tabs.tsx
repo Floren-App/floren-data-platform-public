@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { pageVisible, TAB_PAGES } from "../permissions";
-import { api, DataLocation, EDITOR_LABEL, inLayer, inLine, isActive, poolDot, poolInLayer, shortSha, openInWindow, OutputContent, OutputFile, Run, RunScope, runtimeLabel, WarehouseOccupant, WarehouseOverview } from "../api";
+import { runCan, workspaceCan, api, DataLocation, EDITOR_LABEL, inLayer, inLine, isActive, poolDot, poolInLayer, shortSha, openInWindow, OutputContent, OutputFile, Run, RunScope, runtimeLabel, WarehouseOccupant, WarehouseOverview } from "../api";
 import { DataObjectView } from "../components/DataBrowser";
 import type { Hub } from "../hub";
 import { IconRuns, IconCompute, IconOpen, IconPlay, IconStop, IconTrash, IconWorkspaces } from "../components/Icons";
@@ -12,7 +12,7 @@ import { AdminRepos, WorkloadView, DeployWizard } from "./Deploy";
 import { AccessTab } from "./Access";
 import { UsersTab } from "./Directory";
 import { ProductIcon } from "../components/ProductIcon";
-import { DataSourcesView, FolderView, SchemaView, ServiceView, ServicesView, SourceView } from "./Objects";
+import { DataSourcesView, FolderView, SchemaView, ServiceView, ServicesView, SourceView, DataPermissionsView } from "./Objects";
 import type { ObjectSection } from "../components/Permissions";
 import { AdminRuntimes, SecretsTab } from "./Identity";
 import { CatalogObject, CatalogView } from "./Catalog";
@@ -23,6 +23,7 @@ import { ensureGitChoice, GitCredentialsTab, WorkspaceGit } from "./GitCredentia
 import { WorkspaceSections } from "./WorkspaceSections";
 import { LogView } from "../components/LogView";
 import { PackageImportsView, PackagesView, PackageView } from "./Packages";
+import { BackupsView } from "./Backups";
 import { QueryLogView } from "./QueryLog";
 import { rEnabled, type PackageKind } from "../api";
 
@@ -31,11 +32,11 @@ import { PrivacyForm, PrivacyForms, PrivacyMemberships, PrivacyPolicies, Privacy
 import { CaseView } from "./Cases";
 import { DeadlinesView, SettingsPermissions } from "./AccessArea";
 
-export type TabKind = "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
+export type TabKind = "data-permissions" | "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
   | "products" | "product" | "access-requests" | "app-profiles" | "repos" | "deadlines"
   | "privacy-reviews" | "privacy-case" | "case" | "privacy-memberships" | "privacy-register"
   | "privacy-policies" | "privacy-forms" | "privacy-form" | "privacy-roles" | "privacy-classifications"
-  | "admin-app-profiles" | "admin-notifications" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit";
+  | "admin-app-profiles" | "admin-notifications" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit" | "admin-backups";
 
 export interface TabRef {
   kind: TabKind;
@@ -72,6 +73,7 @@ interface Props {
 export function TabContent({ tab, hub, openTab }: Props) {
   if (!pageVisible(hub.me, TAB_PAGES[tab.kind])) return null;
   switch (tab.kind) {
+    case "data-permissions": return <DataPermissionsView tab={tab} hub={hub} openTab={openTab} />;
     case "apis": return <ApisView direction={tab.ref === "external" ? "external" : "internal"} hub={hub} openTab={openTab} />;
     case "api": return <ApiView key={tab.ref} tab={tab} hub={hub} openTab={openTab} />;
     case "catalog": return <CatalogView openTab={openTab} initialKind={tab.ref} initialQuery={tab.search} layerId={hub.layerId} />;
@@ -115,15 +117,16 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "privacy-form": return <PrivacyForm key={tab.ref} id={tab.ref ?? ""} hub={hub} onRenamed={(title) => openTab({ ...tab, title })}
       onDeleted={() => openTab({ kind: "privacy-forms", title: "Compliance forms" })} />;
     case "admin-sources": return <DataSourcesView hub={hub} openTab={openTab} adding />;
-    case "repos": case "admin-repos": return <AdminRepos />;
+    case "repos": case "admin-repos": return <AdminRepos hub={hub} />;
     case "admin-runtimes": return <><AdminRuntimes withR={rEnabled(hub.me)} /><SettingsPermissions page="set-runtimes" hub={hub} openTab={openTab} /></>;
     case "secrets": return <SecretsTab hub={hub} selectedRef={tab.ref} creating={tab.intent === "create"} openTab={openTab} />;
     case "docs": return <DocsTab runId={tab.ref!} />;
     case "admin-pools": return <><AdminPools hub={hub} /><SettingsPermissions page="set-pools" hub={hub} openTab={openTab} /></>;
     case "admin-workspace-templates": return <><AdminWorkspaceTemplates hub={hub} /><SettingsPermissions page="set-template" hub={hub} openTab={openTab} /></>;
     case "admin-network": return <><AdminNetwork hub={hub} /><SettingsPermissions page="set-network" hub={hub} openTab={openTab} /></>;
+    case "admin-backups": return <BackupsView hub={hub} />;
     case "admin-query-log": return <><QueryLogView key={tab.search ?? ""} hub={hub} initialActor={tab.search} /><SettingsPermissions page="set-querylog" hub={hub} openTab={openTab} /></>;
-    case "git-credentials": return <GitCredentialsTab sections={<WorkspaceSections active="git" openTab={openTab} />} />;
+    case "git-credentials": return <GitCredentialsTab hub={hub} sections={<WorkspaceSections active="git" openTab={openTab} />} />;
     case "packages": return <PackagesView key={tab.ref ?? "all"} hub={hub} openTab={openTab} kind={tab.ref as PackageKind | undefined} />;
     case "package": return <PackageView key={tab.ref} hub={hub} openTab={openTab} reference={tab.ref!} />;
     case "package-imports": return <PackageImportsView />;
@@ -260,7 +263,7 @@ function WorkspaceRuns({ hub, openTab }: { hub: Hub; openTab: (tab: TabRef) => v
   return <>
     <PageHeader icon={<IconRuns size={22} />} title={RUN_SCOPE_TITLE.workspace}
       subtitle="Runs started in your workspaces, in this layer. Only the workspace's owner and administrators see them. Open a run for its console and outputs."
-      actions={!!hub.workspaces.length && <button className="btn" onClick={() => setAdding(!adding)} aria-expanded={adding}><IconPlay size={14} />New run</button>} />
+      actions={hub.workspaces.some((ws) => workspaceCan(ws, "runs.create")) && <button className="btn" onClick={() => setAdding(!adding)} aria-expanded={adding}><IconPlay size={14} />New run</button>} />
     <WorkspaceSections active="runs" openTab={openTab} />
     {adding && <div className="card"><NewRunForm hub={hub} onDone={() => setAdding(false)} /></div>}
     <RunList runs={runs} hub={hub} openTab={openTab} />
@@ -283,18 +286,18 @@ function WorkspaceTab({ id, hub, openTab }: { id: string; hub: Hub; openTab: (t:
       <PageHeader icon={<IconWorkspaces size={22} />} title={ws.name}
         subtitle={<><span className={`dot ${ws.status}`} />{ws.status === "queued" ? `queued · ${inLine(ws.queue_position)}` : ws.status} · {EDITOR_LABEL[ws.editor] ?? ws.editor}{ws.layer_name && <> · Layer: <strong>{ws.layer_name}</strong></>}</>}
         actions={<>
-          <button className="btn ghost danger" title="Files in your home volume are kept"
+          <button className="btn ghost danger" disabled={!workspaceCan(ws, "object.delete")} title="Files in your home volume are kept"
                   onClick={() => confirm(`Delete workspace ${ws.name}? Files in your home volume are kept.`) && hub.act(() => api.deleteWorkspace(ws.id))}>
             <IconTrash size={14} />Delete
           </button>
           <span className="divider" />
           {ws.status === "running" || ws.status === "starting" || ws.status === "queued" ? (
             <>
-              <button className="btn secondary" onClick={() => hub.act(() => api.stopWorkspace(ws.id))}><IconStop size={14} />{ws.status === "queued" ? "Leave the line" : "Stop"}</button>
-              <button className="btn" disabled={starting || ws.status === "queued"} onClick={() => openEditor(hub, ws.id, ws.name)}><IconOpen size={14} />{starting ? "Starting…" : "Open editor"}</button>
+              <button className="btn secondary" disabled={!workspaceCan(ws, "object.stop")} onClick={() => hub.act(() => api.stopWorkspace(ws.id))}><IconStop size={14} />{ws.status === "queued" ? "Leave the line" : "Stop"}</button>
+              <button className="btn" disabled={starting || ws.status === "queued" || !workspaceCan(ws, "object.editor.open")} onClick={() => openEditor(hub, ws.id, ws.name)}><IconOpen size={14} />{starting ? "Starting…" : "Open editor"}</button>
             </>
           ) : (
-            <button className="btn" disabled={requestingStart} onClick={() => void start()}><IconPlay size={14} />{requestingStart ? "Starting…" : ws.status === "failed" ? "Retry start" : "Start"}</button>
+            <button className="btn" disabled={requestingStart || !workspaceCan(ws, "object.start")} onClick={() => void start()}><IconPlay size={14} />{requestingStart ? "Starting…" : ws.status === "failed" ? "Retry start" : "Start"}</button>
           )}
         </>} />
       {ws.status === "queued" && <section className="card workspace-starting" role="status" aria-live="polite">
@@ -315,21 +318,21 @@ function WorkspaceTab({ id, hub, openTab }: { id: string; hub: Hub; openTab: (t:
           <dt>Last activity</dt><dd>{new Date(ws.last_activity_at).toLocaleString()}</dd>
           <dt>Files</dt><dd><code>/workspace</code> — shared with every run you start from here.</dd>
         </dl>
-        <WorkspaceGit ws={ws} onChanged={hub.refresh} />
+        {workspaceCan(ws, "object.settings.edit") && workspaceCan(ws,"git.credentials.binding.change") && <WorkspaceGit ws={ws} onChanged={hub.refresh} />}
       </div>
       {ws.editor === "sql" ? <section className="card"><h2>SQL</h2>
         <p className="muted">Browse every catalog and schema you have a data role on, write queries with completion, and keep them as
           <code>.sql</code> scripts. Queries run on the shared engine as you, with the same governance and audit as programs.
           Results stay on the server: export and file upload are disabled.</p>
         <p className="muted">Scripts are saved on this workspace's private volume and survive stops and restarts.</p>
-      </section> : <>
+      </section> : workspaceCan(ws, "files.read") && workspaceCan(ws, "runs.create") ? <>
         <ProgramRunner workspaceId={ws.id} running={ws.status === "running"} hub={hub} openTab={openTab}
                        onStarted={(r) => openTab(runTab(r))} />
         <details className="card">
           <summary>Run a file without fdp.json</summary>
           <NewRunForm hub={hub} workspaceId={ws.id} />
         </details>
-      </>}
+      </> : null}
       {runs.length > 0 && <>
         <div className="section-heading"><h2>Runs from this workspace</h2></div>
         <RunTable runs={runs} hub={hub} openTab={openTab} />
@@ -352,11 +355,13 @@ function RunTab({ id, hub, openTab }: { id: string; hub: Hub; openTab: (t: TabRe
   // Live console: poll quickly while running, once more when it finishes.
   useEffect(() => {
     let cancelled = false;
+    setLogs("");
+    if (!run || !runCan(run, "logs.read")) return;
     const load = () => api.runLogs(id).then((l) => !cancelled && setLogs(l)).catch(() => undefined);
     load();
     const t = live ? setInterval(load, 1500) : undefined;
     return () => { cancelled = true; if (t) clearInterval(t); };
-  }, [id, live]);
+  }, [id, live, run?.capabilities]);
 
   useEffect(() => {
     if (follow && consoleRef.current) consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
@@ -385,25 +390,23 @@ function RunTab({ id, hub, openTab }: { id: string; hub: Hub; openTab: (t: TabRe
           {run.finished_at && ` · ended ${new Date(run.finished_at).toLocaleTimeString()}`}
         </>}
         actions={<>
-          {live && (
+          {live && (runCan(run,"runs.cancel_own") || runCan(run,"runs.cancel_others")) && (
             <button className="btn danger" onClick={stop} disabled={stopping}>
               <IconStop size={14} />{stopping ? "Stopping…" : "Stop"}
             </button>
           )}
-          {!live && run.program && (
+          {!live && run.program && runCan(run,"runs.retry") && (
             <button className="btn secondary" onClick={() => hub.act(async () => {
-              const again = run.workload_id
-                ? await api.runDeployed(run.workload_id, run.args, run.pool_name)
-                : await api.runProgram(run.workspace_id!, run.program!, run.args, run.pool_name);
+              const again = await api.retryRun(run.id);
               await hub.refresh();
               openTab(runTab(again));
             })}><IconPlay size={14} />Run again</button>
           )}
-          {run.kind === "dbt" && !live && (
+          {run.kind === "dbt" && !live && runCan(run,"artifacts.read") && (
             <button className="btn" onClick={() => openTab({ kind: "docs", ref: run.id, title: `docs · ${run.program ?? "dbt"}` })}>
               <IconOpen size={14} />Open dbt docs</button>
           )}
-          {(run.kind === "app" || run.kind === "airflow") && run.status === "running" && (
+          {(run.kind === "app" || run.kind === "airflow") && run.status === "running" && runCan(run,"artifacts.open") && (
             <button className="btn" onClick={() => hub.act(() =>
               openInWindow(api.openApp(run.id).then((r) => r.url), `${title} — Floren Data Platform`, `app-${run.id}`))}><IconOpen size={14} />{run.kind === "airflow" ? "Open Airflow" : "Open app"}</button>
           )}
@@ -415,7 +418,7 @@ function RunTab({ id, hub, openTab }: { id: string; hub: Hub; openTab: (t: TabRe
         )}
       </PageHeader>
 
-      <div className="section-heading">
+      {runCan(run,"logs.read") && <><div className="section-heading">
         <h2>Console</h2>
         <label className="row muted" style={{ fontSize: 12 }}>
           <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> Follow output
@@ -424,10 +427,10 @@ function RunTab({ id, hub, openTab }: { id: string; hub: Hub; openTab: (t: TabRe
       <pre ref={consoleRef} className="terminal">{logs || (live ? "Waiting for output…" : "No output.")}</pre>
 
       <div className="section-heading"><h2>Log</h2><span className="muted" style={{ fontSize: 12 }}>Platform events and <code>fdp.log</code> lines of this run</span></div>
-      <LogView scope={{ run_id: run.id }} openTab={openTab} showWorkload={false} label="Log of this run" />
+      <LogView scope={{ run_id: run.id }} openTab={openTab} showWorkload={false} label="Log of this run" /></>}
 
       {/* Deployed runs keep outputs on the server's data volume, not in a workspace. */}
-      {!live && <Outputs run={run} workspaceRunning={!!run.workload_id || ws?.status === "running"} />}
+      {!live && runCan(run,"artifacts.list") && <Outputs run={run} workspaceRunning={!!run.workload_id || ws?.status === "running"} />}
     </>
   );
 }
@@ -458,7 +461,7 @@ function Outputs({ run, workspaceRunning }: { run: Run; workspaceRunning: boolea
             <ul className="list" aria-label="Output files">
               {files.map((f) => (
                 <li key={f.path} className={preview?.path === f.path ? "selected" : ""}>
-                  <button className="nav-item" onClick={() => show(f.path)}><span className="grow mono">{f.path}</span><span className="sub">{formatSize(f.size)}</span></button>
+                  <button className="nav-item" disabled={!runCan(run,"artifacts.read")} onClick={() => show(f.path)}><span className="grow mono">{f.path}</span><span className="sub">{formatSize(f.size)}</span></button>
                 </li>
               ))}
             </ul>

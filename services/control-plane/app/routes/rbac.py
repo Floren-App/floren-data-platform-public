@@ -11,8 +11,8 @@ from ..db import get_db
 from ..deps import get_actor, get_secret_store
 from ..models import (AppGroup, DirectoryPrincipal, DirectoryMembership, IdentityBinding, Resource, RoleAssignment, ServiceRoleAssignment,
                       DataSource, Workload, ServiceAccount, utcnow)
-from .. import rbac
-from ..ownership import GLOBAL_ADMIN, require_create, owner_info, browsing_scope, browsing_allowed
+from .. import permissions, rbac
+from ..ownership import GLOBAL_ADMIN, require_create, owner_group, owner_info, browsing_scope, browsing_allowed
 from .common import audit
 
 router = APIRouter(prefix="/v1/rbac", tags=["RBAC"])
@@ -90,7 +90,7 @@ def group_out(db, g, user):
             "system":g.id == GLOBAL_ADMIN,
             "protected_bindings":[p.id for p in db.scalars(select(DirectoryPrincipal).where(
                 DirectoryPrincipal.kind == "role",DirectoryPrincipal.name == user.admin_role))] if g.id == GLOBAL_ADMIN else [],
-            "can_manage": user.is_admin or (g.id != GLOBAL_ADMIN and user.principal_id in g.owners),
+            "can_manage": user.is_admin or (g.id != GLOBAL_ADMIN and (user.principal_id in g.owners or any(permissions.allowed(db,user,key,"group:"+g.id) for key in ("groups.metadata.edit","groups.members.add","groups.members.remove")))),
             "bindings": list(db.scalars(select(IdentityBinding.principal_id).where(
                 IdentityBinding.app_group_id == g.id)))}
 
@@ -100,6 +100,7 @@ def resource_out(db, r, user):
            "object_id": r.object_id, "config": r.config or {},
            **layers.info(db, r),
            **owner_info(db,r),
+           "capabilities":[key for key in ("permissions.bindings.read","permissions.effective.read","permissions.principals.select") if permissions.domain_allowed(db,user,key,r,"assign" if key=="permissions.principals.select" else "read")],
            "actions": [a for a in {a for v in rbac.roles_for(r).values() for a in v}
                        if rbac.allowed(db, user, a, r)]}
     if r.kind in ("source", "schema"):
@@ -119,6 +120,8 @@ def get_resource(db, resource_id):
 @router.get("/roles")
 def roles(_: User = Depends(get_actor)):
     return {"data": {k: sorted(v) for k, v in rbac.DATA_ROLES.items()},
+            "kafka": {k: sorted(v) for k, v in rbac.KAFKA_ROLES.items()},
+            "data_object": {k: sorted(v) for k, v in rbac.DATA_OBJECT_ROLES.items()},
             "program": {k: sorted(v) for k, v in rbac.PROGRAM_ROLES.items()},
             "api": {k: sorted(v) for k, v in rbac.API_ROLES.items()},
             "package": {k: sorted(v) for k, v in rbac.PACKAGE_ROLES.items()},
@@ -129,7 +132,8 @@ def roles(_: User = Depends(get_actor)):
 def directory(db: Session = Depends(get_db), user: User = Depends(get_actor)):
     user = current(db, user)
     # Group owners need a directory picker to bind identities; ordinary users cannot enumerate it.
-    if not user.is_admin and not any(user.principal_id in g.owners for g in db.scalars(select(AppGroup))):
+    legacy_directory = user.is_admin or any(user.principal_id in g.owners for g in db.scalars(select(AppGroup)))
+    if not legacy_directory and not permissions.allowed(db,user,"directory.people.list","people"):
         raise HTTPException(403, "group owner required")
     principals = list(db.scalars(select(DirectoryPrincipal).order_by(DirectoryPrincipal.name)))
     memberships = list(db.scalars(select(DirectoryMembership)))
@@ -140,6 +144,8 @@ def directory(db: Session = Depends(get_db), user: User = Depends(get_actor)):
     result = []
     active_ids = {p.id for p in principals if p.active}
     for p in principals:
+        if not legacy_directory and not permissions.allowed(db,user,"directory.people.read","principal:"+p.id):
+            continue
         ancestors = {p.id}
         while True:
             expanded = ancestors | {m.group_id for m in memberships if m.member_id in ancestors and m.group_id in active_ids}
@@ -165,6 +171,8 @@ def groups(db: Session = Depends(get_db), user: User = Depends(get_actor)):
     memberships = rbac.app_groups(db, user)
     result = []
     for g in db.scalars(select(AppGroup).order_by(AppGroup.name)):
+        if not (user.is_admin or g.id in memberships or user.principal_id in g.owners or permissions.allowed(db,user,"groups.list","group:"+g.id)):
+            continue
         out = group_out(db, g, user)
         out["can_inspect"] = out["can_manage"] or g.id in memberships
         if not out["can_inspect"]:
@@ -179,8 +187,8 @@ def group_assignments(group_id: str, db: Session = Depends(get_db), user: User =
     group = db.get(AppGroup, group_id)
     if not group:
         raise HTTPException(404, "group not found")
-    if not user.is_admin and user.principal_id not in group.owners and group_id not in rbac.app_groups(db, user):
-        raise HTTPException(403, "group membership or ownership required")
+    if not user.is_admin and user.principal_id not in group.owners and group_id not in rbac.app_groups(db, user) and not permissions.allowed(db,user,"groups.access.read","group:"+group_id):
+        raise HTTPException(403, "group membership, ownership or groups.access.read required")
     result = []
     for grant in db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id == group_id)):
         resource = db.get(Resource, grant.resource_id)
@@ -239,8 +247,8 @@ def group_access(group_id: str, db: Session = Depends(get_db), user: User = Depe
     group = db.get(AppGroup, group_id)
     if not group:
         raise HTTPException(404, "group not found")
-    if not user.is_admin and user.principal_id not in group.owners and group_id not in rbac.app_groups(db, user):
-        raise HTTPException(403, "group membership or ownership required")
+    if not user.is_admin and user.principal_id not in group.owners and group_id not in rbac.app_groups(db, user) and not permissions.allowed(db,user,"groups.access.read","group:"+group_id):
+        raise HTTPException(403, "group membership, ownership or groups.access.read required")
     assigned = list(db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id == group_id)))
     profile = db.get(AppProfile, group.profile_id) if group.profile_id else None
     return {"system": group_id == GLOBAL_ADMIN, "grants": access_rows(db, user, assigned, {group.id: group.name}),
@@ -257,8 +265,8 @@ def principal_access(principal_id: str, db: Session = Depends(get_db), user: Use
     principal = db.get(DirectoryPrincipal, principal_id)
     if principal is None or principal.kind not in ("user", "service"):
         raise HTTPException(404, "person or service identity not found")
-    if not user.is_admin and user.principal_id != principal_id:
-        raise HTTPException(403, "administrators, or the identity itself")
+    if not user.is_admin and user.principal_id != principal_id and not permissions.allowed(db,user,"directory.people.access.read","principal:"+principal_id):
+        raise HTTPException(403, "directory.people.access.read permission required")
     ids = rbac.closure(db, principal_id)
     groups = []
     for binding in db.scalars(select(IdentityBinding).where(IdentityBinding.principal_id.in_(list(ids)))):
@@ -288,7 +296,7 @@ def check_owners(db, owners):
 @router.post("/groups", status_code=201)
 def create_group(body: GroupIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     from .. import settings_access
-    user = settings_access.require(db, user, "set-groups")
+    user = settings_access.require(db,user,"set-groups","groups.create")
     if user.is_admin:
         require_create(db, user)  # administrators create with Global Admin active; Groups managers need no active group
     if body.name.strip().casefold() == "global admin":
@@ -307,12 +315,18 @@ def create_group(body: GroupIn, db: Session = Depends(get_db), user: User = Depe
 
 @router.put("/groups/{group_id}")
 def update_group(group_id: str, body: GroupIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = admin(db, user)
+    user=current(db,user)
     group = db.get(AppGroup, group_id)
     if not group:
         raise HTTPException(404, "group not found")
     if group.id == GLOBAL_ADMIN or body.name.strip().casefold() == "global admin":
         raise HTTPException(409,"Global Admin is protected; manage its identity bindings instead")
+    if not user.is_admin:
+        permissions.require(db,user,'groups.metadata.edit','group:'+group.id)
+        if set(body.owners)!=set(group.owners):
+            permissions.require(db,user,'groups.owners.change','group:'+group.id)
+        if 'app_profile' in body.model_fields_set:
+            permissions.require(db,user,'groups.profile.assign','group:'+group.id)
     check_owners(db, body.owners)
     duplicate = db.scalar(select(AppGroup).where(AppGroup.name == body.name, AppGroup.id != group.id))
     if duplicate:
@@ -330,10 +344,11 @@ def update_group(group_id: str, body: GroupIn, db: Session = Depends(get_db), us
 
 @router.delete("/groups/{group_id}", status_code=204)
 def delete_group(group_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    user = admin(db, user)
+    user=current(db,user)
     group = db.get(AppGroup, group_id)
     if not group:
         raise HTTPException(404, "group not found")
+    permissions.require(db,user,"groups.delete","group:"+group.id)
     if group.id == GLOBAL_ADMIN:
         raise HTTPException(409,"Global Admin cannot be deleted")
     if any((resource.config or {}).get('owner_group_id') == group.id for resource in db.scalars(select(Resource))):
@@ -356,22 +371,25 @@ def delete_group(group_id: str, db: Session = Depends(get_db), user: User = Depe
     db.commit()
 
 
-def managed_group(db, user, group_id):
+def managed_group(db,user,group_id,action):
     user = current(db, user)
     g = db.get(AppGroup, group_id)
     if not g:
         raise HTTPException(404, "group not found")
-    if user.execution_context or (not user.is_admin and (g.id == GLOBAL_ADMIN or user.principal_id not in g.owners)):
+    named=permissions.allowed(db,user,action,"group:"+g.id)
+    if user.execution_context or (not user.is_admin and (g.id == GLOBAL_ADMIN or (user.principal_id not in g.owners and not named))):
         raise HTTPException(403, "designated group owner required")
     return g, user
 
 
 @router.post("/groups/{group_id}/bindings", status_code=201)
 def bind(group_id: str, body: BindingIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    group, user = managed_group(db, user, group_id)
+    group, user = managed_group(db,user,group_id,"groups.members.add")
     p = db.get(DirectoryPrincipal, body.principal_id)
     if not p or not p.active:
         raise HTTPException(422, "active directory principal required")
+    if p.kind in ("group","role") and not user.is_admin and user.principal_id not in group.owners:
+        permissions.require(db,user,"groups.idp.bind","group:"+group.id)
     if group.id == GLOBAL_ADMIN and p.kind == "service":
         raise HTTPException(422,"Global Admin is reserved for human administrative identities")
     binding = db.scalar(select(IdentityBinding).where(IdentityBinding.app_group_id == group.id,
@@ -385,8 +403,10 @@ def bind(group_id: str, body: BindingIn, db: Session = Depends(get_db), user: Us
 
 @router.delete("/groups/{group_id}/bindings/{principal_id}", status_code=204)
 def unbind(group_id: str, principal_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    group, user = managed_group(db, user, group_id)
+    group, user = managed_group(db,user,group_id,"groups.members.remove")
     p = db.get(DirectoryPrincipal,principal_id)
+    if p and p.kind in ("group","role") and not user.is_admin and user.principal_id not in group.owners:
+        permissions.require(db,user,"groups.idp.unbind","group:"+group.id)
     if group.id == GLOBAL_ADMIN and p and p.kind == "role" and p.name == user.admin_role:
         raise HTTPException(409,"the configured IdP administrator role remains bound to Global Admin")
     db.execute(delete(IdentityBinding).where(IdentityBinding.app_group_id == group.id,
@@ -431,7 +451,11 @@ def create_folder(body: ResourceIn, db: Session = Depends(get_db), user: User = 
     parent = get_resource(db, body.parent_id)
     if parent.kind not in ("root", "folder"):
         raise HTTPException(422, "folders belong under Deployed or another folder")
-    require_create(db,user,parent)
+    layer_id = layers.selection(db, body.layer_id, parent)
+    if permissions.allowed(db,user,"workloads.folders.create",parent.id,layer_id):
+        owner_group(db,user)
+    else:
+        require_create(db,user,parent)
     if db.scalar(select(Resource).where(Resource.parent_id == parent.id, Resource.name == body.name)):
         raise HTTPException(409, "name already exists in folder")
     config = {}
@@ -464,8 +488,13 @@ def move_resource(resource_id: str, body: ResourceIn, db: Session = Depends(get_
     parent = get_resource(db, body.parent_id)
     if parent.kind not in ("root", "folder") or r.id in {x.id for x in rbac.ancestors(db, parent)}:
         raise HTTPException(422, "invalid parent or folder cycle")
-    rbac.require(db, user, "delete", get_resource(db, r.parent_id))
-    rbac.require(db, user, "create", parent)
+    if r.kind == "folder":
+        permissions.require_domain(db,user,"workloads.folders.rename" if parent.id == r.parent_id else "workloads.folders.move",r,"edit" if parent.id == r.parent_id else "delete")
+        if parent.id != r.parent_id:
+            permissions.require_domain(db,user,"workloads.folders.create",parent,"create")
+    else:
+        rbac.require(db, user, "delete", get_resource(db, r.parent_id))
+        rbac.require(db, user, "create", parent)
     if db.scalar(select(Resource).where(Resource.parent_id == parent.id, Resource.name == body.name, Resource.id != r.id)):
         raise HTTPException(409, "name already exists in folder")
     from ..environments import resource_environment
@@ -481,7 +510,10 @@ def move_resource(resource_id: str, body: ResourceIn, db: Session = Depends(get_
             return ({("group", a.app_group_id, a.role) for a in db.scalars(select(RoleAssignment).where(RoleAssignment.resource_id.in_(ids)))} |
                     {("service", a.principal_id, a.role) for a in db.scalars(select(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id.in_(ids)))})
         if inherited_grants(old_chain) != inherited_grants(new_chain):
-            rbac.require(db, user, "assign", r)
+            if r.kind == "folder":
+                permissions.require_domain(db,user,"workloads.folders.inheritance.change",r,"assign")
+            else:
+                rbac.require(db, user, "assign", r)
     # A folder can have inherited its boundary from the old parent. Moving it
     # into an organization folder must not remove that execution boundary.
     old_layer = resource_environment(db, r)
@@ -498,7 +530,7 @@ def delete_folder(resource_id: str, db: Session = Depends(get_db), user: User = 
     r = get_resource(db, resource_id)
     if r.kind != "folder":
         raise HTTPException(422, "only folders can be deleted here")
-    rbac.require(db, user, "delete", r)
+    permissions.require_domain(db,user,"workloads.folders.delete",r,"delete")
     from ..models import Workload
     children = list(db.scalars(select(Resource).where(Resource.parent_id == r.id)))
     retired = [c for c in children if c.kind == "service" and not c.config.get("service_account")
@@ -527,7 +559,10 @@ def register_schema(name: str, body: SchemaIn, db: Session = Depends(get_db), us
     if not ds:
         raise HTTPException(404, "source not found")
     parent = rbac.source_resource(db, ds)
-    require_create(db,user,parent,action="assign")
+    if permissions.domain_allowed(db,user,"storage.schemas.register",parent,"assign"):
+        owner_group(db,user)
+    else:
+        raise HTTPException(403,"storage.schemas.register permission required")
     if db.scalar(select(Resource).where(Resource.parent_id == parent.id, Resource.name == body.name)):
         raise HTTPException(409, "schema already registered")
     config = {}
@@ -574,7 +609,7 @@ def deregister_schema(resource_id: str, db: Session = Depends(get_db), user: Use
     r = get_resource(db, resource_id)
     if r.kind != "schema":
         raise HTTPException(409, "only schema registrations are removed here; use the object's own API")
-    rbac.require(db, user, "delete", r)
+    permissions.require_domain(db,user,"storage.schemas.deregister",r,"delete")
     rbac.delete_resource_assignments(db, r.id)
     db.delete(r)
     audit(db, user.username, "schema.deregister", resource_id, schema=r.name)
@@ -584,7 +619,7 @@ def deregister_schema(resource_id: str, db: Session = Depends(get_db), user: Use
 @router.get("/resources/{resource_id}/assignments")
 def assignments(resource_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     r = get_resource(db, resource_id)
-    rbac.require(db, user, "read", r)
+    permissions.require_domain(db,user,"permissions.bindings.read",r,"read")
     chain = {x.id for x in rbac.ancestors(db, r)}
     groups = [{"id": a.id, "resource_id": a.resource_id, "app_group_id": a.app_group_id,
              "group": db.get(AppGroup, a.app_group_id).name, "role": a.role,
@@ -606,7 +641,7 @@ def assignments(resource_id: str, db: Session = Depends(get_db), user: User = De
 
 @router.get("/resources/{resource_id}/service-principals")
 def service_principals(resource_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    rbac.require(db, user, "assign", get_resource(db, resource_id))
+    permissions.require_domain(db,user,"permissions.principals.select",get_resource(db,resource_id),"assign")
     # Resource Owners need a minimal service picker without access to the entire IdP directory.
     from ..environments import principal_environment, resource_environment
     environment = resource_environment(db, get_resource(db, resource_id))
@@ -617,7 +652,7 @@ def service_principals(resource_id: str, db: Session = Depends(get_db), user: Us
 
 @router.get("/resources/{resource_id}/user-principals")
 def user_principals(resource_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    rbac.require(db, user, "assign", get_resource(db, resource_id))
+    permissions.require_domain(db,user,"permissions.principals.select",get_resource(db,resource_id),"assign")
     return [{"id": p.id, "name": p.name} for p in db.scalars(select(DirectoryPrincipal).where(
         DirectoryPrincipal.kind == "user", DirectoryPrincipal.active.is_(True)).order_by(DirectoryPrincipal.name))]
 
@@ -628,8 +663,8 @@ def require_justification(db, resource, body) -> None:
     from ..models import AccessCase
     existing = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource.id,
                                                       RoleAssignment.app_group_id == body.app_group_id)) if body.app_group_id else None
-    roles = list(rbac.roles_for(resource))
-    if existing is not None and existing.role in roles and roles.index(existing.role) >= roles.index(body.role):
+    roles = rbac.roles_for(resource)
+    if existing is not None and existing.role in roles and body.role in roles and roles[body.role].issubset(roles[existing.role]):
         return  # not giving more than the group has
     req = compliance.role_requirement(db, resource, body.role, body.app_group_id)
     if req["policy"] is None:
@@ -638,7 +673,7 @@ def require_justification(db, resource, body) -> None:
         raise HTTPException(409, {"code": "justification_required", "message": "access to this data needs a compliance form: give it to a group"})
     case = db.get(AccessCase, body.justification_id) if body.justification_id else None
     valid = (case is not None and case.status == "approved" and case.kind == "role" and case.resource_id == resource.id
-             and case.app_group_id == body.app_group_id and case.role in roles and roles.index(case.role) >= roles.index(body.role)
+             and case.app_group_id == body.app_group_id and case.role in roles and body.role in roles and roles[body.role].issubset(roles[case.role])
              and (case.approved_until is None or compliance._aware(case.approved_until) > utcnow()))
     if not valid:
         raise HTTPException(409, {"code": "justification_required",
@@ -646,10 +681,21 @@ def require_justification(db, resource, body) -> None:
                                   "requirement": compliance.requirement_out(db, req)})
 
 
+def require_role_management(db,user,resource,operation):
+    # Legacy roles span several capability namespaces. A named delegation grant
+    # alone must never mint a broader legacy Owner role.
+    rbac.require(db,user,"assign",resource)
+    key = ("workloads.folders.roles." if resource.kind=="folder" else
+        "storage.objects.roles." if resource.kind in rbac.DATA_OBJECT_KINDS else
+        "storage.access.roles." if resource.kind in ("source","schema") else
+        "workloads.settings.roles.") + operation
+    permissions.require_domain(db,user,key,resource,"assign")
+
+
 @router.put("/resources/{resource_id}/assignments")
 def assign(resource_id: str, body: AssignmentIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     r = get_resource(db, resource_id)
-    rbac.require(db, user, "assign", r)
+    require_role_management(db,user,r,"assign")
     if body.role not in rbac.roles_for(r):
         raise HTTPException(422, "choose a valid built-in role for this resource")
     require_justification(db, r, body)
@@ -684,7 +730,7 @@ def assign(resource_id: str, body: AssignmentIn, db: Session = Depends(get_db), 
 @router.delete("/resources/{resource_id}/assignments/{app_group_id}", status_code=204)
 def revoke(resource_id: str, app_group_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     r = get_resource(db, resource_id)
-    rbac.require(db, user, "assign", r)
+    require_role_management(db,user,r,"revoke")
     if app_group_id == GLOBAL_ADMIN:
         raise HTTPException(409,"Global Admin access cannot be revoked on an object")
     db.execute(delete(RoleAssignment).where(RoleAssignment.resource_id == r.id,
@@ -696,7 +742,7 @@ def revoke(resource_id: str, app_group_id: str, db: Session = Depends(get_db), u
 @router.delete("/resources/{resource_id}/assignments/services/{principal_id}", status_code=204)
 def revoke_service(resource_id: str, principal_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     r = get_resource(db, resource_id)
-    rbac.require(db, user, "assign", r)
+    require_role_management(db,user,r,"revoke")
     db.execute(delete(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id == r.id,
                                                   ServiceRoleAssignment.principal_id == principal_id))
     audit(db, user.username, "role.revoke", r.id, principal_id=principal_id)
@@ -706,7 +752,7 @@ def revoke_service(resource_id: str, principal_id: str, db: Session = Depends(ge
 @router.get("/resources/{resource_id}/access")
 def effective_access(resource_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     r = get_resource(db, resource_id)
-    rbac.require(db, user, "read", r)
+    permissions.require_domain(db,user,"permissions.effective.read",r,"read")
     return {"resource": resource_out(db, r, user), "grants": rbac.access(db, user, r)}
 
 
@@ -716,7 +762,7 @@ def provision(resource_id: str, db: Session = Depends(get_db), user: User = Depe
     r = get_resource(db, resource_id)
     if r.kind != "schema":
         raise HTTPException(422, "only schema provisioning is supported")
-    rbac.require(db, user, "assign", r)
+    permissions.require_domain(db,user,"storage.schemas.create_native",r,"assign")
     ds = db.get(DataSource, r.object_id)
     try:
         provision_schema(ds, r, get_secret_store())

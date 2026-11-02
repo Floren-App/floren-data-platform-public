@@ -2,8 +2,10 @@
 
 FDP has an explicit capability registry, scoped permission assignments, custom action roles,
 and Viewer gates for all desktop pages. These are separate from the existing data/workload
-resource roles during migration. **The complete 506-action design is not yet enforced across
-every endpoint and backend.** Do not treat a registry entry as an implemented security guarantee.
+resource roles during migration. The registry also contains planned operations, including
+separate drafts and exports that have no dedicated API. A registry entry alone does not
+create such an operation. Use the route inventory and source-reference column to review
+the actual implementation; the matrix is not an independent security certification.
 
 The [full matrix](permission-matrix.md) shows role columns and named-check coverage.
 Download its [CSV](permission-matrix.csv) for filtering. The [design](permission-model-plan.md)
@@ -16,17 +18,20 @@ roles that remain in use for workloads, data, APIs, packages and products.
 |---|---|
 | Named grants | Default-deny action checks on a target, globally, in one layer, or explicitly all layers. Known resource layers override caller-supplied scope. |
 | Roles | Viewer, Executor, Contributor, Manager, Admin and Owner bundles from the registry; an explicit action set or custom role can replace a built-in bundle. |
-| Page visibility | All 58 desktop tab kinds and aliases require their page gate. Hidden pages do not mount their content components. Navigation and open tab labels are filtered; page changes invalidate the object cache. |
+| Page visibility | All desktop tab kinds and aliases require their page gate. Hidden pages do not mount their content components. Navigation and open tab labels are filtered; page changes invalidate the object cache. |
 | Administration | Named checks cover the administration handlers identified in the matrix, including form drafting/publication, classification changes, layer settings/infrastructure, pools, runtime registration and log configuration. |
 | Privacy reads | Forms and drafts, policy inventory and review-duty inventory require explicit page/capability access. The `compliance_admin` role no longer grants access to Privacy administration pages. |
 | Network allowlist | Per-layer host rules are bounded by a distinct global host ceiling. Changing the global ceiling requires its protected action. New proxy connections require signed workspace tickets and current layer policy. |
-| Delegation | A scoped Owner may delegate only its capability namespace, targets, layers and held actions. Shared custom-role definitions require active Global Admin because changes affect every recipient. |
+| Delegation | A scoped Owner may delegate only its capability namespace, targets, layers and held actions. Changing a shared custom role checks every existing assignment scope and every new action against the editor's delegation authority. |
 | Administrator context | Global Admin privileges apply with Global Admin active. Selecting another group also restricts backend administrator checks; this is no longer a UI-only preview. |
+| Object data | Table/column and file/directory targets; governed Trino column checks, narrowed S3 sessions, product grants limited to included objects. See [object permissions](data-object-permissions.md). |
+| Workload functions | Separate named checks for settings fields, identity/mode/secret changes, deployment, sync, execution and app/docs opening; the gateway rechecks opening permission. Existing resource roles remain compatibility grants. |
+| Package downloads | Explicit package or repository grants; Viewer metadata access does not permit native Python/R downloads. |
+| Recovery | Configurable encrypted external S3 backup, offline restore and quarantine; see [platform recovery](platform-recovery.md). |
 | Query log | Explicit global, layer, or own-principal read scope. SQL text needs separate permission; a page gate alone is insufficient. |
 
-Existing explicit Viewer/Manager assignments on settings resources remain broad compatibility
-grants. A legacy global Manager assignment must be removed when converting that recipient to
-granular permissions. The compatibility grant is not implicitly converted into layer authority.
+Existing settings-resource roles remain explicit compatibility grants, filtered through
+the per-action role matrix. Remove broad inherited assignments when converting a recipient to granular permissions. The compatibility grant is not implicitly converted into layer authority.
 Existing workload/data/API/package/product roles continue to apply at their existing boundaries.
 
 ## Role meanings
@@ -173,9 +178,49 @@ private-address restrictions still apply in addition to both host lists.
 
 ## Remaining migration work
 
-The registered matrix is broader than this revision's named endpoint enforcement. Individual table,
-column, file and artifact grants; complete common-role replacement for workload/data/API/package/product
+The registered matrix is broader than this revision's named endpoint enforcement. Artifact-specific grants; complete per-function migration for workload/data/API/package/product
 roles; per-control capability wiring everywhere; workflow/draft additions; and complete non-HTTP/backend
 conformance remain unfinished. Legacy resource grants continue to govern those areas. The named-check
 column is generated from source to make this gap visible. Do not deploy on the assumption that all
 506 actions can already be independently delegated across every backend.
+
+## Private workspace functions
+
+Workspace navigation needs `pages` Viewer on `workspaces`. Function grants use
+namespace `workspaces`, collection target `workspaces`, and an explicit layer.
+Individual grants use `workspace:<id>`; the server derives the layer from that
+workspace and rejects a conflicting layer. Grants never share another person's
+private files.
+
+| Role | Workspace functions |
+|---|---|
+| Viewer | List and inspect own workspace metadata; no file contents |
+| Contributor | Change files; opening an executable editor also requires Executor |
+| Executor | Start/stop and read files; opening an executable editor also requires Contributor |
+| Manager | Create workspaces and edit ordinary settings; no execution |
+| Admin | All listed operational functions including deletion |
+| Owner | Administrative functions and permission delegation |
+
+Job submission additionally requires `runs.create` in namespace `runs` on the workspace
+or collection target, scoped to its layer. A workspace Manager grant alone does not
+submit jobs.
+
+Editor access is rechecked by the gateway, and queued starts recheck captured-group
+authority before dispatch. Use Terraform permission assignments to grant both
+Contributor and Executor for development, plus Manager when developers may create
+their own environments. Give these grants in dev only when production editors are
+not permitted. Interactive editors necessarily expose their private filesystem;
+checkout/pull inside the editor cannot be isolated from arbitrary shell execution.
+
+## Run content and controls
+
+Run ownership is a privacy boundary, not permission to read its contents. Named grants
+can target `run:<id>`, its private `workspace:<id>`, the `workspaces` collection, or
+its workload parent. The server derives the run's layer and rejects conflicting grants.
+Use namespace `artifacts` Viewer for output names/sizes and Executor for content and
+rendered app access. Logs require `logs.read`; cancellation requires `runs.cancel_own`
+or `runs.cancel_others`. The app gateway rechecks `artifacts.open` on each authorization.
+Legacy explicit workload execution still supplies its previous run-content authority
+while that domain migrates. Workspace owners receive no corresponding implicit grant.
+Interactive editors expose files on their private volume; artifact API restrictions do
+not hide a file from someone separately authorized to open that editor.

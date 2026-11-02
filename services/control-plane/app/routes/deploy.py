@@ -21,7 +21,7 @@ from ..models import GitRepository, Workload, Resource, DirectoryPrincipal
 from ..orchestrator import Orchestrator
 from ..ownership import owner_info, browsing_allowed
 from ..secrets import SecretStore, repo_path
-from .. import deploying, rbac
+from .. import deploying, rbac, permissions
 from ..schemas import (BranchOut, CommitOut, OpenOut, OrchestrateIn, WorkloadCommitOut, WorkloadEventOut, WorkloadOut, WorkloadVersionsOut,
                        WorkloadPatch, DeployedRunIn, DeployIn, PullOut, RepoIn, RepoOut, RunOut)
 from .common import audit, run_out
@@ -32,16 +32,20 @@ router = APIRouter(prefix="/v1", tags=["deploying"])
 
 # --- repositories ----------------------------------------------------------------------------
 
-def _repo_out(repo: GitRepository, secrets: SecretStore) -> RepoOut:
+def _repo_out(repo: GitRepository, secrets: SecretStore, user=None) -> RepoOut:
     out = RepoOut.model_validate(repo)
     out.has_credentials = bool(secrets.read(repo_path(repo.name)))
+    if user:
+        from sqlalchemy.orm import object_session
+        from ..repository_access import allowed
+        out.capabilities=[a for a in ('repositories.apply','repositories.remove','repositories.trust.change',
+            'repositories.credential.bind','repositories.pull','repositories.branches.read') if allowed(object_session(repo),user,a,repo)]
     return out
 
 
 def _can_deploy_from(repo: GitRepository, user: User, db: Optional[Session] = None) -> bool:
-    from .. import rbac
-    groups = set(user.groups) | (rbac.app_groups(db,user) if db is not None else set())
-    return user.is_admin or not repo.allowed_groups or bool(set(repo.allowed_groups) & groups)
+    from ..repository_access import allowed
+    return db is not None and allowed(db,user,'repositories.list',repo)
 
 
 def _repo(db: Session, repo_id: str, user: User) -> GitRepository:
@@ -53,13 +57,13 @@ def _repo(db: Session, repo_id: str, user: User) -> GitRepository:
 
 @router.get("/admin/repos", response_model=List[RepoOut], tags=["admin"])
 def admin_repos(db: Session = Depends(get_db), secrets: SecretStore = Depends(get_secret_store),
-                _: User = Depends(require_admin)):
-    return [_repo_out(r, secrets) for r in db.scalars(select(GitRepository).order_by(GitRepository.name))]
+                _: User = Depends(get_actor)):
+    return [_repo_out(r,secrets,_) for r in db.scalars(select(GitRepository).order_by(GitRepository.name)) if _can_deploy_from(r,_,db)]
 
 
 @router.put("/admin/repos/{name}", response_model=RepoOut, tags=["admin"])
 def upsert_repo(name: str, body: RepoIn, db: Session = Depends(get_db),
-                secrets: SecretStore = Depends(get_secret_store), admin: User = Depends(require_admin)):
+                secrets: SecretStore = Depends(get_secret_store), admin: User = Depends(get_actor)):
     if body.name != name:
         raise HTTPException(422, "name in path and body differ")
     try:
@@ -68,10 +72,22 @@ def upsert_repo(name: str, body: RepoIn, db: Session = Depends(get_db),
         raise HTTPException(422, str(exc)) from None
     if not valid_branch(body.default_branch):
         raise HTTPException(422, "invalid default branch")
-    repo = db.scalar(select(GitRepository).where(GitRepository.name == name)) or GitRepository(name=name)
+    existing=db.scalar(select(GitRepository).where(GitRepository.name==name))
+    repo=existing or GitRepository(name=name)
+    from .. import repository_access
+    def require_function(action):
+        if existing:
+            repository_access.require(db,admin,action,repo)
+        else:
+            permissions.require(db,admin,action,'repositories')
+    require_function('repositories.apply' if existing else 'repositories.register')
+    if repo.url!=body.url or repo.allowed_groups!=body.allowed_groups:
+        require_function('repositories.trust.change')
+    if body.secret is not None:
+        require_function('repositories.credential.bind')
     if not repo.id:
-        from ..ownership import require_create
-        repo.owner_group_id = require_create(db,admin).id
+        from ..ownership import owner_group
+        repo.owner_group_id=owner_group(db,admin).id
     repo.url, repo.default_branch, repo.description, repo.allowed_groups = (
         body.url, body.default_branch, body.description, body.allowed_groups)
     db.add(repo)
@@ -79,15 +95,17 @@ def upsert_repo(name: str, body: RepoIn, db: Session = Depends(get_db),
         secrets.put(repo_path(name), body.secret)
     audit(db, admin.username, "repo.upsert", name, url=body.url, secret_changed=body.secret is not None)
     db.commit()
-    return _repo_out(repo, secrets)
+    return _repo_out(repo,secrets,admin)
 
 
 @router.delete("/admin/repos/{name}", status_code=204, tags=["admin"])
 def delete_repo(name: str, db: Session = Depends(get_db), secrets: SecretStore = Depends(get_secret_store),
-                admin: User = Depends(require_admin)):
+                admin: User = Depends(get_actor)):
     repo = db.scalar(select(GitRepository).where(GitRepository.name == name))
     if not repo:
         raise HTTPException(404, "repository not found")
+    from ..repository_access import require
+    require(db,admin,"repositories.remove",repo)
     if db.scalar(select(Workload).where(Workload.repo_id == repo.id, Workload.status != "stopped")):
         raise HTTPException(409, "undeploy the programs deployed from this repository first")
     db.delete(repo)
@@ -101,13 +119,15 @@ def list_repos(db: Session = Depends(get_db), secrets: SecretStore = Depends(get
                user: User = Depends(get_actor)):
     """Repositories you may deploy from."""
     repos = db.scalars(select(GitRepository).order_by(GitRepository.name))
-    return [_repo_out(r, secrets) for r in repos if _can_deploy_from(r, user, db)]
+    return [_repo_out(r,secrets,user) for r in repos if _can_deploy_from(r, user, db)]
 
 
 @router.get("/repos/{repo_id}/branches", response_model=List[BranchOut])
 def repo_branches(repo_id: str, db: Session = Depends(get_db), secrets: SecretStore = Depends(get_secret_store),
                   user: User = Depends(get_actor)):
     repo = _repo(db, repo_id, user)
+    from ..repository_access import require
+    require(db,user,"repositories.branches.read",repo)
     try:
         heads = deploying.get_git().branches(repo.url, deploying.repo_secret(secrets, repo))
     except GitError as exc:
@@ -121,6 +141,8 @@ def repo_pull(repo_id: str, branch: str, db: Session = Depends(get_db),
               secrets: SecretStore = Depends(get_secret_store), user: User = Depends(get_actor)):
     """Fetches a branch and lists the programs in its fdp.json."""
     repo = _repo(db, repo_id, user)
+    from ..repository_access import require
+    require(db,user,"repositories.pull",repo)
     try:
         commit, programs, errors = deploying.pull(deploying.get_git(), secrets, repo, branch)
     except GitError as exc:
@@ -143,7 +165,7 @@ def _can_manage(pub: Workload, user: User) -> bool:
 
 def _visible(db: Session, pub_id: str, user: User) -> Workload:
     pub = db.get(Workload, pub_id)
-    if not pub or pub.status == "stopped" or not rbac.allowed(db, user, "read", rbac.workload_resource(db, pub)):
+    if not pub or pub.status == "stopped" or not permissions.domain_allowed(db, user, "workloads.settings.read", rbac.workload_resource(db, pub), "read"):
         raise HTTPException(404, "workload not found")
     return pub
 
@@ -166,7 +188,21 @@ def pub_out(pub: Workload, user: User, with_events: bool = False) -> WorkloadOut
             execution_state = "unknown"
     elif pub.kind == "dbt":
         execution_state = "on_demand"
+    functionality = {
+        "workloads.settings.read": "read", "workloads.settings.edit": "edit",
+        "workloads.code.auto_update.set": "edit", "workloads.code.sync": "deploy",
+        "workloads.code.versions.read": "read", "workloads.code.deploy": "deploy",
+        "workloads.settings.identity.change": "identity",
+        "workloads.settings.execution_mode.change": "identity",
+        "workloads.settings.secret.bind": "identity", "workloads.settings.undeploy": "delete",
+        "workloads.execution.run": "execute", "workloads.execution.read": "execute",
+        "workloads.execution.app.open": "execute", "workloads.execution.docs.open": "execute",
+        "logs.read": "execute",
+    }
+    capabilities = [action for action, legacy in functionality.items()
+        if permissions.domain_allowed(db, user, action, resource, legacy)]
     return WorkloadOut(
+        capabilities=capabilities,
         **layers.info(db, resource),
         **owner_info(db,resource),
         execution_state=execution_state,
@@ -205,7 +241,15 @@ def create_workload(body: DeployIn, db: Session = Depends(get_db), orch: Orchest
     if not parent or parent.kind not in ("root", "folder"):
         raise HTTPException(422, "choose a workload folder")
     from ..ownership import require_create
-    require_create(db,user,parent)
+    from ..layers import selection
+    layer_id = selection(db, body.layer_id, parent)
+    if permissions.allowed(db,user,"workloads.deployments.create",parent.id,layer_id):
+        from ..ownership import owner_group
+        owner_group(db,user)
+    else:
+        require_create(db,user,parent)
+    if not permissions.allowed(db,user,"workloads.deployments.deploy",parent.id,layer_id):
+        permissions.require_domain(db,user,"workloads.deployments.deploy",parent,"deploy")
     from ..environments import check_branch
     check_branch(db, parent, body.branch)
     from ..layers import selection
@@ -241,11 +285,11 @@ def create_workload(body: DeployIn, db: Session = Depends(get_db), orch: Orchest
     if not warehouse:
         raise HTTPException(422, "choose a warehouse (no default warehouse is configured; an administrator can set one)")
     from .common import require_warehouse
-    pool = require_warehouse(db, warehouse, user)  # e.g. a team's dedicated warehouse: only its groups deploy there
+    pool = require_warehouse(db,warehouse,user,layer_id)  # e.g. a team's dedicated warehouse: only its groups deploy there
     capacity.require_scope(db, pool, layer_id, program.kind)
     worker = getattr(program.airflow_settings, "worker_warehouse", None) if program.kind == "airflow" else None
     if worker:
-        capacity.require_scope(db, require_warehouse(db, worker, user), layer_id, program.kind)
+        capacity.require_scope(db, require_warehouse(db,worker,user,layer_id), layer_id, program.kind)
 
     if existing:  # a stopped workload frees its slug
         if existing.resource_id:
@@ -294,6 +338,7 @@ def workload_versions(pub_id: str, limit: int = Query(30, ge=1, le=100), db: Ses
     """The branch's newest commits, newest first, with which one runs here and when each was deployed."""
     from ..models import WorkloadEvent
     pub = _visible(db, pub_id, user)
+    permissions.require_domain(db, user, "workloads.code.versions.read", rbac.workload_resource(db, pub), "read")
     git = deploying.get_git()
     ref = pub.latest_sha or pub.deployed_sha or f"refs/heads/{pub.branch}"
     try:
@@ -339,16 +384,26 @@ def workload_versions(pub_id: str, limit: int = Query(30, ge=1, le=100), db: Ses
 def update_workload(pub_id: str, body: WorkloadPatch, db: Session = Depends(get_db),
                        user: User = Depends(get_actor)):
     pub = _visible(db, pub_id, user)
-    if not _can_manage(pub, user):
-        raise HTTPException(403, "only the deployer or an admin can change this")
     changes = body.model_dump(exclude_none=True)
     if pub.kind == 'stream' and changes.get('execution_mode', pub.execution_mode) != 'fixed':
         raise HTTPException(422, 'Continuous streams require a fixed managed identity')
     resource = rbac.workload_resource(db, pub)
     if "allowed_groups" in changes:
         raise HTTPException(422, "manage visibility using app-group role assignments")
-    if any(k in changes for k in ("run_as", "execution_mode", "secrets", "env")):
-        rbac.require(db, user, "identity", resource)
+    field_permissions = {
+        "title": ("workloads.settings.edit", "edit"),
+        "warehouse": ("workloads.settings.edit", "edit"),
+        "auto_update": ("workloads.code.auto_update.set", "edit"),
+        "run_as": ("workloads.settings.identity.change", "identity"),
+        "execution_mode": ("workloads.settings.execution_mode.change", "identity"),
+        "secrets": ("workloads.settings.secret.bind", "identity"),
+        "env": ("workloads.settings.secret.bind", "identity"),
+    }
+    for field in changes:
+        action, legacy = field_permissions[field]
+        permissions.require_domain(db, user, action, resource, legacy)
+    if any(k in changes for k in ("run_as", "execution_mode", "env", "secrets", "warehouse")):
+        permissions.require_domain(db, user, "workloads.code.deploy", resource, "deploy")
     if "run_as" in changes:
         _identity_for(db, changes["run_as"] or None, user)
         if changes["run_as"]:
@@ -360,7 +415,7 @@ def update_workload(pub_id: str, body: WorkloadPatch, db: Session = Depends(get_
         from .common import require_warehouse
         from .. import capacity
         from ..layers import info
-        pool = require_warehouse(db, changes["warehouse"], user)
+        pool = require_warehouse(db,changes["warehouse"],user,layers.resource_layer(db,rbac.workload_resource(db,pub)))
         capacity.require_scope(db, pool, info(db, resource)["layer_id"], pub.kind)
     for field, value in changes.items():
         setattr(pub, field, value)
@@ -397,7 +452,7 @@ def sync_now(pub_id: str, db: Session = Depends(get_db), orch: Orchestrator = De
              secrets: SecretStore = Depends(get_secret_store), user: User = Depends(get_actor)):
     """Check the branch for new commits right away (the GitOps loop also does this periodically)."""
     pub = _visible(db, pub_id, user)
-    rbac.require(db, user, "deploy", rbac.workload_resource(db, pub))
+    permissions.require_domain(db, user, "workloads.code.sync", rbac.workload_resource(db, pub), "deploy")
     pub.failed_sha = None  # an explicit check retries a commit that failed before
     target = deploying.check(db, orch, secrets, pub)
     if target:
@@ -410,7 +465,7 @@ def sync_now(pub_id: str, db: Session = Depends(get_db), orch: Orchestrator = De
 def undeploy(pub_id: str, db: Session = Depends(get_db), orch: Orchestrator = Depends(get_orchestrator),
               user: User = Depends(get_actor)):
     pub = _visible(db, pub_id, user)
-    rbac.require(db, user, "delete", rbac.workload_resource(db, pub))
+    permissions.require_domain(db, user, "workloads.settings.undeploy", rbac.workload_resource(db, pub), "delete")
     for ref in {pub.execution_ref, *(pub.execution_refs or [])}:
         if ref:
             orch.stop(ref, grace_seconds=5)
@@ -426,7 +481,7 @@ def undeploy(pub_id: str, db: Session = Depends(get_db), orch: Orchestrator = De
 @router.post("/workloads/{pub_id}/open", response_model=OpenOut)
 def open_workload(pub_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     pub = _visible(db, pub_id, user)
-    rbac.require(db, user, "execute", rbac.workload_resource(db, pub))
+    permissions.require_domain(db, user, "workloads.execution.docs.open" if pub.kind == "dbt" else "workloads.execution.app.open", rbac.workload_resource(db, pub), "execute")
     if pub.kind not in ("app", "airflow", "dbt") or pub.status != "live":
         raise HTTPException(409, "only live apps, Airflow deployments and dbt docs can be opened")
     ticket = mint_token("ticket", user.username, 60, target=f"p:{pub.slug}", groups=user.groups, pid=user.principal_id)
@@ -438,7 +493,7 @@ def orchestrator_runs(pub_id: str, limit: int = Query(5, ge=1, le=25), dag_id: s
                       db: Session = Depends(get_db), user: User = Depends(get_actor),
                       store: SecretStore = Depends(get_secret_store)):
     pub = _visible(db, pub_id, user)
-    rbac.require(db, user, "execute", rbac.workload_resource(db, pub))
+    permissions.require_domain(db, user, "workloads.execution.read", rbac.workload_resource(db, pub), "execute")
     if pub.kind != "airflow":
         raise HTTPException(409, "this workload is not an orchestrator")
     from ..airflow_history import recent_runs
@@ -469,7 +524,7 @@ def _start_deployed(db: Session, orch: Orchestrator, pub: Workload, user: User, 
     from ..programs import Program
     from ..executions import with_workload_settings
 
-    rbac.require(db, user, "execute", rbac.workload_resource(db, pub))
+    permissions.require_domain(db, user, "workloads.execution.run", rbac.workload_resource(db, pub), "execute")
     viewer = user
     initiator, initiator_id = user.username, user.principal_id
     if pub.execution_mode == "fixed":

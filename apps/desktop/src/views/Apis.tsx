@@ -89,7 +89,8 @@ function ValuesEditor({ label, values, onChange, errors, prefix, namePlaceholder
 const cleanValues = (values: ApiValue[]) => values.filter((v) => v.name.trim()).map((v) => ({ ...v, secret: v.secret.trim() }));
 
 /** The API's own settings: caller authentication (internal) or the backend (external). Used to create and edit. */
-function ApiSettingsForm({ initial, creating, onSave, onCancel, layers, layerId }: {
+function ApiSettingsForm({ initial, creating, onSave, onCancel, layers, layerId, canChangeTrust = true, canChangeCredentials = true }: {
+  canChangeTrust?: boolean; canChangeCredentials?: boolean;
   initial: ApiInput; creating: boolean; layers: Layer[]; layerId: string; onSave: (body: ApiInput) => Promise<void>; onCancel?: () => void;
 }) {
   const [form, setForm] = useState<ApiInput>({ ...initial, layer_id: initial.layer_id || layerId || defaultLayerId(layers) });
@@ -133,13 +134,13 @@ function ApiSettingsForm({ initial, creating, onSave, onCancel, layers, layerId 
           onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} />
         <FieldError errors={errors} name="slug" hint={internal ? `Callers use …/gw/${form.slug || "<address>"}` : `Programs call fdp.api("${form.slug || "<address>"}")`} /></div>
       <div className="field"><label htmlFor="api-protocol">Protocol</label>
-        <select id="api-protocol" value={form.protocol} onChange={(e) => setForm({ ...form, protocol: e.target.value as "rest" | "soap" })}>
+        <select id="api-protocol" disabled={!canChangeTrust} value={form.protocol} onChange={(e) => setForm({ ...form, protocol: e.target.value as "rest" | "soap" })}>
           <option value="rest">REST (JSON)</option><option value="soap">SOAP (XML)</option></select></div>
       <div className="field"><label htmlFor="api-description">Description</label>
         <input id="api-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
     </div>
 
-    {internal ? <>
+    {internal ? <fieldset disabled={!canChangeTrust}>
       <h3>Caller authentication</h3>
       <p className="hint" style={{ marginTop: -4 }}>Every call must pass each enabled check. At least one is required, unless anonymous callers are allowed for testing.</p>
       <FieldError errors={errors} name="inbound.auth" />
@@ -164,13 +165,14 @@ function ApiSettingsForm({ initial, creating, onSave, onCancel, layers, layerId 
       </fieldset>
       {form.protocol === "soap" && <div className="field" style={{ maxWidth: 260 }}><label htmlFor="soap-version">SOAP version</label>
         <select id="soap-version" value={inbound.soap_version} onChange={(e) => setIn({ soap_version: e.target.value as "1.1" | "1.2" })}><option value="1.1">1.1</option><option value="1.2">1.2</option></select></div>}
-    </> : <>
+    </fieldset> : <>
       <h3>Backend</h3>
       <div className="arg-grid">
-        <div className="field" style={{ gridColumn: "span 2" }}><label htmlFor="out-url">Base URL *</label><input id="out-url" className="mono" value={outbound.base_url} placeholder="https://api.crm.example/v2" onChange={(e) => setOut({ base_url: e.target.value })} /><FieldError errors={errors} name="outbound.base_url" /></div>
+        <div className="field" style={{ gridColumn: "span 2" }}><label htmlFor="out-url">Base URL *</label><input id="out-url" disabled={!canChangeTrust} className="mono" value={outbound.base_url} placeholder="https://api.crm.example/v2" onChange={(e) => setOut({ base_url: e.target.value })} /><FieldError errors={errors} name="outbound.base_url" /></div>
         <div className="field"><label htmlFor="out-timeout">Timeout (s)</label><input id="out-timeout" type="number" min={1} max={120} value={outbound.timeout_seconds} onChange={(e) => setOut({ timeout_seconds: Number(e.target.value) })} /></div>
         {form.protocol === "soap" && <div className="field"><label htmlFor="out-soap">SOAP version</label><select id="out-soap" value={outbound.soap_version} onChange={(e) => setOut({ soap_version: e.target.value as "1.1" | "1.2" })}><option value="1.1">1.1</option><option value="1.2">1.2</option></select></div>}
       </div>
+      <fieldset disabled={!canChangeCredentials}>
       <h3>Authentication</h3>
       <div className="arg-grid">
         <div className="field"><label htmlFor="out-auth">Type</label><select id="out-auth" value={outbound.auth.type} onChange={(e) => setOut({ auth: { ...outbound.auth, type: e.target.value as OutboundConfig["auth"]["type"] } })}>
@@ -181,7 +183,7 @@ function ApiSettingsForm({ initial, creating, onSave, onCancel, layers, layerId 
         </>}
         {outbound.auth.type === "basic" && <div className="field"><label htmlFor="out-user">Username</label><input id="out-user" value={outbound.auth.username} onChange={(e) => setOut({ auth: { ...outbound.auth, username: e.target.value } })} /><FieldError errors={errors} name="outbound.auth.username" /></div>}
         {outbound.auth.type === "oauth2" && <>
-          <div className="field"><label htmlFor="out-token-url">Token URL</label><input id="out-token-url" className="mono" value={outbound.auth.token_url} onChange={(e) => setOut({ auth: { ...outbound.auth, token_url: e.target.value } })} /><FieldError errors={errors} name="outbound.auth.token_url" /></div>
+          <div className="field"><label htmlFor="out-token-url">Token URL</label><input id="out-token-url" disabled={!canChangeTrust} className="mono" value={outbound.auth.token_url} onChange={(e) => setOut({ auth: { ...outbound.auth, token_url: e.target.value } })} /><FieldError errors={errors} name="outbound.auth.token_url" /></div>
           <div className="field"><label htmlFor="out-client-id">Client ID</label><input id="out-client-id" className="mono" value={outbound.auth.client_id} onChange={(e) => setOut({ auth: { ...outbound.auth, client_id: e.target.value } })} /><FieldError errors={errors} name="outbound.auth.client_id" /></div>
           <div className="field"><label htmlFor="out-scope">Scope</label><input id="out-scope" className="mono" value={outbound.auth.scope} onChange={(e) => setOut({ auth: { ...outbound.auth, scope: e.target.value } })} /></div>
         </>}
@@ -191,14 +193,17 @@ function ApiSettingsForm({ initial, creating, onSave, onCancel, layers, layerId 
       <h3>Headers and query</h3>
       <ValuesEditor label="Headers" prefix="outbound.headers" namePlaceholder="X-Tenant" values={outbound.headers} errors={errors} onChange={(headers) => setOut({ headers })} />
       <ValuesEditor label="Query parameters" prefix="outbound.query" namePlaceholder="api-version" values={outbound.query} errors={errors} onChange={(query) => setOut({ query })} />
+      </fieldset>
+      <fieldset disabled={!canChangeTrust}>
       <h3>TLS</h3>
       <div className="arg-grid">
-        <div className="field"><label htmlFor="out-client-cert">Client certificate (mTLS)</label><SecretSelect id="out-client-cert" kind="certificate" needsKey value={outbound.client_certificate} onChange={(v) => setOut({ client_certificate: v })} placeholder="None" />
-          <FieldError errors={errors} name="outbound.client_certificate" hint="Presented to the backend; needs a private key." /></div>
+        <fieldset disabled={!canChangeCredentials} className="field"><label htmlFor="out-client-cert">Client certificate (mTLS)</label><SecretSelect id="out-client-cert" kind="certificate" needsKey value={outbound.client_certificate} onChange={(v) => setOut({ client_certificate: v })} placeholder="None" />
+          <FieldError errors={errors} name="outbound.client_certificate" hint="Presented to the backend; needs a private key." /></fieldset>
         <div className="field"><label htmlFor="out-server-ca">Trusted server CA</label><SecretSelect id="out-server-ca" kind="certificate" value={outbound.server_ca} onChange={(v) => setOut({ server_ca: v })} placeholder="Public CAs" />
           <FieldError errors={errors} name="outbound.server_ca" hint="For backends with a private CA." /></div>
       </div>
       {!outbound.server_ca && <label className="row"><input type="checkbox" checked={!outbound.verify_tls} onChange={(e) => setOut({ verify_tls: !e.target.checked })} />Skip certificate verification (test backends only)</label>}
+      </fieldset>
       <h3>Pass-through</h3>
       <div className="arg-grid">
         <div className="field"><label htmlFor="out-pass-req">Request headers from programs</label><input id="out-pass-req" className="mono" value={text.passRequest} placeholder="X-Correlation-Id, Accept-Language" onChange={(e) => setText({ ...text, passRequest: e.target.value })} />
@@ -294,7 +299,7 @@ export function ApiView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; openTab:
           (and data roles if they run in caller mode), or use app-group grants.</p>
         <div className="form-actions"><button className="btn secondary" onClick={() => openTab({ kind: "access", title: "Groups" })}>Bind to an app group</button></div>
       </section>}
-      {item.actions.includes("edit") ? <ApiSettingsForm layers={hub.layers} layerId={hub.layerId} key={item.id} creating={false} initial={toInput(item)} onSave={async (body) => { setItem(await api.apis.update(item.id, body)); await hub.refresh(); }} />
+      {(item.capabilities?.includes("apis.object.apply") ?? item.actions.includes("edit")) ? <ApiSettingsForm canChangeTrust={item.capabilities?.includes("apis.object.trust.change") ?? item.actions.includes("identity")} canChangeCredentials={item.capabilities?.includes("apis.object.credentials.change") ?? item.actions.includes("identity")} layers={hub.layers} layerId={hub.layerId} key={item.id} creating={false} initial={toInput(item)} onSave={async (body) => { setItem(await api.apis.update(item.id, body)); await hub.refresh(); }} />
         : <p className="notice">You can view this API; changing its settings requires the Contributor role.</p>}
     </>}
     {section === "calls" && <CallsPanel item={item} />}

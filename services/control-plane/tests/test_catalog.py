@@ -9,7 +9,7 @@ from app.auth import User, mint_token
 from app.db import SessionLocal
 from app.models import Workload, Resource, CatalogAsset, Run, ComputePool, LineageEdge, CatalogImport, utcnow
 from .conftest import as_
-from .rbac_helpers import grant_group
+from .rbac_helpers import grant_group, select_group
 from .test_deploying import repo, deploy  # noqa: F401
 
 
@@ -128,6 +128,7 @@ def test_governance_and_sla_cannot_promote_contributors_or_change_iam(client, re
     _, rid = register(client, repo)
     a = asset(client, rid)
     gid = grant_group(client, rid, 'Product editors', 'Contributor', users=['bob'])
+    select_group(client, 'bob', gid)
     path = f"/v1/catalog/assets/{a['id']}"
     doc = {'description': 'Monthly revenue', 'domain': 'Finance', 'tags': ['revenue']}
     assert client.put(path + '/governance', headers=as_('bob'), json=doc).status_code == 200

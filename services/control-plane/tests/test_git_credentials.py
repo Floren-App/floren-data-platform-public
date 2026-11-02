@@ -21,6 +21,8 @@ def credential(client, ws_id, headers, host="github.com", protocol="https"):
 
 
 def save(client, user="ana", **fields):
+    from .rbac_helpers import git_permissions
+    git_permissions(client,user)
     body = {"host": "github.com", "username": f"{user}-gh", "token": TOKEN, **fields}
     r = client.post("/v1/me/git-credentials", headers=as_(user), json=body)
     assert r.status_code == 201, r.text
@@ -113,8 +115,12 @@ def test_only_git_in_your_own_running_editor_gets_your_token(client):
 def test_tokens_saved_per_host_before_labels_still_work(client):
     from app.db import SessionLocal
     from app.models import GitCredential
+    from app import rbac
+    from app.auth import User
+    client.get('/v1/me',headers=as_('ana'))
     with SessionLocal() as db:
-        row = GitCredential(owner="ana", label="github.com", host="github.com", username="ana-gh")
+        row = GitCredential(owner="ana", principal_id=rbac.resolve_user(db,User('ana')).principal_id,
+            legacy_token_allowed=True,label="github.com", host="github.com", username="ana-gh")
         db.add(row)
         db.commit()
     deps.get_secret_store().put(git_credentials.legacy_path("ana", "github.com"), {"token": TOKEN})
@@ -136,3 +142,32 @@ def test_template_repositories_are_cloned_at_first_start(client):
     assert ws["layer_id"] == layers.NON_PROD
     own = workspace(client, "ana")                     # workspaces without a template clone nothing
     assert "FDP_GIT_CLONE" not in execution_token(own["id"])[0].env
+
+
+def test_reused_username_cannot_inherit_private_credentials(client,monkeypatch):
+    from app import rbac,secret_access
+    from app.auth import User
+    from app.db import SessionLocal
+    from app.models import DirectoryPrincipal,GitCredential
+    from .conftest import USERS
+    from .rbac_helpers import secret_permissions,git_permissions
+    secret_permissions(client,'ana')
+    credential_row=save(client)
+    client.put('/v1/secrets/user/me/private',headers=as_('ana'),json={'value':'old-identity-secret'}).raise_for_status()
+    with SessionLocal() as db:
+        replacement=DirectoryPrincipal(kind='user',provider='local',external_id='replacement',name='ana')
+        db.add(replacement);db.flush();pid=replacement.id;db.commit()
+    monkeypatch.setitem(USERS,'ana',User('ana',principal_id=pid))
+    secret_permissions(client,'ana')
+    git_permissions(client,'ana')
+    assert client.get('/v1/secrets',headers=as_('ana')).json()==[]
+    assert client.get('/v1/me/git-credentials',headers=as_('ana')).json()==[]
+    assert client.put('/v1/secrets/user/me/private',headers=as_('ana'),json={'value':'new'}).status_code==403
+    assert client.put('/v1/me/git-credentials/'+credential_row['id'],headers=as_('ana'),json={'host':'github.com','username':'new'}).status_code==404
+    with SessionLocal() as db:
+        user=rbac.resolve_user(db,USERS['ana'])
+        assert not secret_access.allowed(db,user,'secrets.use','user','ana','private')
+        new=GitCredential(owner='ana',principal_id=pid,host='github.com',username='new')
+        db.add(new);db.flush()
+        deps.get_secret_store().put(git_credentials.legacy_path('ana','github.com'),{'token':'old-host-token'})
+        assert git_credentials.token(deps.get_secret_store(),new) is None

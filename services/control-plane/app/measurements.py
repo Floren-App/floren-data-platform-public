@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, delete
 
 from . import catalog as c, layers, rbac
+from .authorization_cache import cached
 from .models import CatalogAsset, DatasetObservation, LineageEdge, MetricDefinition, MetricDefinitionRevision, MetricObservation, Resource, utcnow
 
 
@@ -92,10 +93,11 @@ def observe(db, metric, value, at=None, origin='reported', key=None, run_id='', 
 def dependencies_visible(db, user, asset_ids, browsing=False):
     if not asset_ids:
         return True
-    _, allowed = c.readable_resources(db, user, browsing=browsing)
-    dependencies = dict(db.execute(select(CatalogAsset.id, CatalogAsset.resource_id).where(
-        CatalogAsset.id.in_(asset_ids))).all())
-    return all(dependencies.get(ident) in allowed for ident in asset_ids)
+    resources, allowed = c.readable_resources(db, user, browsing=browsing)
+    from .object_access import asset_visible
+    dependencies = {a.id:a for a in db.scalars(select(CatalogAsset).where(CatalogAsset.id.in_(asset_ids)))}
+    return all(ident in dependencies and dependencies[ident].resource_id in allowed and
+        asset_visible(db, user, dependencies[ident], resources[dependencies[ident].resource_id]) for ident in asset_ids)
 
 
 def validate_dependencies(db, user, asset, identities):
@@ -112,11 +114,69 @@ def observation_out(row):
     return {k: getattr(row, k) for k in ('id', 'observed_at', 'value', 'status', 'definition_version', 'origin', 'run_id', 'revision', 'detail')}
 
 
-def metric_out(db, row):
+@cached
+def observation_authority(db,user):
+    from .data_access import snapshot
+    from .object_access import snapshot as named_snapshot
+    from .data_policies import admission_snapshot
+    user=rbac.resolve_user(db,user)
+    access,named=snapshot(db,user),named_snapshot(db,user)
+    return access,named,admission_snapshot(db,user,access,named)
+
+
+def observations_readable(db,user,metric):
+    """Shared cached values cannot bypass row/column policies or metadata-only grants."""
+    from .models import DataSource
+    from .object_access import actions_for,file_actions
+    from .permissions import domain_allowed
+    user=rbac.resolve_user(db,user)
+    access,named,privacy=observation_authority(db,user)
+    pending=list(metric.definition.get('dependencies') or [metric.asset_id]);seen=set()
+    while pending:
+        ident=pending.pop()
+        if ident in seen:
+            continue
+        seen.add(ident)
+        asset=db.get(CatalogAsset,ident)
+        resource=db.get(Resource,asset.resource_id) if asset else None
+        if not resource or len(seen)>1000:
+            return False
+        dependencies=asset.attributes.get('dependency_asset_ids',[])
+        if dependencies:
+            pending.extend(dependencies)
+            continue
+        if resource.kind!='schema':
+            if not domain_allowed(db,user,'metrics.read',resource,'execute'):
+                return False
+            continue
+        source=db.get(DataSource,resource.object_id)
+        if not source:
+            return False
+        rules=named.get(source.id,{}).get(resource.name,{})
+        legacy=access.get(source.id,{}).get(resource.name)
+        path=asset.attributes.get('object_path') or asset.attributes.get('table') or (
+            asset.name if asset.kind in ('table','view','materialized_view','file','folder') else '')
+        if source.kind=='s3':
+            if not legacy and 'data.files.read' not in file_actions(rules,path):
+                return False
+            continue
+        if not legacy and 'data.sql.select' not in actions_for(rules,path):
+            return False
+        policies=privacy.get(source.id,{}).get('policies',{})
+        if path:
+            if policies.get(resource.name+'.'+path):
+                return False
+        elif any(key.startswith(resource.name+'.') for key in policies):
+            return False
+    return True
+
+
+def metric_out(db, row, user=None):
+    permitted=user is None or observations_readable(db,user,row)
     latest = db.scalar(select(MetricObservation).where(MetricObservation.metric_id == row.id)
-                       .order_by(MetricObservation.observed_at.desc(), MetricObservation.id.desc()).limit(1))
+                       .order_by(MetricObservation.observed_at.desc(), MetricObservation.id.desc()).limit(1)) if permitted else None
     return {k: getattr(row, k) for k in ('id', 'asset_id', 'key', 'name', 'kind', 'description', 'unit', 'origin', 'definition', 'version', 'enabled', 'updated_at')} | {
-        'latest': observation_out(latest) if latest else None}
+        'latest': observation_out(latest) if latest else None, 'observations_restricted':not permitted, 'capabilities':metric_capabilities(db,user,row) if user else []}
 
 
 def dbt_results(db, logical, physical, definitions, results, revision='', run_id='', producer_id='', program_name='', observation_user=None, access_snapshot=None):
@@ -172,3 +232,10 @@ def dbt_results(db, logical, physical, definitions, results, revision='', run_id
             evidence=(execution_at.isoformat() if execution_at else metadata.get('invocation_id') or metadata.get('generated_at') or digest(result.get('status'),value))
             observe(db, metric, value, at, origin='dbt', key=digest(uid,evidence,result.get('status')),
                     run_id=run_id, revision=revision, detail={'dbt_status': result.get('status'), 'execution_seconds': result.get('execution_time')}, result_status=state)
+
+
+def metric_capabilities(db,user,row):
+    from .catalog import asset_capabilities
+    asset=db.get(CatalogAsset,row.asset_id)
+    resource=db.get(Resource,asset.resource_id) if asset else None
+    return asset_capabilities(db,user,asset,resource) if resource else []

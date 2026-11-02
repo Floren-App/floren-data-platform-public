@@ -80,6 +80,9 @@ nav:
       - Layers and isolation: layers.md
       - Secrets and certificates: secrets-and-certificates.md
       - Operations and recovery: kubernetes-operations.md
+      - Data object permissions: data-object-permissions.md
+      - Platform backup and recovery: platform-recovery.md
+      - Metadata upgrades: metadata-upgrades.md
       - Shared system database: shared-system-data.md
       - Layer infrastructure reference: layer-infrastructure.md
       - Troubleshooting: troubleshooting.md

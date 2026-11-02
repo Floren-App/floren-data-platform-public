@@ -45,3 +45,32 @@ def integration(name, kind, secrets=None, **config):
               's3': {'provisioner_secret': {'access_key_id': 'fdp', 'secret_access_key': 'fdp-secret'}},
               'iceberg': {}}[kind]
     return {'name': name, 'kind': kind, 'config': {**defaults, **config}, **stored, **(secrets or {})}
+
+
+def select_group(client, username, group_id):
+    response = client.put('/v1/me/active-group', headers=as_(username), json={'group_id': group_id})
+    assert response.status_code == 200, response.text
+
+
+def workspace_permissions(client,group_id):
+    for namespace in ('workspaces','runs','artifacts','logs'):
+        response=client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+            'target_id':'workspaces','namespace':namespace,'layer_id':'*',
+            'app_group_id':group_id,'role':'Admin'})
+        assert response.status_code==201,response.text
+
+
+def secret_permissions(client,username,scope='user',owner=None,group_id=None):
+    pid=client.get('/v1/me',headers=as_(username)).json()['principal_id']
+    for namespace in ('secrets','certificates'):
+        result=client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+            'target_id':'secret:'+scope+':'+(owner or username),'namespace':namespace,
+            **({'app_group_id':group_id} if group_id else {'principal_id':pid}),
+            'role':'Owner' if namespace=='certificates' else 'Admin'})
+        assert result.status_code==201,result.text
+
+
+def git_permissions(client,username):
+    pid=client.get('/v1/me',headers=as_(username)).json()['principal_id']
+    client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+        'target_id':'git-credentials','namespace':'git.credentials','principal_id':pid,'role':'Owner'}).raise_for_status()

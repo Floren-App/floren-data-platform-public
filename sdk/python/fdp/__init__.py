@@ -21,7 +21,7 @@ from typing import Any, Dict, List, NamedTuple, Optional
 import httpx
 
 __all__ = ["kafka", "log", "api", "certificate", "args", "output_dir", "connect", "credentials", "sources", "run", "run_program", "runs", "programs",
-           "query", "orchestrate", "run_logs", "run_status", "stop_run", "files",
+           "query", "orchestrate", "run_logs", "run_status", "stop_run", "files", "files_object",
            "measure_metric", "report_metric", "observe_dataset"]
 
 
@@ -225,6 +225,20 @@ def files(name: str, token: Optional[str] = None, *, viewer_token: Optional[str]
         info = {**info, "config": {"endpoint_url": cfg.get("s3_endpoint"), "region": cfg.get("region"),
                                    "bucket": bucket, "prefix": prefix}}
     return Files(info)
+
+
+def files_object(object_id: str, mode: str = "read", token: Optional[str] = None) -> Any:
+    """S3 client rooted at one registered file/directory, with server-enforced STS scope.
+
+    Directories use relative paths. For an individual file, use an empty path, e.g.
+    files_object(id).read_text(""). Write mode requires both create and overwrite;
+    delete and listing are separately authorized. No static credential fallback.
+    """
+    from .lake import Files
+    with _client(token) as client:
+        response = client.post("/v1/data-objects/"+object_id+"/session", json={"mode":mode})
+        response.raise_for_status()
+        return Files(response.json())
 
 
 def query(source: str, sql: str, parameters=None, *, viewer_token: Optional[str] = None,

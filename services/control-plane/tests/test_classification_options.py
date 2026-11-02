@@ -51,6 +51,76 @@ def scope_for(user):
         return product_options.attach(db, caller, {"finance_dw": {"source_id": source.id, "kind": "postgres", "schemas": {"public": "Reader"}}})
 
 
+def masked_sales(client,repo):
+    ids=setup_products(client,repo)
+    response=client.post('/v1/catalog/products',headers=as_('ana'),json={
+        'title':'Masked sales','asset_ids':[ids['sales']], 'options':[{'name':'Masked','default':True,
+        'masks':[{'table':'sales','column':'email','method':'hash'}]}]})
+    assert response.status_code==201,response.text
+    product=response.json()
+    with SessionLocal() as db:
+        group=db.scalar(select(AppGroup).where(AppGroup.name=='Deployed executors')).id
+    client.put('/v1/catalog/products/'+product['id']+'/consumers/'+group,
+        headers=as_('ana'),json={}).raise_for_status()
+    return ids,product,group
+
+
+def test_metadata_role_cannot_remove_product_option_masks(client,repo):
+    ids,_,group=masked_sales(client,repo)
+    for role in ('Viewer','Manager'):
+        client.put('/v1/rbac/resources/'+ids['public']+'/assignments',headers=as_('admin'),
+            json={'app_group_id':group,'role':role}).raise_for_status()
+        assert scope_for('bob')['finance_dw']['policies']['public.sales']['masks']['email']['method']=='hash'
+
+
+def test_admitted_job_keeps_product_masks_after_live_access_is_revoked(client,repo,monkeypatch):
+    from app import sql_access
+    from app.auth import Execution
+    from app.models import Resource,Run
+    from app.environments import execution_user
+    from .test_api import start_workspace
+    ids,product,group=masked_sales(client,repo)
+    with SessionLocal() as db:
+        schema=db.get(Resource,ids['public']);schema.config={**schema.config,'state':'ready'};db.commit()
+    workspace=start_workspace(client,user='bob')
+    response=client.post('/v1/runs',headers=as_('bob'),json={
+        'workspace_id':workspace,'pool':'small','kind':'script','entrypoint':'analysis.py'})
+    assert response.status_code==201,response.text
+    ident=response.json()['id']
+    client.delete('/v1/catalog/products/'+product['id']+'/consumers/'+group,headers=as_('ana')).raise_for_status()
+    monkeypatch.setattr(sql_access,'check_native_relations',lambda query:None)
+    with SessionLocal() as db:
+        run=db.get(Run,ident)
+        actor=rbac.resolve_user(db,execution_user(db,{'sub':'bob','pid':run.principal_id,'run':ident}))
+        query=sql_access.admit(db,sql_access.SqlActor(actor,'test',execution=Execution(
+            username='bob',groups=[],workspace_id=workspace,run_id=ident,principal_id=actor.principal_id)), 'finance_dw')
+        assert query.scope['finance_dw']['policies']['public.sales']['masks']['email']['method']=='hash'
+
+
+def test_cached_metrics_cannot_bypass_product_masks_or_metadata_only_access(client,repo):
+    ids,_,group=masked_sales(client,repo)
+    response=client.post('/v1/catalog/assets/'+ids['sales']+'/metrics',headers=as_('admin'),json={
+        'key':'private-total','name':'Private total','kind':'kpi'})
+    assert response.status_code==201,response.text
+    metric=response.json()
+    base='/v1/catalog/assets/'+ids['sales']+'/metrics'
+    client.post(base+'/'+metric['id']+'/observations',headers=as_('admin'),
+        json={'value':987654.321,'idempotency_key':'sensitive-total'}).raise_for_status()
+    client.put('/v1/rbac/resources/'+ids['public']+'/assignments',headers=as_('admin'),
+        json={'app_group_id':group,'role':'Viewer'}).raise_for_status()
+    response=client.get(base,headers=as_('bob'))
+    assert response.status_code==200,response.text
+    assert response.json()[0]['latest'] is None
+    assert response.json()[0]['observations_restricted']
+    assert '987654.321' not in response.text
+    assert client.get(base+'/'+metric['id']+'/history',headers=as_('bob')).status_code==403
+    # An explicit, unfiltered schema read grants these values as well as SQL rows.
+    client.put('/v1/rbac/resources/'+ids['public']+'/assignments',headers=as_('admin'),
+        json={'app_group_id':group,'role':'Executor'}).raise_for_status()
+    response=client.get(base,headers=as_('bob'))
+    assert response.json()[0]['latest']['value']==987654.321
+
+
 def test_options_mask_what_consumers_see_and_set_the_level(client, repo):  # noqa: F811
     ids = setup_products(client, repo)
     classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}, "amount": {"classification": "internal"}})

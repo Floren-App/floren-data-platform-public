@@ -18,6 +18,24 @@ def new_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
+class PlatformBackup(Base):
+    """Recovery archive inventory. Credentials and plaintext artifacts never live here."""
+    __tablename__ = "platform_backups"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    actor: Mapped[str] = mapped_column(String(256))
+    status: Mapped[str] = mapped_column(String(32), default="queued")
+    object_key: Mapped[str] = mapped_column(String(1024), default="")
+    bucket: Mapped[str] = mapped_column(String(255), default="")
+    sha256: Mapped[str] = mapped_column(String(64), default="")
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    error: Mapped[str] = mapped_column(String(256), default="")
+    # Frozen destination prevents a later config update redirecting a queued archive.
+    destination: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
 class DataSource(Base):
     """An admin-registered data source. Secrets live in OpenBao, never in this table."""
 
@@ -202,6 +220,8 @@ class GitCredential(Base):
     """A person's own Git token for a host (several per host are fine, e.g. work and personal), with the name
     and email to commit as. The token itself lives in the secret store, never in a workspace."""
     __tablename__ = "git_credentials"
+    legacy_token_allowed: Mapped[bool] = mapped_column(default=False)
+    principal_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
     owner: Mapped[str] = mapped_column(String(128), index=True)
     label: Mapped[str] = mapped_column(String(64), default="")
@@ -282,6 +302,8 @@ class Run(Base):
     initiator_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
     initiated_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     access_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    named_access_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    sql_policy_snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     primary_create_snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     primary_group_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
     environment_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
@@ -374,6 +396,7 @@ class SecretEntry(Base):
     """Metadata of a secret value in OpenBao. Scope: a user (private), a group or a service account."""
 
     __tablename__ = "secret_entries"
+    owner_principal_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
     __table_args__ = (UniqueConstraint("scope", "owner", "name"),)
 
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
@@ -632,6 +655,7 @@ class KafkaSession(Base):
     mode: Mapped[str] = mapped_column(String(16))
     consumer_group: Mapped[str] = mapped_column(String(256), default='')
     execution_context: Mapped[str] = mapped_column(String(64), default='')
+    active_group_id: Mapped[str] = mapped_column(String(12), default='')
     expires_at: Mapped[int] = mapped_column(Integer, index=True)
 
 
