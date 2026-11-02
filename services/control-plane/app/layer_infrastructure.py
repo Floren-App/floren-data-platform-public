@@ -341,7 +341,12 @@ def configure(db, layer_id, change, retry=False):
             if layer.config.get('production') and change.spec.kafka.replicas < 3:
                 raise HTTPException(422, 'Production Kafka requires at least three replicas')
     if current.get('kafka', {}).get('image'):
-        if any(current['kafka'].get(k) != desired['kafka'].get(k) for k in ('image', 'warehouse')) and not desired['kafka']['running']:
+        # A stopped broker can stage a newer image for its next start. A stop
+        # transition retains the running image; warehouse/storage/quorum changes
+        # remain separate operations.
+        stopping_image_change = current['kafka']['running'] and current['kafka'].get('image') != desired['kafka'].get('image')
+        warehouse_change = current['kafka'].get('warehouse') != desired['kafka'].get('warehouse')
+        if not desired['kafka']['running'] and (stopping_image_change or warehouse_change):
             raise HTTPException(409, 'Stopping Kafka retains its image and warehouse configuration')
         if any(current['kafka'][k] != desired['kafka'][k] for k in ('storage_class','size','replicas')):
             raise HTTPException(409, 'Kafka storage and quorum changes require an explicit migration')

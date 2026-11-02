@@ -704,7 +704,8 @@ def assign(resource_id: str, body: AssignmentIn, db: Session = Depends(get_db), 
         if not principal or not principal.active or principal.kind not in ("service", "user"):
             raise HTTPException(422, "choose an active user or service identity")
         from ..environments import principal_environment, resource_environment
-        if principal.kind == "service" and principal_environment(db, principal.id) != resource_environment(db, r):
+        shared_package = r.kind in ("package-root", "package") and not layers.explicit_layer(db, r)
+        if principal.kind == "service" and not shared_package and principal_environment(db, principal.id) != resource_environment(db, r):
             raise HTTPException(422, "service and resource must belong to the same layer")
         model, recipient = ServiceRoleAssignment, {"principal_id": principal.id}
         condition = ServiceRoleAssignment.principal_id == principal.id

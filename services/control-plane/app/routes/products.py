@@ -435,7 +435,10 @@ def _hold_new_objects(db, product, before) -> None:
 def _set_members(db, product, parts):
     db.execute(delete(CatalogProductMember).where(CatalogProductMember.product_id == product.id))
     db.flush()
-    for i, (asset, _) in enumerate(parts):
+    from ..object_access import target_for_asset
+    for i, (asset, schema) in enumerate(parts):
+        if schema.kind == 'schema':
+            target_for_asset(db, asset, schema, create=True)
         db.add(CatalogProductMember(product_id=product.id, asset_id=asset.id, position=i))
     product.asset_id, product.resource_id = parts[0][0].id, parts[0][1].id
     product.layer_id = layers.info(db, parts[0][1])["layer_id"]

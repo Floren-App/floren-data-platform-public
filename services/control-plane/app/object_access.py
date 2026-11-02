@@ -209,16 +209,33 @@ def ensure_target(db, parent, kind, name, create=True):
         name = parts[-1]
     ident = hashlib.sha256((parent.id+'\0'+kind+'\0'+name).encode()).hexdigest()[:12]
     row = db.get(Resource, ident)
-    if row or not create:
+    if row is not None:
+        if (row.parent_id, row.kind, row.name) != (parent.id, kind, name):
+            from fastapi import HTTPException
+            raise HTTPException(409, 'permission target identity collision')
         return row
+    if not create:
+        return None
     schema = next(r for r in rbac.ancestors(db, parent) if r.kind == 'schema')
     config = {'schema_id':schema.id}
     if kind in ('file','directory'):
         config['path'] = prefix_path(parent.config.get('path', '') if parent.kind == 'directory' else '', name)
     if kind == 'column':
         config['table'] = parent.name
-    row = Resource(id=ident, parent_id=parent.id, kind=kind, name=name, object_id=schema.object_id, config=config)
-    db.add(row); db.flush()
+    # Concurrent readers and catalog writers may discover the same target.
+    # Resolve only the deterministic primary-key conflict, without rolling back
+    # other work or swallowing unrelated constraint failures.
+    if db.get_bind().dialect.name == 'postgresql':
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+    db.execute(insert(Resource.__table__).values(id=ident, parent_id=parent.id,
+        kind=kind, name=name, object_id=schema.object_id, config=config)
+        .on_conflict_do_nothing(index_elements=['id']))
+    row = db.get(Resource, ident)
+    if row is None or (row.parent_id, row.kind, row.name, row.object_id) != (parent.id, kind, name, schema.object_id):
+        from fastapi import HTTPException
+        raise HTTPException(409, 'permission target identity collision')
     return row
 
 
