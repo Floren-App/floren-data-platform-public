@@ -270,3 +270,11 @@ moved {
   from = fdp_role_assignment.engineers_api
   to   = fdp_role_assignment.engineers_api[0]
 }
+
+# Stable targets for installation-specific least-privilege grants. No credentials.
+output "access_contract" {
+  value = {
+    workload_principals = { for name, job in fdp_workload.job : name => job.service_principal_id }
+    namespaces          = { landing = fdp_schema.landing.id, raw = fdp_schema.raw.id }
+  }
+}
