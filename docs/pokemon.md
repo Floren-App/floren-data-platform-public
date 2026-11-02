@@ -157,3 +157,11 @@ development requires an explicit override. Git credentials and personal secrets
 remain private to their stable principal even when a group receives the functions
 to manage its members' own credentials. No token-management or deletion grant is
 included in the development credential bundle.
+
+The module's `access_contract` output exposes managed workload principal IDs and
+registered namespace targets for installation-specific grants. Idempotent extraction
+reads immutable landing files to verify retries, so it needs explicit read authority
+as well as write authority. The SQL loader only needs a read grant on `load_commits`
+for its retry check; register that table with `fdp_data_object` and grant
+`data.sql.select` plus `data.queries.results.read` to the loader identity. Keep those
+read grants separate from its Contributor writes.

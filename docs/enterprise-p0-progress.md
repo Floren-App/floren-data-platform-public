@@ -38,11 +38,10 @@ and metric definition/activation/reporting are checked separately.
 
 ## Delivery boundary
 
-The P0 implementation is in source. Public publication, signed release/image CI,
-installation upgrades and applying installation-specific Terraform are delivery
-steps; these changes have not been published or deployed. Docker image construction
-cannot be verified locally while the Docker daemon is unavailable. The Dockerfile
-checks the matching PostgreSQL tools and client library during the release build.
+Release/image CI, installation upgrades and applying installation-specific Terraform
+are separate delivery steps. Track each installation's rollout and backup configuration
+in its private operational records. The release Dockerfile verifies matching PostgreSQL
+tools and their client library; the recovery CI gate exercises a real PostgreSQL restore.
 
 The 511-row matrix includes reserved design operations without a dedicated API,
 such as separate drafts, destructive infrastructure removal, custom SQL routines
