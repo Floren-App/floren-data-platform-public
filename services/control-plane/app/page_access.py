@@ -1,9 +1,11 @@
 """One page gate for every desktop tab and legacy alias."""
+from .authorization_cache import cached
 from . import permissions, rbac
 from .app_profiles import acting_as_admin
 
 # Stable page IDs. A page grant has namespace "pages", target_id equal to this ID.
 PAGES = {
+    "set-backups": "Backup and recovery",
     "home": "Home", "catalog": "Catalog", "products": "Data products", "requests": "Access requests",
     "people": "People", "set-groups": "Groups", "workspaces": "Workspaces", "runs": "Runs",
     "storage": "Storage", "kafka": "Kafka", "usage": "Usage", "workloads": "Workloads", "apis": "APIs",
@@ -24,6 +26,7 @@ FEATURE_PAGES = {
 }
 
 
+@cached
 def allowed(db, user, page, layer=None):
     if page not in PAGES:
         return False

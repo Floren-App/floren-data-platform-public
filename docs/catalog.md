@@ -109,8 +109,8 @@ and layout.
 
 Discovery follows the selected **Active group**, including inherited permissions. Search,
 suggestions, facets and lineage do not combine other groups' objects into this view.
-Select **Global Admin** to browse everything as a global administrator. Existing-object
-actions still use primary and secondary authorization; browsing is a separate filter.
+Select **Global Admin** to browse everything as a global administrator. Direct object operations use the same selected-group authority. Explicit principal grants
+remain additive. Managed service identities retain their own grants and layer boundaries.
 
 Search covers names, paths, descriptions, tags, column names/descriptions, owners,
 repository and branch. Results rank names above columns/tags, then paths and other

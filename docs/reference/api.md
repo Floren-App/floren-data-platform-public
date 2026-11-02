@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
+| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 | `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
-| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
-| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -78,6 +78,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 |---|---|---|
 | `GET` | `/v1/admin/audit` | Audit Log |
 | `GET` | `/v1/admin/datasources` | List Sources |
+| `GET` | `/v1/admin/datasources/{name}` | Read Source |
 | `PUT` | `/v1/admin/datasources/{name}` | Upsert Source |
 | `DELETE` | `/v1/admin/datasources/{name}` | Delete Source |
 | `POST` | `/v1/admin/datasources/{name}/grants` | Grant |
@@ -325,6 +326,15 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/alerts/rules/{rule_id}` | Update Rule |
 | `DELETE` | `/v1/alerts/rules/{rule_id}` | Delete Rule |
 
+## object permissions
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/data-objects` | Register |
+| `GET` | `/v1/data-objects/{ident}` | Read |
+| `DELETE` | `/v1/data-objects/{ident}` | Unregister |
+| `POST` | `/v1/data-objects/{ident}/session` | File Session |
+
 ## observability
 
 | Method | Path | Purpose |
@@ -367,6 +377,18 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/permissions/roles/{ident}` | Update Role |
 | `DELETE` | `/v1/permissions/roles/{ident}` | Remove Role |
 
+## platform recovery
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/v1/backups` | History |
+| `POST` | `/v1/backups` | Create |
+| `GET` | `/v1/backups/configuration` | Read |
+| `PUT` | `/v1/backups/configuration` | Configure |
+| `DELETE` | `/v1/backups/configuration` | Disable |
+| `GET` | `/v1/backups/recovery` | Recovery |
+| `POST` | `/v1/backups/recovery/resume` | Resume |
+
 ## runs
 
 | Method | Path | Purpose |
@@ -378,6 +400,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/runs/{run_id}/open` | Open App |
 | `GET` | `/v1/runs/{run_id}/outputs` | Run Outputs |
 | `GET` | `/v1/runs/{run_id}/outputs/{path}` | Run Output |
+| `POST` | `/v1/runs/{run_id}/retry` | Retry Run |
 | `POST` | `/v1/runs/{run_id}/stop` | Stop Run |
 
 ## shared SQL
@@ -385,8 +408,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/pages/{token}` | Page |
+| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

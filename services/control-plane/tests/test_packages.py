@@ -20,9 +20,17 @@ ADMIN = as_("admin")
 
 
 @pytest.fixture(autouse=True)
-def offline(monkeypatch):
+def offline(monkeypatch,client):
     """No network in tests: nothing exists upstream unless a test says so."""
     monkeypatch.setattr(package_imports, "upstream_has", lambda kind, name: False)
+    # These scenarios explicitly allow the two test users to install repository packages.
+    # Publication remains separately assigned below.
+    from app.models import ServiceRoleAssignment
+    for username in ('ana','bob'):
+        pid=client.get('/v1/me',headers=as_(username)).json()['principal_id']
+        with SessionLocal() as db:
+            db.add(ServiceRoleAssignment(resource_id='packages',principal_id=pid,role='Executor'))
+            db.commit()
 
 
 def wheel(name="fdp-tools", version="1.0.0", requires=(), tag="py3-none-any", summary="Team helpers"):
@@ -67,6 +75,32 @@ def publishers(client, *users, name="Data engineers"):
 
 def upload(client, user, kind, filename, data):
     return client.post(f"/v1/packages/{kind}/upload", headers=as_(user), files={"file": (filename, data)})
+
+
+def test_metadata_viewer_cannot_download_and_package_executor_cannot_read_siblings(client):
+    from sqlalchemy import delete, select
+    from app.models import ServiceRoleAssignment, Package
+    publishers(client,'ana')
+    filename,data=wheel()
+    upload(client,'ana','python',filename,data).raise_for_status()
+    upload(client,'ana','python',*wheel(name='private-sibling')).raise_for_status()
+    pid=client.get('/v1/me',headers=as_('bob')).json()['principal_id']
+    with SessionLocal() as db:
+        db.execute(delete(ServiceRoleAssignment).where(ServiceRoleAssignment.principal_id==pid))
+        package=db.scalar(select(Package).where(Package.key=='fdp-tools'))
+        db.add(ServiceRoleAssignment(resource_id=package.resource_id,principal_id=pid,role='Viewer'))
+        db.commit()
+    root='/v1/packages/python'
+    assert client.get(root+'/fdp-tools',headers=as_('bob')).status_code==200
+    assert client.get(root+'/private-sibling',headers=as_('bob')).status_code==404
+    assert client.get(root+'/files/fdp-tools/'+filename,headers=as_('bob')).status_code==404
+    index=client.get(root+'/simple/',headers=as_('bob')).text
+    assert 'fdp-tools' in index and 'private-sibling' not in index
+    with SessionLocal() as db:
+        grant=db.scalar(select(ServiceRoleAssignment).where(ServiceRoleAssignment.principal_id==pid))
+        grant.role='Executor';db.commit()
+    assert client.get(root+'/files/fdp-tools/'+filename,headers=as_('bob')).content==data
+    assert client.get(root+'/private-sibling',headers=as_('bob')).status_code==404
 
 
 def test_publishers_publish_packages_and_only_the_owning_group_publishes_new_versions(client):
@@ -280,7 +314,9 @@ def test_executions_install_only_from_the_repository_and_publish_with_their_toke
     twine = {":action": "file_upload", "protocol_version": "1", "name": "fdp-tools", "version": "1.0.0"}
     tw_headers = {"Authorization": "Basic " + base64.b64encode(f"__token__:{token}".encode()).decode()}
     assert client.post("/v1/packages/python/legacy/", headers=tw_headers, data=twine, files={"content": (filename, data)}).status_code == 403
-    publishers(client, "ana")
+    # Grant the group captured by this workspace, rather than an inactive group.
+    client.put("/v1/rbac/resources/packages/assignments",headers=ADMIN,
+        json={"app_group_id":ws["owner_group_id"],"role":"Publisher"}).raise_for_status()
     r = client.post("/v1/packages/python/legacy/", headers=tw_headers, data=twine, files={"content": (filename, data)})
     assert r.status_code == 200 and r.text == "OK"
     # A workspace token keeps working past its expiry while the workspace runs; not after it stops.

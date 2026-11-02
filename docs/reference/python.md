@@ -117,6 +117,18 @@ files(name: str, token: Optional[str]=None, *, viewer_token: Optional[str]=None)
 Files in an S3-compatible data source (RustFS, MinIO, S3), within its bucket/prefix:
 files("lake-files").read_json("x.json"), .write_text(...), .list("reports/").
 
+## `files_object`
+
+```python
+files_object(object_id: str, mode: str='read', token: Optional[str]=None)
+```
+
+S3 client rooted at one registered file/directory, with server-enforced STS scope.
+
+Directories use relative paths. For an individual file, use an empty path, e.g.
+files_object(id).read_text(""). Write mode requires both create and overwrite;
+delete and listing are separately authorized. No static credential fallback.
+
 ## `query`
 
 ```python

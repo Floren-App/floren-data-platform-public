@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .. import layers
+from .. import layers, secret_access
 
 from datetime import datetime
 from typing import Dict, List, Literal, Optional
@@ -83,6 +83,10 @@ def upsert_runtime(kind: str, version: str, body: RuntimeIn, db: Session = Depen
     if row.managed_by == INSTALLATION and body.image != row.image:
         raise HTTPException(409, f"{LABEL.get(kind, kind)} {version} comes with the installation: its image is set in the Helm "
                                  "values (runtime.images) and follows them on every upgrade. Add another version for a different image")
+    if bool(row.enabled)!=body.enabled:
+        settings_access.require(db,admin,"set-runtimes","runtimes.enable")
+    if body.is_default and not row.is_default:
+        settings_access.require(db,admin,"set-runtimes","runtimes.default.set")
     row.image, row.description, row.enabled = body.image, body.description, body.enabled
     if body.is_default:
         for other in db.scalars(select(RuntimeImage).where(RuntimeImage.kind == kind)):
@@ -121,6 +125,7 @@ class SecretOut(BaseModel):
     updated_at: datetime
     # Certificates only: subject, issuer, validity, fingerprint, alternative names, key/chain presence.
     certificate: Optional[Dict[str, object]] = None
+    capabilities: List[str] = Field(default_factory=list)
 
 
 class SecretIn(BaseModel):
@@ -158,8 +163,10 @@ def list_secrets(db: Session = Depends(get_db), user: User = Depends(get_actor))
     """Names (never values) of the secrets you can use: yours, your groups', your service accounts'."""
     out = []
     for e in db.scalars(select(SecretEntry).order_by(SecretEntry.scope, SecretEntry.owner, SecretEntry.name)):
-        if can_access(db, e.scope, e.owner, user):
-            out.append(secret_out(e))
+        if secret_access.allowed(db,user,'secrets.list',e.scope,e.owner,e.name) and secret_access.allowed(db,user,'secrets.read',e.scope,e.owner,e.name):
+            row=secret_out(e)
+            row.capabilities=[a for a in ('secrets.update','secrets.delete','secrets.use') if secret_access.allowed(db,user,a,e.scope,e.owner,e.name)]
+            out.append(row)
     return out
 
 
@@ -171,16 +178,24 @@ def set_secret(scope: str, owner: str, name: str, body: SecretIn, db: Session = 
     if not re.fullmatch(SECRET_NAME, name):
         raise HTTPException(422, "secret names: letters, digits, '.', '_' and '-'")
     owner = _scope_owner(scope, owner, user)
-    if not can_access(db, scope, owner, user):
-        raise HTTPException(403, f"you may not manage {scope} secrets of {owner}")
+    existing=db.scalar(select(SecretEntry).where(SecretEntry.scope==scope,SecretEntry.owner==owner,SecretEntry.name==name))
+    secret_access.require(db,user,'secrets.update' if existing else 'secrets.create',scope,owner,name)
     if body.kind == "certificate":
+        if body.certificate or body.pkcs12_base64:
+            secret_access.require(db,user,'certificates.chain.rotate',scope,owner,name)
+        if body.private_key or body.pkcs12_base64:
+            secret_access.require(db,user,'certificates.private_key.bind',scope,owner,name)
+        if body.ca_chain:
+            secret_access.require(db,user,'certificates.anchors.change',scope,owner,name)
         from ..certificates import bundle
         value = bundle(body.certificate, body.private_key, body.ca_chain, body.pkcs12_base64, body.password)
     elif not body.value:
         raise HTTPException(422, {"message": "secret value is required", "errors": {"value": "required"}})
     else:
         value = body.value
-    e = put_secret(db, store, scope, owner, name, value, user.username, body.description)
+    from ..rbac import resolve_user
+    user=resolve_user(db,user)
+    e = put_secret(db, store, scope, owner, name, value, user.username, body.description,owner_principal_id=user.principal_id if scope=="user" else None)
     audit(db, user.username, "secret.set", f"{scope}:{owner}/{name}", kind=body.kind)  # never the value
     db.commit()
     return secret_out(e)
@@ -190,8 +205,7 @@ def set_secret(scope: str, owner: str, name: str, body: SecretIn, db: Session = 
 def delete_secret(scope: str, owner: str, name: str, db: Session = Depends(get_db),
                   store: SecretStore = Depends(get_secret_store), user: User = Depends(get_actor)):
     owner = _scope_owner(scope, owner, user)
-    if not can_access(db, scope, owner, user):
-        raise HTTPException(403, "not allowed")
+    secret_access.require(db,user,'secrets.delete',scope,owner,name)
     e = db.scalar(select(SecretEntry).where(SecretEntry.scope == scope, SecretEntry.owner == owner, SecretEntry.name == name))
     if e is None:
         raise HTTPException(404, "secret not found")
@@ -213,6 +227,7 @@ class ServiceAccountIn(BaseModel):
 
 
 class ServiceAccountOut(BaseModel):
+    capabilities: List[str] = Field(default_factory=list)
     layer_id: Optional[str] = None
     layer_name: Optional[str] = None
     environment_id: str = ""
@@ -254,7 +269,10 @@ def _sa_out(sa: ServiceAccount, user: User) -> ServiceAccountOut:
     from ..rbac import allowed, service_account_resource
     db = object_session(sa)
     resource = service_account_resource(db, sa)
-    return ServiceAccountOut(**layers.info(db, resource), environment_id=resource.config.get("environment_id", ""), resource_id=resource.id, can_manage=allowed(db, user, "identity", resource), id=sa.id, name=sa.name, principal=f"{SA_PREFIX}{sa.name}", description=sa.description,
+    from ..permissions import domain_allowed
+    capabilities = [action for action in ('identities.tokens.list','identities.tokens.create',
+        'identities.tokens.revoke','secrets.create','identities.metadata.edit','identities.disable','identities.delete','identities.bindings.change') if domain_allowed(db,user,action,resource,'edit' if action=='identities.metadata.edit' else 'delete' if action in ('identities.disable','identities.delete') else 'identity')]
+    return ServiceAccountOut(capabilities=capabilities, **layers.info(db, resource), environment_id=resource.config.get("environment_id", ""), resource_id=resource.id, can_manage=allowed(db, user, "identity", resource), id=sa.id, name=sa.name, principal=f"{SA_PREFIX}{sa.name}", description=sa.description,
                              groups=sa.groups, allowed_groups=sa.allowed_groups, disabled=sa.disabled,
                              created_by=sa.created_by, created_at=sa.created_at)
 
@@ -265,12 +283,13 @@ def _tok_out(t: ServiceToken, raw: Optional[str] = None) -> TokenOut:
                     token=raw)
 
 
-def _usable_sa(db: Session, name: str, user: User) -> ServiceAccount:
+def _usable_sa(db: Session, name: str, user: User, action: str) -> ServiceAccount:
     sa = get_sa(db, name)
     if sa is None:
         raise HTTPException(404, "service account not found")
-    from ..rbac import require, service_account_resource
-    require(db, user, "identity", service_account_resource(db, sa))
+    from ..rbac import service_account_resource
+    from ..permissions import require_domain
+    require_domain(db, user, action, service_account_resource(db, sa), 'identity')
     if sa.disabled:
         raise HTTPException(404, "service account not found")
     return sa
@@ -280,17 +299,34 @@ def _usable_sa(db: Session, name: str, user: User) -> ServiceAccount:
 def list_service_accounts(db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """Service accounts you may run things as."""
     rows = db.scalars(select(ServiceAccount).order_by(ServiceAccount.name))
-    return [_sa_out(sa, user) for sa in rows if user.is_admin or may_use(sa, user)]
+    from .. import rbac, permissions
+    return [_sa_out(sa, user) for sa in rows if permissions.domain_allowed(db,user,
+        'identities.read',rbac.service_account_resource(db,sa),'read')]
 
 
 @router.put("/admin/service-accounts/{name}", response_model=ServiceAccountOut, tags=["admin"])
 def upsert_service_account(name: str, body: ServiceAccountIn, db: Session = Depends(get_db),
-                           admin: User = Depends(settings_access.needs("set-services", "manage"))):
+                           admin: User = Depends(get_actor)):
     import re
 
     if not re.match(NAME, name):
         raise HTTPException(422, "names: lowercase letters, digits and dashes")
-    sa = get_sa(db, name) or ServiceAccount(name=name, created_by=admin.username)
+    existing=get_sa(db,name)
+    from .. import permissions,rbac
+    from ..layers import require_layer
+    resource=rbac.service_account_resource(db,existing) if existing else None
+    actual_layer=require_layer(db,body.layer_id or body.environment_id or ((resource.config or {}).get('layer_id') if resource else None)).id
+    def require_function(action):
+        if resource:
+            permissions.require_domain(db,admin,action,resource,'edit' if action=='identities.metadata.edit' else 'delete' if action=='identities.disable' else 'identity')
+        else:
+            permissions.require(db,admin,action,'set-services',actual_layer)
+    require_function('identities.metadata.edit' if existing else 'identities.create')
+    if existing and existing.disabled!=body.disabled:
+        require_function('identities.disable')
+    if (existing and (existing.groups!=body.groups or existing.allowed_groups!=body.allowed_groups)) or (not existing and (body.groups or body.allowed_groups)):
+        require_function('identities.bindings.change')
+    sa = existing or ServiceAccount(name=name, created_by=admin.username)
     sa.description, sa.groups, sa.allowed_groups, sa.disabled = (
         body.description, body.groups, body.allowed_groups, body.disabled)
     db.add(sa)
@@ -306,8 +342,8 @@ def upsert_service_account(name: str, body: ServiceAccountIn, db: Session = Depe
         raise HTTPException(409, "a service account cannot change layers")
     resource.config = {**resource.config, "layer_id": environment_id}
     if not rbac.has_resource_assignments(db, resource.id):
-        from ..ownership import require_create
-        require_create(db,current)
+        from ..ownership import owner_group
+        owner_group(db,current)
         rbac.own(db, current, resource)
     # Legacy allowed_groups input is translated into the app-owned layer, never checked
     # directly for token/secret authority. Only the platform-admin route accepts it.
@@ -330,12 +366,14 @@ def upsert_service_account(name: str, body: ServiceAccountIn, db: Session = Depe
 
 
 @router.delete("/admin/service-accounts/{name}", status_code=204, tags=["admin"])
-def delete_service_account(name: str, db: Session = Depends(get_db), admin: User = Depends(settings_access.needs("set-services", "manage"))):
+def delete_service_account(name: str, db: Session = Depends(get_db), admin: User = Depends(get_actor)):
     from ..models import Workload
 
     sa = get_sa(db, name)
     if sa is None:
         raise HTTPException(404, "service account not found")
+    from .. import permissions,rbac
+    permissions.require_domain(db,admin,'identities.delete',rbac.service_account_resource(db,sa),'identity')
     if db.scalar(select(Workload).where(Workload.run_as == name, Workload.status != "stopped")):
         raise HTTPException(409, "workloads run as this account; change or undeploy them first")
     sa.disabled = True
@@ -347,7 +385,7 @@ def delete_service_account(name: str, db: Session = Depends(get_db), admin: User
 
 @router.get("/service-accounts/{name}/tokens", response_model=List[TokenOut])
 def list_tokens(name: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    sa = _usable_sa(db, name, user)
+    sa = _usable_sa(db, name, user, 'identities.tokens.list')
     rows = db.scalars(select(ServiceToken).where(ServiceToken.service_account_id == sa.id)
                       .order_by(ServiceToken.created_at.desc()))
     return [_tok_out(t) for t in rows]
@@ -357,7 +395,10 @@ def list_tokens(name: str, db: Session = Depends(get_db), user: User = Depends(g
 def create_token(name: str, body: TokenIn, db: Session = Depends(get_db),
                  store: SecretStore = Depends(get_secret_store), user: User = Depends(get_actor)):
     """A new API token. The response is the only time it is shown (unless saved as a secret)."""
-    sa = _usable_sa(db, name, user)
+    sa = _usable_sa(db, name, user, 'identities.tokens.create')
+    if body.store_as_secret:
+        from .. import rbac, permissions
+        permissions.require_domain(db,user,'secrets.create',rbac.service_account_resource(db,sa),'identity')
     tok, raw = issue_token(db, sa, body.name, user.username, body.expires_days)
     if body.store_as_secret:
         put_secret(db, store, "sa", sa.name, body.store_as_secret, raw, user.username,
@@ -371,7 +412,7 @@ def create_token(name: str, body: TokenIn, db: Session = Depends(get_db),
 
 @router.delete("/service-accounts/{name}/tokens/{token_id}", status_code=204)
 def revoke_token(name: str, token_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    sa = _usable_sa(db, name, user)
+    sa = _usable_sa(db, name, user, 'identities.tokens.revoke')
     tok = db.get(ServiceToken, token_id)
     if tok is None or tok.service_account_id != sa.id:
         raise HTTPException(404, "token not found")

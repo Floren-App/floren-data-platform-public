@@ -108,6 +108,30 @@ jobs:
       - working-directory: services/control-plane
         run: python -m pytest -q -n auto   # in parallel: the tests share no state across processes
 
+  recovery:
+    name: PostgreSQL recovery and concurrent migrations
+    needs: changes
+    if: needs.changes.outputs.control-plane == 'true'
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: fdp-ci-disposable-recovery-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client-16
+      - run: pip install -e 'services/control-plane[dev]'
+      - run: python scripts/verify-platform-recovery.py
+        env:
+          FDP_RECOVERY_TEST_POSTGRES_URL: postgresql+psycopg://postgres:fdp-ci-disposable-recovery-only@127.0.0.1:5432/postgres
+
   sdk:
     name: Python SDK tests
     needs: changes
@@ -216,7 +240,7 @@ jobs:
 
   images:
     name: Image ${{ matrix.image }}
-    needs: [changes, control-plane, sdk, kafka, provider, web, chart, docs]
+    needs: [changes, control-plane, recovery, sdk, kafka, provider, web, chart, docs]
     # After the selected tests: none may have failed (skipped ones did not apply to this change).
     if: >-
       always() && !cancelled() && !contains(needs.*.result, 'failure')

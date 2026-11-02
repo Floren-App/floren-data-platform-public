@@ -8,7 +8,7 @@ from ..auth import User, Execution, get_execution, read_token
 from ..db import get_db
 from ..deps import get_secret_store
 from ..models import DataSource, Workload, CredentialLease, utcnow
-from .. import rbac
+from .. import permissions, rbac
 from ..data_access import credentials, cleanup_leases
 from ..secrets import SecretStore
 from .common import audit
@@ -36,6 +36,7 @@ async def query(body: QueryIn, request: Request, x_fdp_viewer: Optional[str] = H
         return await query_request(SharedQuery(source=body.source, sql=body.sql,
             parameters=body.parameters or [], max_rows=body.max_rows), request, db, authorization, x_fdp_viewer or "")
     user, pub, ds, scope = viewer_scope(body.source, x_fdp_viewer, wl, db)
+    permissions.require_domain(db,user,"delegation.query",rbac.workload_resource(db,pub),"execute")
     if ds.kind != "postgres":
         raise HTTPException(422, "delegated SQL currently requires PostgreSQL")
     cred, _ = credentials(db, ds, scope, store, user.username)
@@ -103,6 +104,7 @@ def files(body: FileIn, x_fdp_viewer: Optional[str] = Header(default=None),
     from botocore.exceptions import BotoCoreError, ClientError
     from ..storage_access import prefix_path
     user, pub, ds, scope = viewer_scope(body.source, x_fdp_viewer, wl, db)
+    permissions.require_domain(db,user,"delegation.files.write" if body.operation in ("write","delete") else "delegation.files.read",rbac.workload_resource(db,pub),"execute")
     if ds.kind != "s3":
         raise HTTPException(422, "delegated file access requires an S3 source")
     key = prefix_path(ds.config.get("prefix", ""), body.path)

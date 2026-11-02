@@ -14,6 +14,32 @@ from .conftest import as_
 from .rbac_helpers import grant_group
 
 
+def test_broker_callback_cannot_borrow_another_groups_rights(client,topic):
+    from .rbac_helpers import select_group
+    readers=grant_group(client,topic['id'],'Original readers','Reader',users=('ana',))
+    select_group(client,'ana',readers)
+    admitted=issue(client,topic['id']).json()
+    privileged=grant_group(client,topic['id'],'Inactive administrators','Admin',users=('ana',))
+    client.put('/v1/rbac/resources/'+topic['id']+'/assignments',headers=as_('admin'),
+        json={'app_group_id':readers,'role':'Viewer'}).raise_for_status()
+    assert issue(client,topic['id']).status_code==403
+    select_group(client,'ana',privileged)
+    assert decision(client,admitted,'READ').json()=={'result':False}
+    assert decision(client,admitted,'WRITE').json()=={'result':False}
+    assert issue(client,topic['id']).status_code==200
+
+
+@pytest.mark.parametrize('role,consume,produce',[
+    ('Viewer',False,False),('Executor',True,False),('Contributor',False,True),
+    ('Manager',False,False),('Admin',True,True),('Owner',True,True),
+])
+def test_six_kafka_roles_separate_metadata_and_payload(client,topic,role,consume,produce):
+    grant_group(client,topic['id'],'Kafka team',role,users=('ana',))
+    assert client.get('/v1/kafka/topics/'+topic['id'],headers=as_('ana')).status_code==200
+    assert issue(client,topic['id']).status_code==(200 if consume else 403)
+    assert issue(client,topic['id'],mode='produce').status_code==(200 if produce else 403)
+
+
 @pytest.fixture
 def topic(client, monkeypatch):
     monkeypatch.setattr(get_settings(), 'layer_namespace_prefix', 'test-layer')

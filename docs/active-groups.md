@@ -8,9 +8,9 @@ continue to enter through SCIM and bind into application-owned groups.
 
 Creation uses the primary group's permissions and assigns it a direct Owner role on
 new folders, workloads, storage integrations, schemas, APIs, operations and service
-accounts. Other group memberships and direct grants remain active for reading, editing,
-running and permission management on existing resources. They cannot supply a missing
-creation privilege to the primary group. Platform configuration creation requires the
+accounts. Interactive reading, editing, execution and delegation use only the selected
+group and explicit direct principal grants. Membership in an inactive group supplies no
+resource authority, compliance duty or masking exemption. Platform configuration creation requires the
 Global Admin primary group. Moving or editing an object does not change its owner.
 
 Workloads, Storage and Catalog discovery show only the active group's direct or inherited
@@ -18,17 +18,13 @@ resource grants. Secondary groups and direct user grants do not add objects to t
 This includes catalog search, autocomplete, facets and lineage traversal. Ancestor names may
 appear to provide navigation to a granted descendant; this does not grant access to siblings.
 Selecting Global Admin shows all current and future objects. Selecting another group applies
-that group's discovery scope even for a global administrator. Secondary authorization still
-supports actions on existing objects; changing the browsing group does not revoke that access.
+that group's authority even for a global administrator. A direct URL uses the same
+selected-group resource checks as discovery.
 Managed identities and running jobs keep their own authorization and layer boundaries.
 
 Switching groups refreshes object lists and clears cached metadata/previews. Workspaces remain
 private to their creator (and manageable by global administrators); their listings show the
 creator's name so identically named development environments can be distinguished.
-
-This follows Snowflake's distinction between primary-role ownership/creation and
-secondary-role access, adapted to Floren Data Platform's fixed roles and schema-level data model.
-See [Snowflake access control](https://docs.snowflake.com/en/user-guide/security-access-control-overview#authorization-through-primary-role-and-secondary-roles).
 
 The server validates membership and permission at admission. A group switch affects
 subsequent requests; an in-flight request keeps its captured group through ownership
@@ -48,15 +44,15 @@ execution tokens retain their workspace group, and managed workload identities r
 the workload's owning group. Managed identities keep their explicit/direct data grants;
 they do not need an intermediate group to perform authorized data operations.
 
-The shared SQL gateway uses combined permissions for reads, writes and alteration, but
+The shared SQL gateway uses selected-group and explicit principal permissions for reads, writes and alteration, and
 requires primary-group DDL authority at the destination for CREATE operations. A secondary
 Admin grant cannot supply that authority. Job admission snapshots both ordinary data
 access and primary CREATE authority, so already running jobs finish under their admitted
 permissions after switches or revocation.
 
-Data remains governed at schema level: current and future tables inherit the schema's IAM.
-There are no individual table grants, and creating a table does not transfer schema
-ownership. Catalog governance defaults to the registered resource's owner group.
+Data supports schema-wide grants and individual table, column, file and directory targets.
+Inheritance is additive: remove broad schema/source grants before granting narrower objects.
+Registering or creating a table does not transfer schema ownership. Catalog governance defaults to the registered resource's owner group.
 Personal credential scope remains separate from shared object ownership.
 
 ## Global Admin
@@ -71,7 +67,7 @@ independent of object grants. IAM pages display this as **System · protected**.
 be revoked or downgraded on an object; the group cannot be renamed or deleted. Group
 membership changes take effect on subsequent authorization checks.
 
-Global administration remains secondary when another primary group is selected: it does
-not supply that group's missing CREATE privileges. Interactive administration can span
+Global administration is inactive while another primary group is selected. It supplies
+no resource or configuration bypass in that context. Interactive administration can span
 layers, but execution contexts never gain an unrestricted administrator bypass. Existing
 workspace/workload layer checks still reject cross-layer execution and data access.

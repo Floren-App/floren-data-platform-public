@@ -93,4 +93,8 @@ def granted_sources(db: Session, actor) -> List[DataSource]:
     from .rbac import data_scope
     if not isinstance(actor, User):
         raise TypeError("granted_sources requires a current principal, not group-name claims")
-    return [ds for ds in db.scalars(select(DataSource).order_by(DataSource.name)) if data_scope(db, actor, ds)]
+    from .object_access import snapshot
+    from .sql_access import SQL_KINDS
+    named = snapshot(db, actor)
+    return [ds for ds in db.scalars(select(DataSource).order_by(DataSource.name))
+            if data_scope(db, actor, ds) or ((ds.kind == "s3" or (get_settings().query_executor == "trino" and ds.kind in SQL_KINDS)) and named.get(ds.id))]

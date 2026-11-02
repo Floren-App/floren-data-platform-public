@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
-from .. import kafka_access as kafka, layers, rbac
+from .. import kafka_access as kafka, layers, rbac, permissions
 from ..db import get_db
 from ..deps import get_actor
 from ..models import Resource
@@ -38,9 +38,9 @@ class SessionIn(BaseModel):
 
 @router.post('/v1/kafka/clusters/{layer_id}', status_code=201)
 def register_cluster(layer_id: str, db=Depends(get_db), user=Depends(get_actor)):
-    user = admin(db, user)
-    from ..ownership import require_create
-    require_create(db, user)
+    permissions.require(db,user,"kafka.clusters.register",layer_id,layer_id)
+    from ..ownership import owner_group
+    owner_group(db,user)
     layer, spec = kafka.specification(db, layer_id, require_running=False)
     item = kafka.cluster(db, layer.id)
     if not item:
@@ -61,14 +61,14 @@ def register_cluster(layer_id: str, db=Depends(get_db), user=Depends(get_actor))
 @router.get('/v1/kafka/clusters')
 def clusters(db=Depends(get_db), user=Depends(get_actor)):
     return [resource_out(db, r, user) for r in db.scalars(select(Resource).where(Resource.kind == 'kafka'))
-            if not r.config.get('deleted') and browsing_allowed(db, user, r)]
+            if not r.config.get('deleted') and browsing_allowed(db, user, r) and permissions.domain_allowed(db,user,'kafka.clusters.list',r,'read')]
 
 
 @router.get('/v1/kafka/topics')
 def topics(layer_id: str = '', db=Depends(get_db), user=Depends(get_actor)):
     return [resource_out(db, r, user) for r in db.scalars(select(Resource).where(Resource.kind == 'topic'))
             if not r.config.get('deleted') and (not layer_id or layers.resource_layer(db, r) == layer_id)
-            and browsing_allowed(db, user, r)]
+            and browsing_allowed(db, user, r) and permissions.domain_allowed(db,user,'kafka.topics.list',r,'read')]
 
 
 @router.get('/v1/kafka/clusters/{ident}')
@@ -114,7 +114,7 @@ def resolve_topic(topic: str, layer_id: str = '', db=Depends(get_db), user=Depen
 @router.get('/v1/kafka/topics/{ident}')
 def get_topic(ident: str, db=Depends(get_db), user=Depends(get_actor)):
     item = kafka.topic(db, ident)
-    rbac.require(db, user, 'read', item)
+    permissions.require_domain(db,user,'kafka.topics.read',item,'read')
     return resource_out(db, item, user)
 
 
@@ -124,9 +124,12 @@ def create_topic(body: TopicIn, db=Depends(get_db), user=Depends(get_actor)):
     cluster = kafka.cluster(db, body.layer_id)
     if not cluster or cluster.config.get('deleted'):
         raise HTTPException(409, 'Register the layer Kafka integration first')
-    rbac.require(db, user, 'ddl', cluster)
-    from ..ownership import require_create
-    require_create(db, user, cluster, 'ddl')
+    permissions.require_domain(db,user,'kafka.topics.create',cluster,'ddl')
+    from ..ownership import require_create,owner_group
+    if permissions.allowed(db,user,'kafka.topics.create',cluster.id):
+        owner_group(db,user)
+    else:
+        require_create(db, user, cluster, 'ddl')
     db.scalar(select(Resource).where(Resource.id == cluster.id).with_for_update())
     if body.name in ('.', '..') or body.name.startswith('__'):
         raise HTTPException(422, 'Reserved Kafka topic name')
@@ -156,7 +159,11 @@ def create_topic(body: TopicIn, db=Depends(get_db), user=Depends(get_actor)):
 @router.put('/v1/kafka/topics/{ident}')
 def update_topic(ident: str, body: TopicSettings, db=Depends(get_db), user=Depends(get_actor)):
     item = kafka.topic(db, ident, locked=True)
-    rbac.require(db, user, 'ddl', item)
+    permissions.require_domain(db, user, 'kafka.topics.configure', item, 'ddl')
+    if body.partitions != item.config['partitions']:
+        permissions.require_domain(db, user, 'kafka.topics.partitions.change', item, 'ddl')
+    if body.retention_ms != item.config.get('retention_ms'):
+        permissions.require_domain(db, user, 'kafka.topics.retention.change', item, 'ddl')
     _, spec = kafka.specification(db, layers.resource_layer(db, item))
     if body.partitions < item.config['partitions']:
         raise HTTPException(422, 'Kafka partitions cannot be decreased')
@@ -171,7 +178,7 @@ def update_topic(ident: str, body: TopicSettings, db=Depends(get_db), user=Depen
 @router.delete('/v1/kafka/topics/{ident}', status_code=204)
 def delete_topic(ident: str, db=Depends(get_db), user=Depends(get_actor)):
     item = kafka.topic(db, ident, locked=True)
-    rbac.require(db, user, 'ddl', item)
+    permissions.require_domain(db, user, 'kafka.topics.delete', item, 'ddl')
     kafka.specification(db, layers.resource_layer(db, item))
     item.config = {**item.config, 'deleted':True, 'phase':'Deleting'}
     audit(db, user.username, 'kafka.topic.delete', item.id, topic_name=item.name)
@@ -183,7 +190,7 @@ def deletion(ident: str, db=Depends(get_db), user=Depends(get_actor)):
     item = db.get(Resource, ident)
     if not item or item.kind != 'topic':
         raise HTTPException(404, 'Kafka topic not found')
-    rbac.require(db, user, 'ddl', item)
+    permissions.require_domain(db, user, 'kafka.topics.deletion.read', item, 'ddl')
     return {'phase':item.config.get('phase', 'Pending')}
 
 
@@ -199,7 +206,7 @@ def session(ident: str, body: SessionIn, db=Depends(get_db), user=Depends(get_ac
 @router.post('/v1/kafka/topics/{ident}/observations', status_code=201)
 def observation(ident: str, body: SessionIn, db=Depends(get_db), user=Depends(get_actor)):
     item = kafka.topic(db, ident)
-    rbac.require(db, user, 'write' if body.mode == 'produce' else 'read', item)
+    permissions.require_domain(db, user, 'kafka.data.produce' if body.mode == 'produce' else 'kafka.data.consume', item, 'write' if body.mode == 'produce' else 'consume')
     from .. import catalog, measurements
     from ..models import Run, Workload, utcnow
     asset = catalog.upsert(db, item, kind='topic', attributes={'layer_id':item.config['layer_id']})

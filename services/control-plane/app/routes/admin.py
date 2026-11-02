@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import User, require_admin
-from .. import settings_access
+from .. import permissions, rbac, settings_access
 from ..db import get_db
 from ..deps import get_actor, get_orchestrator, get_secret_store
 from ..models import AuditEvent, ComputePool, DataSource, Resource, CredentialLease, SqlQuery, Run, utcnow
@@ -32,20 +32,27 @@ def _source(db: Session, name: str) -> DataSource:
 
 
 @router.get("/storage-types")
-def storage_type_list(_: User = Depends(require_admin)):
+def storage_type_list(_: User = Depends(get_actor)):
     """Integration types and the settings each requires; the desktop builds its forms from this."""
     return storage_types.public_types()
 
 
 @router.get("/datasources", response_model=List[DataSourceOut])
-def list_sources(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def list_sources(db: Session = Depends(get_db), _: User = Depends(get_actor)):
     from ..platform_metadata import SOURCE_ID, authorized
     from ..rbac import resolve_user
     user = resolve_user(db, _)
-    result = [ds_out(ds, db) for ds in db.scalars(select(DataSource).order_by(DataSource.name))
-              if ds.id != SOURCE_ID or authorized(user)]
+    result = [ds_out(ds,db,user) for ds in db.scalars(select(DataSource).order_by(DataSource.name))
+              if (ds.id != SOURCE_ID or authorized(user)) and permissions.domain_allowed(db,user,"storage.sources.list",rbac.source_resource(db,ds),"read")]
     db.commit()   # a source's RBAC object is created on first use
     return result
+
+
+@router.get("/datasources/{name}",response_model=DataSourceOut)
+def read_source(name: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    ds=_source(db,name)
+    permissions.require_domain(db,user,'storage.connection.read',rbac.source_resource(db,ds),'read')
+    return ds_out(ds,db,user)
 
 
 @router.put("/datasources/{name}", response_model=DataSourceOut)
@@ -55,7 +62,7 @@ def upsert_source(
     db: Session = Depends(get_db),
     secrets: SecretStore = Depends(get_secret_store),
     orch: Orchestrator = Depends(get_orchestrator),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(get_actor),
 ):
     if body.name != name:
         raise HTTPException(422, "name in path and body differ")
@@ -63,9 +70,6 @@ def upsert_source(
     from ..platform_metadata import SOURCE_ID, SOURCE_NAME
     if ds.id == SOURCE_ID or name == SOURCE_NAME:
         raise HTTPException(409, "Platform metadata is configured through FDP_DATABASE_URL and FDP_METADATA_* deployment settings")
-    from ..ownership import require_create
-    if not ds.id:
-        require_create(db,admin)
     if ds.id and ds.kind != body.kind:
         raise HTTPException(409, "an integration's type cannot change; create a new integration instead")
     stored = {"secret": bool(ds.id and secrets.read(datasource_path(name))),
@@ -73,6 +77,28 @@ def upsert_source(
     from ..layers import canonical, require_layer
     layer = require_layer(db, body.config.get("layer_id") or body.config.get("environment_id") or (ds.config or {}).get("layer_id"))
     environment = layer.id
+    existing=bool(ds.id)
+    resource=rbac.source_resource(db,ds) if existing else None
+    def require_function(action):
+        if resource:
+            permissions.require_domain(db,admin,action,resource,'assign')
+        else:
+            permissions.require(db,admin,action,'storage',environment)
+    require_function('storage.connection.edit' if existing else 'storage.sources.register')
+    if not existing:
+        from ..ownership import owner_group
+        owner_group(db,admin)
+    previous_config=ds.config or {}
+    destination={'host','port','database','bucket','prefix','warehouse','catalog','catalog_uri','endpoint_url','role_arn','managed_rustfs'}
+    trust={'sslmode','sslrootcert','ca_bundle','verify','endpoint_url','catalog_uri'}
+    if any(previous_config.get(k)!=body.config.get(k) for k in destination):
+        require_function('storage.connection.destination.change')
+    if any(previous_config.get(k)!=body.config.get(k) for k in trust):
+        require_function('storage.connection.trust.change')
+    if body.secret is not None or body.provisioner_secret is not None:
+        require_function('storage.connection.credentials.change')
+    if existing and sorted(ds.egress or [])!=sorted(body.egress):
+        permissions.require(db,admin,'network.policies.apply','set-network',environment)
     requested = body.config
     managed = requested.get('managed_rustfs') is True
     if managed:
@@ -113,8 +139,8 @@ def upsert_source(
                                                        SqlQuery.expires_at > utcnow())):
             if any(scope.get("source_id") == ds.id for scope in query.scope.values()):
                 raise HTTPException(409, "wait for active SQL requests before changing the source connection")
-        for run in db.scalars(select(Run).where(Run.status.in_(["pending", "running"]))):
-            if (run.access_snapshot or {}).get(ds.id):
+        for run in db.scalars(select(Run).where(Run.status.in_(["queued", "pending", "running"]))):
+            if (run.access_snapshot or {}).get(ds.id) or (run.named_access_snapshot or {}).get(ds.id):
                 raise HTTPException(409, "wait for admitted data jobs before changing the source connection")
         if db.scalar(select(CredentialLease).where(CredentialLease.source_id == ds.id, CredentialLease.revoked.is_(False))):
             raise HTTPException(409, "wait for native credential leases to end before changing the source connection")
@@ -137,7 +163,7 @@ def upsert_source(
     if not has_resource_assignments(db, resource.id):
         own(db, admin, resource)
     db.commit()
-    return ds_out(ds, db)
+    return ds_out(ds,db,admin)
 
 
 def _sync_catalogs(db, orch, secrets, layer_id):
@@ -161,9 +187,10 @@ def delete_source(
     db: Session = Depends(get_db),
     secrets: SecretStore = Depends(get_secret_store),
     orch: Orchestrator = Depends(get_orchestrator),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(get_actor),
 ):
     ds = _source(db, name)
+    permissions.require_domain(db,admin,"storage.sources.deregister",rbac.source_resource(db,ds),"assign")
     from ..platform_metadata import SOURCE_ID
     if ds.id == SOURCE_ID:
         raise HTTPException(409, "The platform metadata integration is deployment managed")
@@ -191,12 +218,12 @@ def delete_source(
 
 
 @router.post("/datasources/{name}/grants", response_model=DataSourceOut)
-def grant(name: str, body: GrantIn, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+def grant(name: str, body: GrantIn, db: Session = Depends(get_db), admin: User = Depends(get_actor)):
     raise HTTPException(410, "use RBAC app groups and schema role assignments")
 
 
 @router.delete("/datasources/{name}/grants/{group}", response_model=DataSourceOut)
-def revoke(name: str, group: str, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+def revoke(name: str, group: str, db: Session = Depends(get_db), admin: User = Depends(get_actor)):
     raise HTTPException(410, "use RBAC schema role assignments")
 
 

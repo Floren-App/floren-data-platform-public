@@ -126,6 +126,7 @@ services:
 
   control-plane:
     build: ../../services/control-plane
+    command: [sh, -c, "python -m app.schema_migrations upgrade && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
     user: "0"   # dev only: needs the Docker socket
     networks: [default, data]
     depends_on:

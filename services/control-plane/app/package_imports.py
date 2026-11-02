@@ -144,7 +144,8 @@ def platform_tags(arch: str, glibc: str) -> List[str]:
 
 def request(db: Session, user, kind: str, requirement: str) -> PackageImport:
     from . import rbac
-    rbac.require(db, user, "import", rbac.packages_root(db))
+    from .permissions import require_domain
+    require_domain(db,user,"packages.imports.request",rbac.packages_root(db),"import")
     s = get_settings()
     if not (s.package_upstream_pypi if kind == "python" else s.package_upstream_cran):
         raise repo.PackageError(409, f"importing from {'PyPI' if kind == 'python' else 'CRAN'} is turned off in this installation")

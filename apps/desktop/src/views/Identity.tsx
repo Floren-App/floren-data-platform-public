@@ -1,3 +1,4 @@
+import { can } from "../permissions";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, CertificateInfo, Runtime, RuntimeKind, runtimeLabel, Secret, SecretInput, ServiceAccount, ServiceToken } from "../api";
 import type { Hub } from "../hub";
@@ -89,7 +90,10 @@ export function SecretsTab({ hub, selectedRef, creating = false, openTab }: { hu
   const [formOpen, setFormOpen] = useState(creating);
   const selected = secrets.find((s) => s.ref === selectedRef);
   useEffect(() => { if (creating) { setForm(emptySecret); setFormOpen(true); } }, [creating]);
-  const showForm = formOpen || (state.status === "ready" && !secrets.length);
+  const canCreate = can(hub.me,'secrets.create','secrets') || can(hub.me,'secrets.create','personal-secrets') ||
+    can(hub.me,'secrets.create',`secret:user:${hub.me?.username}`) ||
+    !!hub.me?.permission_grants?.some(g=>g.namespace==='secrets'&&g.actions.includes('secrets.create')) || accounts.some(a=>a.capabilities?.includes('secrets.create'));
+  const showForm = (formOpen && (canCreate || !!secrets.find(s=>s.ref===selectedRef)?.capabilities?.includes('secrets.update'))) || (canCreate && state.status === "ready" && !secrets.length);
   const replacing = secrets.find((s) => s.scope === form.scope && s.name === form.name && (s.scope === "user" || s.owner === form.owner));
   const set = (patch: Partial<SecretForm>) => setForm((f) => ({ ...f, ...patch }));
   const startReplace = (s: Secret) => {
@@ -122,7 +126,7 @@ export function SecretsTab({ hub, selectedRef, creating = false, openTab }: { hu
     <>
       <PageHeader icon={<IconKey size={22} />} title="Secrets"
         subtitle={<>API keys, passwords, tokens and certificates for your programs, dashboards, dbt and Airflow. Stored in OpenBao; values and private keys are never shown again.</>}
-        actions={!formOpen && <button className="btn" onClick={() => { setForm(emptySecret); setFieldErrors({}); setFormOpen(true); }}><IconPlus size={14} />Add secret</button>} />
+        actions={!formOpen && canCreate && <button className="btn" onClick={() => { setForm(emptySecret); setFieldErrors({}); setFormOpen(true); }}><IconPlus size={14} />Add secret</button>} />
       {(error || state.error) && <p className="error" role="alert">{error || state.error}</p>}
       {showForm && <form className="card" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <h3>{replacing ? `Replace ${form.name}` : "Add a secret"}</h3>
@@ -235,8 +239,8 @@ export function SecretsTab({ hub, selectedRef, creating = false, openTab }: { hu
               <td>{s.description || <span className="muted">—</span>}</td>
               <td className="muted">{when(s.updated_at)} · {s.updated_by}</td>
               <td className="table-actions"><div className="row">
-                <button className="btn sm secondary" onClick={() => startReplace(s)}>Replace</button>
-                <button className="icon-btn" aria-label={`Delete ${s.ref}`} title="Delete secret" onClick={() => confirm(`Delete secret ${s.ref}? Programs using it will fail to start.`)
+                {s.capabilities?.includes("secrets.update") && <button className="btn sm secondary" onClick={() => startReplace(s)}>Replace</button>}
+                <button className="icon-btn" disabled={!s.capabilities?.includes("secrets.delete")} aria-label={`Delete ${s.ref}`} title="Delete secret" onClick={() => confirm(`Delete secret ${s.ref}? Programs using it will fail to start.`)
                   && api.deleteSecret(s.scope, s.scope === "user" ? "me" : s.owner, s.name).then(reload).catch((e: Error) => setError(e.message))}><IconTrash /></button>
               </div></td>
             </tr>
@@ -354,8 +358,8 @@ export function ServiceAccountForm({ hub, existing, onDone, onCancel }: { hub: H
 }
 
 /** Tokens of one service account. A new token is shown exactly once (or saved straight into a secret). */
-export function TokensCard({ sa, onError }: { sa: string; onError: (m: string) => void }) {
-  const fetchTokens = useCallback(() => api.tokens(sa), [sa]);
+export function TokensCard({ sa, onError, canList = true, canCreate = true, canRevoke = true, canSaveSecret = true }: { sa: string; onError: (m: string) => void; canList?: boolean; canCreate?: boolean; canRevoke?: boolean; canSaveSecret?: boolean }) {
+  const fetchTokens = useCallback(() => canList ? api.tokens(sa) : Promise.resolve([] as ServiceToken[]), [sa, canList]);
   const { data: tokens, reload } = useLoad(fetchTokens, [] as ServiceToken[]);
   const [form, setForm] = useState({ name: "", days: "90", secret: "" });
   const [fresh, setFresh] = useState<ServiceToken | null>(null);
@@ -389,18 +393,18 @@ export function TokensCard({ sa, onError }: { sa: string; onError: (m: string) =
           <tr key={t.id} style={t.revoked ? { opacity: 0.5 } : undefined}>
             <td>{t.name}</td><td className="mono">{t.prefix}…</td><td>{when(t.expires_at)}</td><td>{when(t.last_used_at)}</td>
             <td className="mono">{t.stored_as ?? "—"}</td>
-            <td className="table-actions">{t.revoked ? <span className="badge">Revoked</span> : <button className="btn sm danger" onClick={() => confirm(`Revoke ${t.name}?`)
+            <td className="table-actions">{t.revoked ? <span className="badge">Revoked</span> : canRevoke && <button className="btn sm danger" onClick={() => confirm(`Revoke ${t.name}?`)
               && api.revokeToken(sa, t.id).then(reload).catch((e: Error) => onError(e.message))}>Revoke</button>}</td>
           </tr>))}
           {!tokens.length && <tr><td colSpan={6}>No tokens yet.</td></tr>}
         </tbody>
       </table>
-      <form className="toolbar" style={{ justifyContent: "flex-start", marginTop: 16 }} onSubmit={(e) => { e.preventDefault(); void create(); }}>
+      {canCreate && <form className="toolbar" style={{ justifyContent: "flex-start", marginTop: 16 }} onSubmit={(e) => { e.preventDefault(); void create(); }}>
         <div className="field" style={{ margin: 0 }}><label htmlFor="tok-name">Name</label><input id="tok-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="external-bi" /></div>
         <div className="field" style={{ margin: 0, width: 110 }}><label htmlFor="tok-days">Expires (days)</label><input id="tok-days" type="number" min={1} value={form.days} onChange={(e) => setForm({ ...form, days: e.target.value })} /></div>
-        <div className="field" style={{ margin: 0 }}><label htmlFor="tok-secret">Save as secret (optional)</label><input id="tok-secret" className="mono" value={form.secret} onChange={(e) => setForm({ ...form, secret: e.target.value })} placeholder="api-token" /></div>
+        <div className="field" style={{ margin: 0 }}><label htmlFor="tok-secret">Save as secret (optional)</label><input id="tok-secret" disabled={!canSaveSecret} className="mono" value={form.secret} onChange={(e) => setForm({ ...form, secret: e.target.value })} placeholder="api-token" /></div>
         <button className="btn" disabled={!form.name}>Create token</button>
-      </form>
+      </form>}
     </div>
   );
 }

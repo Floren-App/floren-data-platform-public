@@ -34,8 +34,37 @@ def role_actions(namespace, role):
     return sorted(result)
 
 
+@cached
 def resource_layer(db, target):
     """No implicit default layer for global collections; actual objects inherit explicit layer bindings."""
+    if target.startswith('case:'):
+        from .models import AccessCase
+        case=db.get(AccessCase,target[len('case:'):])
+        return case.layer_id if case else None
+    if target.startswith('secret:sa:'):
+        from .models import ServiceAccount
+        owner=target[len('secret:sa:'):].split('/',1)[0]
+        sa=db.query(ServiceAccount).filter(ServiceAccount.name==owner).first()
+        return resource_layer(db,rbac.service_account_resource(db,sa).id) if sa else None
+    if target.startswith('run:'):
+        from .models import Run, Workload
+        from .layers import canonical
+        run=db.get(Run,target[len('run:'):])
+        if not run:
+            return None
+        if run.environment_id:
+            return canonical(db,run.environment_id)
+        if run.workspace_id:
+            return resource_layer(db,'workspace:'+run.workspace_id)
+        if run.workload_id:
+            pub=db.get(Workload,run.workload_id)
+            return resource_layer(db,rbac.workload_resource(db,pub).id) if pub else None
+        return canonical(db,run.layer_id)
+    if target.startswith('workspace:'):
+        from .models import Workspace
+        from .layers import canonical
+        workspace=db.get(Workspace,target[len('workspace:'):])
+        return canonical(db,workspace.environment_id) if workspace else None
     resource = db.get(Resource, target)
     if resource is None:
         return None
@@ -52,13 +81,12 @@ def resource_layer(db, target):
 @cached
 def grants(db, user):
     user = rbac.resolve_user(db, user)
-    groups = rbac.app_groups(db, user)
-    if interactive(user):
-        groups = groups & {user.active_group_id}
+    groups = rbac.effective_app_groups(db, user)
     return list(db.scalars(select(PermissionGrant).where(or_(
         PermissionGrant.app_group_id.in_(list(groups)), PermissionGrant.principal_id == user.principal_id))))
 
 
+@cached
 def grant_actions(db, grant):
     if grant.custom_role_id:
         role = db.get(CustomPermissionRole, grant.custom_role_id)
@@ -68,23 +96,82 @@ def grant_actions(db, grant):
     return set(grant.actions or [])
 
 
+@cached
 def targets(db, target):
+    if target.startswith('principal:'):
+        return {target,'people'}
+    if target.startswith('custom-role:'):
+        return {target,'roles'}
+    if target.startswith('warehouse:'):
+        return {target,'set-pools'}
+    if target.startswith('group:'):
+        return {target,'set-groups'}
+    if target.startswith('git-credential:'):
+        return {target,'git-credentials'}
+    if target.startswith('case:'):
+        from .models import AccessCase
+        from .compliance import case_target
+        case=db.get(AccessCase,target[len('case:'):])
+        chain={target,'cases'}
+        parent=case_target(db,case) if case else None
+        if parent:
+            chain.update(targets(db,parent))
+        return chain
+    if target.startswith('secret:'):
+        prefix=target.split('/',1)[0]
+        chain={target,prefix,'secrets'}
+        if prefix.startswith('secret:user:'):
+            chain.add('personal-secrets')
+        if prefix.startswith('secret:sa:'):
+            from .models import ServiceAccount
+            sa=db.query(ServiceAccount).filter(ServiceAccount.name==prefix[len('secret:sa:'):]).first()
+            if sa:
+                chain.update(targets(db,rbac.service_account_resource(db,sa).id))
+        return chain
+    if target.startswith('run:'):
+        from .models import Run, Workload
+        run=db.get(Run,target[len('run:'):])
+        chain={target,'runs'}
+        if run:
+            if run.workspace_id:
+                chain.update(targets(db,'workspace:'+run.workspace_id))
+            if run.workload_id:
+                pub=db.get(Workload,run.workload_id)
+                if pub:
+                    chain.update(targets(db,rbac.workload_resource(db,pub).id))
+        return chain
+    if target.startswith('workspace:'):
+        layer=resource_layer(db,target)
+        return {target,'workspaces',layer} if layer else {target}
+    if target.startswith('repository:'):
+        from .models import GitRepository
+        repo=db.get(GitRepository,target[len('repository:'):])
+        return {target,'repositories'} if repo else {target}
     resource = db.get(Resource, target)
-    return {item.id for item in rbac.ancestors(db, resource)} if resource else {target}
+    result={item.id for item in rbac.ancestors(db, resource)} if resource else {target}
+    if resource:
+        collections={'kafka':'kafka','topic':'kafka','source':'storage','schema':'storage','api':'apis','api-operation':'apis',
+            'api-group':'apis','service':'set-services' if resource.config.get('service_account') else 'workloads'}
+        if resource.kind in collections:
+            result.add(collections[resource.kind])
+    return result
 
 
 def scope_matches(granted, actual):
     return granted == actual or (granted == "*" and actual is not None)
 
 
+@cached
 def allowed(db, user, action: str, target: str, layer_id: Optional[str] = None) -> bool:
     if action not in REGISTRY or not target:
         return False
     user = rbac.resolve_user(db, user)
     actual_layer = resource_layer(db, target)
+    resource = db.get(Resource, target)
+    global_package = ((resource is not None and resource.kind in ('package-root', 'package')) or target.startswith(('repository:','secret:','git-credential:'))) and not actual_layer
     if actual_layer and layer_id and actual_layer != layer_id:
         return False
-    layer = actual_layer or layer_id
+    layer = actual_layer or layer_id or (user.environment_id if global_package else None)
     if user.environment_id and layer != user.environment_id:
         return False
     if acting_as_admin(user):
@@ -92,7 +179,8 @@ def allowed(db, user, action: str, target: str, layer_id: Optional[str] = None) 
     chain = targets(db, target)
     held_roles = set()
     for grant in grants(db, user):
-        if grant.target_id not in chain or not scope_matches(grant.layer_id, layer):
+        if grant.target_id not in chain or not (scope_matches(grant.layer_id, layer) or
+            (global_package and grant.layer_id is None)):
             continue
         if action in grant_actions(db, grant):
             return True
@@ -108,6 +196,31 @@ def require(db, user, action, target, layer_id=None):
     if not allowed(db, user, action, target, layer_id):
         raise HTTPException(403, f"{action} permission required")
     return rbac.resolve_user(db, user)
+
+
+def domain_allowed(db, user, action, resource, legacy_action=None):
+    """Named function permission, with explicit compatibility for existing resource roles."""
+    if resource is None:
+        return False
+    if allowed(db,user,action,resource.id):
+        return True
+    if not legacy_action or action not in REGISTRY or not rbac.allowed(db,user,legacy_action,resource,named=False):
+        return False
+    # Domain roles use the same action bundles as named roles. Generic legacy
+    # verbs (e.g. edit) must not make Contributor an Executor or Manager.
+    aliases={'Reader':{'Executor'},'Consumer':{'Executor'},'Publisher':{'Contributor','Executor','Manager'},
+        'Maintainer':{'Contributor','Executor','Manager'}}
+    held=set()
+    for grant in rbac.access(db,user,resource):
+        role=grant['role']
+        held.update(aliases.get(role,{role}))
+    definition=REGISTRY[action]
+    return bool(held & set(definition['roles'])) or bool(definition.get('requires_roles') and set(definition['requires_roles']).issubset(held))
+
+
+def require_domain(db, user, action, resource, legacy_action=None):
+    if not domain_allowed(db, user, action, resource, legacy_action):
+        raise HTTPException(403, f'{action} permission required')
 
 
 def can_delegate(db, user, namespace, target, layer, actions):

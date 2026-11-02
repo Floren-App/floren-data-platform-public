@@ -76,6 +76,14 @@ def render(db: Session, leader: bool) -> str:
 
 def _platform(db: Session, out: Out) -> None:
     from datetime import timezone
+    from .models import PlatformBackup
+    latest_backup = db.scalar(select(PlatformBackup).order_by(PlatformBackup.created_at.desc()))
+    last_good = db.scalar(select(PlatformBackup).where(PlatformBackup.status == 'succeeded')
+                          .order_by(PlatformBackup.finished_at.desc()))
+    out.metric('fdp_backup_failing', 'gauge', 'Latest platform backup failed.',
+               int(bool(latest_backup and latest_backup.status == 'failed')))
+    out.metric('fdp_backup_last_success_timestamp_seconds', 'gauge', 'Last verified S3 recovery archive.',
+               last_good.finished_at.replace(tzinfo=timezone.utc).timestamp() if last_good else 0)
     from .models import SiemCursor
     for cursor in db.scalars(select(SiemCursor)):
         out.metric("fdp_siem_events_sent_total", "counter", "Audit and data-access events delivered, by SIEM destination.",

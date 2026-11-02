@@ -139,13 +139,13 @@ export function CatalogObject({ tab, hub, openTab }: { tab: TabRef; hub: Hub; op
       <p className={asset.governance.description || asset.attributes.description ? "" : "muted"} style={{ maxWidth: "90ch", marginTop: 0 }}>{asset.governance.description || asset.attributes.description || "No description yet. Add one in Governance."}</p>
       <section className="card"><dl className="kv"><dt>Domain</dt><dd>{asset.governance.domain || <span className="muted">Unassigned</span>}</dd><dt>Steward</dt><dd>{asset.governance.steward || <span className="muted">Unassigned</span>}</dd>
         {!!asset.governance.tags?.length && <><dt>Tags</dt><dd className="row wrap" style={{ gap: 4 }}>{asset.governance.tags.map((tag) => <span className="chip" key={tag}>{tag}</span>)}</dd></>}
-        <dt>IAM boundary</dt><dd>{asset.resource.name}</dd><dt>Metadata observed</dt><dd>{new Date(asset.observed_at).toLocaleString()}</dd></dl></section>
+        <dt>IAM boundary</dt><dd>{asset.permission_target?.name ?? asset.resource.name}</dd><dt>Metadata observed</dt><dd>{new Date(asset.observed_at).toLocaleString()}</dd></dl></section>
       <ColumnClassifier asset={asset} onSaved={setAsset} />
     </>}
-    {section === "access" && <><p className="scope-note">{asset.resource.kind === "schema" ? "This object uses its schema's IAM. Grants cover every current and future object in that schema." : "Access uses the same roles and inherited grants as the deployed object. Owner permission is required to change assignments."}</p><PermissionsPanel resource={asset.resource} resources={hub.resources} openTab={openTab} onChanged={reload} /></>}
+    {section === "access" && <><p className="scope-note">{asset.resource.kind === "schema" ? asset.permission_target ? "Permissions apply to this data object. Broad inherited schema or source grants also apply; remove those to restrict access to this object alone." : "This schema grants access to its current and future objects." : "Access uses the same roles and inherited grants as the deployed object. Owner permission is required to change assignments."}</p><PermissionsPanel resource={asset.permission_target ?? asset.resource} resources={hub.resources} openTab={openTab} onChanged={reload} /></>}
     {section === "governance" && <GovernanceEditor key={asset.id} asset={asset} onSaved={setAsset} />}
     {section === "sla" && <SLAEditor key={asset.id} asset={asset} onSaved={setAsset} />}
-    {section === "metrics" && <MetricsPanel key={asset.id} asset={asset} />}
+    {section === "metrics" && <MetricsPanel key={`${asset.id}:${hub.me?.active_group_id}`} asset={asset} />}
     {section === "lineage" && <><Suspense fallback={<p className="muted">Loading lineage explorer…</p>}><LineageExplorer asset={asset} openTab={openTab} version={version} /></Suspense><NativeImport asset={asset} onImported={() => setVersion((v) => v + 1)} /></>}
   </>;
 }

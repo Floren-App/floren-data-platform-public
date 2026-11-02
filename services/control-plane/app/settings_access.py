@@ -5,6 +5,7 @@ from typing import Dict, Optional
 
 from fastapi import Depends, HTTPException
 
+from .authorization_cache import cached
 from . import rbac
 from .auth import User
 from .db import get_db
@@ -15,6 +16,7 @@ ROOT = "admin-root"
 SECTIONS: Dict[str, str] = {"adm-platform": "Platform", "adm-security": "Security", "adm-privacy": "Privacy", "adm-access": "Access"}
 # page id (at most 12 characters, the resource ID) -> (name, section)
 PAGES: Dict[str, tuple] = {
+    "set-backups": ("Backup and recovery", "adm-platform"),
     "set-layers": ("Layers", "adm-platform"),
     "set-pools": ("Compute pools", "adm-platform"),
     "set-runtimes": ("Runtimes", "adm-platform"),
@@ -39,6 +41,7 @@ ROLES = {"Viewer": {"read"}, "Executor": {"read"}, "Contributor": {"read"},
          "Manager": {"read", "manage"}, "Admin": {"read", "manage"}, "Owner": {"read", "manage", "assign"}}
 ACTIONS = {"view": "read", "manage": "manage"}
 NAMESPACES = {
+    "set-backups": "backups",
     "set-layers": "layers.object", "set-pools": "compute.pools", "set-runtimes": "runtimes",
     "set-template": "workspace_templates", "set-alerts": "alerts.rules", "set-profiles": "profiles",
     "set-network": "network.editor_allowlist", "set-classes": "classification.dictionary",
@@ -61,6 +64,7 @@ def ensure(db) -> None:
     db.flush()
 
 
+@cached
 def allowed(db, user, page: str, action: str = "manage", layer_id=None) -> bool:
     """action: view or manage."""
     resolved = rbac.resolve_user(db, user)
@@ -83,8 +87,8 @@ def allowed(db, user, page: str, action: str = "manage", layer_id=None) -> bool:
         # Scoped grants never fall back to an unscoped legacy manager.
         if layer_id is not None:
             return False
-        legacy = "read" if "Viewer" in definition["roles"] else "assign" if definition["roles"] == ["Owner"] else "manage"
-        return rbac.allowed(db, resolved, legacy, db.get(Resource, page))
+        legacy = "assign" if definition["roles"] == ["Owner"] else "read"
+        return permissions.domain_allowed(db, resolved, action, db.get(Resource, page), legacy)
     resource = db.get(Resource, page)
     if resource is None:
         ensure(db)
@@ -121,3 +125,17 @@ def granted(db, user, layer_id=None) -> Dict[str, Optional[str]]:
         if allowed(db, resolved, page, "view", layer_id):
             out[page] = "view"
     return out
+
+
+def capabilities(db,user):
+    """Exact global functions for legacy page-role controls in the desktop."""
+    from .permissions import REGISTRY
+    prefixes={page:(namespace+'.',) for page,namespace in NAMESPACES.items()}
+    prefixes.update({
+        'set-layers':('layers.','layer_infrastructure.','platform.defaults.','certificates.'),
+        'set-network':('network.',), 'set-pools':('compute.',),
+        'set-alerts':('alerts.','webhooks.'), 'set-querylog':('query_log.','siem.'),
+        'set-services':('identities.','secrets.'),
+    })
+    return {page:[action for action in REGISTRY if action.startswith(namespaces) and allowed(db,user,page,action)]
+        for page,namespaces in prefixes.items()}

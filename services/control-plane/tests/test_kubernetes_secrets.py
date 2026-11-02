@@ -68,6 +68,8 @@ def test_invalid_payloads_and_dynamic_credentials_fail_explicitly():
 
 
 def test_api_reports_secret_backend_failure_without_persisting_metadata_or_leaking_payload(client):
+    from .rbac_helpers import secret_permissions
+    secret_permissions(client,'ana')
     from app.deps import get_secret_store
     from .conftest import as_
     core=Core()

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import git_credentials as gc
+from .. import permissions, rbac, git_credentials as gc
 from ..auth import Execution, User, get_current_user, get_execution
 from ..db import get_db
 from ..deps import get_secret_store
@@ -51,7 +51,9 @@ def _out(row: GitCredential) -> dict:
 
 def _mine(db: Session, user: User, credential_id: str) -> GitCredential:
     row = db.get(GitCredential, credential_id)
-    if row is None or row.owner != user.username:
+    from ..rbac import resolve_user
+    user=resolve_user(db,user)
+    if row is None or row.owner != user.username or row.principal_id!=user.principal_id:
         raise HTTPException(404, "Git credential not found")
     return row
 
@@ -62,7 +64,7 @@ def _apply(db: Session, row: GitCredential, body: GitCredentialIn, store: Secret
     email = body.commit_email.strip()
     if email and not EMAIL.fullmatch(email):
         raise HTTPException(422, "the commit email is not an email address")
-    if any(c.id != row.id and c.label.lower() == label.lower() for c in gc.owned(db, row.owner)):
+    if any(c.id != row.id and c.principal_id==row.principal_id and c.label.lower() == label.lower() for c in gc.owned(db, row.owner)):
         raise HTTPException(409, f"you already have a Git credential called {label}")
     row.label, row.host, row.username = label, host, body.username.strip()
     row.commit_name, row.commit_email, row.updated_at = body.commit_name.strip(), email, utcnow()
@@ -75,15 +77,20 @@ def _apply(db: Session, row: GitCredential, body: GitCredentialIn, store: Secret
 @router.get("/me/git-credentials")
 def list_git_credentials(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> List[dict]:
     """Your credentials; tokens are never returned."""
-    return [_out(r) for r in gc.owned(db, user.username)]
+    user=rbac.resolve_user(db,user)
+    return [{**_out(r),'capabilities':[a for a in ('git.credentials.update','git.credentials.delete') if permissions.allowed(db,user,a,'git-credential:'+r.id)]}
+        for r in gc.owned(db,user.username) if r.principal_id==user.principal_id and permissions.allowed(db,user,'git.credentials.read','git-credential:'+r.id)]
 
 
 @router.post("/me/git-credentials", status_code=201)
 def create_git_credential(body: GitCredentialIn, db: Session = Depends(get_db), user: User = Depends(get_current_user),
                           store: SecretStore = Depends(get_secret_store)):
+    permissions.require(db,user,"git.credentials.create","git-credentials")
     if not (body.token or "").strip():
         raise HTTPException(422, "a token is required")
-    row = GitCredential(owner=user.username)
+    from ..rbac import resolve_user
+    user=resolve_user(db,user)
+    row = GitCredential(owner=user.username,principal_id=user.principal_id)
     _apply(db, row, body, store)
     audit(db, user.username, "git.credential.create", row.host, label=row.label)   # never the token
     db.commit()
@@ -94,6 +101,7 @@ def create_git_credential(body: GitCredentialIn, db: Session = Depends(get_db), 
 def update_git_credential(credential_id: str, body: GitCredentialIn, db: Session = Depends(get_db),
                           user: User = Depends(get_current_user), store: SecretStore = Depends(get_secret_store)):
     row = _mine(db, user, credential_id)
+    permissions.require(db,user,"git.credentials.update","git-credential:"+row.id)
     _apply(db, row, body, store)
     audit(db, user.username, "git.credential.update", row.host, label=row.label, token_changed=bool((body.token or "").strip()))
     db.commit()
@@ -104,6 +112,7 @@ def update_git_credential(credential_id: str, body: GitCredentialIn, db: Session
 def delete_git_credential(credential_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user),
                           store: SecretStore = Depends(get_secret_store)):
     row = _mine(db, user, credential_id)
+    permissions.require(db,user,"git.credentials.delete","git-credential:"+row.id)
     store.delete(gc.path(row.owner, row.id))
     store.delete(gc.legacy_path(row.owner, row.host))
     for ws in db.scalars(select(Workspace).where(Workspace.git_credential_id == row.id)):
@@ -123,14 +132,18 @@ def choose_workspace_git(ws_id: str, body: WorkspaceGitIn, db: Session = Depends
     ws = db.get(Workspace, ws_id)
     if ws is None or ws.owner != user.username:
         raise HTTPException(404, "workspace not found")
+    from .. import workspace_access
+    workspace_access.require(db,user,'workspaces.object.settings.edit',ws)
+    permissions.require(db,user,'git.credentials.binding.change','git-credentials')
     if ws.editor not in GIT_EDITORS:
         raise HTTPException(422, "only VS Code and RStudio workspaces use Git")
     if body.credential_id:
-        _mine(db, user, body.credential_id)
+        credential=_mine(db, user, body.credential_id)
+        permissions.require(db,user,"git.credentials.use","git-credential:"+credential.id)
     ws.git_credential_id, ws.git_asked = body.credential_id or None, True
     audit(db, user.username, "workspace.git", ws.id, credential=body.credential_id or "none")
     db.commit()
-    return ws
+    return workspace_access.output(db,user,ws)
 
 
 @router.get("/workspaces/{ws_id}/git-credential", include_in_schema=False)
@@ -140,11 +153,18 @@ def workspace_git_credential(ws_id: str, host: str, protocol: str = "https", db:
     ws = db.get(Workspace, ws_id)
     if execution.workspace_id != ws_id or execution.run_id or execution.workload_id or not ws or ws.owner != execution.username:
         raise HTTPException(403, "only your own running workspace may use your Git tokens")
+    from .. import workspace_access
+    from ..environments import execution_user
+    from ..rbac import resolve_user
+    actor=resolve_user(db,execution_user(db,execution))
+    workspace_access.require(db,actor,'workspaces.object.editor.open',ws)
     if ws.editor not in GIT_EDITORS:
         raise HTTPException(403, "this editor has no Git access")
     if protocol != "https":
         raise HTTPException(404, "Git tokens are used over HTTPS only")
     row, reason = gc.for_workspace(db, ws, _host(host))
+    if row:
+        permissions.require(db,actor,"git.credentials.use","git-credential:"+row.id)
     secret = gc.token(store, row) if row else None
     if not secret:
         raise HTTPException(404, reason or f"the token of {row.label} is missing; save it again under Account → Git credentials")

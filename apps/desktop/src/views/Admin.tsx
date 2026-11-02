@@ -58,17 +58,17 @@ export function AdminLayers({ hub }: { hub: Hub }) {
 type Draft = { name: string; description: string; config: Record<string, string>; secrets: Record<string, Record<string, string>>; egress: string };
 const emptyDraft: Draft = { name: "", description: "", config: {}, secrets: {}, egress: "" };
 
-function SettingField({ id, f, value, error, onChange, keep }: {
-  id: string; f: StorageField; value: string; error?: string; onChange: (v: string) => void; keep?: boolean;
+function SettingField({ id, f, value, error, onChange, keep, disabled }: {
+  id: string; f: StorageField; value: string; error?: string; onChange: (v: string) => void; keep?: boolean; disabled?: boolean;
 }) {
   return <div className="field">
     <label htmlFor={id}>{f.label}{f.required && !keep ? " *" : ""}</label>
     {f.kind === "choice"
-      ? <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+      ? <select id={id} disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)}>
           {SSL_MODES.map((o) => <option key={o} value={o}>{o || "Driver default"}</option>)}
         </select>
       : <input id={id} className={f.kind === "password" || f.kind === "port" ? "" : "mono"}
-          type={f.kind === "password" ? "password" : f.kind === "port" ? "number" : "text"} autoComplete="off" value={value}
+          disabled={disabled} type={f.kind === "password" ? "password" : f.kind === "port" ? "number" : "text"} autoComplete="off" value={value}
           placeholder={keep ? "Leave empty to keep the stored value" : f.placeholder || (f.default != null ? String(f.default) : "")}
           aria-invalid={!!error} onChange={(e) => onChange(e.target.value)} />}
     {error ? <span className="field-error">{error}</span> : f.help && <span className="hint">{f.help}</span>}
@@ -85,6 +85,7 @@ export function StorageConnectionForm({ hub, existing, onDone, onCancel }: { hub
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const spec = types.find((t) => t.kind === kind);
   const editing = !!existing;
+  const capability=(action:string)=>existing?.capabilities?.includes(action) ?? can(hub.me,action,'storage',String(existing?.config.layer_id || hub.layerId));
   useEffect(() => {  // fill the form once the type's fields are known
     if (!spec) return;
     setDraft(existing ? { name: existing.name, description: existing.description, egress: existing.egress.join(", "), secrets: {},
@@ -136,16 +137,16 @@ export function StorageConnectionForm({ hub, existing, onDone, onCancel }: { hub
           onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         <span className="hint">Lowercase and dashes. Programs connect with this name.</span></div>
       <div className="field"><label htmlFor="si-description">Description</label>
-        <input id="si-description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
+        <input id="si-description" disabled={editing && !capability("storage.connection.edit")} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
     </div>
     <div className="field"><label htmlFor="si-layer">Layer</label><select id="si-layer" required disabled={editing} value={draft.config.layer_id || hub.layerId} onChange={(e) => setDraft({ ...draft, config: { ...draft.config, layer_id: e.target.value } })}>{!(draft.config.layer_id || hub.layerId) && <option value="">Choose a layer</option>}{hub.layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.name}</option>)}</select><span className="hint">All schemas and data objects in this connection inherit its layer.</span></div>
     <h3>Location</h3>
-    <div className="arg-grid">{spec.config.map((f) => <SettingField key={f.name} id={`si-${f.name}`} f={f} value={draft.config[f.name] ?? ""} error={fieldErrors[f.name]}
+    <div className="arg-grid">{spec.config.map((f) => <SettingField key={f.name} id={`si-${f.name}`} disabled={!(capability("storage.connection.destination.change") && capability("storage.connection.trust.change"))} f={f} value={draft.config[f.name] ?? ""} error={fieldErrors[f.name]}
       onChange={(v) => setDraft({ ...draft, config: { ...draft.config, [f.name]: v } })} />)}</div>
     {spec.secrets.map((g) => <section key={g.name}>
       <h3>{g.label}{!g.required && <span className="muted" style={{ fontWeight: 400 }}> · optional</span>}</h3>
       <p className="hint" style={{ marginTop: -4 }}>{g.help}</p>
-      <div className="arg-grid">{g.fields.map((f) => <SettingField key={f.name} id={`si-${g.name}-${f.name}`} f={{ ...f, required: g.required }} keep={editing}
+      <div className="arg-grid">{g.fields.map((f) => <SettingField key={f.name} id={`si-${g.name}-${f.name}`} disabled={!capability("storage.connection.credentials.change")} f={{ ...f, required: g.required }} keep={editing}
         value={draft.secrets[g.name]?.[f.name] ?? ""} error={fieldErrors[`${g.name}.${f.name}`]}
         onChange={(v) => setDraft({ ...draft, secrets: { ...draft.secrets, [g.name]: { ...draft.secrets[g.name], [f.name]: v } } })} />)}</div>
     </section>)}
@@ -154,7 +155,7 @@ export function StorageConnectionForm({ hub, existing, onDone, onCancel }: { hub
         <input id="si-egress" className="mono" value={draft.egress} onChange={(e) => setDraft({ ...draft, egress: e.target.value })} placeholder="10.20.0.15/32" />
         <span className="hint">Addresses workloads may reach for this bucket (enforced on Kubernetes).</span></div></details>}
     <div className="form-actions">
-      <button className="btn" disabled={busy || !draft.name.trim()}>{busy ? "Saving…" : editing ? "Save changes" : "Create connection"}</button>
+      <button className="btn" disabled={busy || !draft.name.trim() || (editing && !capability("storage.connection.edit"))}>{busy ? "Saving…" : editing ? "Save changes" : "Create connection"}</button>
       <button type="button" className="btn secondary" onClick={onCancel}>Cancel</button>
     </div>
   </form>;
@@ -173,7 +174,7 @@ export function StorageConnectionSettings({ hub, name, openTab }: { hub: Hub; na
       : <StorageConnectionForm key={formKey} hub={hub} existing={ds} onDone={() => { setMessage("Saved."); setFormKey((k) => k + 1); }} onCancel={() => setFormKey((k) => k + 1)} />}
     {!ds.config.system_metadata && <section className="card danger-zone"><h3>Remove this connection</h3>
       <p className="muted">Removes the connection, its schemas' registrations and its stored credentials. The storage itself is not touched.</p>
-      <button className="btn danger" onClick={() => confirm(`Remove the ${ds.name} connection and its stored credentials? The storage itself is not touched.`)
+      <button className="btn danger" disabled={!(ds.capabilities?.includes("storage.sources.deregister") ?? hub.me?.acting_admin)} onClick={() => confirm(`Remove the ${ds.name} connection and its stored credentials? The storage itself is not touched.`)
         && api.admin.deleteSource(ds.name).then(async () => { await hub.refresh(); openTab({ kind: "data", title: "Storage" }); }).catch((e: Error) => setError(e.message))}>Remove connection</button>
       {error && <p className="error" role="alert">{error}</p>}</section>}
   </>;

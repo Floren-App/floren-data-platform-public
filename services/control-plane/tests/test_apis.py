@@ -182,6 +182,8 @@ def backend():
 
 
 def test_external_api_calls_use_configured_secrets_and_consumer_permissions(client, backend):
+    from .rbac_helpers import secret_permissions
+    secret_permissions(client,'ana',scope='group',owner='finance')
     client.get("/v1/me", headers=as_("bob"))
     assert client.put("/v1/secrets/group/finance/crm-token", headers=as_("ana"), json={"value": "crm-bearer-123"}).status_code == 200
     assert client.put("/v1/secrets/group/finance/crm-tenant", headers=as_("ana"), json={"value": "tenant-42"}).status_code == 200
@@ -240,6 +242,8 @@ def tls_material(tmp_path):
 
 
 def test_external_mtls_presents_the_client_certificate_and_trusts_the_configured_ca(client, tmp_path):
+    from .rbac_helpers import secret_permissions
+    secret_permissions(client,'ana',scope='group',owner='finance')
     import ssl
     ca_pem, (client_pem, client_key) = tls_material(tmp_path)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -304,7 +308,14 @@ def test_operation_grants_allow_scoped_editing_without_sibling_metadata_or_calls
         assert r.status_code == 201, r.text
         return r.json()
     one, two = operation('permitted', 'Finance'), operation('hidden', 'Other department')
-    grant_group(client, one['resource_id'], 'Scoped API editors', 'Contributor', users=['bob'])
+    grant_group(client, one['resource_id'], 'Scoped API editors', 'Manager', users=['bob'])
+    pid=client.get('/v1/me',headers=as_('bob')).json()['principal_id']
+    from app.permissions import resource_layer
+    with SessionLocal() as db:
+        layer=resource_layer(db,one['resource_id'])
+    client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+        'target_id':one['resource_id'],'namespace':'apis.calls','layer_id':layer,
+        'principal_id':pid,'actions':['apis.calls.details.read']}).raise_for_status()
     with SessionLocal() as db:
         db.add_all([ApiCall(api_id=api['id'], operation_id=one['id'], caller='visible-caller', status_code=200),
                     ApiCall(api_id=api['id'], operation_id=two['id'], caller='hidden-caller', status_code=200)])
@@ -326,6 +337,8 @@ def test_operation_grants_allow_scoped_editing_without_sibling_metadata_or_calls
 
 
 def test_outbound_paths_and_configured_credentials_cannot_be_overridden(client, backend):
+    from .rbac_helpers import secret_permissions
+    secret_permissions(client,'ana',scope='group',owner='finance')
     client.put('/v1/secrets/group/finance/api-key', headers=as_('ana'), json={'value': 'configured-key'})
     body = {'name': 'Partner', 'slug': 'partner', 'direction': 'external', 'outbound': {
         'base_url': backend + '/api', 'headers': [{'name': 'X-Tenant', 'value': 'configured-tenant'}],

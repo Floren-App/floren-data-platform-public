@@ -300,7 +300,8 @@ def dispatch(db, orch) -> List[str]:
             if free < 1:
                 break
             launch_workspace(db, orch, ws)
-            started.append("workspace:" + ws.id)
-            free -= 1
+            if ws.status in ('starting','running'):
+                started.append("workspace:" + ws.id)
+                free -= 1
     db.commit()
     return started

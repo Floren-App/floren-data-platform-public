@@ -110,7 +110,7 @@ def admitted(client, monkeypatch, user):
     monkeypatch.setattr(sql_access, 'engine_request', engine)
     with SessionLocal() as db:
         who = rbac.resolve_user(db, User(user))
-        ws = Workspace(name='SQL ' + user, owner=user, principal_id=who.principal_id, editor='sql', status='running')
+        ws = Workspace(name='SQL ' + user, owner=user, principal_id=who.principal_id, owner_group_id=who.active_group_id, editor='sql', status='running')
         db.add(ws)
         db.commit()
         token = mint_token('execution', user, 3600, ws=ws.id, pid=who.principal_id)
@@ -151,7 +151,9 @@ def test_trino_receives_masks_and_filters_for_the_caller(governed, monkeypatch):
     plain = {'input': {**ana, 'action': {'operation': 'SelectFromColumns', 'resource': {'table': table}}}}
     assert client.post('/internal/trino/allow', json=plain).json() == {'result': True}
 
-    bob = admitted(client, monkeypatch, 'bob')  # an auditor: exempt from the mask, all rows through is_member
+    from .rbac_helpers import select_group
+    select_group(client,'bob',auditors)
+    bob = admitted(client, monkeypatch, 'bob')  # selected auditor group: exempt from the mask, all rows through is_member
     assert client.post('/internal/trino/batch-column-masks', json={'input': {**bob, 'action': {
         'operation': 'GetColumnMask', 'filterResources': columns('id', 'email')}}}).json() == {'result': []}
     assert client.post('/internal/trino/row-filters', json={'input': {**bob, 'action': {

@@ -73,3 +73,16 @@ them. Warehouses scoped by layer and kind of work, and column masks and row filt
 - Trino workers that are requested but cannot be placed yet are shown as such, with the cluster's lack of room.
 - Package repository: installing older R versions without renv, PEP 658 metadata files, a cleanup view of
   unused versions, and per-layer restrictions (for example Prod installs only reviewed packages).
+
+### Enterprise P0 implementation status
+
+The P0 source implementation and regression gates are recorded in
+[the implementation checklist](docs/enterprise-p0-progress.md). Release/image CI and
+installation rollout remain delivery steps. Recovery now includes encrypted metadata archives to
+configurable external S3, a Terraform resource and operator interface, authenticated offline
+restore, customer-native PITR quarantine, admission invalidation and reconciliation before
+restart. Customer data, IdP, secret stores and persistent volumes remain customer-operated
+backup responsibilities. See [the recovery procedure](docs/platform-recovery.md).
+
+The action registry and full permission matrix remain a design and migration inventory;
+they are not a claim that every registered function is implemented or enforced end to end.

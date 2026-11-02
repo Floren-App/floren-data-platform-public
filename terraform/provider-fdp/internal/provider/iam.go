@@ -272,8 +272,8 @@ func (r *roleAssignmentResource) Schema(_ context.Context, _ resource.SchemaRequ
 		Attributes: map[string]schema.Attribute{
 			"id":          schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"resource_id": schema.StringAttribute{Required: true, PlanModifiers: replace},
-			"role": schema.StringAttribute{Required: true, Description: "e.g. Reader, Contributor, Admin, Owner, Executor, Consumer; " +
-				"on the package repository (resource_id \"packages\"): Publisher, Maintainer or Owner."},
+			"role": schema.StringAttribute{Required: true, Description: "Viewer, Executor, Contributor, Manager, Admin or Owner. " +
+				"Legacy Reader, Consumer, Publisher and Maintainer assignments remain supported in their domains. Metadata visibility and payload use are separate; see the role matrix."},
 			"app_group_id": schema.StringAttribute{Optional: true, PlanModifiers: replace},
 			"principal_id": schema.StringAttribute{Optional: true, PlanModifiers: replace},
 			"justification_id": schema.StringAttribute{Optional: true,

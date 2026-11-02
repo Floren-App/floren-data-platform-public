@@ -111,10 +111,16 @@ def sync_registry(db):
         if source:
             known.attributes = {**known.attributes, "source_kind": source.kind, "source": source.name}
             reindex(known)
+    from .object_access import target_for_asset
+    for asset in db.scalars(select(CatalogAsset).where(CatalogAsset.resource_id.in_(schemas),
+            CatalogAsset.kind.in_(['table','view','materialized_view','file','folder']))):
+        target_for_asset(db, asset, schemas[asset.resource_id], create=True)
     kafka_clusters = {}
     for resource in resources:
         if resource.kind in ('kafka', 'topic') and resource.config.get('deleted'):
             continue
+        if resource.kind in rbac.DATA_OBJECT_KINDS:
+            continue  # Physical assets retain their canonical catalog identity on the containing schema.
         if resource.kind in ("root", "api-root", "layer", "package-root", "package", "product-root", "product",
                              "settings-root", "settings-section", "setting"):
             continue  # Navigation roots are not deployed products.
@@ -152,7 +158,11 @@ def sync_registry(db):
 
 def index_children(db, schema, items, table=None, path=""):
     """Remember metadata returned by an authorized, user-initiated data browser request."""
+    from .object_access import ensure_target
     if table:
+        parent_target = ensure_target(db, schema, 'table', table)
+        for column in items:
+            ensure_target(db, parent_target, 'column', column['name'])
         asset = db.get(CatalogAsset, asset_id(schema.id, "object:" + table))
         if asset:
             columns = {c["name"]: c for c in (asset.attributes or {}).get("columns", [])}
@@ -165,13 +175,15 @@ def index_children(db, schema, items, table=None, path=""):
         key = item.get("path", item["name"])
         if key.endswith(("__dbt_tmp", "__dbt_backup")):
             continue
-        upsert(db, schema, "object:" + key, kind=item["kind"], name=item["name"], path=parent + " / " + key,
+        asset = upsert(db, schema, "object:" + key, kind=item["kind"], name=item["name"], path=parent + " / " + key,
                attributes={"object_path": key, "schema": schema.name, "origin": "data_browser"})
+        from .object_access import target_for_asset
+        target_for_asset(db, asset, schema, create=True)
 
 
 def permissions(db, user):
     """Bulk evaluation of the same fixed roles/additive inheritance for a catalog request."""
-    cache_key = ("catalog_permissions", user.principal_id, user.username, user.environment_id, user.execution_context)
+    cache_key = ("catalog_permissions", user.principal_id, user.username, user.environment_id, user.execution_context, user.active_group_id)
     if cache_key in db.info:
         return db.info[cache_key]
     user = rbac.resolve_user(db, user)
@@ -198,6 +210,12 @@ def permissions(db, user):
         if user.is_admin and not user.execution_context:
             allowed |= roles.get("Owner",set())
         actions[resource.id] = allowed
+    from .object_access import metadata_visible
+    from .permissions import allowed as capability_allowed
+    for resource in resources.values():
+        if metadata_visible(db, user, resource) or (resource.kind == 'service' and
+            not resource.config.get('service_account') and capability_allowed(db, user, 'workloads.settings.read', resource.id)):
+            actions[resource.id].add('read')
     db.info[cache_key] = (resources, actions)
     return resources, actions
 
@@ -211,10 +229,15 @@ def readable_resources(db, user, browsing=False):
         scope = browsing_scope(db, user)
         allowed = {rid for rid in allowed if any("read" in rbac.roles_for(resources[rid]).get(role, set())
                    for role in scope.get(rid, set()))}
+    from .object_access import metadata_visible
+    allowed.update(rid for rid, resource in resources.items() if metadata_visible(db, user, resource))
+    from .permissions import allowed as capability_allowed
+    allowed.update(rid for rid, resource in resources.items() if resource.kind == 'service' and
+        not resource.config.get('service_account') and capability_allowed(db, user, 'workloads.settings.read', resource.id))
     return resources, allowed
 
 
-def visible_assets(db, user, terms=(), condition=None):
+def visible_assets(db,user,terms=(),condition=None,function=None):
     resources, allowed = readable_resources(db, user, browsing=True)
     stopped = {p.resource_id for p in db.scalars(select(Workload).where(Workload.status == "stopped"))}
     stopped.update(r.id for r in resources.values() if r.kind in ('kafka', 'topic') and r.config.get('deleted'))
@@ -223,14 +246,20 @@ def visible_assets(db, user, terms=(), condition=None):
         statement = statement.where(condition)
     for term in terms:
         statement = statement.where(CatalogAsset.search_text.contains(term, autoescape=True))
+    from .object_access import asset_visible
     assets = [a for a in db.scalars(statement)
-              if not (a.attributes or {}).get("inactive")]
+              if not (a.attributes or {}).get("inactive") and asset_visible(db, user, a, resources[a.resource_id])]
+    if function:
+        from .asset_access import allowed as function_allowed
+        assets=[asset for asset in assets if function_allowed(db,user,function,asset,resources[asset.resource_id],('read',))]
     # Metric dependencies can repeat across hundreds of tests. Fetch their resource
     # IDs together and use the same permission snapshot as the containing entries.
     dependency_ids = {ident for a in assets for ident in a.attributes.get('dependency_asset_ids', [])}
-    dependencies = dict(db.execute(select(CatalogAsset.id, CatalogAsset.resource_id).where(
-        CatalogAsset.id.in_(dependency_ids))).all()) if dependency_ids else {}
-    assets = [a for a in assets if all(dependencies.get(ident) in allowed
+    dependencies = {a.id: a for a in db.scalars(select(CatalogAsset).where(
+        CatalogAsset.id.in_(dependency_ids)))} if dependency_ids else {}
+    visible_dependencies = {ident for ident, dependency in dependencies.items()
+        if dependency.resource_id in allowed and asset_visible(db, user, dependency, resources[dependency.resource_id])}
+    assets = [a for a in assets if all(ident in visible_dependencies
               for ident in a.attributes.get('dependency_asset_ids', []))]
     from .layers import info
     for asset in assets:
@@ -250,11 +279,16 @@ def require_asset(db, ident, user, action="read"):
     pub = db.get(Workload, resource.object_id) if resource and resource.kind == "service" and not resource.config.get("service_account") else None
     if not resource or resource.config.get('deleted') or asset.attributes.get("inactive") or (pub and pub.status == "stopped") or not rbac.allowed(db, user, "read", resource):
         raise HTTPException(404, "catalog object not available")
+    from .object_access import asset_visible
+    if not asset_visible(db, user, asset, resource):
+        raise HTTPException(404, 'catalog object not available')
     from .measurements import dependencies_visible
     if not dependencies_visible(db, user, asset.attributes.get('dependency_asset_ids', [])):
         raise HTTPException(404, 'catalog object not available')
     if action != "read":
-        rbac.require(db, user, action, resource)
+        from .object_access import target_for_asset
+        target = target_for_asset(db, asset, resource) if resource.kind == 'schema' else None
+        rbac.require(db, user, action, target or resource)
     return asset, resource
 
 
@@ -402,15 +436,36 @@ def asset_out(db, asset, resource, user):
     from .models import AppGroup
     _, actions = permissions(db, user)
     permitted = actions.get(resource.id, set())
+    attributes = dict(asset.attributes)
+    classification_info = classification.describe(db, asset)
+    if resource.kind == 'schema':
+        from .object_access import schema_rules, visible
+        from .object_access import source_record
+        source = source_record(db, resource.object_id)
+        if source and not rbac.data_scope(db, user, source).get(resource.name):
+            rules = schema_rules(db, user, resource)
+            table = attributes.get('object_path') or attributes.get('table') or asset.name
+            if 'columns' in attributes:
+                attributes['columns'] = [c for c in attributes['columns'] if visible(rules, table, c.get('name',''))]
+            classification_info['columns'] = {name:value for name,value in classification_info.get('columns', {}).items() if visible(rules, table, name)}
     group = db.get(AppGroup, (asset.governance or {}).get("owner_group_id")) if (asset.governance or {}).get("owner_group_id") else None
-    return {**layers.info(db, resource), "id": asset.id, "name": asset.name, "kind": asset.kind, "path": asset.path,
+    permission_target = None
+    if resource.kind == 'schema':
+        from .object_access import target_for_asset
+        target = target_for_asset(db, asset, resource)
+        if target:
+            from .routes.rbac import resource_out
+            permission_target = resource_out(db, target, user)
+            permitted = set(permission_target['actions'])
+    return {**layers.info(db, resource), "permission_target":permission_target, "id": asset.id, "name": asset.name, "kind": asset.kind, "path": asset.path,
         "resource": {"id": resource.id, "name": resource.name, "kind": resource.kind, "parent_id": resource.parent_id,
-            "object_id": resource.object_id, "config": resource.config or {}, "actions": sorted(permitted)}, "attributes": asset.attributes,
+            "object_id": resource.object_id, "config": resource.config or {}, "actions": sorted(permitted)}, "attributes": attributes,
         "governance": asset.governance, "sla": asset.sla, "service_level": service_level(db, asset, resource),
-        "classification": classification.describe(db, asset),
+        "classification": classification_info,
         "owner_group_name": group.name if group else None,
         "observed_at": asset.observed_at,
-        "can_edit": bool(permitted & {"edit", "write", "ddl"}), "can_govern": "assign" in permitted}
+        "can_edit": bool(permitted & {"edit", "write", "ddl"}), "can_govern": "assign" in permitted,
+        "capabilities":asset_capabilities(db,user,asset,resource)}
 
 
 def lineage_category(source, target, relation):
@@ -635,7 +690,7 @@ def attach_hierarchy(assets, edges, selected, distances, focus):
 
 
 def graph(db, user, focus, direction="both", depth=3, origin="", since=None, view="full", orchestration=False, operational=False, hierarchy=False):
-    assets, resources = visible_assets(db, user)
+    assets, resources = visible_assets(db,user,function="lineage.read")
     by_id = {a.id: a for a in assets}
     if focus not in by_id:
         raise HTTPException(404, "catalog object not available")
@@ -756,3 +811,11 @@ def graph(db, user, focus, direction="both", depth=3, origin="", since=None, vie
                        "upstream_count": len(upstream.get(i, ())), "downstream_count": len(downstream.get(i, ()))} for i in sorted(selected)],
         "edges": links[:400],
         "truncated": truncated}
+
+
+def asset_capabilities(db,user,asset,resource):
+    from .asset_access import allowed
+    functions={'metrics.define':('assign',),'metrics.enable':('assign',),
+        'metrics.measure':('execute',),'metrics.report':('write','edit'),
+        'slas.evaluate':('execute',),'slas.acknowledge':('assign',)}
+    return [action for action,legacy in functions.items() if allowed(db,user,action,asset,resource,legacy)]

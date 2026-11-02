@@ -329,7 +329,7 @@ export function PrivacyReviews({ openTab }: { openTab: (t: TabRef) => void }) {
 
 /** People who joined a group with access given through a form: they get that access once approved. */
 export function PrivacyMemberships({ hub }: { hub: Hub }) {
-  const [items, setItems] = useState<{ app_group_id: string; principal_id: string; group: string; principal: string }[] | null>(null);
+  const [items, setItems] = useState<{ app_group_id: string; principal_id: string; group: string; principal: string; capabilities?: string[] }[] | null>(null);
   const [error, setError] = useState(""), [message, setMessage] = useState(""), [notes, setNotes] = useState<Record<string, string>>({});
   const load = useCallback(() => api.compliance.memberships().then(setItems).catch((e: Error) => setError(e.message)), []);
   useEffect(() => { void load(); }, [load]);
@@ -346,8 +346,8 @@ export function PrivacyMemberships({ hub }: { hub: Hub }) {
         <td className="table-actions"><div className="row">
           <input aria-label={`Note for ${m.principal}`} placeholder="Note (optional)" value={notes[m.app_group_id + m.principal_id] ?? ""}
             onChange={(e) => setNotes({ ...notes, [m.app_group_id + m.principal_id]: e.target.value })} />
-          <button className="btn sm" onClick={() => decide(m.app_group_id, m.principal_id, m.principal, true)}>Approve</button>
-          <button className="btn sm secondary" onClick={() => decide(m.app_group_id, m.principal_id, m.principal, false)}>Decline</button></div></td></tr>)}
+          <button className="btn sm" disabled={m.capabilities ? !m.capabilities.includes("compliance.memberships.approve") : false} onClick={() => decide(m.app_group_id, m.principal_id, m.principal, true)}>Approve</button>
+          <button className="btn sm secondary" disabled={m.capabilities ? !m.capabilities.includes("compliance.memberships.reject") : false} onClick={() => decide(m.app_group_id, m.principal_id, m.principal, false)}>Decline</button></div></td></tr>)}
       {!items.length && <tr><td colSpan={3} className="muted">Nobody waits.</td></tr>}</tbody></table></div>}
   </>;
 }
@@ -365,7 +365,7 @@ export function PrivacyRegister({ openTab }: { openTab: (t: TabRef) => void }) {
   return <>
     <PageHeader icon={<ProductIcon kind="file" size={22} />} title="Access register"
       subtitle="Access given because a compliance form was approved. Reviewers see what is in their scope."
-      actions={<button className="btn secondary" onClick={() => void exportCsv()}>Export CSV</button>} />
+      actions={<button className="btn secondary" disabled={!rows?.some((row) => row.can_export)} onClick={() => void exportCsv()}>Export CSV</button>} />
     {error && <p className="error" role="alert">{error}</p>}
     <input aria-label="Filter the register" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter by group, data, person…" style={{ marginBottom: 8, minWidth: 280 }} />
     {!rows ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Access register"><thead><tr>

@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .. import data_policies, rbac
+from .. import data_policies, permissions, rbac
 from ..auth import User
 from ..db import get_db
 from ..deps import get_actor
@@ -108,7 +108,7 @@ def list_policies(schema_id: Optional[str] = Query(default=None), db: Session = 
     result = []
     for policy in db.scalars(query):
         if policy.schema_id not in visible:
-            visible[policy.schema_id] = rbac.allowed(db, user, "read", db.get(Resource, policy.schema_id))
+            visible[policy.schema_id] = permissions.domain_allowed(db,user,"data.policies.read",db.get(Resource,policy.schema_id),"read")
         if visible[policy.schema_id]:
             result.append(out(policy))
     return result
@@ -128,7 +128,7 @@ def normalize(body: ExpressionIn, user: User = Depends(get_actor)):
 @router.get("/{policy_id}", response_model=PolicyOut)
 def get_policy(policy_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     policy = db.get(DataPolicy, policy_id)
-    if not policy or not rbac.allowed(db, user, "read", db.get(Resource, policy.schema_id)):
+    if not policy or not permissions.domain_allowed(db,user,"data.policies.read",db.get(Resource,policy.schema_id),"read"):
         raise HTTPException(404, "policy not found")
     return out(policy)
 
@@ -136,7 +136,9 @@ def get_policy(policy_id: str, db: Session = Depends(get_db), user: User = Depen
 @router.post("", response_model=PolicyOut, status_code=201)
 def create_policy(body: PolicyIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     schema = governed_schema(db, body.schema_id)
-    rbac.require(db, user, "assign", schema)
+    permissions.require_domain(db,user,"data.policies.apply_restrictive",schema,"assign")
+    if body.exempt_groups or body.exempt_principals:
+        permissions.require_domain(db,user,"data.policies.exemptions.change",schema,"assign")
     table = data_policies.normalize_name(body.table, "table")
     column = data_policies.normalize_name(body.column, "column") if body.column else ""
     method, expression, groups, principals = check(db, body, body.kind, column)
@@ -160,10 +162,13 @@ def update_policy(policy_id: str, body: PolicyChange, db: Session = Depends(get_
     """Change how a policy masks or filters and who is exempt. Table, kind and column are fixed."""
     policy = db.get(DataPolicy, policy_id)
     schema = db.get(Resource, policy.schema_id) if policy else None
-    if not policy or not rbac.allowed(db, user, "read", schema):
+    if not policy or not permissions.domain_allowed(db,user,"data.policies.read",schema,"read"):
         raise HTTPException(404, "policy not found")
-    rbac.require(db, user, "assign", schema)
     method, expression, groups, principals = check(db, body, policy.kind, policy.column_name)
+    changes_policy=method!=policy.method or expression!=policy.expression
+    permissions.require_domain(db,user,'data.policies.weaken' if changes_policy else 'data.policies.draft.edit',schema,'assign')
+    if set(groups)!=set(policy.exempt_groups or []) or set(principals)!=set(policy.exempt_principals or []):
+        permissions.require_domain(db,user,'data.policies.exemptions.change',schema,'assign')
     policy.method, policy.expression, policy.exempt_groups, policy.exempt_principals = method, expression, groups, principals
     policy.description, policy.updated_by = body.description, user.username
     audit(db, user.username, "data_policy.update", policy.id, **detail(policy))
@@ -175,9 +180,9 @@ def update_policy(policy_id: str, body: PolicyChange, db: Session = Depends(get_
 def delete_policy(policy_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     policy = db.get(DataPolicy, policy_id)
     schema = db.get(Resource, policy.schema_id) if policy else None
-    if not policy or not rbac.allowed(db, user, "read", schema):
+    if not policy or not permissions.domain_allowed(db,user,"data.policies.read",schema,"read"):
         raise HTTPException(404, "policy not found")
-    rbac.require(db, user, "assign", schema)
+    permissions.require_domain(db,user,"data.policies.weaken",schema,"assign")
     audit(db, user.username, "data_policy.delete", policy.id, **detail(policy))
     db.delete(policy)
     db.commit()

@@ -8,7 +8,7 @@ from fastapi import HTTPException
 import jwt
 from sqlalchemy import delete, select
 
-from . import layers, rbac
+from . import layers, rbac, permissions
 from .auth import User
 from .config import get_settings
 from .layer_infrastructure import InfrastructureSpec, require_ready
@@ -65,8 +65,9 @@ def issue(db, actor, item, mode, group=''):
     layer_id = layers.resource_layer(db, item)
     _, spec = specification(db, layer_id)
     require_ready(db, layer_id)
-    action = 'write' if mode == 'produce' else 'read'
-    rbac.require(db, actor, action, item)
+    legacy = 'write' if mode == 'produce' else 'consume'
+    permissions.require_domain(db, actor, 'kafka.data.session.create', item, legacy)
+    permissions.require_domain(db, actor, 'kafka.data.produce' if mode == 'produce' else 'kafka.data.consume', item, legacy)
     if item.config.get('phase') != 'Ready':
         raise HTTPException(409, 'The Kafka topic is not ready; check its provisioning status')
     if not actor.principal_id:
@@ -77,7 +78,7 @@ def issue(db, actor, item, mode, group=''):
     expires = int(time.time()) + spec.kafka.token_ttl_seconds
     record = KafkaSession(id='s_'+secrets.token_urlsafe(24), principal_id=actor.principal_id,
         username=actor.username, layer_id=layer_id, topic_id=item.id, mode=mode,
-        consumer_group=own_group, execution_context=actor.execution_context, expires_at=expires)
+        consumer_group=own_group, execution_context=actor.execution_context, active_group_id=actor.active_group_id or "", expires_at=expires)
     db.add(record)
     # Bounded expiry cleanup; no long-running periodic full-table scan on admissions.
     expired = list(db.scalars(select(KafkaSession.id).where(KafkaSession.expires_at < int(time.time()))
@@ -124,22 +125,30 @@ def decide(db, layer_id, payload):
     if layers.resource_layer(db, item) != layer_id:
         return False
     actor = rbac.resolve_user(db, User(session.username, principal_id=session.principal_id,
-        environment_id=layer_id, execution_context=session.execution_context or 'kafka-session'))
+        environment_id=layer_id, execution_context=session.execution_context, active_group_id=session.active_group_id))
     if pattern.get('unknown') or pattern.get('patternType') != 'LITERAL':
         return False
     operation = action.get('operation')
     kind, name = pattern.get('resourceType'), pattern.get('name')
+    payload_action = 'kafka.data.produce' if session.mode == 'produce' else 'kafka.data.consume'
+    legacy_action = 'write' if session.mode == 'produce' else 'consume'
+    payload_allowed = permissions.domain_allowed(db, actor, payload_action, item, legacy_action)
     if kind == 'TOPIC' and name == item.name:
-        if operation in ('READ', 'DESCRIBE', 'DESCRIBE_CONFIGS'):
-            return rbac.allowed(db, actor, 'read', item) and (operation != 'READ' or session.mode == 'consume')
+        if operation in ('DESCRIBE', 'DESCRIBE_CONFIGS'):
+            return payload_allowed
+        if operation == 'READ' and session.mode == 'consume':
+            return payload_allowed
         if operation == 'WRITE' and session.mode == 'produce':
-            return rbac.allowed(db, actor, 'write', item)
+            return permissions.domain_allowed(db, actor, 'kafka.data.produce', item, 'write')
     if kind == 'GROUP' and session.mode == 'consume' and name == session.consumer_group:
-        return operation in ('READ', 'DESCRIBE') and rbac.allowed(db, actor, 'read', item)
+        if operation == 'DESCRIBE':
+            return payload_allowed
+        return operation == 'READ' and payload_allowed and permissions.domain_allowed(
+            db, actor, 'kafka.data.offsets.commit_own', item, 'consume')
     if kind == 'CLUSTER' and name == 'kafka-cluster' and operation == 'IDEMPOTENT_WRITE':
-        return session.mode == 'produce' and rbac.allowed(db, actor, 'write', item)
+        return session.mode == 'produce' and permissions.domain_allowed(db, actor, 'kafka.data.produce', item, 'write')
     if kind == 'CLUSTER' and name == 'kafka-cluster' and operation == 'DESCRIBE':
-        return rbac.allowed(db, actor, 'read', item)
+        return payload_allowed
     # Native DDL and ACL/cluster administration are deliberately not granted by a data session.
     # Topic lifecycle uses the validated FDP API and its controller-owned KafkaTopic CRs.
     return False

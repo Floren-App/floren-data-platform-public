@@ -3,9 +3,11 @@ import { TAB_PAGES } from "../src/permissions";
 const ALL_FEATURES = ["products.browse", "products.request", "products.publish", "catalog.objects", "workspaces", "workloads.view", "workloads.manage", "storage", "packages", "kafka", "apis", "usage", "security"];
 const allPages = Object.fromEntries(Object.values(TAB_PAGES).map((p) => [p, true]));
 
-type Resource = { id: string; kind: string; name: string; parent_id: string | null; object_id: string | null; config: Record<string, unknown>; actions: string[]; data_access?: boolean };
+type Resource = { id: string; kind: string; name: string; parent_id: string | null; object_id: string | null; config: Record<string, unknown>; actions: string[]; capabilities?: string[]; data_access?: boolean };
 type Grant = { id: string; resource_id: string; app_group_id: string | null; group: string | null;
   principal_id?: string; principal_name?: string; principal_kind?: string; role: string };
+const runCapabilities = ["logs.read", "artifacts.list", "artifacts.read", "artifacts.open", "runs.cancel_own", "runs.cancel_others", "runs.retry"];
+const workspaceCapabilities = ["object.read", "object.start", "object.stop", "object.editor.open", "object.settings.edit", "object.delete", "files.read"].map((a) => `workspaces.${a}`).concat("runs.create", "git.credentials.binding.change");
 const allActions = ["read", "write", "create", "delete", "alter", "execute", "assign", "identity"];
 const resource = (id: string, kind: string, name: string, parent: string | null = null, config = {}, objectId: string | null = null): Resource =>
   ({ id, kind, name, parent_id: parent, object_id: objectId, config, actions: [...allActions] });
@@ -22,6 +24,7 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     resource("etl-service", "service", "Service account: finance-etl", null, { service_account: true, account_name: "finance-etl", principal_id: "etl-identity" }, "etl")];
   for (let i = 0; i < 120; i++) resources.push(resource(`pg-schema-${i}`, "schema", `schema_${String(i).padStart(3, "0")}`, "source-pg", { state: "ready" }, "pg"));
   if (access !== "owner") for (const r of resources) r.actions = access === "navigation" && r.id === "source-pg" ? [] : ["read", "execute"];
+  if (access === "reader") for (const r of resources) r.capabilities = ["permissions.bindings.read", "permissions.effective.read"];
   if (dataAccess) for (const r of resources) if (r.kind === "source" || r.kind === "schema") r.data_access = dataAccess(r);
   const groups = [{ id: "analysts", name: "Analysts", description: "Finance analysts", owners: ["admin"], bindings: ["idp-finance"], can_manage: true, can_inspect: true },
     { id: "operators", name: "Operators", description: "Platform operators", owners: ["admin"], bindings: [], can_manage: true, can_inspect: true }];
@@ -230,7 +233,7 @@ test("Kafka opens topics lazily and keeps data roles on the topic permission pag
   const panel = page.getByRole("region", { name: "Permissions for pokemon.cards" });
   await expect(panel).toBeVisible();
   await expect(panel.getByLabel("Role", { exact: true })).toHaveValue("Reader");
-  await expect(panel.getByRole("option", { name: /Executor/ })).toHaveCount(0);
+  await expect(panel.getByRole("option", { name: /^Executor/ })).toHaveCount(1);
   await expect(panel).toContainText("Consumer groups are isolated by identity");
 });
 
@@ -309,7 +312,7 @@ test("inherited grant opens the parent's permissions and direct revoke targets t
   await expect(page.getByRole("button", { name: "Remove Operators's direct Owner role" })).toBeVisible();
 });
 
-test("readers see grants without permission editing or service identity controls", async ({ page }) => {
+test("explicit binding inspectors see grants without editing or service identity controls", async ({ page }) => {
   await setup(page, "reader");
   await openSchema(page);
   await expect(page.getByText("Inherited", { exact: true })).toBeVisible();
@@ -322,12 +325,22 @@ test("readers see grants without permission editing or service identity controls
   await expect(page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Settings", exact: true })).toHaveCount(0);
 });
 
+test("metadata readers do not fetch grant bindings without inspection permission", async ({ page }) => {
+  const state = await setup(page, "reader");
+  for (const resource of state.resources) resource.capabilities = [];
+  await page.reload();
+  await openSchema(page);
+  await expect(page.getByText(/Permission bindings require explicit inspection/)).toBeVisible();
+  expect(state.reads).not.toContain("/v1/rbac/resources/pg-reporting/assignments");
+  await expect(page.getByRole("button", { name: "Assign role", exact: true })).toHaveCount(0);
+});
+
 test("navigation-only ancestors do not fetch protected permission details", async ({ page }) => {
   const state = await setup(page, "navigation");
   await page.getByRole("button", { name: "Storage", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: "finance-dw", exact: true }).click();
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Permissions", exact: true }).click();
-  await expect(page.getByText(/Permission details require access/)).toBeVisible();
+  await expect(page.getByText(/Permission bindings require explicit inspection/)).toBeVisible();
   expect(state.reads).not.toContain("/v1/rbac/resources/source-pg/assignments");
 });
 
@@ -456,6 +469,25 @@ test("service permissions and identity bindings have their own contextual pages"
   expect(state.errors).toEqual([]);
 });
 
+test("credential auditors see token metadata without creation or revocation controls", async ({ page }) => {
+  await setup(page, "reader");
+  await page.route("**/api/v1/service-accounts", (route) => route.fulfill({ json: [{
+    id:"etl", name:"finance-etl", principal:"sa:finance-etl", can_manage:false,
+    capabilities:["identities.tokens.list"], groups:[], allowed_groups:[], disabled:false,
+  }] }));
+  await page.route("**/api/v1/service-accounts/finance-etl/tokens", (route) => route.fulfill({ json: [{
+    id:"audit-token", name:"Automation", prefix:"dcs_visible", revoked:false, token:null,
+    expires_at:null, last_used_at:null, stored_as:null,
+  }] }));
+  await page.getByRole("button", { name:"Access", exact:true }).click();
+  await page.locator(".sidebar").getByRole("button", { name:"Service identities", exact:true }).click();
+  await page.getByRole("button", { name:"Service account: finance-etl", exact:true }).click();
+  await expect(page.getByRole("heading", { name:"Tokens", exact:true })).toBeVisible();
+  await expect(page.getByRole("cell", { name:"Automation", exact:true })).toBeVisible();
+  await expect(page.getByRole("button", { name:"Create token", exact:true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name:"Revoke", exact:true })).toHaveCount(0);
+});
+
 const deniedData = {
   code: "data_access_denied", message: 'Service account "finance-etl" has no data access to "finance-dw".',
   guidance: "Assign a data role on the required schema and bind this service account to the app security group.",
@@ -563,7 +595,7 @@ test("workload identity settings preserve the caller and fixed-service choices",
   await page.getByLabel("Run as", { exact: true }).selectOption("finance-etl");
   await page.getByRole("button", { name: "Save and redeploy", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Production settings saved.");
-  expect(state.mutations.at(-1)).toEqual({ method: "PATCH", path: "/v1/workloads/sales", body: { execution_mode: "fixed", run_as: "finance-etl", env: {}, secrets: {} } });
+  expect(state.mutations.at(-1)).toEqual({ method: "PATCH", path: "/v1/workloads/sales", body: { execution_mode: "fixed", run_as: "finance-etl" } });
   expect(state.errors).toEqual([]);
 });
 
@@ -917,7 +949,7 @@ test("owners classify columns and the object follows the highest", async ({ page
   await page.route("https://iam.test/api/v1/catalog/classifications", (route) => route.fulfill({ json: { levels: [
     { name: "public", masked_as: "public", description: "" }, { name: "internal", masked_as: "internal", description: "" },
     { name: "restricted", masked_as: "internal", description: "" }, { name: "secret", masked_as: "restricted", description: "" }] } }));
-  await page.route(/\/v1\/catalog\/assets\/[^/]+\/columns$/, (route) => { saved.push(route.request().postDataJSON()); return route.fulfill({ json: {} }); });
+  await page.route(/\/v1\/catalog\/assets\/[^/]+\/columns$/, (route) => { saved.push(route.request().postDataJSON()); return route.fulfill({ json: state.catalogItems.find(a => a.id === "cat-table")! }); });
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: "Everything", exact: true }).click();
   const main = page.locator(".main");
@@ -938,7 +970,7 @@ test("logs: a workload's Logs tab, the joint Workloads log and a run's log", asy
   const asked: URLSearchParams[] = [];
   const line = (id: number, level: string, message: string, extra: Record<string, unknown> = {}) => ({ id, at: new Date(Date.now() - id * 60_000).toISOString(), level, source: "program",
     event: "", message, fields: {}, workload_id: "sales", workload: "Sales app", run_id: null, workspace_id: null, commit_sha: "abc1234" + "0".repeat(33), layer_id: "1a0000000002", actor: "admin", ...extra });
-  await page.route("https://iam.test/api/v1/runs?*", (route) => route.fulfill({ json: [{ id: "run-1", initiated_by: "admin", owner: "admin", workspace_id: null, workload_id: "script",
+  await page.route("https://iam.test/api/v1/runs?*", (route) => route.fulfill({ json: [{ id: "run-1", capabilities: runCapabilities, initiated_by: "admin", owner: "admin", workspace_id: null, workload_id: "script",
     commit_sha: "abc1234" + "0".repeat(33), kind: "script", entrypoint: "daily.py", program: "daily-report", args: {}, runtime: "python", runtime_version: "3.12",
     status: "succeeded", pool_name: "small", created_at: "2026-10-19T10:00:00Z", finished_at: "2026-10-19T11:00:00Z" }] }));
   await page.reload();
@@ -1493,7 +1525,7 @@ test("warehouse choices start with the default and never offer Trino's warehouse
     pools: [{ id: "a", name: "small", cpu: 1, memory_gb: 2, max_concurrent: 6, auto_suspend_seconds: 600, allowed_groups: [] },
       { id: "b", name: "medium", cpu: 2, memory_gb: 2, max_concurrent: 6, auto_suspend_seconds: 600, allowed_groups: [], default: true },
       { id: "c", name: "tf-trino", cpu: 1, memory_gb: 1, max_concurrent: 6, auto_suspend_seconds: 600, allowed_groups: [], trino_layers: ["Non-Prod"] }] } }));
-  await page.route("https://iam.test/api/v1/workspaces", (route) => route.fulfill({ json: [{ id: "ws-1", owner: "admin", name: "Notebook", editor: "vscode", status: "running",
+  await page.route("https://iam.test/api/v1/workspaces", (route) => route.fulfill({ json: [{ id: "ws-1", capabilities: workspaceCapabilities, owner: "admin", name: "Notebook", editor: "vscode", status: "running",
     last_activity_at: "2026-10-20T10:00:00Z", created_at: "2026-10-20T10:00:00Z" }] }));
   await page.reload();
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workspaces", exact: true }).click();
@@ -1513,7 +1545,7 @@ test("warehouse choices only offer warehouses meant for the layer and kind, star
       pool("c", "prod-only", { layer_ids: ["1a0000000001"], layer_names: ["Prod"] }),
       pool("d", "nonprod-scripts", { layer_ids: ["1a0000000002"], workload_kinds: ["script"],
         default_for: [{ layer_id: "1a0000000002", layer_name: "Non-Prod", workload_kind: "script" }] })] } }));
-  await page.route("https://iam.test/api/v1/workspaces", (route) => route.fulfill({ json: [{ id: "ws-1", owner: "admin", name: "Notebook", editor: "vscode", status: "running",
+  await page.route("https://iam.test/api/v1/workspaces", (route) => route.fulfill({ json: [{ id: "ws-1", capabilities: workspaceCapabilities, owner: "admin", name: "Notebook", editor: "vscode", status: "running",
     layer_id: "1a0000000002", layer_name: "Non-Prod", last_activity_at: "2026-10-20T10:00:00Z", created_at: "2026-10-20T10:00:00Z" }] }));
   await page.reload();
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Workspaces", exact: true }).click();
@@ -1633,7 +1665,7 @@ test("a SQL workspace is created from the editor choice and explains where scrip
   await page.route("https://iam.test/api/v1/workspaces", async (route) => {
     if (route.request().method() === "POST") {
       const body = route.request().postDataJSON();
-      created.push({ id: "sqlws", owner: "admin", name: body.name, editor: body.editor, status: "stopped", last_activity_at: "2026-10-18T10:00:00Z", created_at: "2026-10-18T10:00:00Z" });
+      created.push({ id: "sqlws", capabilities: workspaceCapabilities, owner: "admin", name: body.name, editor: body.editor, status: "stopped", last_activity_at: "2026-10-18T10:00:00Z", created_at: "2026-10-18T10:00:00Z" });
       return route.fulfill({ status: 201, json: created.at(-1) });
     }
     return route.fulfill({ json: created });
@@ -1791,7 +1823,7 @@ test("people keep Git credentials, whose tokens are never shown again", async ({
     const req = route.request();
     if (req.method() === "POST") { saved.push(req.postDataJSON()); return route.fulfill({ status: 201, json: { id: "c1", ...req.postDataJSON(), updated_at: "now" } }); }
     if (req.method() === "PUT") { saved.push({ put: new URL(req.url()).pathname.split("/").pop(), ...req.postDataJSON() }); return route.fulfill({ json: {} }); }
-    return route.fulfill({ json: saved.filter((c) => !c.put).map(({ token, ...c }, i) => ({ id: `c${i + 1}`, label: c.label || c.host, ...c, updated_at: "now" })) });
+    return route.fulfill({ json: saved.filter((c) => !c.put).map(({ token, ...c }, i) => ({ id: `c${i + 1}`, label: c.label || c.host, ...c, capabilities: ["git.credentials.update", "git.credentials.delete"], updated_at: "now" })) });
   });
   const main = page.locator(".main");
   await page.getByRole("button", { name: "Account", exact: true }).click();
@@ -1821,7 +1853,7 @@ test("people keep Git credentials, whose tokens are never shown again", async ({
 
 test("the first start of a workspace asks which Git credential it uses", async ({ page }) => {
   const state = await setup(page);
-  const ws = { id: "w1", owner: "admin", name: "Analysis", editor: "vscode", status: "stopped", git_asked: false, git_credential_id: null,
+  const ws = { id: "w1", capabilities: workspaceCapabilities, owner: "admin", name: "Analysis", editor: "vscode", status: "stopped", git_asked: false, git_credential_id: null,
     last_activity_at: "2026-10-24T10:00:00Z", created_at: "2026-10-24T10:00:00Z" };
   const calls: string[] = [];
   await page.route("https://iam.test/api/v1/workspaces", (route) => route.fulfill({ json: [ws] }));
@@ -2164,7 +2196,7 @@ test("Home starts with scoped activity and submits global search into the catalo
 
 test("Workloads keeps runs in a searchable tab, not in the sidebar", async ({ page }) => {
   const state = await setup(page);
-  const run = { id: "run-1", initiated_by: "admin", owner: "admin", workspace_id: null, workload_id: "script", commit_sha: null,
+  const run = { id: "run-1", capabilities: runCapabilities, initiated_by: "admin", owner: "admin", workspace_id: null, workload_id: "script", commit_sha: null,
     kind: "script", entrypoint: "daily.py", program: "daily-report", args: {}, runtime: "python", runtime_version: "3.12", status: "failed", pool_name: "small", created_at: "2026-10-19T10:00:00Z", finished_at: "2026-10-19T11:00:00Z" };
   await page.route("https://iam.test/api/v1/runs?*", (route) => route.fulfill({ json: [run] }));
   await page.reload();
@@ -2476,7 +2508,7 @@ test("switching group refreshes storage and catalog without reusing the previous
 
 test("SQL workspace waits for readiness and explains startup failures", async ({ page }) => {
   const state=await setup(page);
-  const ws={id:"waiting-sql",owner:"admin",name:"Queries",editor:"sql",status:"starting",startup_error:null as string|null,
+  const ws={id:"waiting-sql",capabilities:workspaceCapabilities,owner:"admin",name:"Queries",editor:"sql",status:"starting",startup_error:null as string|null,
     started_at:"2026-10-20T10:00:00Z",last_activity_at:"2026-10-20T10:00:00Z",created_at:"2026-10-20T10:00:00Z"};
   await page.route("https://iam.test/api/v1/workspaces",route=>route.fulfill({json:[ws]}));
   const sidebar=page.locator(".sidebar"),main=page.locator(".main");
@@ -2500,9 +2532,9 @@ test("SQL workspace waits for readiness and explains startup failures", async ({
 
 test("queued work shows its place in line and admins set workspace limits", async ({ page }) => {
   const state = await setup(page);
-  const ws = { id: "waiting-ws", owner: "admin", name: "Notebook", editor: "vscode", status: "queued", queue_position: 2,
+  const ws = { id: "waiting-ws", capabilities: workspaceCapabilities, owner: "admin", name: "Notebook", editor: "vscode", status: "queued", queue_position: 2,
     started_at: null, last_activity_at: "2026-10-20T10:00:00Z", created_at: "2026-10-20T10:00:00Z" };
-  const run = { id: "run-1", owner: "admin", workspace_id: "waiting-ws", workload_id: null, commit_sha: null, kind: "script", entrypoint: "etl.py",
+  const run = { id: "run-1", capabilities: runCapabilities, owner: "admin", workspace_id: "waiting-ws", workload_id: null, commit_sha: null, kind: "script", entrypoint: "etl.py",
     program: null, args: {}, runtime: "python", runtime_version: "3.12", status: "queued", queue_position: 1, pool_name: "small",
     created_at: "2026-10-20T10:01:00Z", finished_at: null, initiated_by: "admin" };
   const settings = { warehouse: null as string | null, max_running: null as number | null, max_running_per_user: 3, running: 4, queued: 1 };
@@ -2582,7 +2614,7 @@ test('catalog owners define and measure a KPI and inspect its history',async({pa
   await page.route('https://iam.test/api/v1/catalog/assets/cat-table/metrics',route=>{
     if(route.request().method()==='POST'){
       const body=route.request().postDataJSON();
-      metrics.push({id:'coverage',asset_id:'cat-table',...body,definition:body,origin:'manual',version:1,latest:null});
+      metrics.push({id:'coverage',capabilities:['metrics.define','metrics.enable','metrics.measure'],asset_id:'cat-table',...body,definition:body,origin:'manual',version:1,latest:null});
       return route.fulfill({status:201,json:metrics[0]});
     }
     return route.fulfill({json:metrics});
@@ -2978,7 +3010,7 @@ test("the register exports CSV and approvers let new members in", async ({ page 
     if (url.pathname.endsWith("/register") && url.searchParams.get("format") === "csv")
       return route.fulfill({ body: "group,access\nAnalysts,Reader on reporting\n", headers: { "content-type": "text/csv" } });
     if (url.pathname.endsWith("/register")) return route.fulfill({ json: [{ group: "Analysts", app_group_id: "analysts", access: "Reader on reporting", kind: "role",
-      classification: "confidential", layer: "Prod", form: "Personal data access v1", requester: "ana", approved_by: "priya", approved_at: "2026-09-21T09:00:00Z",
+      classification: "confidential", layer: "Prod", form: "Personal data access v1", can_export: true, requester: "ana", approved_by: "priya", approved_at: "2026-09-21T09:00:00Z",
       until: "2027-09-21T00:00:00Z", members: 2, case_id: "case1" }] });
     if (url.pathname.endsWith("/memberships") && req.method() === "GET") return route.fulfill({ json: decided.length ? [] : [{ app_group_id: "analysts", principal_id: "p-carl", group: "Analysts", principal: "carl" }] });
     if (url.pathname.includes("/memberships/")) { decided.push({ url: url.pathname, body: req.postDataJSON() }); return route.fulfill({ json: { status: "approved" } }); }
@@ -3381,5 +3413,94 @@ test("network Viewer has read-only controls and requests the selected layer", as
   await expect(main.getByRole("button", { name: /Remove dev/ })).toHaveCount(0);
   await expect(main.getByRole("checkbox", { name: "Platform host ceiling" })).toHaveCount(0);
   expect(requested.every((url) => url.includes("layer_id=1a0000000002"))).toBe(true);
+  expect(state.errors).toEqual([]);
+});
+
+test("backup administration saves S3 configuration and queues an encrypted archive", async ({ page }) => {
+  const state = await setup(page);
+  const saved: Record<string, unknown>[] = [];
+  let queued = false;
+  let configuration = { enabled:false, bucket:"", prefix:"fdp-recovery", endpoint_url:"", region:"us-east-1", source_id:"", interval_hours:24,
+    recovery_public_key:"", server_side_encryption:"", kms_key_id:"", object_lock_days:0 };
+  await page.route("https://iam.test/api/v1/backups**", route => {
+    const req=route.request(), path=new URL(req.url()).pathname;
+    if (path.endsWith("/configuration") && req.method()==="PUT") {
+      saved.push(req.postDataJSON());configuration=saved[0] as typeof configuration;
+      return route.fulfill({json:configuration});
+    }
+    if (path.endsWith("/configuration")) return route.fulfill({json:configuration});
+    if (req.method()==="POST") { queued=true;return route.fulfill({status:202,json:{id:"backup-test",status:"queued"}}); }
+    return route.fulfill({json:queued ? [{id:"backup-test",created_at:"2026-11-01T12:00:00Z",finished_at:null,actor:"admin",status:"queued",bucket:"",object_key:"",sha256:"",size_bytes:0,error:""}] : []});
+  });
+  await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Administration",exact:true}).click();
+  await page.getByRole("button",{name:"Backup and recovery",exact:true}).click();
+  const main=page.locator(".main");
+  await main.getByRole("textbox",{name:"S3 bucket",exact:true}).fill("company-recovery");
+  await main.getByRole("textbox",{name:/Recovery public key/}).fill("public-key-fixture");
+  await main.getByRole("button",{name:"Save configuration",exact:true}).click();
+  await expect(main.getByRole("status")).toHaveText("Backup configuration saved.");
+  expect(saved[0]?.bucket).toBe("company-recovery");
+  await main.getByRole("button",{name:"Create backup",exact:true}).click();
+  await expect(main.getByRole("table",{name:"Platform backups"})).toContainText("queued");
+  await expect(main.getByRole("textbox",{name:/private key/i})).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+test("backup page viewer cannot change its destination or start a backup", async ({ page }) => {
+  const state=await setup(page,"reader");
+  await page.route("https://iam.test/api/v1/me",route=>route.fulfill({json:{username:"reader",is_admin:false,acting_admin:false,
+    active_group_id:"analysts",active_layer_id:"1a0000000002",available_groups:[{id:"analysts",name:"Readers"}],groups:[],pools:[],data_sources:[],app_features:[],settings:{},
+    pages:{"set-backups":true},permission_grants:[{target_id:"set-backups",namespace:"backups",layer_id:null,actions:["backups.history.read","backups.configuration.read"]}]}}));
+  await page.route("https://iam.test/api/v1/backups**",route=>route.fulfill({json:route.request().url().endsWith("/configuration") ?
+    {enabled:false,bucket:"company-recovery",prefix:"fdp-recovery",endpoint_url:"",region:"us-east-1",source_id:"",interval_hours:24,recovery_public_key:"public",server_side_encryption:"",kms_key_id:"",object_lock_days:0}:[]}));
+  await page.reload();
+  await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Administration",exact:true}).click();
+  const main=page.locator(".main");
+  await expect(main.getByRole("heading",{name:"Backup and recovery",exact:true})).toBeVisible();
+  await expect(main.getByRole("textbox",{name:"S3 bucket",exact:true})).toBeDisabled();
+  await expect(main.getByRole("button",{name:"Save configuration",exact:true})).toHaveCount(0);
+  await expect(main.getByRole("button",{name:"Create backup",exact:true})).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+
+test('workspace metadata viewers cannot create, execute, open editors or change Git',async({page})=>{
+  const state=await setup(page,'reader');
+  const ws={id:'readonly-ws',owner:'admin',name:'Inspect workspace',editor:'vscode',status:'running',
+    capabilities:['workspaces.object.read','workspaces.files.list'],
+    last_activity_at:'2026-10-20T10:00:00Z',created_at:'2026-10-20T10:00:00Z'};
+  await page.route('https://iam.test/api/v1/workspaces',route=>route.fulfill({json:[ws]}));
+  await page.reload();
+  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Workspaces',exact:true}).click();
+  const sidebar=page.locator('.sidebar'),main=page.locator('.main');
+  await expect(sidebar.getByRole('button',{name:'New workspace',exact:true})).toHaveCount(0);
+  await sidebar.getByRole('button',{name:/^Inspect workspace/}).click();
+  await expect(main.getByRole('button',{name:'Open editor',exact:true})).toBeDisabled();
+  await expect(main.getByRole('button',{name:'Stop',exact:true})).toBeDisabled();
+  await expect(main.getByRole('button',{name:'Delete',exact:true})).toBeDisabled();
+  await expect(main.getByLabel('Git credential',{exact:true})).toHaveCount(0);
+  await expect(main.getByText('Run a file without fdp.json',{exact:true})).toHaveCount(0);
+  expect(state.reads.filter(path=>path.endsWith('/readonly-ws/config'))).toEqual([]);
+  expect(state.errors).toEqual([]);
+});
+
+
+test('run metadata does not request logs, expose content or offer execution controls',async({page})=>{
+  const state=await setup(page,'reader');
+  const run={id:'restricted-run',initiated_by:'admin',owner:'admin',workspace_id:null,workload_id:'script',
+    capabilities:['artifacts.list'],kind:'script',entrypoint:'restricted.py',program:'restricted-report',args:{},
+    runtime:'python',runtime_version:'3.12',status:'succeeded',pool_name:'small',
+    created_at:'2026-10-20T10:00:00Z',finished_at:'2026-10-20T10:01:00Z'};
+  await page.route('https://iam.test/api/v1/runs?*',route=>route.fulfill({json:[run]}));
+  await page.route('https://iam.test/api/v1/runs/restricted-run/outputs',route=>route.fulfill({json:[{path:'private.csv',size:42}]}));
+  await page.reload();
+  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Workloads',exact:true}).click();
+  await page.locator('.sidebar').getByRole('button',{name:'Recent runs',exact:true}).click();
+  const main=page.locator('.main');
+  await main.getByRole('button',{name:'restricted-report',exact:true}).click();
+  await expect(main.getByRole('button',{name:'Run again',exact:true})).toHaveCount(0);
+  await expect(main.getByRole('heading',{name:'Console',exact:true})).toHaveCount(0);
+  await expect(main.getByRole('button',{name:/private.csv/})).toBeDisabled();
+  expect(state.reads.filter(path=>path.includes('restricted-run/logs')||path.includes('restricted-run/outputs/private.csv'))).toEqual([]);
   expect(state.errors).toEqual([]);
 });

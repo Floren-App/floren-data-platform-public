@@ -24,6 +24,7 @@ from ..runtimes import LABEL as RUNTIME_LABEL
 from ..runtimes import RuntimeUnavailable
 from ..runtimes import resolve as resolve_runtime
 from ..schemas import OpenOut, OutputContent, OutputFile, RunIn, RunOut
+from .. import run_access
 from ..executions import RunPlan, plan_from_program, run_spec, runtime_for, safe_entrypoint
 from ..workspace_files import load_config, outputs, read_output
 from ..workspace_files import console as run_console
@@ -89,7 +90,7 @@ def list_runs(workspace_id: str = "", limit: int = Query(100, ge=1, le=500),
     stmt = stmt.where(Run.workload_id.is_(None) | Run.workload_id.in_(visible_workloads))
     from ..environments import run_permitted
     ordered_at = func.coalesce(Run.finished_at, Run.created_at) if sort == "updated" else Run.created_at
-    return [run_out(r) for r in db.scalars(stmt.order_by(ordered_at.desc(), Run.id.desc()).limit(limit)) if run_permitted(db, user, r)]
+    return [run_out(r,db,user) for r in db.scalars(stmt.order_by(ordered_at.desc(), Run.id.desc()).limit(limit)) if run_permitted(db, user, r) and run_access.allowed(db,user,'runs.list',r) and run_access.allowed(db,user,'runs.read',r)]
 
 
 def _plan(body: RunIn, db: Session, orch: Orchestrator, ws: Workspace, user: User, granted: set):
@@ -151,7 +152,8 @@ def start_run(db: Session, orch: Orchestrator, user: User, plan: RunPlan, pool_n
     if not pool_name:
         raise HTTPException(422, "choose a warehouse (no default warehouse is configured; an administrator can set one)")
     pool = db.scalar(select(ComputePool).where(ComputePool.name == pool_name))
-    if not pool or (pool.allowed_groups and not set(pool.allowed_groups) & set(user.groups)):
+    from .. import compute_access
+    if not pool or not compute_access.allowed(db,user,"compute.pools.use",pool,user.environment_id):
         raise HTTPException(404, f"warehouse {pool_name!r} not available")
     capacity.refuse_trino_warehouse(db, pool.name)
     capacity.require_scope(db, pool, user.environment_id, plan.kind)  # its layers and kinds of work
@@ -169,6 +171,7 @@ def start_run(db: Session, orch: Orchestrator, user: User, plan: RunPlan, pool_n
             raise HTTPException(403, f"secrets: {exc}") from None
 
     from ..data_access import snapshot
+    from ..object_access import snapshot as named_snapshot
     from ..rbac import resolve_user
     user = resolve_user(db, user)
     from ..ownership import creation_data_snapshot
@@ -179,11 +182,14 @@ def start_run(db: Session, orch: Orchestrator, user: User, plan: RunPlan, pool_n
     pool = db.scalar(select(ComputePool).where(ComputePool.id == pool.id).with_for_update())
     wait = bool(capacity.queue(db, pool.name)) or capacity.shortfall(db, {pool.name: 1}) is not None
     run = Run(owner=user.username, principal_id=user.principal_id, initiator_id=initiator_id or user.principal_id, initiated_by=initiated_by or user.username, access_snapshot=snapshot(db, user), environment_id=user.environment_id or None, workspace_id=workspace_id, workload_id=plan.workload_id,
+              named_access_snapshot=named_snapshot(db,user),
               primary_create_snapshot=creation_data_snapshot(db,user),
               primary_group_id=user.active_group_id or None,
               commit_sha=plan.commit_sha, pool_id=pool.id, kind=plan.kind, entrypoint=plan.entrypoint,
               program=program, args=plan.args, runtime=plan.image_kind, runtime_version=rt.version,
               status="queued" if wait else "pending")
+    from ..data_policies import admission_snapshot
+    run.sql_policy_snapshot = admission_snapshot(db,user,run.access_snapshot,run.named_access_snapshot)
     run.pool = pool
     db.add(run)
     db.flush()
@@ -291,18 +297,22 @@ def create_run(
     if user.execution_context and user.execution_context != f"workspace:{ws.id}":
         raise HTTPException(403, "cannot start work in another workspace")
     workspace_environment(db, user, ws.environment_id)
+    from .. import workspace_access
+    workspace_access.require(db,user,'runs.create',ws)
     primary = user.active_group_id
     user = rbac.resolve_user(db, execution_user(db, {"sub": ws.owner, "pid": ws.principal_id, "ws": ws.id}))
     from dataclasses import replace
     user = replace(user,active_group_id=primary)
     granted = {s.name for s in granted_sources(db, user)}
     plan, pool_name = _plan(body, db, orch, ws, user, granted)
-    return run_out(start_run(db, orch, user, plan, pool_name, ws.id, body.program))
+    return run_out(start_run(db, orch, user, plan, pool_name, ws.id, body.program),db,user)
 
 
 @router.get("/{run_id}", response_model=RunOut)
 def get_run(run_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    return run_out(owned_run(db, run_id, user))
+    run=owned_run(db,run_id,user)
+    run_access.require(db,user,'runs.read',run)
+    return run_out(run,db,user)
 
 
 @router.get("/{run_id}/logs", response_class=PlainTextResponse)
@@ -315,6 +325,7 @@ def run_logs(
 ):
     """The program's console: live while it runs, from console.log after its container is gone."""
     run = owned_run(db, run_id, user)
+    run_access.require(db,user,'logs.read',run)
     text = run_console(orch, (db.get(Workspace, run.workspace_id) if run.workspace_id else None), run,
                        tail=max(1, min(tail, 20000)))
     return mask(text, run.id, run.secret_paths or [], get_secret_store())
@@ -329,6 +340,7 @@ def run_outputs(
 ):
     """Files the program wrote to $FDP_OUTPUT_DIR."""
     run = owned_run(db, run_id, user)
+    run_access.require(db,user,'artifacts.list',run)
     files = outputs(orch, (db.get(Workspace, run.workspace_id) if run.workspace_id else None), run)
     if files is None:
         raise HTTPException(409, "start the workspace to browse outputs (they live on its volume)")
@@ -347,6 +359,7 @@ def run_output(
     if not is_safe_relpath(path):
         raise HTTPException(422, "invalid path")
     run = owned_run(db, run_id, user)
+    run_access.require(db,user,'artifacts.read',run)
     ws = (db.get(Workspace, run.workspace_id) if run.workspace_id else None)
     sizes = dict(outputs(orch, ws, run) or [])
     if path not in sizes:
@@ -367,6 +380,7 @@ def stop_run(
 ):
     """Stop button: the program gets SIGTERM and a few seconds to clean up before it is killed."""
     run = owned_run(db, run_id, user)
+    run_access.require(db,user,'runs.cancel_own' if rbac.same_identity(run,user) or run.initiator_id==user.principal_id else 'runs.cancel_others',run)
     if run.execution_ref:
         orch.stop(run.execution_ref, grace_seconds=STOP_GRACE_SECONDS if run.status in ACTIVE else 0)
     if run.status in ACTIVE or run.status == "queued":
@@ -374,13 +388,34 @@ def stop_run(
         audit(db, user.username, "run.stop", run.id)
     run.execution_ref = run.upstream_url = None
     db.commit()
-    return run_out(run)
+    return run_out(run,db,user)
 
 
 @router.post("/{run_id}/open", response_model=OpenOut)
 def open_app(run_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     run = owned_run(db, run_id, user)
+    run_access.require(db,user,'artifacts.open',run)
     if run.kind not in ("app", "airflow") or run.status != "running":
         raise HTTPException(409, "only running apps and Airflow test deployments can be opened")
-    ticket = mint_token("ticket", user.username, 60, target=f"apps:{run.id}")
+    ticket = mint_token("ticket", user.username, 60, target=f"apps:{run.id}",pid=user.principal_id)
     return OpenOut(url=f"{get_settings().public_url}/apps/{run.id}/?dc_ticket={ticket}")
+
+
+@router.post("/{run_id}/retry", response_model=RunOut, status_code=201)
+def retry_run(run_id: str, db: Session = Depends(get_db), orch: Orchestrator = Depends(get_orchestrator),
+              user: User = Depends(get_actor)):
+    """Retry under current parent execution, code, data, secret and capacity checks."""
+    run=owned_run(db,run_id,user)
+    run_access.require(db,user,'runs.retry',run)
+    if run.status in (*ACTIVE,'queued'):
+        raise HTTPException(409,'Stop the active run before retrying')
+    if run.workload_id:
+        from ..models import Workload
+        from .deploy import _start_deployed, _visible
+        pub=_visible(db,run.workload_id,user)
+        return run_out(_start_deployed(db,orch,pub,user,run.args,run.pool.name),db,user)
+    if not run.workspace_id:
+        raise HTTPException(409,'The original workspace is no longer available')
+    body=RunIn(workspace_id=run.workspace_id,program=run.program,args=run.args or {},
+        kind=run.kind,entrypoint=run.entrypoint,pool=run.pool.name)
+    return create_run(body,db,orch,user)

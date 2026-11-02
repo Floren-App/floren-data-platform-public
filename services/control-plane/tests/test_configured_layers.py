@@ -15,6 +15,9 @@ def test_the_platform_creates_no_layers_by_itself(monkeypatch):
     from app.main import app
     from .conftest import FakeVerifier, fake_user
     Base.metadata.drop_all(engine)
+    from sqlalchemy import text
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
     deps._orchestrator = None
     monkeypatch.setattr(auth, "_verifier", FakeVerifier())
     app.dependency_overrides[auth.get_current_user] = fake_user

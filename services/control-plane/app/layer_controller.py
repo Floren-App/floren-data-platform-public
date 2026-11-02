@@ -217,6 +217,10 @@ class Claim:
 
 
 def claim_operation(session_factory=SessionLocal, now=None):
+    from .backups import recovery_blocked
+    with session_factory() as db:
+        if recovery_blocked(db):
+            return None
     now = now or utcnow()
     # Steady-state managed layers stay claimable so drift is repaired; unmanaged "Ready" saves are not.
     available = and_(or_(LayerOperation.phase.in_(ACTIVE_PHASES),

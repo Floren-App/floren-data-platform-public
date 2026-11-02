@@ -33,3 +33,20 @@ installation. Check the package import task and the actual runtime version.
 Publishing follows package repository/resource roles such as Publisher, Maintainer
 and Owner. An administrator can configure the upstream package allowlist. Package
 permissions do not grant permission to query data or execute a workload.
+
+## Package access
+
+Signing in does not grant repository contents. Assign Viewer for package metadata and
+Executor for downloads/installation, on an individual package or the `packages` root.
+Repository grants include all current and future packages. Native Python and R indexes
+filter inaccessible packages; the file URLs recheck download authority. Imported packages
+also have individual permission targets. Workload/service identities need their own
+explicit grants, just as people do.
+
+Contributor uploads new packages; Manager publishes/manages versions and requests
+upstream imports; Executor installs already approved packages. Admin and Owner
+combine these functions, with Owner controlling delegation. Legacy Publisher and Maintainer
+assignments remain compatible publishing bundles. Human editor and job credentials use
+the group captured at admission, plus explicit direct grants; assigning an inactive group
+later does not expand an existing editor's permissions. Update the captured group's grants
+or start a workspace under the appropriate group.

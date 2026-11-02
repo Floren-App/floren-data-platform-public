@@ -303,3 +303,34 @@ def test_background_sla_tick_skips_unconfigured_assets_and_resolves_removed_poli
         incident = db.scalar(select(SlaIncident).where(SlaIncident.asset_id == aid))
         assert incident.status == 'resolved' and incident.resolved_at
         assert db.scalar(select(func.count()).select_from(SlaEvaluation)) == 2
+
+
+def test_metric_definition_activation_reporting_and_sla_are_separate(product):
+    client,aid,_,_=product
+    asset=client.get('/v1/catalog/assets/'+aid,headers=as_('admin')).json()
+    target=(asset['permission_target'] or asset['resource'])['id']
+    pid=client.get('/v1/me',headers=as_('ana')).json()['principal_id']
+    def grant(actions):
+        result=client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+            'target_id':target,'namespace':'metrics','layer_id':asset['layer_id'],
+            'principal_id':pid,'actions':actions})
+        assert result.status_code==201,result.text
+    base='/v1/catalog/assets/'+aid
+    body={'key':'separate','name':'Separate','enabled':False}
+    grant(['metrics.define'])
+    response=client.post(base+'/metrics',headers=as_('ana'),json=body)
+    assert response.status_code==201,response.text
+    metric=response.json()
+    assert 'metrics.define' in metric['capabilities'] and 'metrics.enable' not in metric['capabilities']
+    assert client.post(base+'/metrics',headers=as_('ana'),json={**body,'enabled':True}).status_code==403
+    from .rbac_helpers import grant_group
+    viewer=grant_group(client,target,'SLA viewers','Viewer',users=['bob'])
+    client.put('/v1/me/active-group',headers=as_('bob'),json={'group_id':viewer}).raise_for_status()
+    assert client.post(base+'/evaluate-sla',headers=as_('bob')).status_code==403
+    grant(['metrics.enable'])
+    response=client.post(base+'/metrics',headers=as_('ana'),json={**body,'enabled':True})
+    assert response.status_code==201,response.text
+    path=base+'/metrics/'+metric['id']+'/observations'
+    assert client.post(path,headers=as_('ana'),json={'value':1}).status_code==403
+    grant(['metrics.report'])
+    assert client.post(path,headers=as_('ana'),json={'value':1}).status_code==201

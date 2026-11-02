@@ -8,10 +8,9 @@ from .db import Base, engine, SessionLocal
 from .models import Workload, Run, AuditEvent, ServiceAccount, Workspace
 
 
-def upgrade():
-    with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE IF NOT EXISTS fdp_migrations (revision VARCHAR(64) PRIMARY KEY)"))
-    with SessionLocal() as db:
+def upgrade(session_factory=SessionLocal):
+    with session_factory() as db:
+        db.execute(text("CREATE TABLE IF NOT EXISTS fdp_migrations (revision VARCHAR(64) PRIMARY KEY)"))
         if db.execute(text("SELECT revision FROM fdp_migrations WHERE revision='001_rbac'")).first():
             return
         from .rbac import root, workload_resource
@@ -46,9 +45,9 @@ def upgrade():
         db.commit()
 
 
-def upgrade_git_credentials():
+def upgrade_git_credentials(session_factory=SessionLocal):
     """004: a person may keep several Git credentials per host, each with a label (formerly one per host)."""
-    with SessionLocal() as db:
+    with session_factory() as db:
         if db.execute(text("SELECT revision FROM fdp_migrations WHERE revision='004_git_credential_labels'")).first():
             return
         if db.bind.dialect.name == "postgresql":

@@ -419,3 +419,8 @@ traefik:
     - --providers.http.pollInterval=2s
     - --providers.http.headers.X-FDP-Gateway-Config=$(FDP_GATEWAY_CONFIG_TOKEN)
 
+
+# Schema upgrades run in a serialized init container before API startup. Existing
+# pre-versioned installations must first back up, then opt in once to adoption.
+migrations:
+  adoptLegacy: false

@@ -36,6 +36,23 @@ def certificates(db: Session = Depends(get_db), user: User = Depends(get_actor))
 @router.put('/v1/admin/layers/{ident}/infrastructure', status_code=202)
 def configure_infrastructure(ident: str, body: InfrastructureChange, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     user = settings_access.require(db, user, "set-layers", "layer_infrastructure.apply", layer_id=ident)
+    layer = layers.require_layer(db, ident)
+    previous = InfrastructureSpec.model_validate(layer.config.get('infrastructure', {})).model_dump()
+    proposed = body.spec.model_dump()
+    def changed_keys(keys):
+        def extract(value):
+            if isinstance(value,dict):
+                return {k:v if k in keys else extract(v) for k,v in value.items() if k in keys or isinstance(v,(dict,list))}
+            if isinstance(value,list):
+                return [extract(v) for v in value]
+            return None
+        return extract(previous) != extract(proposed)
+    if changed_keys({'image','tls','storage_class','catalog','bucket','buckets'}):
+        settings_access.require(db,user,"set-layers","layer_infrastructure.trust.change",layer_id=ident)
+    if changed_keys({'credentials_secret','internal_secret','issuer','trust_bundle'}):
+        settings_access.require(db,user,"set-layers","layer_infrastructure.identity.change",layer_id=ident)
+    if previous['quota'] != proposed['quota']:
+        settings_access.require(db,user,"set-layers","layers.object.quota.set",layer_id=ident)
     if body.spec.retired:
         settings_access.require(db, user, "set-layers", "layer_infrastructure.retire", layer_id=ident)
         # Retiring through a full update (e.g. infrastructure-as-code) has the same precondition.
@@ -192,6 +209,8 @@ def create(body: LayerIn, db: Session = Depends(get_db), user: User = Depends(ge
 def update(ident: str, body: LayerIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     user = settings_access.require(db, user, "set-layers", "layers.object.settings.edit", layer_id=ident)
     layer = layers.require_layer(db, ident)
+    if body.workspaces != bool((layer.config or {}).get("workspaces")):
+        settings_access.require(db,user,"set-layers","layers.object.workspaces.set",layer_id=ident)
     if bool(body.production) != bool((layer.config or {}).get("production")):
         settings_access.require(db, user, "set-layers", "layers.object.production.set", layer_id=ident)
     layer = db.scalar(select(Resource).where(Resource.id == layer.id).with_for_update()

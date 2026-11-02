@@ -326,8 +326,13 @@ def export_once(factory, sink, settings: Settings, now: Optional[datetime] = Non
         if not rows:
             db.commit()
             return 0
+        from .models import PlatformSetting
+        recovery = db.get(PlatformSetting, 'platform.recovery_epoch')
+        epoch = recovery.value['id'] if recovery else ''
         events, seq, prev = [], cursor.seq, cursor.last_hash or GENESIS
         for _, _, event, _ in sorted(rows, key=lambda item: (_aware(item[0]), item[1])):
+            if epoch:
+                event = {**event, 'id':epoch+':'+event['id'], 'recovery_epoch':epoch}
             seq += 1
             event = chain(event, seq, prev, settings.siem_signing_key)
             prev = event['chain']['hash']

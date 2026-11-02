@@ -11,6 +11,8 @@ def group(client, name, *users):
     g = client.post("/v1/rbac/groups", headers=ADMIN, json={"name": name, "owners": [me["principal_id"]]}).json()
     for user in users:
         join(client, g, user)
+    from .rbac_helpers import workspace_permissions
+    workspace_permissions(client,g['id'])
     return g
 
 

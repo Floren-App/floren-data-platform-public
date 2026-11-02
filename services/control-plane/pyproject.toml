@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "sqlalchemy>=2.0",
+    "alembic>=1.13,<2",  # serialized, versioned platform schema migrations
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "pyjwt[crypto]>=2.9",
@@ -39,7 +40,7 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["permission_registry.json"]
+app = ["permission_registry.json", "alembic/*.json", "alembic/*.py", "alembic/versions/*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

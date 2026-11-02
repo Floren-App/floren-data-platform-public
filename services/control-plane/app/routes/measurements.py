@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 
-from .. import catalog as c, layers, measurements as m, rbac, sql_access, sla_monitor
+from .. import asset_access, catalog as c, layers, measurements as m, rbac, sql_access, sla_monitor
 from ..auth import User
 from ..db import get_db
 from ..deps import get_actor
@@ -87,14 +87,19 @@ def definition_query(sql):
 
 @router.get('/assets/{ident}/metrics')
 def metrics(ident: str, db=Depends(get_db), user: User = Depends(get_actor)):
-    asset, _ = c.require_asset(db, ident, user)
-    return [m.metric_out(db, row) for row in db.scalars(select(MetricDefinition).where(MetricDefinition.asset_id == asset.id).order_by(MetricDefinition.name))
+    asset, resource = c.require_asset(db, ident, user)
+    asset_access.require(db,user,"metrics.read",asset,resource,("read",))
+    return [m.metric_out(db, row, user) for row in db.scalars(select(MetricDefinition).where(MetricDefinition.asset_id == asset.id).order_by(MetricDefinition.name))
             if m.dependencies_visible(db, user, row.definition.get('dependencies', []))]
 
 
 @router.post('/assets/{ident}/metrics', status_code=201)
 def define(ident: str, body: MetricIn, db=Depends(get_db), user: User = Depends(get_actor)):
-    asset, resource = c.require_asset(db, ident, user, 'assign')
+    asset, resource = c.require_asset(db, ident, user)
+    asset_access.require(db,user,'metrics.define',asset,resource,('assign',))
+    previous=db.scalar(select(MetricDefinition).where(MetricDefinition.asset_id==ident,MetricDefinition.key==body.key))
+    if (previous.enabled if previous else False)!=body.enabled:
+        asset_access.require(db,user,'metrics.enable',asset,resource,('assign',))
     if asset.kind in ('kpi', 'quality_metric'):
         raise HTTPException(422, 'Attach definitions to the underlying data product')
     dependencies = m.validate_dependencies(db, user, asset, body.dependencies)
@@ -118,19 +123,23 @@ def define(ident: str, body: MetricIn, db=Depends(get_db), user: User = Depends(
     node.attributes = {**node.attributes, 'inactive': not row.enabled}
     audit(db, user.username, 'metric.define', row.id, asset_id=ident, version=row.version, enabled=row.enabled)
     db.commit()
-    return m.metric_out(db, row)
+    return m.metric_out(db, row, user)
 
 
 @router.get('/assets/{ident}/metrics/{metric_id}/history')
 def history(ident: str, metric_id: str, limit: int = Query(default=100, ge=1, le=1000), db=Depends(get_db), user: User = Depends(get_actor)):
-    row, _, _ = require_metric(db, ident, metric_id, user)
+    row, asset, resource = require_metric(db, ident, metric_id, user)
+    asset_access.require(db,user,"metrics.history.read",asset,resource,("read",))
+    if not m.observations_readable(db,user,row):
+        raise HTTPException(403,'Cached observations require unfiltered dependency access; measure under your own governed SQL policy')
     return [m.observation_out(o) for o in db.scalars(select(MetricObservation).where(MetricObservation.metric_id == row.id)
         .order_by(MetricObservation.observed_at.desc(), MetricObservation.id.desc()).limit(limit))]
 
 
 @router.get('/assets/{ident}/metrics/{metric_id}/versions')
 def versions(ident: str, metric_id: str, limit: int = Query(default=100, ge=1, le=1000), db=Depends(get_db), user: User = Depends(get_actor)):
-    row, _, _ = require_metric(db, ident, metric_id, user)
+    row, asset, resource = require_metric(db, ident, metric_id, user)
+    asset_access.require(db,user,"metrics.versions.read",asset,resource,("read",))
     return [{'version':v.version,'created_at':v.created_at,'definition':v.definition} for v in db.scalars(
         select(MetricDefinitionRevision).where(MetricDefinitionRevision.metric_id==row.id).order_by(MetricDefinitionRevision.version.desc()).limit(limit))]
 
@@ -146,8 +155,7 @@ def report(ident: str, metric_id: str, body: ObservationIn, db=Depends(get_db), 
     row, asset, resource = require_metric(db, ident, metric_id, user)
     if not row.enabled or row.origin != 'manual':
         raise HTTPException(409, 'Only enabled manual metrics accept reported values')
-    if not any(rbac.allowed(db, user, action, resource) for action in ('write', 'edit')):
-        raise HTTPException(403, 'Contributor or higher required to report measurements')
+    asset_access.require(db,user,'metrics.report',asset,resource,('write','edit'))
     at = c.aware(body.observed_at or utcnow())
     if at > utcnow():
         raise HTTPException(422, 'Observation time cannot be in the future')
@@ -166,6 +174,7 @@ async def measure(ident: str, metric_id: str, request: Request, db=Depends(get_d
     enabled()
     who = await run_in_threadpool(transaction_call, db, sql_access.actor, authorization, x_fdp_viewer)
     row, asset, resource = require_metric(db, ident, metric_id, who.user)
+    asset_access.require(db,who.user,'metrics.measure',asset,resource,('execute',))
     if not row.enabled or not row.definition.get('sql'):
         raise HTTPException(409, 'This metric has no enabled SQL calculation')
     definition_query(row.definition['sql'])
@@ -220,7 +229,8 @@ def dataset_report(ident: str, body: DatasetObservationIn, db=Depends(get_db), u
 
 @router.get('/assets/{ident}/sla-history')
 def sla_history(ident: str, limit: int = Query(default=100, ge=1, le=1000), db=Depends(get_db), user: User = Depends(get_actor)):
-    c.require_asset(db, ident, user)
+    asset,resource=c.require_asset(db,ident,user)
+    asset_access.require(db,user,"slas.read",asset,resource,("read",))
     return [{'id': row.id, 'evaluated_at': row.evaluated_at, 'status': row.status, 'result': row.result}
             for row in db.scalars(select(SlaEvaluation).where(SlaEvaluation.asset_id == ident).order_by(SlaEvaluation.evaluated_at.desc()).limit(limit))]
 
@@ -228,6 +238,7 @@ def sla_history(ident: str, limit: int = Query(default=100, ge=1, le=1000), db=D
 @router.post('/assets/{ident}/evaluate-sla')
 def evaluate_sla(ident: str, db=Depends(get_db), user: User = Depends(get_actor)):
     asset, resource = c.require_asset(db, ident, user)
+    asset_access.require(db,user,'slas.evaluate',asset,resource,('execute',))
     db.scalar(select(CatalogAsset).where(CatalogAsset.id == ident).with_for_update())
     result = sla_monitor.record_evaluation(db, asset, resource)
     db.commit()
@@ -259,7 +270,8 @@ def acknowledge(incident_id: str, db=Depends(get_db), user: User = Depends(get_a
     incident = db.get(SlaIncident, incident_id)
     if not incident:
         raise HTTPException(404, 'Alert not found')
-    asset, resource = c.require_asset(db, incident.asset_id, user, 'assign')
+    asset, resource = c.require_asset(db, incident.asset_id, user)
+    asset_access.require(db,user,'slas.acknowledge',asset,resource,('assign',))
     db.scalar(select(CatalogAsset).where(CatalogAsset.id == asset.id).with_for_update())
     incident.acknowledged_at, incident.acknowledged_by = utcnow(), user.principal_id
     audit(db, user.username, 'sla.acknowledge', incident.id, asset_id=asset.id)

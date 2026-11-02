@@ -1,3 +1,5 @@
+import { workspaceCreateLayers } from "../permissions";
+import { workspaceCan } from "../api";
 import { useEffect, useRef, useState } from "react";
 import { api, type Product, EDITOR_NAME, inGroup, inLayer, isActive, openInWindow, workloadDot, workloadStatus, type OrchestratorHistory, type OrchestratorRun, type Workload, type Run } from "../api";
 import { getServer } from "../auth";
@@ -73,7 +75,7 @@ function FullHome({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   return <div className="home-dashboard">
     <div className="home-intro"><PageHeader icon={<IconHome size={22} />} title={hub.me ? `Welcome back, ${hub.me.username}` : "Welcome to Floren Data Platform"}
       subtitle="Pick up your work, follow your pipelines, and find what you need."
-      actions={<><button className="btn secondary" onClick={() => void hub.refresh()}><IconRefresh size={14} />Refresh</button>{W && <button className="btn" onClick={newWorkspace}><IconPlus size={14} />New workspace</button>}</>} />
+      actions={<><button className="btn secondary" onClick={() => void hub.refresh()}><IconRefresh size={14} />Refresh</button>{W && workspaceCreateLayers(hub).length > 0 && <button className="btn" onClick={newWorkspace}><IconPlus size={14} />New workspace</button>}</>} />
       {hub.has("catalog.objects") && <><div className="home-search"><CatalogSearchBox id="home-search" label="Search across Floren Data Platform" autoFocus={false} value={query} onChange={setQuery} openTab={openTab} onSubmit={search} /><button className="btn secondary" onClick={search}>Search</button></div>
       <p className="hint">Find workloads, datasets, APIs, columns, owners, and tags in the catalog.</p></>}
     </div>
@@ -87,8 +89,8 @@ function FullHome({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
       {W && <section className="home-card" aria-labelledby="home-workspaces"><div className="home-card-heading"><h2 id="home-workspaces"><IconWorkspaces size={18} />Your workspaces</h2><button className="text-button" onClick={() => openTab({ kind: "workspaces", title: "Workspaces" })}>View all</button></div>
         {workspaces.length ? <ul className="home-list">{workspaces.slice(0, 4).map((ws) => <li key={ws.id}>
           <button className="home-list-link" onClick={() => openTab({ kind: "workspace", ref: ws.id, title: ws.name })}><IconWorkspaces size={18} /><span className="home-item-text"><strong>{ws.name}</strong><small>{ws.owner} · {EDITOR_NAME[ws.editor]}{ws.environment_id ? ` · ${hub.layers.find((r) => r.id === (ws.layer_id || ws.environment_id))?.name || "Scoped"}` : ""}</small></span><Status value={ws.status} /></button>
-          {ws.status === "running" && <button className="icon-btn" aria-label={`Open editor for ${ws.name}`} title="Open editor" onClick={() => void openEditor(hub, ws.id, ws.name)}><IconOpen size={16} /></button>}
-        </li>)}</ul> : <div className="home-empty"><p>Your workspace is where you edit and explore.</p><button className="btn secondary" onClick={newWorkspace}>Create a workspace</button></div>}
+          {ws.status === "running" && workspaceCan(ws, "object.editor.open") && <button className="icon-btn" aria-label={`Open editor for ${ws.name}`} title="Open editor" onClick={() => void openEditor(hub, ws.id, ws.name)}><IconOpen size={16} /></button>}
+        </li>)}</ul> : <div className="home-empty"><p>Your workspace is where you edit and explore.</p>{workspaceCreateLayers(hub).length > 0 && <button className="btn secondary" onClick={newWorkspace}>Create a workspace</button>}</div>}
       </section>}
       <section className="home-card" aria-labelledby="home-recent"><div className="home-card-heading"><h2 id="home-recent"><IconRuns size={18} />Recent runs</h2><button className="text-button" onClick={() => openTab(historyTab)}>View all</button></div><ActivityList runs={recent.slice(0, 4)} hub={hub} openTab={openTab} /></section>
       {hub.me && L && <OrchestratorWatch key={`${getServer()}:${hub.me.username}`} hub={hub} openTab={openTab} />}
@@ -120,10 +122,10 @@ function RecentUpdates({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
 export function WorkspacesView({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const workspaces = myWorkspaces(hub), hidden = hub.workspaces.length - workspaces.length;
   return <><PageHeader icon={<IconWorkspaces size={22} />} title="Workspaces" subtitle="Your private development environments. Each workspace has private files and a layer boundary. Your object permissions still apply."
-    actions={<button className="btn" onClick={() => openTab({ kind: "workspaces", title: "Workspaces", intent: "create" })}><IconPlus size={14} />New workspace</button>} />
+    actions={workspaceCreateLayers(hub).length > 0 && <button className="btn" onClick={() => openTab({ kind: "workspaces", title: "Workspaces", intent: "create" })}><IconPlus size={14} />New workspace</button>} />
     <WorkspaceSections active="workspaces" openTab={openTab} />
     <div className="table-scroll"><table aria-label="Your workspaces"><thead><tr><th>Workspace</th><th>Owner</th><th>Editor</th><th>Layer</th><th>Status</th><th /></tr></thead><tbody>
-      {workspaces.map((ws) => <tr key={ws.id}><td><button className="text-button" onClick={() => openTab({ kind: "workspace", ref: ws.id, title: ws.name })}>{ws.name}</button></td><td>{ws.owner}</td><td>{EDITOR_NAME[ws.editor]}</td><td>{hub.layers.find((r) => r.id === (ws.layer_id || ws.environment_id))?.name || "—"}</td><td><Status value={ws.status} /></td><td>{ws.status === "running" && <button className="btn sm secondary" onClick={() => void openEditor(hub, ws.id, ws.name)}><IconOpen size={14} />Open editor</button>}</td></tr>)}
+      {workspaces.map((ws) => <tr key={ws.id}><td><button className="text-button" onClick={() => openTab({ kind: "workspace", ref: ws.id, title: ws.name })}>{ws.name}</button></td><td>{ws.owner}</td><td>{EDITOR_NAME[ws.editor]}</td><td>{hub.layers.find((r) => r.id === (ws.layer_id || ws.environment_id))?.name || "—"}</td><td><Status value={ws.status} /></td><td>{ws.status === "running" && workspaceCan(ws, "object.editor.open") && <button className="btn sm secondary" onClick={() => void openEditor(hub, ws.id, ws.name)}><IconOpen size={14} />Open editor</button>}</td></tr>)}
       {!workspaces.length && <tr><td colSpan={6} className="muted">{hidden ? "No workspaces of this group in this layer." : "No workspaces yet. Create one to start developing."}</td></tr>}
     </tbody></table></div>
     {!!hidden && <p className="muted">{hidden} more in other groups or layers. Switch at the bottom of the sidebar to see {hidden === 1 ? "it" : "them"}.</p>}</>;

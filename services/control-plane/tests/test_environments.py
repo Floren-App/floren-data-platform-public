@@ -21,6 +21,7 @@ def environments(client):
 def test_workspace_legacy_environment_selection_uses_global_layer_policy_and_private_volumes(client):
     from .test_api import onboard_workspace_group
     onboard_workspace_group(client,'ana')
+    workspace_group=client.get('/v1/me',headers=as_('ana')).json()['active_group_id']
     test,prod=environments(client)
     base={'name':'Workspace','editor':'vscode'}
     assert client.post('/v1/workspaces',headers=as_('ana'),json=base).status_code==201
@@ -29,6 +30,8 @@ def test_workspace_legacy_environment_selection_uses_global_layer_policy_and_pri
     grant_group(client,prod['id'],'Viewers','Executor',users=['ana'])
     created=client.post('/v1/workspaces',headers=as_('admin'),json={**base,'environment_id':prod['id']})
     assert created.status_code==201 and created.json()['layer_id']==layers.PROD
+    from .rbac_helpers import select_group
+    select_group(client,'ana',workspace_group)
     volumes=[]
     for name in ('One','Two'):
         response=client.post('/v1/workspaces',headers=as_('ana'),json={**base,'name':name,'environment_id':test['id']})

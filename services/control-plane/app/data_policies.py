@@ -139,9 +139,26 @@ def mask_sql(method, expression, column, column_type, groups):
 def caller_groups(db, user):
     """App group IDs and names of the caller, including nested directory groups."""
     from . import rbac
-    ids = rbac.app_groups(db, user)
+    ids = rbac.effective_app_groups(db, user)
     names = set(db.scalars(select(AppGroup.name).where(AppGroup.id.in_(ids)))) if ids else set()
     return ids, names
+
+
+def admission_snapshot(db, user, access, named):
+    """Capture privacy transformations for every admitted SQL schema, including idle ones."""
+    from .models import DataSource
+    from .sql_access import SQL_KINDS, catalog_name
+    scope = {}
+    for source in db.scalars(select(DataSource).where(DataSource.kind.in_(SQL_KINDS))):
+        schemas = set(access.get(source.id,{})) | set(named.get(source.id,{}))
+        if schemas:
+            scope[catalog_name(source)] = {'source_id':source.id, 'kind':source.kind,
+                'schemas':{name:'Reader' for name in schemas}, 'named_objects':named.get(source.id,{})}
+    attach(db,user,scope)
+    from .product_options import attach as product_options
+    product_options(db,user,scope)
+    return {item['source_id']:{'schemas':sorted(item['schemas']), 'policies':item.get('policies',{}),
+        'groups':item.get('groups',[])} for item in scope.values()}
 
 
 def applies(policy, group_ids, principal_id):

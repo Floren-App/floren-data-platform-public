@@ -6,7 +6,7 @@ For named actions, page gates, layer-scoped grants and migration status, see
 the resource roles below still describe the workload/data/API model in use.
 
 See [active groups and ownership](active-groups.md) for primary-group creation,
-secondary-group access and the protected Global Admin group.
+selected-group authority and the protected Global Admin group.
 
 Floren Data Platform has one policy layer for schema access, nested workload folders, deployed
 services, and service accounts:
@@ -56,8 +56,9 @@ Workload folders under Workloads are separate from groups.
 
 ### Who may use the Access and Administration pages
 
-Every page in Access and Administration is an object you grant like any other, with two roles:
-**Viewer** (see the page) and **Manager** (also change it). Sections are their parents, so a role
+Every page in Access and Administration is an object you grant like any other.
+**Viewer** grants page visibility; named function permissions control individual operations.
+Legacy page roles are interpreted against the same per-action role matrix. Manager covers operational application/publication; Contributor covers draft edits, and destructive operations need Admin or Owner. Sections are their parents, so a role
 on a section covers all its pages, and a role on Administration covers everything. Platform
 administrators (Global Admin) have all of it. Grant them at the bottom of each page, under **Who can
 see or change this page** (administrators), or in Terraform:
@@ -72,7 +73,7 @@ resource "fdp_role_assignment" "privacy_forms" {
 
 | Section (ID) | Pages (IDs) |
 |---|---|
-| Platform (`adm-platform`) | Layers (`set-layers`), Compute pools (`set-pools`), Runtimes (`set-runtimes`), Workspace templates (`set-template`), Alerts (`set-alerts`) |
+| Platform (`adm-platform`) | Layers (`set-layers`), Compute pools (`set-pools`), Runtimes (`set-runtimes`), Workspace templates (`set-template`), Alerts (`set-alerts`), Backup and recovery (`set-backups`) |
 | Security (`adm-security`) | App profiles (`set-profiles`), Network allowlist (`set-network`) |
 | Privacy (`adm-privacy`) | Classifications (`set-classes`), Access policies (`set-policies`), Compliance forms (`set-forms`), Review duties (`set-duties`) |
 | Access (`adm-access`) | Groups: create groups (`set-groups`), Service identities: create service accounts (`set-services`), Access register (`set-register`), Audit log (`set-auditlog`), Query log (`set-querylog`) |
@@ -137,8 +138,10 @@ the workload/folder and the configured execution identity's data grants still ap
 
 | Data role | Permissions within a schema |
 |---|---|
-| Reader | Read tables/views |
-| Contributor | Read, insert, update, delete; no table creation/alteration/drop |
+| Viewer | Metadata discovery; no row/file payload |
+| Executor | Read tables/views (legacy alias: Reader) |
+| Manager | Edit descriptive metadata; no row/file payload |
+| Contributor | Insert, update, delete; no payload read or native DDL |
 | Admin | Read/write and native DDL |
 | Owner | Admin plus Floren Data Platform role assignment |
 
@@ -146,20 +149,23 @@ Custom stored-function execution is not granted to Reader or Contributor.
 
 | Workload/folder role | Permissions |
 |---|---|
+| Viewer | Discover metadata without opening apps or running programs |
 | Executor | Discover/open/run |
-| Contributor | Executor plus edit/deploy and automatic GitOps updates |
-| Admin | Contributor plus create/remove programs/apps |
+| Manager | Configure, deploy and create; execution and identity delegation remain separate |
+| Contributor | Edit permitted settings and drafts; no execution or deployment |
+| Admin | Execution, editing, deployment and create/remove programs/apps |
 | Owner | Admin plus role assignment and protected identity configuration |
 
-Parent grants always apply. Children can add permissions, never block them. There are no
-custom permission bundles, deny rules, inheritance breaks, or individual-table grants. Schema grants include existing/future tables under managed creation paths.
+Parent grants always apply. Children can add permissions, never block them. Named permissions support custom action bundles. Individual table, column, file and directory
+targets are available; see [data object permissions](data-object-permissions.md). There are no
+deny rules or inheritance breaks. Schema grants include existing/future tables under managed creation paths.
 Folder moves require source removal and destination creation rights; moves that change
 inherited assignments also require Owner authority on the moved resource.
 
 Global Admin has protected Owner access to every resource, including data. New registered
 objects receive a direct Owner assignment for the active primary group, in addition to
 inherited access. Only that primary group's privileges authorize creation; other groups remain
-active for existing-object access. See [active groups](active-groups.md).
+inactive for interactive resource checks until selected. See [active groups](active-groups.md).
 
 ## Shared SQL and storage support
 
@@ -210,7 +216,7 @@ identity picker. Permissions **on** the workload control management/invocation. 
 
 The deployer selects caller mode or fixed mode. Fixed mode uses the workload's own
 service principal or a service account the deployer is authorized to select. Human deployer
-identities are not fixed execution identities. Contributors can deploy with the configured
+identities are not fixed execution identities. Managers can deploy with the configured
 identity, but cannot change that identity, environment/secret bindings, or role assignments.
 Service-account Executor permits selection for execution, not token or secret management;
 those operations require Owner. Git branch permissions must reflect who can modify code

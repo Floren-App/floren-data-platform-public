@@ -1,0 +1,331 @@
+{
+  "alert_rules": {
+    "events": [],
+    "layer_ids": [],
+    "resource_ids": [],
+    "classifications": [],
+    "enabled": true,
+    "created_by": ""
+  },
+  "api_calls": {
+    "caller": "",
+    "status_code": 0
+  },
+  "api_definitions": {
+    "description": "",
+    "config": {},
+    "created_by": ""
+  },
+  "app_groups": {
+    "description": "",
+    "owners": []
+  },
+  "app_profiles": {
+    "description": "",
+    "features": [],
+    "default": false
+  },
+  "audit_events": {
+    "detail": {}
+  },
+  "certificate_checks": {
+    "message": ""
+  },
+  "compliance_cases": {
+    "status": "draft",
+    "requester_principal_id": "",
+    "role": "",
+    "classification": "",
+    "answers": {},
+    "steps": [],
+    "step": 0,
+    "decisions": [],
+    "comments": []
+  },
+  "compliance_deadlines": {
+    "classification": ""
+  },
+  "compliance_forms": {
+    "description": ""
+  },
+  "compliance_memberships": {
+    "approved_by": ""
+  },
+  "compliance_roles": {
+    "scope": {}
+  },
+  "custom_permission_roles": {
+    "actions": []
+  },
+  "data_sources": {
+    "description": "",
+    "config": {},
+    "egress": []
+  },
+  "directory_principals": {
+    "provider": "local",
+    "active": true,
+    "managed": false,
+    "attributes": {}
+  },
+  "git_credentials": {
+    "label": "",
+    "commit_name": "",
+    "commit_email": ""
+  },
+  "kafka_sessions": {
+    "consumer_group": "",
+    "execution_context": ""
+  },
+  "notification_webhooks": {
+    "events": [],
+    "enabled": true,
+    "has_secret": false
+  },
+  "notifications": {
+    "payload": {},
+    "attempts": 0,
+    "error": ""
+  },
+  "package_imports": {
+    "status": "queued",
+    "log": "",
+    "added": []
+  },
+  "packages": {
+    "summary": "",
+    "created_by": ""
+  },
+  "platform_settings": {
+    "value": {}
+  },
+  "query_log": {
+    "sql_query_id": "",
+    "principal_id": "",
+    "actor": "",
+    "initiator_id": "",
+    "run_id": "",
+    "workload_id": "",
+    "workspace_id": "",
+    "trino_user": "",
+    "source": "",
+    "query_type": "",
+    "state": "",
+    "error": "",
+    "tables": [],
+    "output_table": "",
+    "rows": 0,
+    "bytes": 0,
+    "cpu_ms": 0,
+    "wall_ms": 0,
+    "queued_ms": 0
+  },
+  "rbac_resources": {
+    "config": {}
+  },
+  "runtime_images": {
+    "description": "",
+    "is_default": false,
+    "enabled": true,
+    "managed_by": ""
+  },
+  "secret_entries": {
+    "kind": "string",
+    "description": ""
+  },
+  "service_accounts": {
+    "description": "",
+    "groups": [],
+    "allowed_groups": [],
+    "disabled": false
+  },
+  "siem_cursors": {
+    "audit_id": 0,
+    "query_id": "",
+    "seq": 0,
+    "last_hash": "",
+    "last_error": ""
+  },
+  "sql_queries": {
+    "initiator_id": "",
+    "run_id": "",
+    "workload_id": "",
+    "scope": {},
+    "lineage": {},
+    "workspace_id": "",
+    "engine_layer": "",
+    "engine_scheme": "http",
+    "state": "QUEUED"
+  },
+  "workload_logs": {
+    "level": "info",
+    "source": "platform",
+    "event": "",
+    "message": "",
+    "fields": {},
+    "actor": ""
+  },
+  "api_operations": {
+    "group": "",
+    "method": "GET",
+    "path": "/",
+    "soap_action": "",
+    "description": "",
+    "config": {}
+  },
+  "catalog_assets": {
+    "path": "",
+    "attributes": {},
+    "governance": {},
+    "sla": {},
+    "search_text": ""
+  },
+  "catalog_imports": {
+    "scope": "",
+    "revision": "",
+    "nodes": 0,
+    "edges": 0
+  },
+  "compliance_case_files": {
+    "content_type": "application/octet-stream",
+    "uploaded_by": ""
+  },
+  "compliance_form_versions": {
+    "definition": {},
+    "published": false,
+    "published_by": ""
+  },
+  "compliance_policies": {
+    "steps": [],
+    "max_days": 365,
+    "review_days": 10,
+    "renew_days": 30,
+    "grace_days": 30
+  },
+  "compute_pools": {
+    "gpu": 0,
+    "max_concurrent": 10,
+    "dedicated": false,
+    "auto_suspend_seconds": 600,
+    "allowed_groups": [],
+    "layer_ids": [],
+    "workload_kinds": []
+  },
+  "credential_leases": {
+    "revoked": false
+  },
+  "data_policies": {
+    "column_name": "",
+    "method": "",
+    "expression": "",
+    "exempt_groups": [],
+    "exempt_principals": [],
+    "description": "",
+    "updated_by": ""
+  },
+  "git_repositories": {
+    "default_branch": "main",
+    "description": "",
+    "allowed_groups": []
+  },
+  "layer_operations": {
+    "phase": "Pending",
+    "reason": "ConfigurationAccepted",
+    "message": ""
+  },
+  "package_files": {
+    "requires": [],
+    "meta": {},
+    "yanked": false,
+    "yanked_reason": "",
+    "uploaded_by": ""
+  },
+  "permission_grants": {
+    "actions": []
+  },
+  "service_tokens": {
+    "revoked": false
+  },
+  "workspace_templates": {
+    "description": "",
+    "repositories": []
+  },
+  "workspaces": {
+    "status": "stopped",
+    "git_asked": false
+  },
+  "catalog_lineage_edges": {
+    "revision": ""
+  },
+  "catalog_products": {
+    "summary": "",
+    "published_by": ""
+  },
+  "dataset_observations": {
+    "run_id": "",
+    "revision": ""
+  },
+  "metric_definitions": {
+    "description": "",
+    "unit": "",
+    "origin": "manual",
+    "definition": {},
+    "version": 1,
+    "enabled": true,
+    "created_by": ""
+  },
+  "sla_evaluations": {
+    "result": {}
+  },
+  "sla_incidents": {
+    "acknowledged_by": "",
+    "detail": {}
+  },
+  "workloads": {
+    "owner_groups": [],
+    "execution_mode": "caller",
+    "env": {},
+    "secrets": {},
+    "allowed_groups": [],
+    "auto_update": true,
+    "status": "deploying",
+    "deployed_commit": {},
+    "program_def": {},
+    "execution_refs": []
+  },
+  "catalog_access_requests": {
+    "requester_principal_id": "",
+    "reason": "",
+    "status": "pending",
+    "role": "",
+    "decided_by": "",
+    "decision_note": ""
+  },
+  "catalog_product_members": {
+    "position": 0
+  },
+  "catalog_product_options": {
+    "description": "",
+    "default": false,
+    "position": 0,
+    "masks": [],
+    "filters": []
+  },
+  "metric_definition_revisions": {
+    "changed_by": ""
+  },
+  "metric_observations": {
+    "run_id": "",
+    "revision": "",
+    "detail": {}
+  },
+  "runs": {
+    "access_snapshot": {},
+    "args": {},
+    "secret_paths": [],
+    "status": "pending"
+  },
+  "workload_events": {
+    "message": ""
+  }
+}

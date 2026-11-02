@@ -132,3 +132,28 @@ The optional Kafka pipeline publishes synthetic EUR quotes into an append-only
 table and a separate market product schema. The [demo walkthrough and access
 matrices](pokemon-demo.md) cover setup, managed identities, groups, denials, retry
 semantics, and the remaining RBAC migration limits.
+
+## Private development permissions
+
+The reusable module grants its engineer group explicit workspace and run page Viewer
+access plus workspace Manager, Contributor and Executor functions in the test layer.
+These let engineers create private environments, edit code and execute it without
+workspace deletion or permission delegation. Job submission has its own `runs`
+Executor assignment. Log and artifact content use separate Executor assignments. Production receives none of these development grants by default;
+set `developer_workspaces = true` on that module instance only when production
+interactive development is intended. Set it to false in test to disable the module's
+development grants. Other explicit grants remain additive.
+
+This uses `fdp_permission_assignment` from provider 0.6.0 or newer and the corresponding
+workspace function enforcement in the control-plane source. Install compatible images
+before applying a configuration that depends on these boundaries.
+
+
+The module declares page and function permissions alongside resource roles.
+`catalog_permissions.tf` separates product discovery, private access requests and
+form submission from consumer data grants and owner review.
+`workspace_permissions.tf` grants development only in Test by default; production
+development requires an explicit override. Git credentials and personal secrets
+remain private to their stable principal even when a group receives the functions
+to manage its members' own credentials. No token-management or deletion grant is
+included in the development credential bundle.

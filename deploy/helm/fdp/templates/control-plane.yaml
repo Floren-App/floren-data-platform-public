@@ -38,8 +38,33 @@ spec:
       terminationGracePeriodSeconds: 30
       {{- include "fdp.imagePullSecrets" . | nindent 6 }}
       securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: { type: RuntimeDefault } }   # fsGroup: the package volume
-      {{- if .Values.packages.persistence.fixPermissions }}
       initContainers:
+        - name: migrate-metadata
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [python, -m, app.schema_migrations, upgrade{{ if .Values.migrations.adoptLegacy }}, --adopt-legacy{{ end }}]
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          envFrom:
+            - secretRef: { name: {{ .Values.existingSecret }} }
+          {{- if or .Values.metadataDatabase.enabled .Values.metadataDatabase.connectionSecret }}
+          env:
+            {{- if .Values.metadataDatabase.enabled }}
+            - { name: FDP_DATABASE_HOST, value: {{ include "fdp.databaseHost" . | quote }} }
+            - { name: FDP_DATABASE_NAME, value: fdp }
+            - { name: FDP_DATABASE_USER, value: fdp }
+            - name: FDP_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "fdp-metadata-db" .Values.metadataDatabase.existingSecret }}
+                  key: fdp-password
+            {{- else if .Values.metadataDatabase.connectionSecret }}
+            - name: FDP_DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.metadataDatabase.connectionSecret }}, key: database-url }
+            {{- end }}
+          {{- end }}
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: "1", memory: 512Mi } }
+      {{- if .Values.packages.persistence.fixPermissions }}
         # fsGroup does not reach every volume (e.g. Longhorn ReadWriteMany): hand the package folder to the
         # control plane's user. Only CHOWN, nothing else; the only root container in the chart (see values).
         - name: package-volume

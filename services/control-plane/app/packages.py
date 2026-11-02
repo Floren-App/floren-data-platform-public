@@ -5,7 +5,7 @@ CRAN-style repository (src/contrib/PACKAGES with the newest version of each pack
 src/contrib/Archive/<package>/, the layout renv uses for "pkg@version"). Workspaces, runs and deployed programs
 install only from here: they have no route to PyPI or CRAN.
 
-Everyone may read. Publishing is RBAC on the "packages" resource: Publishers publish new packages (their
+Metadata and downloads require explicit package or repository grants. Publishing is RBAC: Publishers publish new packages (their
 group becomes the package's Owner) and import packages from PyPI/CRAN; a package's Owner and Maintainers
 publish its new versions. Published files are never overwritten; a version can be yanked. A package name
 is either internal or imported, never both, so a published package cannot shadow an upstream one.
@@ -31,7 +31,7 @@ from packaging.version import InvalidVersion, Version
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import rbac
+from . import permissions, rbac
 from .auth import User
 from .config import get_settings
 from .models import Package, PackageFile, Resource
@@ -280,7 +280,7 @@ def publish(db: Session, user: User, kind: str, filename: str, received: Receive
             raise PackageError(409, f"{package.name} is imported from {ORIGIN_LABEL[package.origin]}; it cannot be "
                                     "published here. Choose another name for your own package")
         if package is None:
-            rbac.require(db, user, "create", rbac.packages_root(db))
+            permissions.require_domain(db,user,"packages.upload",rbac.packages_root(db),"create")
             from .package_imports import upstream_has
             if upstream_has(kind, parsed.name):
                 raise PackageError(409, f"a package named {parsed.name} exists on {'PyPI' if kind == 'python' else 'CRAN'}; "
@@ -295,7 +295,7 @@ def publish(db: Session, user: User, kind: str, filename: str, received: Receive
             package.resource_id = resource.id
             rbac.own(db, user, resource)
         else:
-            rbac.require(db, user, "publish", db.get(Resource, package.resource_id))
+            permissions.require_domain(db,user,"packages.publish",db.get(Resource,package.resource_id),"publish")
         return add_file(db, package, parsed, filename, received, user.username)
     finally:
         received.path.unlink(missing_ok=True)
@@ -311,6 +311,12 @@ def store_imported(db: Session, kind: str, origin: str, filename: str, received:
         package = Package(kind=kind, key=parsed.key, name=parsed.name, origin=origin, created_by=by)
         db.add(package)
         db.flush()
+    if not package.resource_id:
+        target = Resource(kind='package', name=package.name, parent_id=rbac.packages_root(db).id,
+                          object_id=package.id, config={'package_kind':kind})
+        db.add(target)
+        db.flush()
+        package.resource_id = target.id
     return add_file(db, package, parsed, filename, received, by)
 
 
@@ -365,7 +371,11 @@ def guard(db: Session, package: Package) -> Resource:
 
 def actions(db: Session, user: User, package: Optional[Package] = None) -> List[str]:
     resource = guard(db, package) if package else rbac.packages_root(db)
-    return sorted(a for a in ("create", "import", "publish", "yank", "delete", "assign") if rbac.allowed(db, user, a, resource))
+    keys={'create':('packages.upload','create'),'import':('packages.imports.request','import'),
+        'publish':('packages.publish','publish'),'yank':('packages.yank','yank'),
+        'unyank':('packages.unyank','yank'),'delete':('packages.version.delete','delete'),
+        'assign':('packages.roles.assign','assign')}
+    return sorted(a for a,(action,legacy) in keys.items() if permissions.domain_allowed(db,user,action,resource,legacy))
 
 
 # --- versions --------------------------------------------------------------------------------------------
@@ -400,17 +410,29 @@ def latest(db: Session, package: Package) -> Optional[str]:
 
 # --- the indexes -------------------------------------------------------------------------------------------
 
-def python_project_list(db: Session) -> List[Package]:
-    return sorted(db.scalars(select(Package).where(Package.kind == "python")), key=lambda p: p.key)
+def permitted(db, user, package, action='read'):
+    from .permissions import domain_allowed
+    return domain_allowed(db, user, 'packages.'+action, guard(db,package), action)
 
 
-def python_index_html(db: Session) -> str:
-    links = "\n".join(f'<a href="{html.escape(p.key)}/">{html.escape(p.name)}</a><br>' for p in python_project_list(db))
+def require_permitted(db, user, package, action='read'):
+    if not permitted(db, user, package, action):
+        from fastapi import HTTPException
+        raise HTTPException(404, 'package not available')
+
+
+def python_project_list(db: Session, user=None) -> List[Package]:
+    return sorted((p for p in db.scalars(select(Package).where(Package.kind == "python"))
+        if user is None or permitted(db,user,p)), key=lambda p: p.key)
+
+
+def python_index_html(db: Session, user=None) -> str:
+    links = "\n".join(f'<a href="{html.escape(p.key)}/">{html.escape(p.name)}</a><br>' for p in python_project_list(db, user))
     return f"<!DOCTYPE html>\n<html><head><meta name=\"pypi:repository-version\" content=\"1.0\"><title>Simple index</title></head><body>\n{links}\n</body></html>\n"
 
 
-def python_index_json(db: Session) -> dict:
-    return {"meta": {"api-version": "1.0"}, "projects": [{"name": p.name} for p in python_project_list(db)]}
+def python_index_json(db: Session, user=None) -> dict:
+    return {"meta": {"api-version": "1.0"}, "projects": [{"name": p.name} for p in python_project_list(db, user)]}
 
 
 def _file_url(package: Package, f: PackageFile) -> str:
@@ -444,10 +466,12 @@ def python_project_json(db: Session, package: Package) -> dict:
             "versions": [v for v, _ in reversed(versions(db, package))]}
 
 
-def r_packages_index(db: Session) -> str:
+def r_packages_index(db: Session, user=None) -> str:
     """PACKAGES: the newest version of each R package that is not yanked."""
     stanzas = []
     for package in sorted(db.scalars(select(Package).where(Package.kind == "r")), key=lambda p: p.key):
+        if user is not None and not permitted(db,user,package):
+            continue
         for version, files in versions(db, package):
             current = [f for f in files if not f.yanked]
             if current:
@@ -456,8 +480,8 @@ def r_packages_index(db: Session) -> str:
     return "\n\n".join(stanzas) + ("\n" if stanzas else "")
 
 
-def r_packages_gz(db: Session) -> bytes:
-    return gzip.compress(r_packages_index(db).encode(), mtime=0)
+def r_packages_gz(db: Session, user=None) -> bytes:
+    return gzip.compress(r_packages_index(db, user).encode(), mtime=0)
 
 
 def r_file(db: Session, filename: str) -> Optional[Tuple[Package, PackageFile]]:

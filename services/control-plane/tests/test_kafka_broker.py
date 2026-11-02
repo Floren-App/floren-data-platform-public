@@ -49,6 +49,14 @@ def test_real_broker_tls_oauth_sdk_and_revocation(client, topic, tmp_path, monke
     import fdp
 
     grant_group(client,topic['id'],'Writers','Contributor',users=('ana',))
+    # Producing and consuming are independent powers. This round-trip fixture
+    # explicitly grants both; removing Contributor later must still stop writes.
+    assert client.post(f"/v1/kafka/topics/{topic['id']}/session",headers=as_('ana'),
+        json={'mode':'consume'}).status_code==403
+    principal=client.get('/v1/me',headers=as_('ana')).json()['principal_id']
+    client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+        'target_id':topic['id'],'namespace':'kafka.data','layer_id':topic['config']['layer_id'],
+        'principal_id':principal,'role':'Executor'}).raise_for_status()
     with SessionLocal() as db:
         layer=db.get(Resource,topic['config']['layer_id'])
         layer.config={**layer.config,'infrastructure':{**layer.config['infrastructure'],

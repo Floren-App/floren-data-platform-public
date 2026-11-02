@@ -30,6 +30,7 @@ class DataSourceIn(BaseModel):
 
 
 class DataSourceOut(ORM):
+    capabilities: List[str] = Field(default_factory=list)
     id: str
     name: str
     kind: str
@@ -90,6 +91,7 @@ class WorkspaceIn(BaseModel):
 
 
 class WorkspaceOut(ORM):
+    capabilities: List[str] = Field(default_factory=list)
     started_at: Optional[datetime] = None
     startup_error: Optional[str] = None
     owner_group_id: Optional[str] = None
@@ -129,6 +131,7 @@ class RunIn(BaseModel):
 
 
 class RunOut(ORM):
+    capabilities: List[str] = Field(default_factory=list)
     initiated_by: Optional[str] = None
     id: str
     owner: str
@@ -169,6 +172,7 @@ class RepoIn(BaseModel):
 
 
 class RepoOut(ORM):
+    capabilities: List[str] = Field(default_factory=list)
     owner_group_id: Optional[str] = None
     id: str
     name: str
@@ -269,6 +273,7 @@ class WorkloadEventOut(ORM):
 
 
 class WorkloadOut(BaseModel):
+    capabilities: List[str] = Field(default_factory=list)
     owner_group_id: Optional[str] = None
     owner_group_name: Optional[str] = None
     layer_id: Optional[str] = None
@@ -343,6 +348,7 @@ class Me(BaseModel):
     compliance_roles: List[str] = Field(default_factory=list, description="Compliance roles this person holds (in any scope)")
     settings: Dict[str, str] = Field(default_factory=dict, description="Access and Administration pages this person may use: page -> view or manage")
     pages: Dict[str, bool] = Field(default_factory=dict, description="Explicit Viewer gates for every desktop page")
+    settings_capabilities: Dict[str, List[str]] = Field(default_factory=dict)
     permission_grants: List[Dict[str, Any]] = Field(default_factory=list, description="Effective named capabilities and their target/layer scopes")
     acting_admin: bool = Field(default=False, description="A platform administrator with Global Admin (or no group) active: the whole app")
     available_groups: List[Dict[str, Any]] = Field(default_factory=list)

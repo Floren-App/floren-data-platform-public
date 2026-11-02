@@ -131,7 +131,7 @@ export function GiveAccess({ group, hub, onDone }: { group: { id: string; name: 
 
 const SECTION_OF: Record<string, [string, string]> = {
   "set-layers": ["adm-platform", "Platform"], "set-pools": ["adm-platform", "Platform"], "set-runtimes": ["adm-platform", "Platform"],
-  "set-template": ["adm-platform", "Platform"], "set-alerts": ["adm-platform", "Platform"],
+  "set-backups": ["adm-platform", "Platform"], "set-template": ["adm-platform", "Platform"], "set-alerts": ["adm-platform", "Platform"],
   "set-profiles": ["adm-security", "Security"], "set-network": ["adm-security", "Security"],
   "set-classes": ["adm-privacy", "Privacy"], "set-policies": ["adm-privacy", "Privacy"], "set-forms": ["adm-privacy", "Privacy"], "set-duties": ["adm-privacy", "Privacy"],
   "set-groups": ["adm-access", "Access"], "set-services": ["adm-access", "Access"], "set-register": ["adm-access", "Access"],

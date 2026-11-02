@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import classification, compliance as cp, layers, notify, rbac, settings_access
+from .. import case_access, permissions, classification, compliance as cp, layers, notify, rbac, settings_access
 from ..auth import User
 from ..db import get_db
 from ..deps import get_actor
@@ -305,6 +305,14 @@ class CaseIn(TargetIn):
 def new_case(db, user, target: TargetIn, answers: dict, until: Optional[datetime], submit: bool, request_id: Optional[str] = None) -> AccessCase:
     """A case for this access under the policy that applies; answers checked against the form's current version."""
     req = requirement_for(db, target)
+    parent=target.resource_id
+    if target.kind=='product':
+        product=db.get(CatalogProduct,target.product_id)
+        parent=product.access_resource_id if product else None
+    for action in ('compliance.cases.create','compliance.cases.submit') if submit else ('compliance.cases.create',):
+        if not (permissions.allowed(db,user,action,'cases',req['layer_id']) or
+                (parent and permissions.allowed(db,user,action,parent,req['layer_id']))):
+            raise HTTPException(403,action+' permission required')
     policy = req["policy"]
     if policy is None:
         raise HTTPException(409, "this access needs no compliance form")
@@ -348,11 +356,12 @@ def case_out(db, case: AccessCase, user, full: bool = True) -> dict:
            "classification": case.classification, "form": form.name if form else None, "form_version": version.version if version else None,
            "steps": case.steps, "step": case.step, "decisions": case.decisions or [], "until": case.until,
            "approved_until": case.approved_until, "due_at": case.due_at, "created_at": case.created_at,
-           "submitted_at": case.submitted_at, "decided_at": case.decided_at, "can_review": cp.may_review(db, user, case),
+           "submitted_at": case.submitted_at, "decided_at": case.decided_at, "can_review": cp.may_review(db, user, case) and any(case_access.allowed(db,user,a,case) for a in ('compliance.cases.approve','compliance.cases.reject','compliance.cases.changes.request')),
+           "capabilities":[a for a in permissions.REGISTRY if a.startswith('compliance.cases.') and case_access.allowed(db,user,a,case)],
            "renewal_of": case.renewal_of,
            "renewal": db.scalar(select(AccessCase.id).where(AccessCase.renewal_of == case.id,
                                                             AccessCase.status.in_(("draft", "in_review", "changes_requested", "approved")))),
-           "is_requester": rbac.resolve_user(db, user).username == case.requester}
+           "is_requester": case_access.is_requester(db,user,case)}
     if full:
         out.update({"answers": case.answers or {}, "definition": version.definition if version else None, "comments": case.comments or [],
                     "files": [{"id": f.id, "field_id": f.field_id, "name": f.name, "content_type": f.content_type}
@@ -364,7 +373,7 @@ def case_out(db, case: AccessCase, user, full: bool = True) -> dict:
 
 def may_see(db, user, case: AccessCase) -> bool:
     resolved = rbac.resolve_user(db, user)
-    if resolved.is_admin or resolved.username == case.requester or cp.may_review(db, user, case) or cp.is_compliance_admin(db, user):
+    if resolved.is_admin or case_access.is_requester(db,resolved,case) or cp.may_review(db, user, case) or cp.is_compliance_admin(db, user):
         return True
     target = cp.case_target(db, case)
     resource = db.get(Resource, target) if target else None
@@ -413,19 +422,22 @@ def list_cases(box: Literal["mine", "review", "all"] = "mine", status: str = "",
         stmt = stmt.where(AccessCase.status == status)
     out = []
     for case in db.scalars(stmt.limit(1000)):
-        if box == "mine" and case.requester != resolved.username:
+        if box == "mine" and not case_access.is_requester(db,resolved,case):
             continue
         if box == "review" and not cp.may_review(db, user, case):
             continue
         if box == "all" and not may_see(db, user, case):
             continue
-        out.append(case_out(db, case, user, full=False))
+        if case_access.allowed(db,user,"compliance.cases.list",case) and case_access.allowed(db,user,"compliance.cases.read",case):
+            out.append(case_out(db, case, user, full=False))
     return out
 
 
 @router.get("/cases/{case_id}")
 def get_case(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
-    return case_out(db, _case(db, case_id, user), user)
+    case=_case(db,case_id,user)
+    case_access.require(db,user,"compliance.cases.read",case)
+    return case_out(db,case,user)
 
 
 class CasePatch(BaseModel):
@@ -438,7 +450,8 @@ class CasePatch(BaseModel):
 def update_case(case_id: str, body: CasePatch, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     """The requester changes answers of a draft, or after the reviewer asked for changes."""
     case = _case(db, case_id, user)
-    if rbac.resolve_user(db, user).username != case.requester or case.status not in ("draft", "changes_requested"):
+    case_access.require(db,user,"compliance.cases.answers.edit",case)
+    if not case_access.is_requester(db,user,case) or case.status not in ("draft", "changes_requested"):
         raise HTTPException(409, "answers can be changed in a draft, or when changes are asked for")
     version = db.get(AccessFormVersion, case.form_version_id)
     files = [f.field_id for f in db.scalars(select(AccessCaseFile).where(AccessCaseFile.case_id == case.id))]
@@ -453,7 +466,8 @@ def update_case(case_id: str, body: CasePatch, db: Session = Depends(get_db), us
 @router.post("/cases/{case_id}/submit")
 def submit_case(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     case = _case(db, case_id, user)
-    if rbac.resolve_user(db, user).username != case.requester or case.status not in ("draft", "changes_requested"):
+    case_access.require(db,user,"compliance.cases.submit",case)
+    if not case_access.is_requester(db,user,case) or case.status not in ("draft", "changes_requested"):
         raise HTTPException(409, "only a draft, or a case with changes asked for, can be sent")
     version = db.get(AccessFormVersion, case.form_version_id)
     files = [f.field_id for f in db.scalars(select(AccessCaseFile).where(AccessCaseFile.case_id == case.id))]
@@ -478,6 +492,7 @@ class DecisionIn(BaseModel):
 @router.post("/cases/{case_id}/decision")
 def decide_case(case_id: str, body: DecisionIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     case = _case(db, case_id, user)
+    case_access.require(db,user,{'approve':'compliance.cases.approve','changes':'compliance.cases.changes.request','decline':'compliance.cases.reject'}[body.decision],case)
     if body.decision in ("changes", "decline") and not body.note.strip():
         raise HTTPException(422, "say why, so the requester can act on it")
     cp.decide(db, case, user, body.decision, body.note.strip(), body.until)
@@ -495,6 +510,7 @@ class CommentIn(BaseModel):
 @router.post("/cases/{case_id}/comments")
 def comment(case_id: str, body: CommentIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     case = _case(db, case_id, user)
+    case_access.require(db,user,"compliance.cases.comment",case)
     by = rbac.resolve_user(db, user).username
     case.comments = [*(case.comments or []), {"by": by, "text": body.text.strip(), "at": utcnow().isoformat()}]
     notify.case_event(db, case, "comment", by=by)
@@ -505,7 +521,8 @@ def comment(case_id: str, body: CommentIn, db: Session = Depends(get_db), user: 
 @router.post("/cases/{case_id}/withdraw")
 def withdraw_case(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     case = _case(db, case_id, user)
-    if rbac.resolve_user(db, user).username != case.requester or case.status not in ("draft", "in_review", "changes_requested"):
+    case_access.require(db,user,"compliance.cases.withdraw",case)
+    if not case_access.is_requester(db,user,case) or case.status not in ("draft", "in_review", "changes_requested"):
         raise HTTPException(409, "only your own open case can be withdrawn")
     case.status, case.decided_at = "withdrawn", utcnow()
     db.commit()
@@ -523,7 +540,8 @@ class FileIn(BaseModel):
 @router.post("/cases/{case_id}/files", status_code=201)
 def add_file(case_id: str, body: FileIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     case = _case(db, case_id, user)
-    if rbac.resolve_user(db, user).username != case.requester or case.status not in ("draft", "changes_requested"):
+    case_access.require(db,user,"compliance.cases.attachment.add",case)
+    if not case_access.is_requester(db,user,case) or case.status not in ("draft", "changes_requested"):
         raise HTTPException(409, "files are added to a draft, or when changes are asked for")
     version = db.get(AccessFormVersion, case.form_version_id)
     field = next((f for p in version.definition["pages"] for f in p["fields"] if f["id"] == body.field_id), None)
@@ -547,6 +565,7 @@ def add_file(case_id: str, body: FileIn, db: Session = Depends(get_db), user: Us
 @router.get("/cases/{case_id}/files/{file_id}")
 def get_file(case_id: str, file_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     case = _case(db, case_id, user)
+    case_access.require(db,user,"compliance.cases.attachment.read",case)
     item = db.get(AccessCaseFile, file_id)
     if item is None or item.case_id != case.id:
         raise HTTPException(404, "file not found")
@@ -565,10 +584,14 @@ def pending_memberships(db: Session = Depends(get_db), user: User = Depends(get_
     for item in cp.pending_members(db):
         if (item["app_group_id"], item["principal_id"]) in declined:
             continue
+        if not permissions.allowed(db,user,"compliance.memberships.list","group:"+item["app_group_id"]):
+            continue
         if not cp.has_role(db, user, "membership_approver", group_id=item["app_group_id"]):
             continue
         group, principal = db.get(AppGroup, item["app_group_id"]), db.get(DirectoryPrincipal, item["principal_id"])
-        out.append({**item, "group": group.name if group else item["app_group_id"], "principal": principal.name if principal else item["principal_id"]})
+        out.append({**item, "group": group.name if group else item["app_group_id"], "principal": principal.name if principal else item["principal_id"],
+            "capabilities":[action for action in ("compliance.memberships.approve","compliance.memberships.reject")
+                if permissions.allowed(db,user,action,"group:"+item["app_group_id"])]})
     return out
 
 
@@ -582,6 +605,7 @@ class MembershipDecision(BaseModel):
 def decide_membership(group_id: str, principal_id: str, body: MembershipDecision,
                       db: Session = Depends(get_db), user: User = Depends(get_actor)):
     resolved = rbac.resolve_user(db, user)
+    permissions.require(db,user,"compliance.memberships.approve" if body.approve else "compliance.memberships.reject","group:"+group_id)
     if not cp.has_role(db, user, "membership_approver", group_id=group_id):
         raise HTTPException(403, "membership approver required for this group")
     if principal_id == resolved.principal_id:
@@ -619,6 +643,9 @@ def register_rows(db, user) -> List[dict]:
         target = cp.case_target(db, case) if case.kind == "product" else case.resource_id
         if not admin and not cp.has_role(db, user, "compliance_reviewer", resource_id=target, layer_id=case.layer_id, level=case.classification):
             continue
+        action = "compliance.register.export" if db.info.get("register_export") else "compliance.register.read"
+        if not (permissions.allowed(db,user,action,"case:"+case.id,case.layer_id) or permissions.allowed(db,user,action,"set-register",case.layer_id)):
+            continue
         out = case_out(db, case, user, full=False)
         access = (f"{out['product']} ({out['option']})" if out["option"] else out["product"]) if case.kind == "product" \
             else f"{grant.role} on {out['resource']['name'] if out['resource'] else grant.resource_id}"
@@ -627,7 +654,7 @@ def register_rows(db, user) -> List[dict]:
                      "form": f"{out['form']} v{out['form_version']}" if out["form"] else "", "requester": case.requester,
                      "approved_by": ", ".join(sorted({d["by"] for d in case.decisions or [] if d["decision"] == "approve"})),
                      "approved_at": case.decided_at, "until": grant.until, "members": len(cp.members_of(db, case.app_group_id)),
-                     "case_id": case.id})
+                     "case_id": case.id, "can_export": permissions.allowed(db,user,"compliance.register.export","case:"+case.id,case.layer_id) or permissions.allowed(db,user,"compliance.register.export","set-register",case.layer_id)})
     return rows
 
 
@@ -637,9 +664,13 @@ def access_register(format: Literal["json", "csv"] = "json", db: Session = Depen
     import csv
     import io
     held = db.scalar(select(ComplianceRole.id).where(ComplianceRole.role == "compliance_reviewer",
-                                                     ComplianceRole.app_group_id.in_(list(rbac.app_groups(db, rbac.resolve_user(db, user))))))
+                                                     ComplianceRole.app_group_id.in_(list(rbac.effective_app_groups(db, rbac.resolve_user(db, user))))))
     if not (cp.is_compliance_admin(db, user) or held or settings_access.allowed(db, user, "set-register", "view")):
         raise HTTPException(403, "Viewer on Access register, or a review duty, required")
+    if format == "csv":
+        db.info["register_export"] = True
+        if not held and not cp.is_compliance_admin(db,user):
+            settings_access.require(db,user,"set-register","compliance.register.export")
     rows = register_rows(db, user)
     audit(db, rbac.resolve_user(db, user).username, "compliance.register_read", "compliance-register", rows=len(rows), format=format)
     db.commit()
@@ -667,7 +698,7 @@ def access_register(format: Literal["json", "csv"] = "json", db: Session = Depen
 def may_act_for(db, user, case: AccessCase) -> bool:
     """The requester, or someone who can give the access: the object's or product's owners."""
     resolved = rbac.resolve_user(db, user)
-    if resolved.username == case.requester or resolved.is_admin:
+    if case_access.is_requester(db,resolved,case) or resolved.is_admin:
         return True
     target = cp.case_target(db, case)
     resource = db.get(Resource, target) if target else None
@@ -679,6 +710,7 @@ def renew_case(case_id: str, db: Session = Depends(get_db), user: User = Depends
     """Start the renewal of approved access now: a draft on the current form, prefilled with the answers."""
     from .. import expiry
     case = _case(db, case_id, user)
+    case_access.require(db,user,"compliance.cases.renew",case)
     if case.status not in ("approved", "expired") or case.kind == "membership":
         raise HTTPException(409, "only approved or ended access can be renewed")
     if not may_act_for(db, user, case):
@@ -705,6 +737,8 @@ def list_deadlines(resource_id: Optional[str] = None, db: Session = Depends(get_
         if resource is None:
             continue
         policy = db.get(AccessPolicy, item.policy_id)
+        if not permissions.allowed(db,user,"compliance.deadlines.read",resource.id,policy.layer_id if policy else None):
+            continue
         if not (admin or rbac.allowed(db, user, "assign", resource) or cp.has_role(
                 db, user, "compliance_reviewer", resource_id=resource.id, layer_id=policy.layer_id if policy else None, level=item.classification)):
             continue

@@ -27,6 +27,7 @@ export const inGroup = (mode: string | null | undefined, itemGroup: string | nul
   !mode || mode === GLOBAL_ADMIN_GROUP || !itemGroup || itemGroup === mode;
 
 export interface DataSource {
+  capabilities?: string[];
   id: string;
   name: string;
   kind: string;
@@ -69,6 +70,7 @@ export interface DataPolicy {
 }
 export type DataPolicyChange = Pick<DataPolicy, "method" | "expression" | "exempt_groups" | "exempt_principals" | "description">;
 export interface AccessResource {
+  capabilities?: string[];
   owner_group_id?: string | null; owner_group_name?: string | null;
   layer_id?: string | null; layer_name?: string | null;
   id: string; name: string; kind: "root" | "folder" | "service" | "source" | "schema" | "kafka" | "topic" | "api-root" | "api" | "api-group" | "api-operation" | "package-root" | "package" | "product-root" | "product";
@@ -99,6 +101,7 @@ export interface ApiOperation {
   resource_id: string; actions: string[];
 }
 export interface ApiDefinition {
+  capabilities?: string[];
   id: string; slug: string; name: string; direction: ApiDirection; protocol: "rest" | "soap"; description: string;
   config: { inbound?: InboundConfig; outbound?: OutboundConfig; layer_id?: string; environment_id?: string }; resource_id: string; actions: string[]; endpoint: string;
   operation_count: number; updated_at: string; created_by: string;
@@ -256,6 +259,7 @@ export interface Me {
   /** Access and Administration pages this person may use: page id -> "view" or "manage". */
   settings?: Record<string, "view" | "manage">;
   pages?: Record<string, boolean>;
+  settings_capabilities?: Record<string, string[]>;
   permission_grants?: { target_id: string; namespace: string; layer_id: string | null; actions: string[] }[];
   /** A platform administrator with Global Admin active: the whole app. With another group active, the app is that group's. */
   acting_admin?: boolean;
@@ -278,6 +282,7 @@ export const EDITOR_LABEL: Record<Editor, string> = {
   vscode: "VS Code · Python, Jupyter, Streamlit", rstudio: "RStudio · R, Shiny", sql: "SQL · CloudBeaver, query any data you can access" };
 
 export interface Workspace {
+  capabilities?: string[];
   owner_group_id?: string | null; owner_group_name?: string | null;
   layer_id?: string | null; layer_name?: string | null;
   environment_id?: string | null;
@@ -303,6 +308,7 @@ export interface Workspace {
 export type RunKind = "script" | "notebook" | "app" | "dbt" | "airflow" | "stream";
 
 export interface Run {
+  capabilities?: string[];
   initiated_by: string | null;
   id: string;
   owner: string;
@@ -408,7 +414,7 @@ export const PACKAGE_KIND_LABEL: Record<PackageKind, string> = { python: "Python
 export const PACKAGE_ORIGIN_LABEL: Record<PackageSummary["origin"], string> = { internal: "Published here", pypi: "PyPI", cran: "CRAN" };
 
 /** One of your own Git tokens (the token itself is never returned). */
-export interface GitCredential { id: string; label: string; host: string; username: string; commit_name: string; commit_email: string; updated_at: string }
+export interface GitCredential { capabilities?: string[]; id: string; label: string; host: string; username: string; commit_name: string; commit_email: string; updated_at: string }
 export interface GitCredentialInput { label: string; host: string; username: string; token?: string; commit_name: string; commit_email: string }
 /** VS Code and RStudio use Git; the SQL editor does not. */
 export const usesGit = (ws: Pick<Workspace, "editor">) => ws.editor === "vscode" || ws.editor === "rstudio";
@@ -418,6 +424,7 @@ export interface EgressHost { host: string; description: string }
 export interface EgressAllowlist { hosts: EgressHost[]; proxy: boolean }
 
 export interface Repo {
+  capabilities?: string[];
   id: string;
   name: string;
   url: string;
@@ -461,6 +468,7 @@ export interface CertificateInfo {
 }
 
 export interface Secret {
+  capabilities?: string[];
   scope: "user" | "group" | "sa";
   owner: string;
   name: string;
@@ -478,6 +486,7 @@ export type SecretInput =
   | { kind: "certificate"; certificate?: string; private_key?: string; ca_chain?: string; pkcs12_base64?: string; password?: string; description?: string };
 
 export interface ServiceAccount {
+  capabilities?: string[];
   layer_id?: string | null; layer_name?: string | null;
   environment_id?: string;
   can_manage: boolean; resource_id: string;
@@ -590,6 +599,7 @@ export interface Requirement { required: boolean; layer_id: string | null; class
 export interface ComplianceRoleItem { id: string; role: string; label: string; app_group_id: string; group: string;
   scope: { resource_ids?: string[]; layers?: string[]; classifications?: string[]; group_ids?: string[] } }
 export interface AccessCaseItem {
+  capabilities?: string[];
   id: string; kind: "product" | "role" | "membership"; status: "draft" | "in_review" | "changes_requested" | "approved" | "declined" | "withdrawn" | "expired";
   requester: string; app_group_id: string; group: string; resource_id: string | null; resource: { kind: string; name: string } | null; role: string;
   product_id: string | null; product: string | null; option: string | null; principal: string | null; layer_id: string | null; layer: string | null;
@@ -617,7 +627,7 @@ export interface FilePreview { path: string; size: number; content_type: string;
   kind: "table" | "json" | "text" | "image" | "none"; columns?: string[]; rows?: unknown[][]; total_rows?: number; types?: string[];
   text?: string; data?: string; note?: string }
 export interface RegisterRow { group: string; app_group_id: string; access: string; kind: string; classification: string; layer: string; form: string;
-  requester: string; approved_by: string; approved_at: string | null; until: string | null; members: number; case_id: string }
+  requester: string; approved_by: string; approved_at: string | null; until: string | null; members: number; case_id: string; can_export?: boolean }
 export type CaseTarget = { kind: "product" | "role"; app_group_id: string; product_id?: string; option_id?: string; resource_id?: string; role?: string };
 
 /** One line of the central log. Run, workload, commit and layer are stamped by the platform. */
@@ -638,6 +648,7 @@ export interface WorkloadEvent {
 }
 
 export interface Workload {
+  capabilities?: string[];
   owner_group_id?: string | null; owner_group_name?: string | null;
   layer_id?: string | null; layer_name?: string | null;
   execution_state?: string;
@@ -793,12 +804,13 @@ export interface CatalogSLA { freshness_minutes?: number | null; success_rate_pe
   weekdays?: number[]; grace_minutes?: number; warning_minutes?: number; quality_required?: boolean; quality_max_age_minutes?: number;
   required_assets?: string[]; enforcement?: "monitor" | "block_new_runs"; block_on_unknown?: boolean }
 export interface MetricObservation { id: string; observed_at: string; value: number | null; status: string; definition_version: number; origin: string; run_id: string; revision: string; detail: Record<string, unknown> }
-export interface MetricDefinition { id: string; asset_id: string; key: string; name: string; kind: "kpi" | "quality"; description: string; unit: string; origin: string; enabled: boolean; version: number;
+export interface MetricDefinition { capabilities?: string[]; observations_restricted?: boolean; id: string; asset_id: string; key: string; name: string; kind: "kpi" | "quality"; description: string; unit: string; origin: string; enabled: boolean; version: number;
   definition: { source?: string; sql?: string; dependencies?: string[]; minimum?: number | null; maximum?: number | null; warn_minimum?: number | null; warn_maximum?: number | null }; latest: MetricObservation | null }
 export interface SlaIncident { id: string; asset_id: string; asset_name?:string; status: string; opened_at: string; updated_at: string; resolved_at: string | null; acknowledged_at: string | null; detail: {checks?: {name: string; status: string}[]} }
 export interface CatalogAsset {
+  capabilities?: string[];
   layer_id?: string | null; layer_name?: string | null;
-  id: string; name: string; kind: string; path: string; resource: AccessResource;
+  id: string; name: string; kind: string; path: string; resource: AccessResource; permission_target?: AccessResource | null;
   attributes: { description?: string; origin?: string; repo?: string; branch?: string; program?: string; runtime?: string; source_kind?: string;
     columns?: { name: string; data_type?: string; description?: string }[]; object_path?: string; test_status?: string; [key: string]: unknown };
   governance: CatalogGovernance; sla: CatalogSLA;
@@ -820,7 +832,23 @@ export interface CatalogGraph { nodes: (CatalogAsset & { distance: number; linea
 export interface OrchestratorRun { dag_id: string; run_id: string; state: string; logical_date: string | null; start_date: string | null; end_date: string | null }
 export interface OrchestratorHistory { runs: OrchestratorRun[]; dags: string[] }
 
+export interface BackupConfiguration {
+  enabled: boolean; bucket: string; prefix: string; endpoint_url: string; region: string;
+  source_id: string; interval_hours: number; recovery_public_key: string;
+  server_side_encryption: string; kms_key_id: string; object_lock_days: number;
+}
+export interface BackupRecord {
+  id: string; created_at: string; finished_at: string | null; actor: string; status: string;
+  bucket: string; object_key: string; sha256: string; size_bytes: number; error: string;
+}
+
 export const api = {
+  backups: {
+    configuration: () => request<BackupConfiguration>("GET", "/v1/backups/configuration"),
+    configure: (body: BackupConfiguration) => request<BackupConfiguration>("PUT", "/v1/backups/configuration", body),
+    history: () => request<BackupRecord[]>("GET", "/v1/backups"),
+    create: () => request<BackupRecord>("POST", "/v1/backups"),
+  },
   kafka: {
     setRunning: (id: string, running: boolean) => request<unknown>("PUT", `/v1/kafka/clusters/${id}/running`, { running }),
     clusters: () => request<AccessResource[]>("GET", "/v1/kafka/clusters"),
@@ -948,6 +976,7 @@ export const api = {
     request<Run>("POST", "/v1/runs", { workspace_id, pool, kind, entrypoint }),
   runProgram: (workspace_id: string, program: string, args: Record<string, unknown>, pool?: string) =>
     request<Run>("POST", "/v1/runs", { workspace_id, program, args, ...(pool ? { pool } : {}) }),
+  retryRun: (id: string) => request<Run>("POST", `/v1/runs/${id}/retry`),
   stopRun: (id: string) => request<Run>("POST", `/v1/runs/${id}/stop`),
   runLogs: (id: string) => request<string>("GET", `/v1/runs/${id}/logs?tail=20000`),
   runOutputs: (id: string) => request<OutputFile[]>("GET", `/v1/runs/${id}/outputs`),
@@ -1010,7 +1039,7 @@ export const api = {
     caseFile: (id: string, fileId: string) => fetchBlob(`/v1/compliance/cases/${id}/files/${fileId}`),
     register: () => request<RegisterRow[]>("GET", "/v1/compliance/register"),
     registerCsv: () => request<string>("GET", "/v1/compliance/register?format=csv"),
-    memberships: () => request<{ app_group_id: string; principal_id: string; group: string; principal: string }[]>("GET", "/v1/compliance/memberships"),
+    memberships: () => request<{ app_group_id: string; principal_id: string; group: string; principal: string; capabilities?: string[] }[]>("GET", "/v1/compliance/memberships"),
     decideMembership: (group: string, principal: string, approve: boolean, note = "") =>
       request<{ status: string }>("POST", `/v1/compliance/memberships/${group}/${principal}`, { approve, note }),
   },
@@ -1143,3 +1172,8 @@ export async function openInWindow(url: string | Promise<string>, title: string,
     throw e;
   }
 }
+
+/** Capabilities are evaluated by the server against the workspace’s actual layer. */
+export const workspaceCan = (ws: Workspace, action: string) => ws.capabilities?.includes((action.startsWith("runs.") || action.startsWith("git.")) ? action : `workspaces.${action}`) ?? false;
+
+export const runCan = (run: Run, action: string) => run.capabilities?.includes(action) ?? false;

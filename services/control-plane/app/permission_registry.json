@@ -2682,6 +2682,7 @@
     "description": "Create consume session within granted scope",
     "roles": [
       "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5958,14 +5959,14 @@
   "packages.imports.request": {
     "description": "Request approved import",
     "roles": [
-      "Executor",
+      "Manager",
       "Admin",
       "Owner"
     ],
     "scope": "Global source trust; layer + policy/job/package",
     "target": "Package imports and source policy",
     "area": "Packages",
-    "constraint": "Import may publish shared executable code; importing Dev is distinct from approving Prod."
+    "constraint": "Imports publish shared executable code and require publication authority; consumers can install approved packages separately."
   },
   "packages.imports.approve": {
     "description": "Approve scoped import",
@@ -6129,5 +6130,67 @@
     "target": "Viewer-bound SQL/files",
     "area": "Integration",
     "constraint": "Reauthorize viewer on each request; no shared cache between viewers."
+  },
+  "backups.configuration.read": {
+    "description": "Read backup configuration",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Installation; target set-backups",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
+  },
+  "backups.configuration.update": {
+    "description": "Configure or disable platform recovery backups",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Installation; target set-backups",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
+  },
+  "backups.history.read": {
+    "description": "Read recovery archive inventory and status",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Installation; target set-backups",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
+  },
+  "backups.create": {
+    "description": "Create an encrypted platform metadata backup",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Installation; target set-backups",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
+  },
+  "backups.recovery.resume": {
+    "description": "Release recovery quarantine after reconciliation",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Installation; target set-backups",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
   }
 }

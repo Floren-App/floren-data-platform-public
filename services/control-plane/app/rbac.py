@@ -12,31 +12,46 @@ from .models import (AppGroup, DirectoryMembership, DirectoryPrincipal, Identity
                      Resource, RoleAssignment, ServiceRoleAssignment, ServiceAccount)
 
 PROGRAM_ROLES = {
+    "Viewer": {"read"},
     "Executor": {"read", "execute"},
-    "Contributor": {"read", "execute", "edit", "deploy"},
+    "Contributor": {"read", "edit"},
+    "Manager": {"read", "edit", "deploy", "create"},
     "Admin": {"read", "execute", "edit", "deploy", "create", "delete"},
     "Owner": {"read", "execute", "edit", "deploy", "create", "delete", "assign", "identity"},
 }
 # API management: Consumer may call (external APIs, as a program or person); management is separate.
 API_ROLES = {
     "Consumer": {"read", "call"},
-    "Contributor": {"read", "call", "edit"},
+    "Viewer": {"read"},
+    "Executor": {"read", "call"},
+    "Contributor": {"read", "edit"},
+    "Manager": {"read", "edit", "create"},
     "Admin": {"read", "call", "edit", "create", "delete"},
     "Owner": {"read", "call", "edit", "create", "delete", "assign", "identity"},
 }
 API_KINDS = ("api-root", "api", "api-group", "api-operation")
-# The package repository: everyone reads. On the repository, Publisher publishes new packages and imports
+# Package metadata and downloads are independently granted. Publisher publishes new packages and imports
 # from PyPI/CRAN; a package's Owner (the publishing group) and Maintainers publish its new versions.
 PACKAGE_ROLES = {
-    "Publisher": {"read", "create", "import"},
-    "Maintainer": {"read", "create", "import", "publish", "yank"},
-    "Owner": {"read", "create", "import", "publish", "yank", "delete", "assign"},
+    "Viewer": {"read"},
+    "Executor": {"read", "download"},
+    "Contributor": {"read", "create"},
+    "Manager": {"read", "publish", "yank", "import"},
+    "Admin": {"read", "download", "create", "import", "publish", "yank", "delete"},
+    "Publisher": {"read", "download", "create", "import"},
+    "Maintainer": {"read", "download", "create", "import", "publish", "yank"},
+    "Owner": {"read", "download", "create", "import", "publish", "yank", "delete", "assign"},
 }
 PACKAGE_KINDS = ("package-root", "package")
 # Data products: Consumer may read or use everything in the product (see product_grants); Owner also
 # manages the product and decides access requests.
 PRODUCT_ROLES = {
     "Consumer": {"read", "use"},
+    "Viewer": {"read"},
+    "Executor": {"read", "use"},
+    "Contributor": {"read", "edit"},
+    "Manager": {"read", "edit", "create"},
+    "Admin": {"read", "use", "edit", "create", "delete"},
     "Owner": {"read", "use", "assign"},
 }
 PRODUCT_KINDS = ("product-root", "product")
@@ -45,9 +60,33 @@ READER_ROLE = {"schema": "Reader", "source": "Reader", "topic": "Reader", "kafka
                "api": "Consumer", "api-group": "Consumer", "api-operation": "Consumer"}
 DATA_ROLES = {
     "Reader": {"read"},
+    "Viewer": {"read"},
+    "Executor": {"read"},
     "Contributor": {"read", "write"},
+    "Manager": {"read", "edit"},
     "Admin": {"read", "write", "ddl"},
     "Owner": {"read", "write", "ddl", "assign"},
+}
+
+KAFKA_ROLES = {
+    "Reader": {"read", "consume"},  # Existing assignment alias.
+    "Viewer": {"read"},
+    "Executor": {"read", "consume"},
+    "Contributor": {"read", "write"},
+    "Manager": {"read", "ddl"},
+    "Admin": {"read", "consume", "write", "ddl"},
+    "Owner": {"read", "consume", "write", "ddl", "assign"},
+}
+
+
+DATA_OBJECT_KINDS = ('table','column','file','directory')
+DATA_OBJECT_ROLES = {
+    'Viewer': {'read'},
+    'Executor': {'read','select','download'},
+    'Contributor': {'read','write','insert','update','delete_data'},
+    'Manager': {'read','configure','edit'},
+    'Admin': {'read','select','download','write','insert','update','delete_data','configure','edit','ddl','create','delete'},
+    'Owner': {'read','select','download','write','insert','update','delete_data','configure','edit','ddl','create','delete','assign'},
 }
 
 
@@ -192,6 +231,30 @@ def app_groups(db: Session, user: User) -> set:
     return set(db.scalars(select(IdentityBinding.app_group_id).where(IdentityBinding.principal_id.in_(ids))))
 
 
+@cached
+def effective_app_groups(db: Session, user: User) -> set:
+    """Authority in the selected app context; membership discovery stays separate."""
+    user = resolve_user(db, user)
+    groups = app_groups(db, user)
+    # Human editor/job identities retain the group captured at admission. A bound
+    # execution is not a reason to combine otherwise inactive human groups.
+    return groups if user.username.startswith(('service:', 'sa:')) else groups & {user.active_group_id}
+
+
+@cached
+def effective_allowlist_groups(db: Session, user: User) -> set:
+    """App groups and IdP groups that participate in this selected execution context."""
+    user=resolve_user(db,user)
+    held=effective_app_groups(db,user)
+    result=set(held)
+    result.update(db.scalars(select(AppGroup.name).where(AppGroup.id.in_(held))))
+    bound=set(db.scalars(select(IdentityBinding.principal_id).where(IdentityBinding.app_group_id.in_(held))))
+    selected=bound & closure(db,user.principal_id)
+    result.update(db.scalars(select(DirectoryPrincipal.name).where(
+        DirectoryPrincipal.id.in_(selected),DirectoryPrincipal.kind=='group')))
+    return result
+
+
 def ancestors(db: Session, resource: Resource) -> list:
     chain, seen = [], set()
     while resource:
@@ -204,6 +267,10 @@ def ancestors(db: Session, resource: Resource) -> list:
 
 
 def roles_for(resource: Resource) -> dict:
+    if resource.kind in ('kafka', 'topic'):
+        return KAFKA_ROLES
+    if resource.kind in DATA_OBJECT_KINDS:
+        return DATA_OBJECT_ROLES
     if resource.kind in API_KINDS:
         return API_ROLES
     if resource.kind in PACKAGE_KINDS:
@@ -241,20 +308,25 @@ def product_grants(db: Session, assignments) -> list:
     from .models import CatalogAsset, CatalogProductMember, ProductAccess
     out = []
     for a in assignments:
-        if a.role not in PRODUCT_ROLES:
+        if "use" not in PRODUCT_ROLES.get(a.role, set()):
             continue
         product = db.get(Resource, a.resource_id)
         if not product or product.kind != "product":
             continue
         access = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.object_id,
-                                                       ProductAccess.app_group_id == a.app_group_id)) if a.role == "Consumer" else None
+                                                       ProductAccess.app_group_id == a.app_group_id)) if a.role != "Owner" else None
         covered = set(access.approved_assets) if access is not None and access.approved_assets is not None else None
         for m in db.scalars(select(CatalogProductMember).where(CatalogProductMember.product_id == product.object_id)):
             if covered is not None and m.asset_id not in covered:
                 continue
             asset = db.get(CatalogAsset, m.asset_id)
             target = db.get(Resource, asset.resource_id) if asset else None
-            if target is not None and target.kind in READER_ROLE:
+            if target and target.kind == 'schema' and asset.kind in ('table','view','materialized_view','file','folder'):
+                from .object_access import target_for_asset
+                target = target_for_asset(db, asset, target, create=True)
+            if target is not None and target.kind in DATA_OBJECT_KINDS:
+                out.append(ProductGrant(target.id, 'Executor', a.app_group_id, product.id))
+            elif target is not None and target.kind in READER_ROLE:
                 out.append(ProductGrant(target.id, READER_ROLE[target.kind], a.app_group_id, product.id))
     return out
 
@@ -273,7 +345,7 @@ def group_grants(db: Session, group_ids, user=None) -> list:
 
 @cached
 def _role_grants(db, user):
-    groups = app_groups(db, user)
+    groups = effective_app_groups(db, user)
     result = group_grants(db, groups, user)
     principal = db.get(DirectoryPrincipal, user.principal_id)
     if principal and principal.active and principal.kind in ("service", "user"):
@@ -331,7 +403,7 @@ def access(db: Session, user: User, resource: Resource) -> list:
     return result
 
 
-def allowed(db: Session, user: User, action: str, resource: Resource) -> bool:
+def allowed(db: Session, user: User, action: str, resource: Resource, named: bool = True) -> bool:
     if not resource:
         return False
     from .environments import permits
@@ -339,8 +411,6 @@ def allowed(db: Session, user: User, action: str, resource: Resource) -> bool:
     from .platform_metadata import is_resource, authorized
     if is_resource(resource):
         return authorized(user) and action == "read"
-    if resource.kind in PACKAGE_KINDS and action == "read":
-        return True  # every identity may install packages and see who publishes them
     if not permits(db, user, resource):
         return False
     # Interactive Global Admin has protected access; layer checks precede every grant.
@@ -348,7 +418,24 @@ def allowed(db: Session, user: User, action: str, resource: Resource) -> bool:
                                     "import", "publish", "yank"}:
         return True
     definitions = roles_for(resource)
-    return any(action in definitions.get(a["role"], set()) for a in access(db, user, resource))
+    if any(action in definitions.get('Executor' if resource.kind in DATA_OBJECT_KINDS and a['role'] == 'Reader' else a['role'], set()) for a in access(db, user, resource)):
+        return True
+    if action == 'read' and named:
+        from .permissions import allowed as capability_allowed
+        metadata={'kafka':'kafka.clusters.read','topic':'kafka.topics.read','source':'storage.connection.read','schema':'storage.schemas.list',
+            'folder':'workloads.folders.list','root':'workloads.folders.list',
+            'api':'apis.object.read','api-group':'apis.operations.read','api-operation':'apis.operations.read',
+            'product':'products.object.read','package':'packages.read','package-root':'packages.list'}
+        if resource.kind in metadata and capability_allowed(db,user,metadata[resource.kind],resource.id):
+            return True
+        if resource.kind == 'service':
+            from .permissions import allowed as capability_allowed
+            action = 'identities.read' if resource.config.get('service_account') else 'workloads.settings.read'
+            if capability_allowed(db, user, action, resource.id):
+                return True
+        from .object_access import metadata_visible
+        return metadata_visible(db, user, resource)
+    return False
 
 
 def require(db: Session, user: User, action: str, resource: Resource):
@@ -419,15 +506,23 @@ def source_resource(db: Session, source) -> Resource:
     return r
 
 
+@cached
 def data_scope(db: Session, user: User, source) -> dict:
     """Schema -> effective level, including protected interactive Global Admin access."""
     result = {}
     r = source_resource(db, source)
     for schema in db.scalars(select(Resource).where(Resource.kind == "schema", Resource.parent_id == r.id)):
         grants = access(db, user, schema)
-        ranks = [a["role"] for a in grants if a["role"] in DATA_ROLES]
+        levels = ("Reader", "Admin", "Owner")
+        ranks = ["Reader" if a["role"] == "Executor" else a["role"] for a in grants
+                 if a["role"] in (*levels, "Executor")]
         if ranks:
-            result[schema.name] = max(ranks, key=lambda role: list(DATA_ROLES).index(role))
+            level=max(ranks,key=levels.index)
+            # The native compatibility lease can combine separately granted read
+            # and write. Contributor alone never receives a read/write lease.
+            if level=='Reader' and any(a['role']=='Contributor' for a in grants):
+                level='Contributor'
+            result[schema.name]=level
     return result
 
 

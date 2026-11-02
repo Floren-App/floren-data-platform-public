@@ -17,7 +17,7 @@ def test_group_and_person_access_show_roles_products_and_where_they_come_from(cl
     group = client.get(f"/v1/rbac/groups/{viewers}/access", headers=as_("admin")).json()
     rows = {(r["resource"]["name"], r["role"], r["via"], (r["product"] or {}).get("title")) for r in group["grants"]}
     assert ("Sales", "Consumer", "direct", None) in rows                 # the product itself
-    assert ("public", "Reader", "product", "Sales") in rows              # its table's schema, through the product
+    assert ("sales", "Executor", "product", "Sales") in rows              # only its table, through the product
     assert any(r[2] == "product" and r[1] == "Executor" for r in rows)   # its dashboard
     assert group["compliance_roles"] == [] and group["app_profile"] is None
     assert client.get(f"/v1/rbac/groups/{viewers}/access", headers=as_("ana")).status_code == 403
@@ -25,7 +25,8 @@ def test_group_and_person_access_show_roles_products_and_where_they_come_from(cl
     me = client.get("/v1/me", headers=as_("bob")).json()
     person = client.get(f"/v1/rbac/principals/{me['principal_id']}/access", headers=as_("bob")).json()
     assert {(g["name"], g["via"]) for g in person["groups"]} >= {("Readers", "marketing"), ("Viewers", None)}
-    assert {(r["resource"]["name"], r["group"]["name"]) for r in person["grants"] if r["via"] == "direct"} >= {("public", "Readers"), ("Sales", "Viewers")}
+    # Membership inventory includes inactive groups; their object details stay hidden.
+    assert not any(r["resource"]["name"] in ("public", "sales") for r in person["grants"])
     # Administrators and the person themselves; nobody else.
     assert client.get(f"/v1/rbac/principals/{me['principal_id']}/access", headers=as_("admin")).status_code == 200
     assert client.get(f"/v1/rbac/principals/{me['principal_id']}/access", headers=as_("ana")).status_code == 403
@@ -48,7 +49,7 @@ def test_the_audit_log_filters_by_who_what_and_object(client):
 
 def test_each_access_and_administration_page_is_granted_on_its_own(client):
     from .rbac_helpers import grant_group
-    forms = grant_group(client, "set-forms", "Form editors", "Manager", users=["bob"])
+    forms = grant_group(client, "set-forms", "Form editors", "Admin", users=["bob"])
     form = {"name": "Purpose", "definition": {"pages": [{"id": "p", "title": "P", "fields": [{"id": "why", "label": "Why", "type": "short_text"}]}]}}
     assert client.put("/v1/compliance/forms/Purpose", headers=as_("bob"), json=form).status_code == 200
     # Manager on compliance forms is not Manager on classifications.
@@ -60,7 +61,7 @@ def test_each_access_and_administration_page_is_granted_on_its_own(client):
     assert client.get("/v1/admin/audit", headers=as_("ana")).status_code == 200
     assert client.put("/v1/admin/settings/egress", headers=as_("ana"), json={"hosts": []}).status_code == 403
     # A section covers its pages.
-    grant_group(client, "adm-privacy", "Form editors", "Manager", users=["bob"])
+    grant_group(client, "adm-privacy", "Form editors", "Admin", users=["bob"])
     assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 200
     me = client.get("/v1/me", headers=as_("bob")).json()
     assert me["settings"]["set-classes"] == "manage" and me["settings"]["set-forms"] == "manage" and "set-layers" not in me["settings"]
@@ -122,11 +123,11 @@ def test_an_administrator_sees_the_pages_of_the_group_they_act_as(client):
     office = grant_group(client, "workloads", "Privacy office", "Executor", users=["admin"])
     client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_admin", "app_group_id": office}).raise_for_status()
     full = client.get("/v1/me", headers=as_("admin")).json()
-    assert full["acting_admin"] and len(full["settings"]) == 16
+    assert full["acting_admin"] and len(full["settings"]) == 17
     assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": office}).status_code == 200
     acting = client.get("/v1/me", headers=as_("admin")).json()
     assert not acting["acting_admin"] and acting["compliance_roles"] == ["compliance_admin"]
     assert acting["settings"] == {}  # legacy compliance_admin is not a page grant
     assert client.get("/v1/admin/audit", headers=as_("admin")).status_code == 403
     assert client.put("/v1/me/active-group", headers=as_("admin"), json={"group_id": "000000000001"}).status_code == 200
-    assert len(client.get("/v1/me", headers=as_("admin")).json()["settings"]) == 16
+    assert len(client.get("/v1/me", headers=as_("admin")).json()["settings"]) == 17

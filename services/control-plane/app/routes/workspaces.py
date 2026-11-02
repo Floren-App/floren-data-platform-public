@@ -18,6 +18,8 @@ from ..workspace_files import load_config
 from .. import git_credentials
 from .common import audit, ds_out, pools_for
 
+from .. import workspace_access, permissions, rbac
+
 router = APIRouter(prefix="/v1", tags=["workspaces"])
 
 
@@ -30,13 +32,14 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
     db.commit()
     from ..compute_usage import inventory, pool_usage
     items = inventory(orch)
-    pools = pools_for(db, user.groups)
+    pools = pools_for(db,rbac.effective_allowlist_groups(db,user),user=user)
     pools = [p.model_copy(update=pool_usage(items, p.name)) for p in pools]
     browsing = browsing_scope(db,user)
     visible_sources = {r.object_id for r in db.scalars(select(Resource))
                        if r.kind in ("source","schema") and browsing.get(r.id,set()) & DATA_ROLES.keys()}
     from ..runtimes import r_enabled
     from ..app_profiles import acting_as_admin, features_for, profile_for, FEATURES
+    from .. import settings_access
     from ..settings_access import granted as settings_granted
     from .. import page_access, permissions
     selected_layer = active_layer(db, user)
@@ -51,6 +54,7 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
         compliance_roles=compliance_roles(db, user),
         acting_admin=acting_as_admin(user),
         settings=settings_granted(db, user, selected_layer),
+        settings_capabilities=settings_access.capabilities(db,user),
         pages=pages,
         permission_grants=[{"target_id": g.target_id, "namespace": g.namespace, "layer_id": g.layer_id,
                             "actions": sorted(permissions.grant_actions(db, g))} for g in permissions.grants(db, user)],
@@ -69,11 +73,11 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user), or
 def compliance_roles(db, user):
     from ..compliance import ROLES
     from ..models import ComplianceRole
-    from ..rbac import app_groups
+    from ..rbac import effective_app_groups
     from ..app_profiles import acting_as_admin
     if acting_as_admin(user):
         return list(ROLES)   # with another group active, an administrator holds what their groups hold
-    groups = app_groups(db, user)
+    groups = effective_app_groups(db, user)
     held = set(db.scalars(select(ComplianceRole.role).where(ComplianceRole.app_group_id.in_(groups)))) if groups else set()
     return [r for r in ROLES if r in held]
 
@@ -154,7 +158,9 @@ def list_workspaces(db: Session = Depends(get_db), user: User = Depends(get_curr
     if not user.is_admin:
         query = query.where((Workspace.principal_id == user.principal_id) |
             (Workspace.principal_id.is_(None) & (Workspace.owner == user.username)))
-    return db.scalars(query.order_by(Workspace.created_at)).all()
+    return [workspace_access.output(db,user,ws) for ws in db.scalars(query.order_by(Workspace.created_at))
+        if workspace_access.allowed(db,user,'workspaces.collection.list',ws)
+        and workspace_access.allowed(db,user,'workspaces.object.read',ws)]
 
 
 @router.post("/workspaces", response_model=WorkspaceOut, status_code=201)
@@ -166,6 +172,7 @@ def create_workspace(body: WorkspaceIn, db: Session = Depends(get_db), user: Use
         require_kind("r")
     from ..environments import workspace_environment
     environment = workspace_environment(db, user, body.layer_id or body.environment_id)
+    permissions.require(db,user,'workspaces.collection.create','workspaces',environment)
     from ..ownership import owner_group
     group = owner_group(db,user)
     ws = Workspace(owner=user.username, principal_id=user.principal_id, environment_id=environment,
@@ -176,7 +183,7 @@ def create_workspace(body: WorkspaceIn, db: Session = Depends(get_db), user: Use
     ws.volume_owner = f"ws-{ws.id}"
     db.add(ws)
     db.commit()
-    return ws
+    return workspace_access.output(db,user,ws)
 
 
 @router.post("/workspaces/{ws_id}/start", response_model=WorkspaceOut)
@@ -187,6 +194,7 @@ def start_workspace(
     user: User = Depends(get_current_user),
 ):
     ws = owned(db, ws_id, user)
+    workspace_access.require(db,user,'workspaces.object.start',ws)
     if ws.editor == "rstudio":
         from ..runtimes import require_kind
         require_kind("r")
@@ -216,9 +224,9 @@ def start_workspace(
             ws.status, ws.queued_at, ws.startup_error = "queued", utcnow(), None
             audit(db, user.username, "workspace.queue", ws.id, editor=ws.editor)
             db.commit()
-            return ws
+            return workspace_access.output(db,user,ws)
         launch_workspace(db, orch, ws)
-    return ws
+    return workspace_access.output(db,user,ws)
 
 
 def template_repositories(db: Session, ws: Workspace) -> list:
@@ -235,6 +243,11 @@ def launch_workspace(db: Session, orch: Orchestrator, ws: Workspace) -> Workspac
     from ..rbac import resolve_user
     from .. import capacity
     user = resolve_user(db, execution_user(db, {"sub": ws.owner, "pid": ws.principal_id, "ws": ws.id}))
+    control=resolve_user(db,User(ws.owner,principal_id=ws.principal_id or "",active_group_id=ws.owner_group_id or ""))
+    if not workspace_access.allowed(db,control,'workspaces.object.start',ws):
+        ws.status,ws.queued_at,ws.startup_error='failed',None,'Workspace start permission was revoked before dispatch'
+        db.commit()
+        return ws
     warehouse = capacity.workspace_settings(db)["warehouse"]
     pool = db.scalar(select(ComputePool).where(ComputePool.name == warehouse)) if warehouse else None
     spec = workspace_spec(get_settings(), ws, user.groups, granted_sources(db, user),
@@ -270,13 +283,14 @@ def stop_workspace(
     user: User = Depends(get_current_user),
 ):
     ws = owned(db, ws_id, user)
+    workspace_access.require(db,user,'workspaces.object.stop',ws)
     ws = db.scalar(select(Workspace).where(Workspace.id == ws.id).with_for_update().execution_options(populate_existing=True))
     if ws.execution_ref:
         orch.stop(ws.execution_ref)
     ws.status, ws.execution_ref, ws.upstream_url = "stopped", None, None
     ws.startup_error, ws.queued_at = None, None
     db.commit()
-    return ws
+    return workspace_access.output(db,user,ws)
 
 
 @router.delete("/workspaces/{ws_id}", status_code=204)
@@ -287,6 +301,7 @@ def delete_workspace(
     user: User = Depends(get_current_user),
 ):
     ws = owned(db, ws_id, user)
+    workspace_access.require(db,user,'workspaces.object.delete',ws)
     ws = db.scalar(select(Workspace).where(Workspace.id == ws.id).with_for_update().execution_options(populate_existing=True))
     if ws.execution_ref:
         orch.stop(ws.execution_ref)
@@ -307,7 +322,7 @@ def list_pools(layer_id: Optional[str] = None, kind: Optional[Literal["script", 
         layer_id = canonical(db, layer_id)
     elif kind and user.environment_id:
         layer_id = user.environment_id
-    return pools_for(db, user.groups, layer_id, kind)
+    return pools_for(db,rbac.effective_allowlist_groups(db,user),layer_id,kind,user=user)
 
 
 @router.get("/workspaces/{ws_id}/config", response_model=ConfigOut)
@@ -318,7 +333,9 @@ def workspace_config(
     user: User = Depends(get_actor),
 ):
     """The workspace's fdp.json: programs, their arguments and default warehouses."""
-    out, _ = load_config(db, orch, owned(db, ws_id, user))
+    ws=owned(db,ws_id,user)
+    workspace_access.require(db,user,'workspaces.files.read',ws)
+    out, _ = load_config(db, orch, ws)
     return out
 
 
@@ -326,6 +343,7 @@ def workspace_config(
 def open_workspace(ws_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Returns a one-time URL; the gateway trades the ticket for a path-scoped cookie."""
     ws = owned(db, ws_id, user)
+    workspace_access.require(db,user,'workspaces.object.editor.open',ws)
     if ws.status not in ("starting","running"):
         raise HTTPException(409, ws.startup_error or "Start the workspace before opening its editor.")
     ticket = mint_token("ticket", user.username, 60, target=f"ws:{ws.id}", pid=user.principal_id)

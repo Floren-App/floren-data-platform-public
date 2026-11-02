@@ -207,6 +207,9 @@ def make_sa(client, name="finance-etl"):
         ident = rbac.resolve_user(db, __import__("app.auth", fromlist=["User"]).User(f"sa:{name}"))
         pid = ident.principal_id
         db.commit()
+        client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+            'target_id':r.json()['resource_id'],'namespace':'secrets','principal_id':pid,
+            'layer_id':r.json()['layer_id'],'role':'Executor'}).raise_for_status()
         schemas = list(db.scalars(select(Resource).where(Resource.kind == "schema")))
     for schema in schemas:
         grant_group(client, schema.id, "Finance services", "Admin", services=[pid])
@@ -217,7 +220,7 @@ def make_sa(client, name="finance-etl"):
         resource = rbac.service_account_resource(db, sa)
         rid = resource.id
         db.commit()
-    grant_group(client, rid, "Service managers", "Owner", users=["ana"])
+    grant_group(client, rid, "Finance data", "Owner", users=["ana"])
     return r.json()
 
 
