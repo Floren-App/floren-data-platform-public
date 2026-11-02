@@ -147,3 +147,33 @@ def test_postgres_concurrent_infrastructure_updates_do_not_lose_a_generation(cli
                 return exc.status_code
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert sorted(pool.map(lambda _:update(),range(2)))==[1,409]
+
+
+def test_stopped_kafka_can_stage_image_without_starting_or_resizing(client):
+    from app.models import Resource
+    from fastapi import HTTPException
+    from copy import deepcopy
+    current = infra.InfrastructureSpec.model_validate({**managed(), 'kafka': {
+        'running': False, 'image': 'fdp/kafka:old', 'replicas': 3, 'size': '10Gi',
+        'warehouse': 'trino', 'tls': {'mode': 'existing', 'secret_name': 'kafka-tls'}}}).model_dump(mode='json')
+    with SessionLocal() as db:
+        layer = db.get(Resource, layers.NON_PROD)
+        layer.config = {**layer.config, 'infrastructure': current}
+        db.commit()
+        desired = deepcopy(current)
+        desired['kafka']['image'] = 'fdp/kafka:new'
+        result = infra.configure(db, layers.NON_PROD, infra.InfrastructureChange(
+            expected_generation=0, spec=infra.InfrastructureSpec.model_validate(desired)))
+        assert result['spec']['kafka']['running'] is False
+        assert result['spec']['kafka']['image'] == 'fdp/kafka:new'
+        assert result['spec']['kafka']['size'] == '10Gi' and result['spec']['kafka']['replicas'] == 3
+        db.rollback()
+        running = deepcopy(current)
+        running['kafka']['running'] = True
+        layer = db.get(Resource, layers.NON_PROD)
+        layer.config = {**layer.config, 'infrastructure': running}
+        db.commit()
+        with pytest.raises(HTTPException) as exc:
+            infra.configure(db, layers.NON_PROD, infra.InfrastructureChange(
+                expected_generation=0, spec=infra.InfrastructureSpec.model_validate(desired)))
+        assert exc.value.status_code == 409
