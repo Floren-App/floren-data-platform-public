@@ -3,7 +3,7 @@ from sqlalchemy import select
 
 from app import catalog
 from app.db import SessionLocal
-from app.models import AccessRequest, AppGroup, AuditEvent, Resource, RoleAssignment
+from app.models import AccessRequest, AppGroup, AuditEvent, CatalogAsset, Resource, RoleAssignment
 from .conftest import as_
 from .rbac_helpers import grant_group
 from .test_catalog import register
@@ -51,6 +51,11 @@ def test_bundle_publish_browse_lineage_request_and_approve(client, repo):  # noq
         "domain": "Finance", "classification": "internal"})
     assert published.status_code == 201, published.text
     product = published.json()
+    # Publication commits physical permission targets before any consumer read.
+    from app.object_access import target_for_asset
+    with SessionLocal() as db:
+        asset = db.get(CatalogAsset, ids["sales"])
+        assert target_for_asset(db, asset, db.get(Resource, asset.resource_id), create=False) is not None
     assert product["title"] == "Sales" and product["kind"] == "app" and product["domain"] == "Finance" and product["can_manage"]
     assert [(m["name"], m["kind"]) for m in product["members"]] == [("dash", "app"), ("sales", "table")]
     assert {(g["kind"], g["name"], g["role"]) for g in product["grants"]} == {("service", "dash", "Executor"), ("table", "sales", "Executor")}
