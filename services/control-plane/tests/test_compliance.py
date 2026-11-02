@@ -425,3 +425,39 @@ def test_the_datas_owners_need_no_form_below_what_they_own(client, repo):  # noq
     others = grant_group(client, "workloads", "Others", "Executor")
     refused = client.put(f"/v1/rbac/resources/{source}/assignments", headers=as_("admin"), json={"app_group_id": others, "role": "Owner"})
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "justification_required"
+
+
+def test_existing_direct_identity_grants_reconcile_but_cannot_expand_protected_access(client, repo):
+    from app.models import DirectoryPrincipal, ServiceRoleAssignment
+    ids = setup_products(client, repo)
+    rid = ids['public']
+    with SessionLocal() as db:
+        principal = DirectoryPrincipal(kind='service', provider='local', external_id='stable-runtime',
+                                       name='Stable runtime', active=True)
+        db.add(principal); db.flush()
+        pid = principal.id
+        db.add(Resource(kind='service', name='Stable runtime', object_id='stable-runtime', config={'layer_id': layers.NON_PROD}))
+        db.add(ServiceRoleAssignment(resource_id=rid, principal_id=pid, role='Reader'))
+        db.commit()
+    classify(client, ids['sales'], {'ssn': {'classification': 'restricted'}})
+    set_up_policy(client, rid)
+    path = '/v1/rbac/resources/'+rid+'/assignments'
+    def assign(role):
+        return client.put(path, headers=as_('admin'), json={'principal_id': pid, 'role': role})
+    assert assign('Reader').status_code == 200  # Terraform resends the current grant.
+    assert assign('Admin').status_code == 409   # New authority still needs approval.
+    assert assign('Viewer').status_code == 200  # Reduction remains possible.
+    assert assign('Reader').status_code == 409  # A previous grant is not reusable approval.
+    client.delete(path+'/services/'+pid, headers=as_('admin')).raise_for_status()
+    assert assign('Reader').status_code == 409  # Revocation cannot be undone by reconciliation.
+
+
+def test_metadata_group_cannot_turn_viewer_into_protected_payload_access(client, repo):
+    ids = setup_products(client, repo)
+    rid = ids['public']
+    classify(client, ids['sales'], {'ssn': {'classification': 'restricted'}})
+    set_up_policy(client, rid)
+    group = grant_group(client, rid, 'Metadata only', 'Viewer', users=['bob'])
+    response = client.put('/v1/rbac/resources/'+rid+'/assignments', headers=as_('admin'),
+                          json={'app_group_id': group, 'role': 'Reader'})
+    assert response.status_code == 409 and response.json()['detail']['code'] == 'justification_required'

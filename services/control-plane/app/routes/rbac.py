@@ -661,11 +661,20 @@ def require_justification(db, resource, body) -> None:
     """Under an access policy a role is given only with an approved case for exactly this access."""
     from .. import compliance
     from ..models import AccessCase
-    existing = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource.id,
-                                                      RoleAssignment.app_group_id == body.app_group_id)) if body.app_group_id else None
+    if body.principal_id:
+        existing = db.scalar(select(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id == resource.id,
+                                                                  ServiceRoleAssignment.principal_id == body.principal_id))
+    else:
+        existing = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource.id,
+                                                          RoleAssignment.app_group_id == body.app_group_id)) if body.app_group_id else None
     roles = rbac.roles_for(resource)
+    if resource.kind in ('source', 'schema'):
+        # Legacy read means metadata for Viewer, but payload for Reader/Executor.
+        # Coarse role verbs alone must never turn metadata into approved data use.
+        roles = {name: actions | ({'payload.read'} if name in ('Reader', 'Executor', 'Admin', 'Owner') else set())
+                 for name, actions in roles.items()}
     if existing is not None and existing.role in roles and body.role in roles and roles[body.role].issubset(roles[existing.role]):
-        return  # not giving more than the group has
+        return  # Reconciliation or reduction adds no authority, for groups or direct identities.
     req = compliance.role_requirement(db, resource, body.role, body.app_group_id)
     if req["policy"] is None:
         return
