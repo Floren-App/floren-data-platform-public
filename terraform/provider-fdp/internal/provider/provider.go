@@ -76,7 +76,7 @@ func (p *fdpProvider) Configure(ctx context.Context, req provider.ConfigureReque
 
 func (p *fdpProvider) Resources(context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewPermissionAssignmentResource, NewCustomRoleResource, NewBackupConfigurationResource, NewDataObjectResource,
+		NewPermissionAssignmentResource, NewCustomRoleResource, NewBackupConfigurationResource, NewBackupPlanResource, NewBackupDestinationResource, NewDataObjectResource,
 		NewLayerResource, NewComputePoolResource, NewDataSourceResource, NewSchemaResource, NewAppGroupResource,
 		NewKafkaClusterResource, NewKafkaTopicResource,
 		NewAppGroupMemberResource, NewRoleAssignmentResource, NewRepositoryResource, NewWorkloadResource,

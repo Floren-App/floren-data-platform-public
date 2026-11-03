@@ -90,6 +90,15 @@ DATA_OBJECT_ROLES = {
 }
 
 
+# Explicit role families coexist with legacy roles; no existing assignment gains new authority.
+for _roles in (PROGRAM_ROLES, API_ROLES, PACKAGE_ROLES, PRODUCT_ROLES, DATA_ROLES, KAFKA_ROLES, DATA_OBJECT_ROLES):
+    _roles['AccessAdministrator'] = {'read', 'assign'}
+    _roles['PlatformContributor'] = {'read', 'edit', 'configure', 'ddl'}
+for _roles in (DATA_ROLES, KAFKA_ROLES, DATA_OBJECT_ROLES):
+    _roles['DataReader'] = set(_roles['Executor'])
+    _roles['DataContributor'] = set(_roles['Executor']) | set(_roles['Contributor'])
+
+
 def principal(db: Session, kind: str, external_id: str, name: str = "", provider: Optional[str] = None):
     provider = provider or get_settings().oidc_issuer
     p = db.scalar(select(DirectoryPrincipal).where(DirectoryPrincipal.kind == kind,
@@ -513,9 +522,9 @@ def data_scope(db: Session, user: User, source) -> dict:
     r = source_resource(db, source)
     for schema in db.scalars(select(Resource).where(Resource.kind == "schema", Resource.parent_id == r.id)):
         grants = access(db, user, schema)
-        levels = ("Reader", "Admin", "Owner")
-        ranks = ["Reader" if a["role"] == "Executor" else a["role"] for a in grants
-                 if a["role"] in (*levels, "Executor")]
+        levels = ("Reader", "Contributor", "Admin", "Owner")
+        ranks = [{"Executor":"Reader", "DataReader":"Reader", "DataContributor":"Contributor"}.get(a["role"],a["role"]) for a in grants
+                 if a["role"] in ("Reader", "Admin", "Owner", "Executor", "DataReader", "DataContributor")]
         if ranks:
             level=max(ranks,key=levels.index)
             # The native compatibility lease can combine separately granted read

@@ -24,6 +24,9 @@ from .models import (AccessCase, AccessForm, AccessFormVersion, AccessPolicy, Ap
 ROLES = {"compliance_reviewer": "Review compliance forms in scope",
          "membership_approver": "Approve people joining groups with justified access",
          "compliance_admin": "Set up forms, policies, classifications and compliance roles"}
+REVIEW_PERMISSIONS = {"compliance_reviewer":"reviews.forms.review",
+                      "membership_approver":"reviews.memberships.approve",
+                      "compliance_admin":"reviews.configuration.manage"}
 STEP_ROLES = ("data_owner", "compliance_reviewer")
 FIELD_TYPES = ("short_text", "long_text", "choice", "multi_choice", "date", "number", "statement", "person", "file")
 _ID = re.compile(r"[a-z][a-z0-9_]{0,63}")
@@ -222,13 +225,13 @@ def owns(db, resource: Resource, group_id: Optional[str]) -> bool:
         return False
     for item in rbac.ancestors(db, resource):
         assignment = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == item.id, RoleAssignment.app_group_id == group_id))
-        if assignment is not None and "assign" in rbac.roles_for(item).get(assignment.role, set()):
+        if assignment is not None and assignment.role != "AccessAdministrator" and "assign" in rbac.roles_for(item).get(assignment.role, set()):
             return True
     return False
 
 
 def role_requirement(db, resource: Resource, role: str, group_id: Optional[str]) -> dict:
-    if resource.kind in (*rbac.DATA_OBJECT_KINDS, 'source', 'schema', 'kafka', 'topic') and role in ('Viewer', 'Manager'):
+    if resource.kind in (*rbac.DATA_OBJECT_KINDS, 'source', 'schema', 'kafka', 'topic') and role in ('Viewer', 'Manager', 'PlatformContributor', 'AccessAdministrator'):
         return {"layer_id": None, "classification": classification.UNCLASSIFIED, "policy": None}
     # The data's owners do not justify their own use of it; becoming an owner does need a form.
     if "read" not in rbac.roles_for(resource).get(role, set()) or owns(db, resource, group_id):
@@ -286,6 +289,24 @@ def role_groups(db, role: str, *, resource_id: Optional[str] = None, layer_id: O
         if scope.get("group_ids") and group_id not in scope["group_ids"]:
             continue
         out.append(item.app_group_id)
+    # Ordinary scoped platform grants can supply review authority as well.
+    # Existing duty assignments retain their richer classification/group constraints.
+    from .models import PermissionGrant
+    from .permissions import grant_actions, scope_matches
+    action = REVIEW_PERMISSIONS.get(role)
+    for grant in db.scalars(select(PermissionGrant).where(PermissionGrant.app_group_id.is_not(None))):
+        if among is not None and grant.app_group_id not in among:
+            continue
+        if not action or action not in grant_actions(db,grant):
+            continue
+        if grant.target_id not in (ancestors | {'cases'} | ({'group:'+group_id} if group_id else set())):
+            continue
+        actual_layer = layer_id
+        if actual_layer is None and resource_id:
+            from .permissions import resource_layer
+            actual_layer = resource_layer(db,resource_id)
+        if scope_matches(grant.layer_id,actual_layer):
+            out.append(grant.app_group_id)
     return sorted(set(out))
 
 

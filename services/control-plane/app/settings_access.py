@@ -39,6 +39,8 @@ KINDS = ("settings-root", "settings-section", "setting")
 # administrators see these pages in listings like any other object.
 ROLES = {"Viewer": {"read"}, "Executor": {"read"}, "Contributor": {"read"},
          "Manager": {"read", "manage"}, "Admin": {"read", "manage"}, "Owner": {"read", "manage", "assign"}}
+ROLES["AccessAdministrator"] = {"read", "assign"}
+ROLES["PlatformContributor"] = {"read", "manage"}
 ACTIONS = {"view": "read", "manage": "manage"}
 NAMESPACES = {
     "set-backups": "backups",
@@ -80,6 +82,8 @@ def allowed(db, user, page: str, action: str = "manage", layer_id=None) -> bool:
     if action not in ACTIONS:
         if permissions.allowed(db, resolved, action, page, layer_id):
             return True
+        if page == 'set-backups':
+            return False  # Backup functions require explicit grants; a page role only opens the page.
         definition = permissions.REGISTRY.get(action)
         if not definition:
             return False
@@ -127,9 +131,8 @@ def granted(db, user, layer_id=None) -> Dict[str, Optional[str]]:
     return out
 
 
-def capabilities(db,user):
-    """Exact global functions for legacy page-role controls in the desktop."""
-    from .permissions import REGISTRY
+def feature_namespaces():
+    """The feature domains belonging to each administration page."""
     prefixes={page:(namespace+'.',) for page,namespace in NAMESPACES.items()}
     prefixes.update({
         'set-layers':('layers.','layer_infrastructure.','platform.defaults.','certificates.'),
@@ -137,5 +140,11 @@ def capabilities(db,user):
         'set-alerts':('alerts.','webhooks.'), 'set-querylog':('query_log.','siem.'),
         'set-services':('identities.','secrets.'),
     })
+    return prefixes
+
+
+def capabilities(db,user):
+    """Exact global functions for legacy page-role controls in the desktop."""
+    from .permissions import REGISTRY
     return {page:[action for action in REGISTRY if action.startswith(namespaces) and allowed(db,user,page,action)]
-        for page,namespaces in prefixes.items()}
+        for page,namespaces in feature_namespaces().items()}

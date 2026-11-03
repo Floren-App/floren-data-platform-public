@@ -7,7 +7,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global page; scoped cards",
     "target": "Home",
@@ -22,7 +23,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One named page; optional layer restriction",
     "target": "Every page and alias",
@@ -32,7 +34,8 @@
   "pages.roles.assign": {
     "description": "Grant a role on this page",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "One named page; optional layer restriction",
     "target": "Every page and alias",
@@ -42,7 +45,8 @@
   "pages.roles.revoke": {
     "description": "Revoke a role on this page",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "One named page; optional layer restriction",
     "target": "Every page and alias",
@@ -57,7 +61,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Own session",
     "target": "Active group and layer selector",
@@ -72,7 +77,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Own session",
     "target": "Active group and layer selector",
@@ -87,7 +93,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Own session",
     "target": "Active group and layer selector",
@@ -102,7 +109,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + authorized objects",
     "target": "Catalog search and discovery",
@@ -117,7 +125,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + authorized objects",
     "target": "Catalog search and discovery",
@@ -132,7 +141,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + authorized objects",
     "target": "Catalog search and discovery",
@@ -147,7 +157,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + each node/edge",
     "target": "Lineage and dependencies",
@@ -159,7 +170,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + each node/edge",
     "target": "Lineage and dependencies",
@@ -171,7 +183,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + each node/edge",
     "target": "Lineage and dependencies",
@@ -186,7 +199,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + asset",
     "target": "Governance metadata",
@@ -198,7 +212,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + asset",
     "target": "Governance metadata",
@@ -235,7 +250,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + asset/column",
     "target": "Asset and column classification",
@@ -247,7 +263,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + asset/column",
     "target": "Asset and column classification",
@@ -284,7 +301,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + collection",
     "target": "Data products collection",
@@ -311,7 +329,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + product + member objects",
     "target": "Individual data product",
@@ -335,7 +354,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + product + member objects",
     "target": "Individual data product",
@@ -391,7 +411,8 @@
   "products.object.roles.assign": {
     "description": "Assign product roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + product + member objects",
     "target": "Individual data product",
@@ -401,7 +422,8 @@
   "products.object.roles.revoke": {
     "description": "Revoke product roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + product + member objects",
     "target": "Individual data product",
@@ -416,7 +438,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + product + affected asset",
     "target": "Product access options",
@@ -428,7 +451,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + product + affected asset",
     "target": "Product access options",
@@ -465,7 +489,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Own request + layer + target group",
     "target": "My product access requests",
@@ -489,7 +514,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Own request + layer + target group",
     "target": "My product access requests",
@@ -540,7 +566,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + product + assigned duty",
     "target": "Product requests to decide",
@@ -599,7 +626,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + collection",
     "target": "Workspaces collection",
@@ -626,7 +654,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + personal workspace",
     "target": "Individual workspace",
@@ -713,7 +742,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -725,7 +755,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -737,7 +769,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -749,7 +783,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -761,7 +796,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -773,7 +809,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -785,7 +822,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -800,7 +838,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Personal credential; layer-bound use",
     "target": "Git credentials",
@@ -812,7 +851,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Personal credential; layer-bound use",
     "target": "Git credentials",
@@ -824,7 +864,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Personal credential; layer-bound use",
     "target": "Git credentials",
@@ -872,7 +913,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global definition; explicit layer binding",
     "target": "Repositories",
@@ -887,7 +929,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global definition; explicit layer binding",
     "target": "Repositories",
@@ -902,7 +945,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global definition; explicit layer binding",
     "target": "Repositories",
@@ -938,7 +982,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global definition; explicit layer binding",
     "target": "Repositories",
@@ -1008,7 +1053,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + source/destination folder",
     "target": "Workload folders",
@@ -1065,7 +1111,8 @@
   "workloads.folders.roles.assign": {
     "description": "Assign folder roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source/destination folder",
     "target": "Workload folders",
@@ -1075,7 +1122,8 @@
   "workloads.folders.roles.revoke": {
     "description": "Revoke folder roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source/destination folder",
     "target": "Workload folders",
@@ -1100,7 +1148,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + destination collection",
     "target": "Deployment collection and wizard",
@@ -1139,7 +1188,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + workload",
     "target": "Workload source and versions",
@@ -1163,7 +1213,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + workload",
     "target": "Workload source and versions",
@@ -1214,7 +1265,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + workload and selected identity",
     "target": "Workload configuration",
@@ -1276,7 +1328,8 @@
   "workloads.settings.roles.assign": {
     "description": "Assign workload roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + workload and selected identity",
     "target": "Workload configuration",
@@ -1286,7 +1339,8 @@
   "workloads.settings.roles.revoke": {
     "description": "Revoke workload roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + workload and selected identity",
     "target": "Workload configuration",
@@ -1312,7 +1366,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + workload",
     "target": "Workload apps, programs and generated docs",
@@ -1411,7 +1466,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + run and parent workload/workspace",
     "target": "Run history, queue and orchestration",
@@ -1426,7 +1482,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + run and parent workload/workspace",
     "target": "Run history, queue and orchestration",
@@ -1501,7 +1558,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + stream/run/workload",
     "target": "Logs",
@@ -1540,7 +1598,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + run/artifact",
     "target": "Outputs and artifacts",
@@ -1602,7 +1661,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + pool and referenced workload",
     "target": "Usage and occupancy",
@@ -1641,7 +1701,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source collection",
     "target": "Storage source collection",
@@ -1679,7 +1743,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source",
     "target": "Source connection",
@@ -1746,7 +1814,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source/schema",
     "target": "Source and schema access",
@@ -1778,7 +1850,8 @@
   "storage.access.roles.assign": {
     "description": "Assign source/schema roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source/schema",
     "target": "Source and schema access",
@@ -1788,7 +1861,8 @@
   "storage.access.roles.revoke": {
     "description": "Revoke source/schema roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source/schema",
     "target": "Source and schema access",
@@ -1803,7 +1877,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source/schema collection",
     "target": "Schema and namespace collection",
@@ -1815,7 +1893,8 @@
     "roles": [
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + source/schema collection",
     "target": "Schema and namespace collection",
@@ -1837,7 +1916,8 @@
     "description": "Create native schema/namespace",
     "roles": [
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + source/schema collection",
     "target": "Schema and namespace collection",
@@ -1848,7 +1928,8 @@
     "description": "Drop native schema/namespace",
     "roles": [
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + source/schema collection",
     "target": "Schema and namespace collection",
@@ -1873,7 +1954,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1888,7 +1973,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1900,7 +1989,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1911,7 +2001,8 @@
     "description": "Create native table/view",
     "roles": [
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1922,7 +2013,8 @@
     "description": "Alter native table/view",
     "roles": [
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1933,7 +2025,8 @@
     "description": "Drop native table/view",
     "roles": [
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1943,7 +2036,8 @@
   "storage.objects.roles.assign": {
     "description": "Assign object roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1953,7 +2047,8 @@
   "storage.objects.roles.revoke": {
     "description": "Revoke object roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1965,7 +2060,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -1977,7 +2074,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -1989,7 +2088,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2001,7 +2101,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2013,7 +2114,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2024,7 +2126,8 @@
     "description": "Execute authorized native DDL",
     "roles": [
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2035,7 +2138,8 @@
     "description": "Truncate table",
     "roles": [
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2047,7 +2151,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2062,7 +2168,10 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + query and referenced source",
     "target": "SQL query lifecycle",
@@ -2074,7 +2183,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + query and referenced source",
     "target": "SQL query lifecycle",
@@ -2086,7 +2197,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + query and referenced source",
     "target": "SQL query lifecycle",
@@ -2098,7 +2211,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + query and referenced source",
     "target": "SQL query lifecycle",
@@ -2125,7 +2240,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + executable object",
     "target": "Functions, procedures and sequences",
@@ -2197,7 +2313,9 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2209,7 +2327,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2221,7 +2341,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2233,7 +2355,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2245,7 +2368,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2257,7 +2381,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2289,7 +2414,8 @@
   "data.files.roles.assign": {
     "description": "Assign prefix/file roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2299,7 +2425,8 @@
   "data.files.roles.revoke": {
     "description": "Revoke prefix/file roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2314,7 +2441,9 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + namespace/table",
     "target": "Iceberg tables and snapshots",
@@ -2326,7 +2455,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + namespace/table",
     "target": "Iceberg tables and snapshots",
@@ -2338,7 +2469,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + namespace/table",
     "target": "Iceberg tables and snapshots",
@@ -2386,7 +2518,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + schema/table/column policy",
     "target": "Masks and row filters",
@@ -2398,7 +2531,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + schema/table/column policy",
     "target": "Masks and row filters",
@@ -2410,7 +2544,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + schema/table/column policy",
     "target": "Masks and row filters",
@@ -2452,7 +2587,8 @@
   "data.policies.roles.assign": {
     "description": "Delegate policy authority",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + schema/table/column policy",
     "target": "Masks and row filters",
@@ -2467,7 +2603,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + cluster",
     "target": "Kafka cluster collection and cluster",
@@ -2482,7 +2622,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + cluster",
     "target": "Kafka cluster collection and cluster",
@@ -2537,7 +2681,8 @@
   "kafka.clusters.roles.assign": {
     "description": "Assign cluster roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + cluster",
     "target": "Kafka cluster collection and cluster",
@@ -2547,7 +2692,8 @@
   "kafka.clusters.roles.revoke": {
     "description": "Revoke cluster roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + cluster",
     "target": "Kafka cluster collection and cluster",
@@ -2562,7 +2708,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2577,7 +2727,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2592,7 +2746,11 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2616,7 +2774,8 @@
     "roles": [
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2628,7 +2787,8 @@
     "roles": [
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2640,7 +2800,8 @@
     "roles": [
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2661,7 +2822,8 @@
   "kafka.topics.roles.assign": {
     "description": "Assign topic roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2671,7 +2833,8 @@
   "kafka.topics.roles.revoke": {
     "description": "Revoke topic roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2684,7 +2847,9 @@
       "Executor",
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + topic + consumer group",
     "target": "Kafka data and consumer groups",
@@ -2696,7 +2861,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + topic + consumer group",
     "target": "Kafka data and consumer groups",
@@ -2708,7 +2875,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + topic + consumer group",
     "target": "Kafka data and consumer groups",
@@ -2720,7 +2889,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + topic + consumer group",
     "target": "Kafka data and consumer groups",
@@ -2747,7 +2917,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + collection",
     "target": "API collection",
@@ -2774,7 +2945,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + API",
     "target": "API definition and trust",
@@ -2786,7 +2958,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + API",
     "target": "API definition and trust",
@@ -2849,7 +3022,8 @@
   "apis.object.roles.assign": {
     "description": "Assign API roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + API",
     "target": "API definition and trust",
@@ -2859,7 +3033,8 @@
   "apis.object.roles.revoke": {
     "description": "Revoke API roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + API",
     "target": "API definition and trust",
@@ -2874,7 +3049,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + API/group/operation",
     "target": "Endpoint groups and operations",
@@ -2886,7 +3062,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + API/group/operation",
     "target": "Endpoint groups and operations",
@@ -2943,7 +3120,8 @@
   "apis.operations.roles.assign": {
     "description": "Assign operation/group roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + API/group/operation",
     "target": "Endpoint groups and operations",
@@ -2953,7 +3131,8 @@
   "apis.operations.roles.revoke": {
     "description": "Revoke operation/group roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + API/group/operation",
     "target": "Endpoint groups and operations",
@@ -2980,7 +3159,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + operation + execution context",
     "target": "API inbound and outbound gateway",
@@ -3031,7 +3211,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global directory or own person; filtered referenced resources",
     "target": "Directory and person detail",
@@ -3046,7 +3227,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global directory or own person; filtered referenced resources",
     "target": "Directory and person detail",
@@ -3085,7 +3267,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3100,7 +3283,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3145,7 +3329,8 @@
   "groups.owners.change": {
     "description": "Change designated group owners",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3155,7 +3340,8 @@
   "groups.members.add": {
     "description": "Add member to group",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3165,7 +3351,8 @@
   "groups.members.remove": {
     "description": "Remove member from group",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3175,7 +3362,8 @@
   "groups.idp.bind": {
     "description": "Bind IdP group/role/user",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3195,7 +3383,8 @@
   "groups.profile.assign": {
     "description": "Assign app profile to group",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3210,7 +3399,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Group + each referenced resource/layer",
     "target": "Group has-access and grants",
@@ -3249,7 +3439,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + actual target",
     "target": "Permissions panels and identity pickers",
@@ -3279,7 +3470,8 @@
   "permissions.roles.assign": {
     "description": "Assign role on target",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + actual target",
     "target": "Permissions panels and identity pickers",
@@ -3289,7 +3481,8 @@
   "permissions.roles.revoke": {
     "description": "Revoke role on target",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + actual target",
     "target": "Permissions panels and identity pickers",
@@ -3324,7 +3517,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global definition + delegated action/scope ceiling",
     "target": "Custom role definitions",
@@ -3381,7 +3575,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + identity",
     "target": "Service identities and service accounts",
@@ -3396,7 +3591,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + identity",
     "target": "Service identities and service accounts",
@@ -3462,7 +3658,8 @@
   "identities.roles.assign": {
     "description": "Assign roles on/to identity within delegation authority",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + identity",
     "target": "Service identities and service accounts",
@@ -3472,7 +3669,8 @@
   "identities.roles.revoke": {
     "description": "Revoke identity role assignments",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + identity",
     "target": "Service identities and service accounts",
@@ -3509,7 +3707,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + identity/token",
     "target": "Service-account tokens",
@@ -3554,7 +3753,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3569,7 +3769,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3581,7 +3782,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3593,7 +3795,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3648,7 +3851,8 @@
   "secrets.roles.assign": {
     "description": "Assign secret roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3658,7 +3862,8 @@
   "secrets.roles.revoke": {
     "description": "Revoke secret roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3673,7 +3878,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global definition + profile object",
     "target": "App profiles",
@@ -3685,7 +3891,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global definition + profile object",
     "target": "App profiles",
@@ -3747,7 +3954,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global dictionary",
     "target": "Classification dictionary",
@@ -3759,7 +3967,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global dictionary",
     "target": "Classification dictionary",
@@ -3797,7 +4006,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -3812,7 +4022,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -3824,7 +4035,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -3836,7 +4048,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -3869,7 +4082,8 @@
   "compliance.forms.roles.assign": {
     "description": "Assign form roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -3879,7 +4093,8 @@
   "compliance.forms.roles.revoke": {
     "description": "Revoke form roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -3894,7 +4109,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + classification/target policy",
     "target": "Access policies",
@@ -3906,7 +4122,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + classification/target policy",
     "target": "Access policies",
@@ -3948,7 +4165,8 @@
   "compliance.policies.roles.assign": {
     "description": "Delegate scoped policy authority",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Layer + classification/target policy",
     "target": "Access policies",
@@ -3963,7 +4181,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + target + classification/group",
     "target": "Review duties",
@@ -3998,7 +4217,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4013,7 +4233,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4028,7 +4249,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4040,7 +4262,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4052,7 +4275,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4064,7 +4288,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4076,7 +4301,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4163,7 +4389,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Group + assigned approval duty; layer when bound",
     "target": "Membership approvals",
@@ -4202,7 +4429,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + grants/cases",
     "target": "Access register",
@@ -4229,7 +4457,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + case/access",
     "target": "Deadlines",
@@ -4268,7 +4497,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Explicit global events or layer + target",
     "target": "Audit log",
@@ -4331,7 +4561,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + query/source; explicit global defaults",
     "target": "Query log",
@@ -4418,7 +4649,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global integration; layer export filters",
     "target": "SIEM",
@@ -4465,7 +4697,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global collection",
     "target": "Layers collection",
@@ -4492,7 +4725,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer",
     "target": "Individual layer",
@@ -4569,7 +4803,8 @@
   "layers.object.roles.assign": {
     "description": "Assign layer roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "One layer",
     "target": "Individual layer",
@@ -4579,7 +4814,8 @@
   "layers.object.roles.revoke": {
     "description": "Revoke layer roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "One layer",
     "target": "Individual layer",
@@ -4594,7 +4830,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Dedicated global configuration",
     "target": "Global defaults",
@@ -4633,7 +4870,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + infrastructure resource",
     "target": "Layer infrastructure",
@@ -4648,7 +4886,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + infrastructure resource",
     "target": "Layer infrastructure",
@@ -4660,7 +4899,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + infrastructure resource",
     "target": "Layer infrastructure",
@@ -4741,7 +4981,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -4756,7 +4997,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -4768,7 +5010,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -4780,7 +5023,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -4836,7 +5080,8 @@
   "network.policies.roles.assign": {
     "description": "Assign network-policy roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -4846,7 +5091,8 @@
   "network.policies.roles.revoke": {
     "description": "Revoke network-policy roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -4861,7 +5107,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + allowlist; separate global ceiling",
     "target": "Editor HTTPS allowlist",
@@ -4873,7 +5120,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + allowlist; separate global ceiling",
     "target": "Editor HTTPS allowlist",
@@ -4922,7 +5170,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + destination; separate global ceiling",
     "target": "External API destination/trust allowlist",
@@ -4934,7 +5183,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "One layer + destination; separate global ceiling",
     "target": "External API destination/trust allowlist",
@@ -4983,7 +5233,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global or layer + certificate/binding",
     "target": "Certificates and TLS trust",
@@ -5037,7 +5288,8 @@
   "certificates.roles.assign": {
     "description": "Assign certificate roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global or layer + certificate/binding",
     "target": "Certificates and TLS trust",
@@ -5047,7 +5299,8 @@
   "certificates.roles.revoke": {
     "description": "Revoke certificate roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global or layer + certificate/binding",
     "target": "Certificates and TLS trust",
@@ -5062,7 +5315,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global size definition; explicit layer/pool binding",
     "target": "Pools and warehouse sizes",
@@ -5131,7 +5385,8 @@
   "compute.pools.roles.assign": {
     "description": "Assign pool usage/management roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global size definition; explicit layer/pool binding",
     "target": "Pools and warehouse sizes",
@@ -5141,7 +5396,8 @@
   "compute.pools.roles.revoke": {
     "description": "Revoke pool roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global size definition; explicit layer/pool binding",
     "target": "Pools and warehouse sizes",
@@ -5156,7 +5412,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + workload kind; separate global fallback",
     "target": "Workspace limits and default warehouses",
@@ -5231,7 +5488,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global image definition; explicit layer approval",
     "target": "Runtimes",
@@ -5255,7 +5513,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global image definition; explicit layer approval",
     "target": "Runtimes",
@@ -5329,7 +5588,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + template + target group",
     "target": "Workspace templates",
@@ -5344,7 +5604,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + template + target group",
     "target": "Workspace templates",
@@ -5356,7 +5617,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + template + target group",
     "target": "Workspace templates",
@@ -5436,7 +5698,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + rule + monitored targets + destination",
     "target": "Alert rules and channels",
@@ -5448,7 +5711,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + rule + monitored targets + destination",
     "target": "Alert rules and channels",
@@ -5523,7 +5787,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global channel or explicit layer binding",
     "target": "Webhooks and deliveries",
@@ -5538,7 +5803,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global channel or explicit layer binding",
     "target": "Webhooks and deliveries",
@@ -5633,7 +5899,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + metric + all dependencies",
     "target": "Metrics, KPIs and quality definitions",
@@ -5648,7 +5915,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + metric + all dependencies",
     "target": "Metrics, KPIs and quality definitions",
@@ -5663,7 +5931,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + metric + all dependencies",
     "target": "Metrics, KPIs and quality definitions",
@@ -5675,7 +5944,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + metric + all dependencies",
     "target": "Metrics, KPIs and quality definitions",
@@ -5738,7 +6008,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + asset/incident",
     "target": "SLAs and incidents",
@@ -5750,7 +6021,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + asset/incident",
     "target": "SLAs and incidents",
@@ -5801,7 +6073,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -5816,7 +6089,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -5852,7 +6126,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -5909,7 +6184,8 @@
   "packages.roles.assign": {
     "description": "Assign package roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -5919,7 +6195,8 @@
   "packages.roles.revoke": {
     "description": "Revoke package roles",
     "roles": [
-      "Owner"
+      "Owner",
+      "AccessAdministrator"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -5934,7 +6211,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global source trust; layer + policy/job/package",
     "target": "Package imports and source policy",
@@ -5949,7 +6227,8 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Global source trust; layer + policy/job/package",
     "target": "Package imports and source policy",
@@ -6055,7 +6334,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Layer + data resource + execution identity",
     "target": "Connection and scoped credentials",
@@ -6100,7 +6380,9 @@
     "roles": [
       "Executor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataReader",
+      "DataContributor"
     ],
     "scope": "Layer + workload + original viewer + data object",
     "target": "Viewer-bound SQL/files",
@@ -6112,7 +6394,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + workload + original viewer + data object",
     "target": "Viewer-bound SQL/files",
@@ -6124,7 +6407,8 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner"
+      "Owner",
+      "DataContributor"
     ],
     "scope": "Layer + workload + original viewer + data object",
     "target": "Viewer-bound SQL/files",
@@ -6139,12 +6423,13 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Installation; target set-backups",
     "target": "Backup and recovery",
     "area": "Administration",
-    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
   },
   "backups.configuration.update": {
     "description": "Configure or disable platform recovery backups",
@@ -6154,7 +6439,7 @@
     "scope": "Installation; target set-backups",
     "target": "Backup and recovery",
     "area": "Administration",
-    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
   },
   "backups.history.read": {
     "description": "Read recovery archive inventory and status",
@@ -6164,12 +6449,13 @@
       "Contributor",
       "Manager",
       "Admin",
-      "Owner"
+      "Owner",
+      "PlatformContributor"
     ],
     "scope": "Installation; target set-backups",
     "target": "Backup and recovery",
     "area": "Administration",
-    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
   },
   "backups.create": {
     "description": "Create an encrypted platform metadata backup",
@@ -6181,7 +6467,7 @@
     "scope": "Installation; target set-backups",
     "target": "Backup and recovery",
     "area": "Administration",
-    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
   },
   "backups.recovery.resume": {
     "description": "Release recovery quarantine after reconciliation",
@@ -6191,6 +6477,232 @@
     "scope": "Installation; target set-backups",
     "target": "Backup and recovery",
     "area": "Administration",
-    "constraint": "Configuration and recovery approval additionally require active Global Admin. Recovery private keys stay offline. No customer data backup is implied."
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.plans.read": {
+    "description": "Plans read",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner",
+      "PlatformContributor",
+      "AccessAdministrator"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.plans.create": {
+    "description": "Plans create",
+    "roles": [
+      "Contributor",
+      "PlatformContributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.plans.update": {
+    "description": "Plans update",
+    "roles": [
+      "Contributor",
+      "PlatformContributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.plans.schedule.change": {
+    "description": "Plans schedule change",
+    "roles": [
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.plans.source.change": {
+    "description": "Plans source change",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.plans.destination.change": {
+    "description": "Plans destination change",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.plans.retention.change": {
+    "description": "Plans retention change",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.plans.delete": {
+    "description": "Plans delete",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.plans.run": {
+    "description": "Plans run",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.destinations.read": {
+    "description": "Destinations read",
+    "roles": [
+      "Viewer",
+      "Executor",
+      "Contributor",
+      "Manager",
+      "Admin",
+      "Owner",
+      "PlatformContributor",
+      "AccessAdministrator"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.destinations.create": {
+    "description": "Destinations create",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.destinations.update": {
+    "description": "Destinations update",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.destinations.delete": {
+    "description": "Destinations delete",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.destinations.use": {
+    "description": "Destinations use",
+    "roles": [
+      "Executor",
+      "Manager",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "backups.sources.export": {
+    "description": "Sources export",
+    "roles": [
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Storage export and destination use are independent. Control-plane backup and destination registration require active Global Admin. Secrets remain in the selected vault."
+  },
+  "backups.archives.delete": {
+    "description": "Archives delete",
+    "roles": [
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Backup plan/destination or storage integration; source layer applies",
+    "target": "Backup and recovery",
+    "area": "Administration",
+    "constraint": "Control-plane backups, destination registration and recovery approval additionally require active Global Admin. Secret values remain in the selected vault; archives contain references only. Storage source export and destination use require independent permission."
+  },
+  "reviews.forms.review": {
+    "description": "Review compliance access requests in scope",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Case/resource or group and layer; no data access",
+    "target": "Access requests",
+    "area": "Access",
+    "constraint": "Self-review, review-step and matching function permissions remain enforced. Legacy classification/group restrictions remain on existing assignments."
+  },
+  "reviews.memberships.approve": {
+    "description": "Review requests to join groups with approved access",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Case/resource or group and layer; no data access",
+    "target": "Access requests",
+    "area": "Access",
+    "constraint": "Self-review, review-step and matching function permissions remain enforced. Legacy classification/group restrictions remain on existing assignments."
+  },
+  "reviews.configuration.manage": {
+    "description": "Manage compliance review configuration in scope",
+    "roles": [
+      "Executor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Case/resource or group and layer; no data access",
+    "target": "Access requests",
+    "area": "Access",
+    "constraint": "Self-review, review-step and matching function permissions remain enforced. Legacy classification/group restrictions remain on existing assignments."
   }
 }

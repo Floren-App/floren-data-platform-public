@@ -18,12 +18,12 @@ Managed service identities can also receive a fixed role directly, without an ap
 choose **Grant to → Service identity**, select a deployed program/app, API identity, or
 service account, and assign a role such as Contributor. Direct service grants and group
 grants add together and inherit to children; a weaker child grant never reduces parent access.
-Only resource Owners can assign or revoke either kind of grant. Human and IdP membership
+Resource Owners and scoped Access Administrators can assign or revoke grants within their authority. Human and IdP membership
 continues through app security groups. Disabled identities cannot receive new grants or
 start new work; admitted jobs retain their permission snapshots until they finish.
 
 Platform admins create application groups and designate owners. Group owners maintain
-identity bindings. Resource Owners assign roles to groups or directly to services. Group ownership does not itself
+identity bindings. Resource Owners and scoped Access Administrators assign roles to groups or directly to services. Group ownership does not itself
 confer permission to assign resource roles. Permissions live on the objects they govern:
 open a data source, schema, deployed folder, program/app, or service account and choose
 **Permissions**. Direct and inherited grants are shown together; inherited grants link to
@@ -36,9 +36,10 @@ sidebar only switches between them; each page carries its own list and detail.
 
 - **Groups** are app-managed security groups. Their members are people, IdP groups/roles and
   service identities; they get fixed roles on objects. A group's page has **Members**, **Has
-  access to** (roles on objects, directly and through data products, with end dates and deadlines
-  from [access policies](access-policies.md), and its review duties) and **Settings** (name,
-  owners, app profile, review duties). Changing members and changing roles on objects remain
+  access to** (three searchable sections: **Data access**, **Platform access** and
+  **Privileged access**, including object roles, named feature/configuration grants,
+  product grants and review permissions across all layers) and **Settings** (name,
+  owners, app profile and compatibility review assignments). Changing members and changing roles on objects remain
   separate powers.
 - **New group** is one page: name and owners, what its people see (app profile) and its first
   members. The group then opens on **Has access to**, where **Give access** offers the data products
@@ -83,7 +84,8 @@ checks the same roles. A platform administrator with another group than Global A
 what their groups were explicitly given; backend administrator privileges are reduced in that
 context too. The earlier **compliance administrator** role no longer grants page visibility or
 Privacy administration rights. Assign explicit page and capability grants. Group owners still
-manage their own groups, and review duties stay scoped duties.
+manage their own groups. Review authority is an ordinary scoped platform permission;
+legacy review assignments preserve their existing conditions.
 IdP identities and memberships carry **IdP · SCIM/OIDC** labels and are read-only here;
 application groups and managed service identities carry **App-managed** labels.
 
@@ -138,6 +140,10 @@ the workload/folder and the configured execution identity's data grants still ap
 
 | Data role | Permissions within a schema |
 |---|---|
+| PlatformContributor | Configure the object and permitted DDL; no payload or role administration |
+| DataReader | Read actual data; no configuration or role administration |
+| DataContributor | Read and write actual data; no configuration or role administration |
+| AccessAdministrator | Read object metadata and administer access; no payload/configuration |
 | Viewer | Metadata discovery; no row/file payload |
 | Executor | Read tables/views (legacy alias: Reader) |
 | Manager | Edit descriptive metadata; no row/file payload |
@@ -280,3 +286,18 @@ STS credentials expire at the storage service (minimum 15 minutes for AWS-style 
 Delegated app requests are blocked as soon as policy changes are processed, but
 previously issued STS credentials remain valid until they expire. SCIM delivery latency
 precedes all of these timings.
+
+## Group permission inventory
+
+Access → Groups → Has access to shows **Data access**, **Platform access** and
+**Privileged access** together across all layers. Rows include the concrete function,
+object/page scope, role, origin and conditions. Search by feature, permission key,
+object, role or layer. Review authority appears in Platform access, not a separate
+privilege category. Approval expiry, profile restrictions, self-review rules and
+layer boundaries still apply when an action runs.
+
+Prefer `DataReader`, `DataContributor`, `PlatformContributor` and
+`AccessAdministrator` when separating duties. Existing roles retain their authority;
+legacy storage Contributor remains write-only. Named assignments and custom roles
+can select individual functions. The [matrix](permission-matrix.md) defines every
+registered bundle, including protected operations with additional admission rules.

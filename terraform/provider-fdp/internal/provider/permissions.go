@@ -46,7 +46,7 @@ func (r *permissionAssignmentResource) Schema(_ context.Context, _ resource.Sche
 		"layer_id":       schema.StringAttribute{Optional: true, Description: "Omit for explicit global scope. Use a layer ID for that layer, or * for explicit all-layer authority (Global Admin only). Global never implicitly includes a layer."},
 		"app_group_id":   schema.StringAttribute{Optional: true},
 		"principal_id":   schema.StringAttribute{Optional: true},
-		"role":           schema.StringAttribute{Optional: true, Description: "Viewer, Executor, Contributor, Manager, Admin or Owner."},
+		"role":           schema.StringAttribute{Optional: true, Description: "Viewer, Executor, Contributor, Manager, Admin, Owner, PlatformContributor, DataReader, DataContributor or AccessAdministrator."},
 		"actions":        schema.SetAttribute{Optional: true, ElementType: types.StringType, Description: "Individually named permissions in this namespace, instead of a built-in role."},
 		"custom_role_id": schema.StringAttribute{Optional: true, Description: "fdp_custom_role ID, instead of a built-in role or explicit actions."},
 	}}

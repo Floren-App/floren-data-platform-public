@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, AppGroup, AppProfile, DirectoryPrincipal } from "../api";
-import { ComplianceRolesHeld, GiveAccess, HasAccessTo } from "./AccessArea";
+import { GroupAccessInventory, GiveAccess, HasAccessTo } from "./AccessArea";
 import { PrivacyRoles } from "./Privacy";
 import type { OpenTab } from "../components/Permissions";
 import type { TabRef } from "./Tabs";
@@ -114,11 +114,10 @@ export function AccessTab({ hub, groupId, section, bindingPrincipalId, onSelect,
           {section === "access" && group.can_inspect !== false && <>
             {group.system && <p className="scope-note">Owner on every object, including what is added later.</p>}
             {!access ? <p className="muted" role="status">Loading…</p> : <>
-              <p className="hint">Roles on objects, directly and through data products. Change them on the object's Permissions tab.
+              <p className="hint">Data, platform and privileged permissions, including named feature grants and inherited object roles.
                 {access.app_profile ? <> App profile: <strong>{access.app_profile}</strong>.</> : null}</p>
               {notice && <p className="success-message" role="status">{notice}</p>}
-              <HasAccessTo rows={access.grants} hub={hub} openTab={openTab} />
-              <ComplianceRolesHeld roles={access.compliance_roles} openTab={openTab} />
+              {access.access_sections ? <GroupAccessInventory sections={access.access_sections} /> : <HasAccessTo rows={access.grants} hub={hub} openTab={openTab} />}
               {!group.system && <GiveAccess key={group.id} group={group} hub={hub} onDone={(text) => { setNotice(text); setAccessVersion((v) => v + 1); }} />}
             </>}
           </>}

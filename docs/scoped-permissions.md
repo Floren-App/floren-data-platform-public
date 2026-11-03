@@ -17,17 +17,17 @@ roles that remain in use for workloads, data, APIs, packages and products.
 | Area | Behavior |
 |---|---|
 | Named grants | Default-deny action checks on a target, globally, in one layer, or explicitly all layers. Known resource layers override caller-supplied scope. |
-| Roles | Viewer, Executor, Contributor, Manager, Admin and Owner bundles from the registry; an explicit action set or custom role can replace a built-in bundle. |
+| Roles | Viewer, Executor, Contributor, Manager, Admin and Owner plus PlatformContributor, DataReader, DataContributor and AccessAdministrator bundles from the registry; an explicit action set or custom role can replace a built-in bundle. |
 | Page visibility | All desktop tab kinds and aliases require their page gate. Hidden pages do not mount their content components. Navigation and open tab labels are filtered; page changes invalidate the object cache. |
 | Administration | Named checks cover the administration handlers identified in the matrix, including form drafting/publication, classification changes, layer settings/infrastructure, pools, runtime registration and log configuration. |
 | Privacy reads | Forms and drafts, policy inventory and review-duty inventory require explicit page/capability access. The `compliance_admin` role no longer grants access to Privacy administration pages. |
 | Network allowlist | Per-layer host rules are bounded by a distinct global host ceiling. Changing the global ceiling requires its protected action. New proxy connections require signed workspace tickets and current layer policy. |
-| Delegation | A scoped Owner may delegate only its capability namespace, targets, layers and held actions. Changing a shared custom role checks every existing assignment scope and every new action against the editor's delegation authority. |
+| Delegation | A scoped Owner may delegate only its capability namespace, targets, layers and held actions. An explicit AccessAdministrator may administer access in its scope without first acquiring data/configuration authority. Changing a shared custom role checks every existing assignment scope and every new action against the editor's delegation authority. |
 | Administrator context | Global Admin privileges apply with Global Admin active. Selecting another group also restricts backend administrator checks; this is no longer a UI-only preview. |
 | Object data | Table/column and file/directory targets; governed Trino column checks, narrowed S3 sessions, product grants limited to included objects. See [object permissions](data-object-permissions.md). |
 | Workload functions | Separate named checks for settings fields, identity/mode/secret changes, deployment, sync, execution and app/docs opening; the gateway rechecks opening permission. Existing resource roles remain compatibility grants. |
 | Package downloads | Explicit package or repository grants; Viewer metadata access does not permit native Python/R downloads. |
-| Recovery | Configurable encrypted external S3 backup, offline restore and quarantine; see [platform recovery](platform-recovery.md). |
+| Recovery | Independent control-plane, PostgreSQL, S3 and Iceberg v1/v2 backup plans, vault-referenced destinations, local-time schedules, scoped retention, offline restore and quarantine; see [platform recovery](platform-recovery.md). |
 | Query log | Explicit global, layer, or own-principal read scope. SQL text needs separate permission; a page gate alone is insufficient. |
 
 Existing settings-resource roles remain explicit compatibility grants, filtered through
@@ -224,3 +224,40 @@ Legacy explicit workload execution still supplies its previous run-content autho
 while that domain migrates. Workspace owners receive no corresponding implicit grant.
 Interactive editors expose files on their private volume; artifact API restrictions do
 not hide a file from someone separately authorized to open that editor.
+
+
+## Data, platform and privileged access
+
+Access → Groups → Has access to now lists three searchable sections across **all
+layers**. Named feature grants, object roles, inherited administrative scopes,
+product-derived grants and review permissions appear together. Each row shows its
+scope, role, origin and conditions, including approval expiry and profile limits.
+A mixed role appears in every applicable category; viewing a grant is not a bypass
+of active-group, profile, reviewed-access or execution-layer checks.
+
+| Role family | Intended scope |
+|---|---|
+| `PlatformContributor` | Object/configuration changes without payload read/write or role administration. |
+| `DataReader` | Read actual data in the assigned scope without configuration or delegation. |
+| `DataContributor` | Read and modify actual data without configuration or delegation. |
+| `AccessAdministrator` | Manage access assignments without reading data or changing object configuration. |
+
+Existing `Contributor`, `Executor`, `Manager`, `Admin` and `Owner` assignments retain
+their existing capabilities for compatibility. In particular, legacy storage
+Contributor is write-only; it is not silently relabeled as configuration-only or
+upgraded to a read/write data role. Prefer the explicit families for new object
+grants and use the matrix for each concrete function. New families coexist with
+existing roles rather than widening them.
+
+Review authority is a platform permission. New assignments can use namespace
+`reviews`, with `reviews.forms.review`, `reviews.memberships.approve` or
+`reviews.configuration.manage`, scoped to the case/object/group and layer. Matching
+case/membership function permissions, self-review restrictions and review-step
+checks still apply. Existing review assignments retain their classification/group
+conditions and appear as scoped platform assignments in the same inventory.
+The new namespace prevents existing broad compliance function roles from silently
+acquiring review-step eligibility.
+
+Backup destinations, encryption-key references and runtime key references use the
+installation's selected secret backend. New archives do not contain secret values;
+see [backup plans and recovery](platform-recovery.md).

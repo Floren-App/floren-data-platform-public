@@ -57,13 +57,27 @@ Generated from mounted FastAPI routes and desktop page mappings. Entry-point inv
 
 | Method | Path | Handler / source |
 |---|---|---|
-| GET | `/v1/backups` | [`history`](../services/control-plane/app/routes/backups.py#L69) |
-| POST | `/v1/backups` | [`create`](../services/control-plane/app/routes/backups.py#L77) |
-| DELETE | `/v1/backups/configuration` | [`disable`](../services/control-plane/app/routes/backups.py#L58) |
-| GET | `/v1/backups/configuration` | [`read`](../services/control-plane/app/routes/backups.py#L35) |
-| PUT | `/v1/backups/configuration` | [`configure`](../services/control-plane/app/routes/backups.py#L41) |
-| GET | `/v1/backups/recovery` | [`recovery`](../services/control-plane/app/routes/backups.py#L86) |
-| POST | `/v1/backups/recovery/resume` | [`resume`](../services/control-plane/app/routes/backups.py#L103) |
+| GET | `/v1/backups` | [`history`](../services/control-plane/app/routes/backups.py#L79) |
+| POST | `/v1/backups` | [`create`](../services/control-plane/app/routes/backups.py#L88) |
+| DELETE | `/v1/backups/configuration` | [`disable`](../services/control-plane/app/routes/backups.py#L68) |
+| GET | `/v1/backups/configuration` | [`read`](../services/control-plane/app/routes/backups.py#L45) |
+| PUT | `/v1/backups/configuration` | [`configure`](../services/control-plane/app/routes/backups.py#L51) |
+| GET | `/v1/backups/destinations` | [`destinations`](../services/control-plane/app/routes/backups.py#L156) |
+| POST | `/v1/backups/destinations` | [`create_destination`](../services/control-plane/app/routes/backups.py#L163) |
+| DELETE | `/v1/backups/destinations/{ident}` | [`delete_destination`](../services/control-plane/app/routes/backups.py#L198) |
+| GET | `/v1/backups/destinations/{ident}` | [`destination_detail`](../services/control-plane/app/routes/backups.py#L178) |
+| PUT | `/v1/backups/destinations/{ident}` | [`update_destination`](../services/control-plane/app/routes/backups.py#L184) |
+| GET | `/v1/backups/plans` | [`list_plans`](../services/control-plane/app/routes/backups.py#L208) |
+| POST | `/v1/backups/plans` | [`create_plan`](../services/control-plane/app/routes/backups.py#L215) |
+| DELETE | `/v1/backups/plans/{ident}` | [`delete_plan`](../services/control-plane/app/routes/backups.py#L232) |
+| GET | `/v1/backups/plans/{ident}` | [`plan_detail`](../services/control-plane/app/routes/backups.py#L221) |
+| PUT | `/v1/backups/plans/{ident}` | [`update_plan`](../services/control-plane/app/routes/backups.py#L227) |
+| GET | `/v1/backups/plans/{ident}/runs` | [`plan_history`](../services/control-plane/app/routes/backups.py#L246) |
+| POST | `/v1/backups/plans/{ident}/runs` | [`run_plan`](../services/control-plane/app/routes/backups.py#L239) |
+| DELETE | `/v1/backups/plans/{ident}/runs/{run_id}` | [`delete_archive`](../services/control-plane/app/routes/backups.py#L253) |
+| GET | `/v1/backups/recovery` | [`recovery`](../services/control-plane/app/routes/backups.py#L97) |
+| POST | `/v1/backups/recovery/resume` | [`resume`](../services/control-plane/app/routes/backups.py#L114) |
+| GET | `/v1/backups/sources` | [`sources`](../services/control-plane/app/routes/backups.py#L144) |
 
 ### catalog
 
@@ -340,16 +354,16 @@ Generated from mounted FastAPI routes and desktop page mappings. Entry-point inv
 
 | Method | Path | Handler / source |
 |---|---|---|
-| POST | `/v1/permissions/assignments` | [`create`](../services/control-plane/app/routes/permissions.py#L90) |
-| DELETE | `/v1/permissions/assignments/{ident}` | [`remove`](../services/control-plane/app/routes/permissions.py#L127) |
-| GET | `/v1/permissions/assignments/{ident}` | [`read`](../services/control-plane/app/routes/permissions.py#L110) |
-| PUT | `/v1/permissions/assignments/{ident}` | [`update`](../services/control-plane/app/routes/permissions.py#L115) |
-| GET | `/v1/permissions/capabilities` | [`capabilities`](../services/control-plane/app/routes/permissions.py#L85) |
-| GET | `/v1/permissions/registry` | [`registry`](../services/control-plane/app/routes/permissions.py#L80) |
-| POST | `/v1/permissions/roles` | [`create_role`](../services/control-plane/app/routes/permissions.py#L149) |
-| DELETE | `/v1/permissions/roles/{ident}` | [`remove_role`](../services/control-plane/app/routes/permissions.py#L193) |
-| GET | `/v1/permissions/roles/{ident}` | [`read_role`](../services/control-plane/app/routes/permissions.py#L162) |
-| PUT | `/v1/permissions/roles/{ident}` | [`update_role`](../services/control-plane/app/routes/permissions.py#L171) |
+| POST | `/v1/permissions/assignments` | [`create`](../services/control-plane/app/routes/permissions.py#L92) |
+| DELETE | `/v1/permissions/assignments/{ident}` | [`remove`](../services/control-plane/app/routes/permissions.py#L129) |
+| GET | `/v1/permissions/assignments/{ident}` | [`read`](../services/control-plane/app/routes/permissions.py#L112) |
+| PUT | `/v1/permissions/assignments/{ident}` | [`update`](../services/control-plane/app/routes/permissions.py#L117) |
+| GET | `/v1/permissions/capabilities` | [`capabilities`](../services/control-plane/app/routes/permissions.py#L87) |
+| GET | `/v1/permissions/registry` | [`registry`](../services/control-plane/app/routes/permissions.py#L82) |
+| POST | `/v1/permissions/roles` | [`create_role`](../services/control-plane/app/routes/permissions.py#L151) |
+| DELETE | `/v1/permissions/roles/{ident}` | [`remove_role`](../services/control-plane/app/routes/permissions.py#L197) |
+| GET | `/v1/permissions/roles/{ident}` | [`read_role`](../services/control-plane/app/routes/permissions.py#L164) |
+| PUT | `/v1/permissions/roles/{ident}` | [`update_role`](../services/control-plane/app/routes/permissions.py#L173) |
 
 ### products
 
@@ -357,17 +371,17 @@ Generated from mounted FastAPI routes and desktop page mappings. Entry-point inv
 |---|---|---|
 | GET | `/v1/catalog/assets/{ident}/product` | [`asset_product`](../services/control-plane/app/routes/products.py#L334) |
 | GET | `/v1/catalog/products` | [`list_products`](../services/control-plane/app/routes/products.py#L278) |
-| POST | `/v1/catalog/products` | [`publish`](../services/control-plane/app/routes/products.py#L447) |
+| POST | `/v1/catalog/products` | [`publish`](../services/control-plane/app/routes/products.py#L450) |
 | GET | `/v1/catalog/products/candidates` | [`publish_candidates`](../services/control-plane/app/routes/products.py#L298) |
-| DELETE | `/v1/catalog/products/{product_id}` | [`unpublish`](../services/control-plane/app/routes/products.py#L535) |
-| GET | `/v1/catalog/products/{product_id}` | [`product_detail`](../services/control-plane/app/routes/products.py#L559) |
-| PATCH | `/v1/catalog/products/{product_id}` | [`update_product`](../services/control-plane/app/routes/products.py#L497) |
-| DELETE | `/v1/catalog/products/{product_id}/consumers/{group_id}` | [`delete_consumer`](../services/control-plane/app/routes/products.py#L835) |
-| PUT | `/v1/catalog/products/{product_id}/consumers/{group_id}` | [`put_consumer`](../services/control-plane/app/routes/products.py#L804) |
-| POST | `/v1/catalog/products/{product_id}/requests` | [`request_access`](../services/control-plane/app/routes/products.py#L677) |
-| GET | `/v1/catalog/requests` | [`list_requests`](../services/control-plane/app/routes/products.py#L723) |
-| DELETE | `/v1/catalog/requests/{request_id}` | [`withdraw`](../services/control-plane/app/routes/products.py#L790) |
-| POST | `/v1/catalog/requests/{request_id}/decision` | [`decide`](../services/control-plane/app/routes/products.py#L741) |
+| DELETE | `/v1/catalog/products/{product_id}` | [`unpublish`](../services/control-plane/app/routes/products.py#L538) |
+| GET | `/v1/catalog/products/{product_id}` | [`product_detail`](../services/control-plane/app/routes/products.py#L562) |
+| PATCH | `/v1/catalog/products/{product_id}` | [`update_product`](../services/control-plane/app/routes/products.py#L500) |
+| DELETE | `/v1/catalog/products/{product_id}/consumers/{group_id}` | [`delete_consumer`](../services/control-plane/app/routes/products.py#L838) |
+| PUT | `/v1/catalog/products/{product_id}/consumers/{group_id}` | [`put_consumer`](../services/control-plane/app/routes/products.py#L807) |
+| POST | `/v1/catalog/products/{product_id}/requests` | [`request_access`](../services/control-plane/app/routes/products.py#L680) |
+| GET | `/v1/catalog/requests` | [`list_requests`](../services/control-plane/app/routes/products.py#L726) |
+| DELETE | `/v1/catalog/requests/{request_id}` | [`withdraw`](../services/control-plane/app/routes/products.py#L793) |
+| POST | `/v1/catalog/requests/{request_id}/decision` | [`decide`](../services/control-plane/app/routes/products.py#L744) |
 
 ### query_log
 
@@ -385,31 +399,31 @@ Generated from mounted FastAPI routes and desktop page mappings. Entry-point inv
 | Method | Path | Handler / source |
 |---|---|---|
 | GET | `/v1/rbac/directory` | [`directory`](../services/control-plane/app/routes/rbac.py#L131) |
-| POST | `/v1/rbac/folders` | [`create_folder`](../services/control-plane/app/routes/rbac.py#L448) |
-| DELETE | `/v1/rbac/folders/{resource_id}` | [`delete_folder`](../services/control-plane/app/routes/rbac.py#L528) |
+| POST | `/v1/rbac/folders` | [`create_folder`](../services/control-plane/app/routes/rbac.py#L449) |
+| DELETE | `/v1/rbac/folders/{resource_id}` | [`delete_folder`](../services/control-plane/app/routes/rbac.py#L529) |
 | GET | `/v1/rbac/groups` | [`groups`](../services/control-plane/app/routes/rbac.py#L168) |
-| POST | `/v1/rbac/groups` | [`create_group`](../services/control-plane/app/routes/rbac.py#L296) |
-| DELETE | `/v1/rbac/groups/{group_id}` | [`delete_group`](../services/control-plane/app/routes/rbac.py#L345) |
-| PUT | `/v1/rbac/groups/{group_id}` | [`update_group`](../services/control-plane/app/routes/rbac.py#L316) |
+| POST | `/v1/rbac/groups` | [`create_group`](../services/control-plane/app/routes/rbac.py#L297) |
+| DELETE | `/v1/rbac/groups/{group_id}` | [`delete_group`](../services/control-plane/app/routes/rbac.py#L346) |
+| PUT | `/v1/rbac/groups/{group_id}` | [`update_group`](../services/control-plane/app/routes/rbac.py#L317) |
 | GET | `/v1/rbac/groups/{group_id}/access` | [`group_access`](../services/control-plane/app/routes/rbac.py#L241) |
 | GET | `/v1/rbac/groups/{group_id}/assignments` | [`group_assignments`](../services/control-plane/app/routes/rbac.py#L184) |
-| POST | `/v1/rbac/groups/{group_id}/bindings` | [`bind`](../services/control-plane/app/routes/rbac.py#L385) |
-| DELETE | `/v1/rbac/groups/{group_id}/bindings/{principal_id}` | [`unbind`](../services/control-plane/app/routes/rbac.py#L404) |
-| GET | `/v1/rbac/principals/{principal_id}/access` | [`principal_access`](../services/control-plane/app/routes/rbac.py#L258) |
-| GET | `/v1/rbac/resources` | [`resources`](../services/control-plane/app/routes/rbac.py#L418) |
-| DELETE | `/v1/rbac/resources/{resource_id}` | [`deregister_schema`](../services/control-plane/app/routes/rbac.py#L605) |
-| GET | `/v1/rbac/resources/{resource_id}` | [`read_resource`](../services/control-plane/app/routes/rbac.py#L594) |
-| PATCH | `/v1/rbac/resources/{resource_id}` | [`move_resource`](../services/control-plane/app/routes/rbac.py#L482) |
-| GET | `/v1/rbac/resources/{resource_id}/access` | [`effective_access`](../services/control-plane/app/routes/rbac.py#L752) |
-| GET | `/v1/rbac/resources/{resource_id}/assignments` | [`assignments`](../services/control-plane/app/routes/rbac.py#L619) |
-| PUT | `/v1/rbac/resources/{resource_id}/assignments` | [`assign`](../services/control-plane/app/routes/rbac.py#L695) |
-| DELETE | `/v1/rbac/resources/{resource_id}/assignments/services/{principal_id}` | [`revoke_service`](../services/control-plane/app/routes/rbac.py#L742) |
-| DELETE | `/v1/rbac/resources/{resource_id}/assignments/{app_group_id}` | [`revoke`](../services/control-plane/app/routes/rbac.py#L730) |
-| POST | `/v1/rbac/resources/{resource_id}/provision` | [`provision`](../services/control-plane/app/routes/rbac.py#L759) |
-| GET | `/v1/rbac/resources/{resource_id}/service-principals` | [`service_principals`](../services/control-plane/app/routes/rbac.py#L642) |
-| GET | `/v1/rbac/resources/{resource_id}/user-principals` | [`user_principals`](../services/control-plane/app/routes/rbac.py#L653) |
+| POST | `/v1/rbac/groups/{group_id}/bindings` | [`bind`](../services/control-plane/app/routes/rbac.py#L386) |
+| DELETE | `/v1/rbac/groups/{group_id}/bindings/{principal_id}` | [`unbind`](../services/control-plane/app/routes/rbac.py#L405) |
+| GET | `/v1/rbac/principals/{principal_id}/access` | [`principal_access`](../services/control-plane/app/routes/rbac.py#L259) |
+| GET | `/v1/rbac/resources` | [`resources`](../services/control-plane/app/routes/rbac.py#L419) |
+| DELETE | `/v1/rbac/resources/{resource_id}` | [`deregister_schema`](../services/control-plane/app/routes/rbac.py#L606) |
+| GET | `/v1/rbac/resources/{resource_id}` | [`read_resource`](../services/control-plane/app/routes/rbac.py#L595) |
+| PATCH | `/v1/rbac/resources/{resource_id}` | [`move_resource`](../services/control-plane/app/routes/rbac.py#L483) |
+| GET | `/v1/rbac/resources/{resource_id}/access` | [`effective_access`](../services/control-plane/app/routes/rbac.py#L765) |
+| GET | `/v1/rbac/resources/{resource_id}/assignments` | [`assignments`](../services/control-plane/app/routes/rbac.py#L620) |
+| PUT | `/v1/rbac/resources/{resource_id}/assignments` | [`assign`](../services/control-plane/app/routes/rbac.py#L705) |
+| DELETE | `/v1/rbac/resources/{resource_id}/assignments/services/{principal_id}` | [`revoke_service`](../services/control-plane/app/routes/rbac.py#L755) |
+| DELETE | `/v1/rbac/resources/{resource_id}/assignments/{app_group_id}` | [`revoke`](../services/control-plane/app/routes/rbac.py#L743) |
+| POST | `/v1/rbac/resources/{resource_id}/provision` | [`provision`](../services/control-plane/app/routes/rbac.py#L772) |
+| GET | `/v1/rbac/resources/{resource_id}/service-principals` | [`service_principals`](../services/control-plane/app/routes/rbac.py#L643) |
+| GET | `/v1/rbac/resources/{resource_id}/user-principals` | [`user_principals`](../services/control-plane/app/routes/rbac.py#L654) |
 | GET | `/v1/rbac/roles` | [`roles`](../services/control-plane/app/routes/rbac.py#L120) |
-| POST | `/v1/rbac/sources/{name}/schemas` | [`register_schema`](../services/control-plane/app/routes/rbac.py#L555) |
+| POST | `/v1/rbac/sources/{name}/schemas` | [`register_schema`](../services/control-plane/app/routes/rbac.py#L556) |
 
 ### runs
 
@@ -490,18 +504,18 @@ Generated from mounted FastAPI routes and desktop page mappings. Entry-point inv
 
 | Method | Path | Handler / source |
 |---|---|---|
-| POST | `/v1/executions/token` | [`refresh_run_token`](../services/control-plane/app/routes/workspaces.py#L353) |
+| POST | `/v1/executions/token` | [`refresh_run_token`](../services/control-plane/app/routes/workspaces.py#L359) |
 | GET | `/v1/me` | [`me`](../services/control-plane/app/routes/workspaces.py#L26) |
-| PUT | `/v1/me/active-group` | [`select_active_group`](../services/control-plane/app/routes/workspaces.py#L124) |
-| PUT | `/v1/me/active-layer` | [`select_active_layer`](../services/control-plane/app/routes/workspaces.py#L104) |
-| GET | `/v1/pools` | [`list_pools`](../services/control-plane/app/routes/workspaces.py#L315) |
-| GET | `/v1/workspaces` | [`list_workspaces`](../services/control-plane/app/routes/workspaces.py#L153) |
-| POST | `/v1/workspaces` | [`create_workspace`](../services/control-plane/app/routes/workspaces.py#L166) |
-| DELETE | `/v1/workspaces/{ws_id}` | [`delete_workspace`](../services/control-plane/app/routes/workspaces.py#L296) |
-| GET | `/v1/workspaces/{ws_id}/config` | [`workspace_config`](../services/control-plane/app/routes/workspaces.py#L328) |
-| POST | `/v1/workspaces/{ws_id}/open` | [`open_workspace`](../services/control-plane/app/routes/workspaces.py#L342) |
-| POST | `/v1/workspaces/{ws_id}/start` | [`start_workspace`](../services/control-plane/app/routes/workspaces.py#L189) |
-| POST | `/v1/workspaces/{ws_id}/stop` | [`stop_workspace`](../services/control-plane/app/routes/workspaces.py#L278) |
+| PUT | `/v1/me/active-group` | [`select_active_group`](../services/control-plane/app/routes/workspaces.py#L130) |
+| PUT | `/v1/me/active-layer` | [`select_active_layer`](../services/control-plane/app/routes/workspaces.py#L110) |
+| GET | `/v1/pools` | [`list_pools`](../services/control-plane/app/routes/workspaces.py#L321) |
+| GET | `/v1/workspaces` | [`list_workspaces`](../services/control-plane/app/routes/workspaces.py#L159) |
+| POST | `/v1/workspaces` | [`create_workspace`](../services/control-plane/app/routes/workspaces.py#L172) |
+| DELETE | `/v1/workspaces/{ws_id}` | [`delete_workspace`](../services/control-plane/app/routes/workspaces.py#L302) |
+| GET | `/v1/workspaces/{ws_id}/config` | [`workspace_config`](../services/control-plane/app/routes/workspaces.py#L334) |
+| POST | `/v1/workspaces/{ws_id}/open` | [`open_workspace`](../services/control-plane/app/routes/workspaces.py#L348) |
+| POST | `/v1/workspaces/{ws_id}/start` | [`start_workspace`](../services/control-plane/app/routes/workspaces.py#L195) |
+| POST | `/v1/workspaces/{ws_id}/stop` | [`stop_workspace`](../services/control-plane/app/routes/workspaces.py#L284) |
 
 ## Desktop pages and aliases
 

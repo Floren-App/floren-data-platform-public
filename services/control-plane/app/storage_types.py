@@ -52,7 +52,7 @@ TYPES = {
     },
     "iceberg": {
         "label": "Iceberg tables on S3",
-        "summary": "Iceberg tables in an S3-compatible bucket, served by a REST catalog. Queries run through the "
+        "summary": "Iceberg tables in an S3-compatible bucket, served by a REST or layer-managed JDBC catalog. Queries run through the "
                    "shared SQL engine; table storage credentials stay in that engine.",
         "external": "Create a Trino catalog (connector iceberg, REST catalog type) pointing at the REST catalog and "
                     "warehouse below, with its own S3 credentials. The warehouse bucket is reserved for tables.",
@@ -71,6 +71,12 @@ TYPES = {
              "help": "S3 credentials the layer's Trino uses for the table data. In a managed layer the platform "
                      "writes the Trino catalog from them; otherwise configure the catalog yourself.",
              "fields": [field("access_key_id", "Access key ID"), field("secret_access_key", "Secret access key", kind="password")]},
+            {"name": "provisioner_secret", "label": "Backup storage/catalog login", "required": False,
+             "help": "Optional dedicated read-only warehouse credentials and REST catalog bearer token for snapshot backups. Stored in the selected vault. Managed catalogs use their existing layer credentials.",
+             "fields": [field("access_key_id", "Access key ID"),
+                        field("secret_access_key", "Secret access key", kind="password"),
+                        field("session_token", "Session token", kind="password", required=False),
+                        field("catalog_token", "REST catalog bearer token", kind="password", required=False)]},
         ],
     },
     "s3": {
@@ -157,7 +163,7 @@ def validate(kind: str, config: dict, secrets: dict, has_stored: dict) -> dict:
                     errors[f"{group['name']}.{f['name']}"] = "required"
             continue
         for f in group["fields"]:
-            if not str(given.get(f["name"], "")).strip():
+            if f["required"] and not str(given.get(f["name"], "")).strip():
                 errors[f"{group['name']}.{f['name']}"] = "required"
     if errors:
         raise HTTPException(422, {"message": f"{spec['label']} integration is incomplete", "errors": errors})

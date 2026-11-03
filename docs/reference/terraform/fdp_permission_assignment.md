@@ -13,7 +13,7 @@ An explicit named capability grant on a target, globally or in one layer. Import
 | `layer_id` | `basetypes.StringType` | Optional | Omit for explicit global scope. Use a layer ID for that layer, or * for explicit all-layer authority (Global Admin only). Global never implicitly includes a layer. |
 | `namespace` | `basetypes.StringType` | Required | Capability domain, e.g. pages, network.editor_allowlist, compliance.forms. |
 | `principal_id` | `basetypes.StringType` | Optional |  |
-| `role` | `basetypes.StringType` | Optional | Viewer, Executor, Contributor, Manager, Admin or Owner. |
+| `role` | `basetypes.StringType` | Optional | Viewer, Executor, Contributor, Manager, Admin, Owner, PlatformContributor, DataReader, DataContributor or AccessAdministrator. |
 | `target_id` | `basetypes.StringType` | Required | Stable target resource or collection ID; page IDs include set-network and set-forms. |
 
 Nested object types are shown in the Type column. Server-side permission, layer and ownership checks also apply.

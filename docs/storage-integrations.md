@@ -12,7 +12,7 @@ control plane validates the same rules (`GET /v1/admin/storage-types` serves the
 | Type | Location you configure | Credentials Floren Data Platform keeps (secret store, write-only) | Must exist outside Floren Data Platform |
 |---|---|---|---|
 | **PostgreSQL** | host, port, database, Trino catalog name; optional SSL mode | access-setup login (creates roles, grants schema privileges); the engine login | the database. In an unmanaged layer, also a Trino catalog (`connector.name=postgresql`) for it |
-| **Iceberg tables on S3** | Trino catalog name, warehouse (`s3://bucket/path`), REST catalog URL; optional S3 endpoint, region | the engine's S3 keys | an Iceberg REST catalog and the bucket. In an unmanaged layer, also a Trino catalog (`connector.name=iceberg`, REST type) |
+| **Iceberg tables on S3** | Trino catalog name, warehouse (`s3://bucket/path`), REST catalog URL; optional S3 endpoint, region | the engine's S3 keys; optional separate backup storage/catalog login in the same vault | an Iceberg REST catalog and the bucket. In an unmanaged layer, also a Trino catalog (`connector.name=iceberg`, REST type) |
 | **S3 files** | bucket, region, role to assume; optional base prefix, S3 and STS endpoints | STS provisioning access key | the bucket and a role that the provisioning key may assume |
 
 What happens after an integration is added:
@@ -127,3 +127,20 @@ local stack.
 3. Under **Storage**, register its schemas, set up access, and assign roles.
 
 `FDP_SQL_LAKE_BUCKETS` can reserve additional table buckets.
+
+## Iceberg backups
+
+Iceberg integrations can be selected in Backup and recovery plans. Backups capture
+the catalog pointers and every file needed by retained snapshots in each table's
+metadata, including delete files and statistics. Both external REST catalogs and
+layer-managed JDBC catalogs are supported for Iceberg v1/v2.
+
+The optional **Backup storage/catalog login** uses the integration's existing
+`provisioner_secret` in the selected vault: S3 access/secret keys, optional session
+token and optional REST `catalog_token`. Use read-only warehouse credentials for
+backups and separately authorized credentials for offline recovery. Managed layer
+credentials are resolved through the existing layer mechanism. Key values and
+REST-vended credentials never enter backup plans or recovery manifests.
+
+See [backup plans and recovery](platform-recovery.md#iceberg-snapshot-backups-and-recovery)
+for namespace selection, scheduling, snapshot consistency and safe catalog recovery.

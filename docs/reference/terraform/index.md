@@ -30,6 +30,8 @@ Configures Floren Data Platform through its API. Authenticate with a token, or w
 - [fdp_app_group_member](fdp_app_group_member.md)
 - [fdp_app_profile](fdp_app_profile.md)
 - [fdp_backup_configuration](fdp_backup_configuration.md)
+- [fdp_backup_destination](fdp_backup_destination.md)
+- [fdp_backup_plan](fdp_backup_plan.md)
 - [fdp_catalog_governance](fdp_catalog_governance.md)
 - [fdp_classifications](fdp_classifications.md)
 - [fdp_column_classification](fdp_column_classification.md)

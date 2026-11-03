@@ -2,7 +2,7 @@
 
 Configure Floren Data Platform declaratively: layers (including isolated infrastructure), storage
 integrations, schemas, app groups and role assignments, compute pools, Git repositories and
-workloads. Every change goes through the same validated API as the desktop app.
+workloads, independent backup plans and vault-referenced S3 recovery destinations. Every change goes through the same validated API as the desktop app.
 
 Terraform itself has been under the Business Source License since 1.6, so this provider is built
 and tested with [OpenTofu](https://opentofu.org) (MPL-2.0). It uses HashiCorp's MPL-licensed
@@ -148,3 +148,20 @@ The map manages only its listed direct assignments, detects revoked/changed gran
 on refresh and removes assignments when keys are removed. Do not manage those same
 assignments through `fdp_role_assignment`. Separate service accounts remain available
 for external clients or deliberately shared execution identities.
+
+## Backup plans and access families
+
+Use `fdp_backup_destination` for an existing S3 integration or a dedicated bucket, a base
+prefix and `recovery_key_ref` in the installation's selected vault. Use `fdp_backup_plan`
+for a control-plane, PostgreSQL, S3 or Iceberg source, destination, additional prefix, five-field
+cron schedule, IANA timezone and retention. Plans start paused; multiple plans may copy
+the same source to different destinations. Other storage engines require a native adapter.
+No private keys or credentials belong in these resources or Terraform state.
+
+Named permission assignments support `DataReader`, `DataContributor`,
+`PlatformContributor` and `AccessAdministrator` alongside the six existing roles.
+These separate payload operations, configuration and access delegation. Existing grants
+keep their previous authority. Source export and destination use are independently
+authorized; raw source export requires Global Admin approval. See the platform's
+[recovery guide](https://floren-app.github.io/floren-data-platform-public/platform-recovery/)
+and [permission matrix](https://floren-app.github.io/floren-data-platform-public/permission-matrix/).

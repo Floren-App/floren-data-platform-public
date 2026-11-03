@@ -3149,16 +3149,21 @@ test("groups show members, what they reach and settings; connections and service
   const main = page.locator(".main"), sidebar = page.locator(".sidebar");
   await page.route(/\/v1\/rbac\/groups\/analysts\/access$/, (route) => route.fulfill({ json: { system: false, app_profile: "Analyst",
     compliance_roles: [{ role: "compliance_reviewer", label: "Review compliance forms in scope", scope: { classifications: ["restricted"] }, group: { id: "analysts", name: "Analysts" } }],
-    grants: [{ resource: state.resources.find((r) => r.id === "pg-reporting"), role: "Reader", group: { id: "analysts", name: "Analysts" }, via: "direct", product: null,
-      until: "2027-01-31T00:00:00Z", deadline: null, pending_membership: false }] } }));
+    grants: [], access_sections:{
+      data:[{permission:"data.sql.select",description:"Read reporting rows",target_id:"pg-reporting",target_name:"reporting",role:"DataReader",origin:"Object role",layer_id:"production",conditions:["Approved until 2027-01-31"],grant_id:null}],
+      platform:[{permission:"reviews.forms.review",description:"Review compliance forms in scope",target_id:"cases",target_name:"Access requests",role:"Executor",origin:"Named assignment",layer_id:"production",conditions:[],grant_id:"review-grant"}],
+      privileged:[{permission:"storage.access.roles.assign",description:"Assign object access",target_id:"pg-reporting",target_name:"reporting",role:"AccessAdministrator",origin:"Named assignment",layer_id:"production",conditions:[],grant_id:"access-grant"}]
+    } } }));
   await page.getByRole("button", { name: "Access", exact: true }).click();
   await sidebar.getByRole("button", { name: "Groups", exact: true }).click();
   await main.getByRole("button", { name: /^Analysts/ }).click();
   const sections = main.getByRole("navigation", { name: "Group sections" });
   await expect(main.getByRole("table", { name: "Members" })).toBeVisible();
   await sections.getByRole("button", { name: "Has access to", exact: true }).click();
-  const reach = main.getByRole("table", { name: "Has access to" });
-  await expect(reach.getByRole("row", { name: /reporting/ })).toContainText("until");
+  const reach = main.getByRole("table", { name: "Data access permissions" });
+  await expect(reach.getByRole("row", { name: /reporting/ })).toContainText("Approved until");
+  await expect(main.getByRole("table", {name:"Privileged access permissions"})).toContainText("Access Administrator");
+  await expect(main.getByRole("table", {name:"Platform access permissions"})).toContainText("Review compliance forms in scope");
   await expect(main.getByText("Review compliance forms in scope")).toBeVisible();
   await sections.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(main.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Analysts");
@@ -3416,50 +3421,65 @@ test("network Viewer has read-only controls and requests the selected layer", as
   expect(state.errors).toEqual([]);
 });
 
-test("backup administration saves S3 configuration and queues an encrypted archive", async ({ page }) => {
+test("backup plans save a vault reference, bucket path and local schedule", async ({ page }) => {
   const state = await setup(page);
   const saved: Record<string, unknown>[] = [];
+  const destinations: any[] = [], plans: any[] = [];
   let queued = false;
-  let configuration = { enabled:false, bucket:"", prefix:"fdp-recovery", endpoint_url:"", region:"us-east-1", source_id:"", interval_hours:24,
-    recovery_public_key:"", server_side_encryption:"", kms_key_id:"", object_lock_days:0 };
   await page.route("https://iam.test/api/v1/backups**", route => {
     const req=route.request(), path=new URL(req.url()).pathname;
-    if (path.endsWith("/configuration") && req.method()==="PUT") {
-      saved.push(req.postDataJSON());configuration=saved[0] as typeof configuration;
-      return route.fulfill({json:configuration});
+    if(path.endsWith("/sources"))return route.fulfill({json:[{id:"",name:"Control plane",kind:"control_plane",supported:true,detail:"Metadata and vault references"}]});
+    if(path.endsWith("/destinations")){
+      if(req.method()==="POST"){saved.push(req.postDataJSON());destinations.push({id:"offsite",...req.postDataJSON()});return route.fulfill({status:201,json:destinations[0]});}
+      return route.fulfill({json:destinations});
     }
-    if (path.endsWith("/configuration")) return route.fulfill({json:configuration});
-    if (req.method()==="POST") { queued=true;return route.fulfill({status:202,json:{id:"backup-test",status:"queued"}}); }
-    return route.fulfill({json:queued ? [{id:"backup-test",created_at:"2026-11-01T12:00:00Z",finished_at:null,actor:"admin",status:"queued",bucket:"",object_key:"",sha256:"",size_bytes:0,error:""}] : []});
+    if(path.endsWith("/plans")){
+      if(req.method()==="POST"){saved.push(req.postDataJSON());plans.push({id:"daily",next_run_at:"2026-11-04T01:30:00Z",...req.postDataJSON()});return route.fulfill({status:201,json:plans[0]});}
+      return route.fulfill({json:plans});
+    }
+    if(path.endsWith("/runs") && req.method()==="POST"){queued=true;return route.fulfill({status:202,json:{id:"backup-test",status:"queued"}});}
+    return route.fulfill({json:queued ? [{id:"backup-test",created_at:"2026-11-03T12:00:00Z",finished_at:null,status:"queued",bucket:"",object_key:"",sha256:"",size_bytes:0,error:""}]:[]});
   });
   await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Administration",exact:true}).click();
   await page.getByRole("button",{name:"Backup and recovery",exact:true}).click();
   const main=page.locator(".main");
-  await main.getByRole("textbox",{name:"S3 bucket",exact:true}).fill("company-recovery");
-  await main.getByRole("textbox",{name:/Recovery public key/}).fill("public-key-fixture");
-  await main.getByRole("button",{name:"Save configuration",exact:true}).click();
-  await expect(main.getByRole("status")).toHaveText("Backup configuration saved.");
-  expect(saved[0]?.bucket).toBe("company-recovery");
-  await main.getByRole("button",{name:"Create backup",exact:true}).click();
-  await expect(main.getByRole("table",{name:"Platform backups"})).toContainText("queued");
-  await expect(main.getByRole("textbox",{name:/private key/i})).toHaveCount(0);
+  await main.getByRole("button",{name:"New destination",exact:true}).click();
+  await main.getByLabel("Name",{exact:true}).fill("Offsite");
+  await main.getByLabel("Bucket (when no integration is selected)",{exact:true}).fill("company-recovery");
+  await main.getByLabel("Recovery key reference in the configured vault").fill("backups/production/key");
+  await main.getByRole("button",{name:"Save destination",exact:true}).click();
+  await expect(main.getByRole("status")).toHaveText("Destination saved.");
+  await main.getByRole("button",{name:"New backup plan",exact:true}).click();
+  await main.getByLabel("Plan name",{exact:true}).fill("Nightly platform");
+  await main.getByLabel("Destination",{exact:true}).selectOption("offsite");
+  await main.getByLabel("Path below destination",{exact:true}).fill("platform/nightly");
+  await main.getByLabel("Daily backup time",{exact:true}).fill("02:30");
+  await main.getByLabel("Timezone",{exact:true}).fill("Europe/Amsterdam");
+  await main.getByRole("button",{name:"Save plan",exact:true}).click();
+  await expect(main.getByRole("status")).toHaveText("Backup plan saved.");
+  expect(saved[0]).toMatchObject({bucket:"company-recovery",recovery_key_ref:"backups/production/key"});
+  expect(saved[1]).toMatchObject({prefix:"platform/nightly",schedule:"30 2 * * *",timezone:"Europe/Amsterdam",enabled:false});
+  expect(saved.every(body=>!("private_key" in body) && !("recovery_public_key" in body))).toBe(true);
+  await main.getByRole("button",{name:"Run now",exact:true}).click();
+  await expect(main.getByRole("status")).toHaveText("Backup queued.");
+  await main.getByRole("button",{name:"History",exact:true}).click();
+  await expect(main.getByRole("table",{name:"Backup history"})).toContainText("queued");
   expect(state.errors).toEqual([]);
 });
 
-test("backup page viewer cannot change its destination or start a backup", async ({ page }) => {
+test("backup page viewer cannot change destinations or start a backup", async ({ page }) => {
   const state=await setup(page,"reader");
   await page.route("https://iam.test/api/v1/me",route=>route.fulfill({json:{username:"reader",is_admin:false,acting_admin:false,
     active_group_id:"analysts",active_layer_id:"1a0000000002",available_groups:[{id:"analysts",name:"Readers"}],groups:[],pools:[],data_sources:[],app_features:[],settings:{},
-    pages:{"set-backups":true},permission_grants:[{target_id:"set-backups",namespace:"backups",layer_id:null,actions:["backups.history.read","backups.configuration.read"]}]}}));
-  await page.route("https://iam.test/api/v1/backups**",route=>route.fulfill({json:route.request().url().endsWith("/configuration") ?
-    {enabled:false,bucket:"company-recovery",prefix:"fdp-recovery",endpoint_url:"",region:"us-east-1",source_id:"",interval_hours:24,recovery_public_key:"public",server_side_encryption:"",kms_key_id:"",object_lock_days:0}:[]}));
+    pages:{"set-backups":true},permission_grants:[{target_id:"set-backups",namespace:"backups",layer_id:null,actions:["backups.history.read","backups.plans.read","backups.destinations.read"]}]}}));
+  await page.route("https://iam.test/api/v1/backups**",route=>route.fulfill({json:[]}));
   await page.reload();
   await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Administration",exact:true}).click();
   const main=page.locator(".main");
   await expect(main.getByRole("heading",{name:"Backup and recovery",exact:true})).toBeVisible();
-  await expect(main.getByRole("textbox",{name:"S3 bucket",exact:true})).toBeDisabled();
-  await expect(main.getByRole("button",{name:"Save configuration",exact:true})).toHaveCount(0);
-  await expect(main.getByRole("button",{name:"Create backup",exact:true})).toHaveCount(0);
+  await expect(main.getByRole("button",{name:"New destination",exact:true})).toHaveCount(0);
+  await expect(main.getByRole("button",{name:"New backup plan",exact:true})).toHaveCount(0);
+  await expect(main.getByRole("button",{name:"Run now",exact:true})).toHaveCount(0);
   expect(state.errors).toEqual([]);
 });
 
@@ -3502,5 +3522,35 @@ test('run metadata does not request logs, expose content or offer execution cont
   await expect(main.getByRole('heading',{name:'Console',exact:true})).toHaveCount(0);
   await expect(main.getByRole('button',{name:/private.csv/})).toBeDisabled();
   expect(state.reads.filter(path=>path.includes('restricted-run/logs')||path.includes('restricted-run/outputs/private.csv'))).toEqual([]);
+  expect(state.errors).toEqual([]);
+});
+
+test("Iceberg backup plans select namespaces and keep the existing schedule and vault destination flow", async ({page}) => {
+  const state=await setup(page);
+  const plans:any[]=[];let saved:any;
+  await page.route("https://iam.test/api/v1/backups**",route=>{
+    const path=new URL(route.request().url()).pathname;
+    if(path.endsWith("/sources"))return route.fulfill({json:[{id:"lake-source",name:"Analytics lake",kind:"iceberg",supported:true,detail:"Captured metadata and retained snapshot files"}]});
+    if(path.endsWith("/destinations"))return route.fulfill({json:[{id:"offsite",name:"Offsite",bucket:"recovery",prefix:"backups",recovery_key_ref:"backups/public"}]});
+    if(path.endsWith("/plans")){
+      if(route.request().method()==="POST"){saved=route.request().postDataJSON();plans.push({id:"lake-plan",...saved});return route.fulfill({status:201,json:plans[0]});}
+      return route.fulfill({json:plans});
+    }
+    return route.fulfill({json:path.endsWith("/configuration") ? {enabled:false}:[]});
+  });
+  await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Administration",exact:true}).click();
+  await page.getByRole("button",{name:"Backup and recovery",exact:true}).click();
+  const main=page.locator(".main");
+  await main.getByRole("button",{name:"New backup plan",exact:true}).click();
+  await main.getByLabel("Plan name",{exact:true}).fill("Nightly lake");
+  await main.getByLabel("What to back up",{exact:true}).selectOption("lake-source");
+  await main.getByLabel("Destination",{exact:true}).selectOption("offsite");
+  await main.getByLabel("Schemas / Iceberg namespaces (comma separated; empty means all)").fill("reporting, analytics.daily");
+  await expect(main.getByLabel("Source prefix (relative to integration)")).toHaveCount(0);
+  await main.getByLabel("Daily backup time",{exact:true}).fill("03:15");
+  await main.getByRole("button",{name:"Save plan",exact:true}).click();
+  await expect(main.getByRole("status")).toHaveText("Backup plan saved.");
+  expect(saved).toMatchObject({source_kind:"storage",source_id:"lake-source",schemas:["reporting","analytics.daily"],destination_id:"offsite",schedule:"15 3 * * *",enabled:false});
+  await expect(main.getByRole("table",{name:"Backup plans"})).toContainText("Analytics lake");
   expect(state.errors).toEqual([]);
 });

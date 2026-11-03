@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
-| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 | `PUT` | `/v1/egress/{slug}/{path}` | Egress |
-| `GET` | `/v1/egress/{slug}/{path}` | Egress |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
+| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
+| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -386,8 +386,22 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `GET` | `/v1/backups/configuration` | Read |
 | `PUT` | `/v1/backups/configuration` | Configure |
 | `DELETE` | `/v1/backups/configuration` | Disable |
+| `GET` | `/v1/backups/destinations` | Destinations |
+| `POST` | `/v1/backups/destinations` | Create Destination |
+| `GET` | `/v1/backups/destinations/{ident}` | Destination Detail |
+| `PUT` | `/v1/backups/destinations/{ident}` | Update Destination |
+| `DELETE` | `/v1/backups/destinations/{ident}` | Delete Destination |
+| `GET` | `/v1/backups/plans` | List Plans |
+| `POST` | `/v1/backups/plans` | Create Plan |
+| `GET` | `/v1/backups/plans/{ident}` | Plan Detail |
+| `PUT` | `/v1/backups/plans/{ident}` | Update Plan |
+| `DELETE` | `/v1/backups/plans/{ident}` | Delete Plan |
+| `POST` | `/v1/backups/plans/{ident}/runs` | Run Plan |
+| `GET` | `/v1/backups/plans/{ident}/runs` | Plan History |
+| `DELETE` | `/v1/backups/plans/{ident}/runs/{run_id}` | Delete Archive |
 | `GET` | `/v1/backups/recovery` | Recovery |
 | `POST` | `/v1/backups/recovery/resume` | Resume |
+| `GET` | `/v1/backups/sources` | Sources |
 
 ## runs
 
@@ -408,8 +422,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `GET` | `/v1/sql/pages/{token}` | Page |
 | `DELETE` | `/v1/sql/pages/{token}` | Page |
+| `GET` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

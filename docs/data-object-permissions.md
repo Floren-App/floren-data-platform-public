@@ -7,6 +7,10 @@ does not cancel an inherited grant.
 
 | Role | Physical object authority |
 |---|---|
+| PlatformContributor | Change object configuration and permitted DDL; no payload or role administration |
+| DataReader | Read actual data; no configuration or access delegation |
+| DataContributor | Read and modify actual data; no configuration or access delegation |
+| AccessAdministrator | Administer access in scope; no payload or configuration |
 | Viewer | Discover metadata; no row or file contents |
 | Executor | Read rows or file contents |
 | Contributor | Write data; does not imply reading data |

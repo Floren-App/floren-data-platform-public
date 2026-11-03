@@ -23,14 +23,16 @@ dependencies = [
     "azure-keyvault-secrets>=4.9",   # (MIT)
     "google-cloud-secret-manager>=2.21",   # Google Secret Manager secret store (Apache-2.0)
     "sqlglot>=28,<29",   # validate invoker views, including prepared/EXECUTE IMMEDIATE wrappers
+    "croniter>=6,<7",     # timezone-aware five-field backup schedules (MIT)
     "tzdata>=2024.1",     # IANA zones for scheduled SLAs, including slim runtime images
     "packaging>=24",      # package repository: names, versions, wheel/sdist filenames (Apache-2.0/BSD)
     "python-multipart>=0.0.18",  # package uploads from the app and twine (Apache-2.0)
+    "fastavro>=1.9,<2",   # Iceberg manifest traversal (MIT)
     "pyarrow>=17",        # previews of Parquet files in storage (Apache-2.0)
 ]
 
 [project.optional-dependencies]
-dev = ["jinja2>=3.1", "jsonschema>=4.23", "pytest>=8.0", "pytest-xdist>=3.6", "moto[secretsmanager]>=5.0"]   # xdist: parallel tests (MIT); moto: in-process AWS API (Apache-2.0)
+dev = ["jinja2>=3.1", "jsonschema>=4.23", "pytest>=8.0", "pytest-xdist>=3.6", "pyiceberg[sql-sqlite,pyarrow]>=0.9,<0.10", "moto[secretsmanager]>=5.0"]   # xdist: parallel tests (MIT); moto: in-process AWS API (Apache-2.0)
 
 [build-system]
 requires = ["setuptools>=69"]

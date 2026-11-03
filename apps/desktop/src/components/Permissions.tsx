@@ -61,18 +61,22 @@ export function ObjectBreadcrumbs({ resource, resources, openTab, trailing = [] 
   </nav>;
 }
 
+export function roleLabel(role: string): string {
+  return ({PlatformContributor:"Platform Contributor",DataReader:"Data Reader",DataContributor:"Data Contributor",AccessAdministrator:"Access Administrator"} as Record<string,string>)[role] || role;
+}
+
 /** The roles an object offers (with what each allows), and the one to suggest first. */
 export function rolesFor(resource: Pick<AccessResource, "kind">) {
   const isDataObject = ["table", "column", "file", "directory"].includes(resource.kind);
   const isKafka = resource.kind === "kafka" || resource.kind === "topic";
   const isData = resource.kind === "source" || resource.kind === "schema" || isKafka || isDataObject;
-  if (isDataObject) return { roles: { Viewer:"Read object metadata", Executor:"Read permitted content", Contributor:"Write content; reading is separate", Manager:"Manage object metadata", Admin:"Execute, edit and administer", Owner:"Administer and delegate" } as Record<string,string>, initial:"Viewer", isData, isProduct:false, isApi:false, isPackage:false, isKafka:false };
+  if (isDataObject) return { roles: { PlatformContributor:"Change object configuration; no data or access administration", DataReader:"Read actual data", DataContributor:"Read and modify actual data", AccessAdministrator:"Manage access without reading data or changing configuration", Viewer:"Read object metadata", Executor:"Read permitted content", Contributor:"Write content; reading is separate", Manager:"Manage object metadata", Admin:"Execute, edit and administer", Owner:"Administer and delegate" } as Record<string,string>, initial:"Viewer", isData, isProduct:false, isApi:false, isPackage:false, isKafka:false };
   const isApi = API_KINDS.includes(resource.kind);
   const isPackage = PACKAGE_KINDS.includes(resource.kind);
   const isProduct = resource.kind === "product";
   if (["setting", "settings-section", "settings-root"].includes(resource.kind))
     return { roles: { Viewer: "Read permitted metadata", Contributor: "Edit drafts and content", Executor: "Use permitted functions and exports", Manager: "Apply operational configuration", Admin: "Execute, edit and administer", Owner: "Administer and delegate" } as Record<string, string>, initial: "Viewer", isData, isProduct, isApi, isPackage, isKafka };
-  const roles: Record<string, string> = isProduct ? PRODUCT_ROLES : isKafka ? { Viewer: "View topic metadata", Executor: "Consume and commit offsets for own groups", Contributor: "Produce messages; consuming is separate", Manager: "Configure topic lifecycle without reading messages", Admin: "Payload and topic administration", Owner: "All topic permissions and role assignments", Reader: "Legacy alias for Executor" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
+  const roles: Record<string, string> = isProduct ? PRODUCT_ROLES : isKafka ? { PlatformContributor: "Change configuration without messages or role administration", DataReader: "Consume messages", DataContributor: "Produce and consume messages", AccessAdministrator: "Manage access without message access", Viewer: "View topic metadata", Executor: "Consume and commit offsets for own groups", Contributor: "Produce messages; consuming is separate", Manager: "Configure topic lifecycle without reading messages", Admin: "Payload and topic administration", Owner: "All topic permissions and role assignments", Reader: "Legacy alias for Executor" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
   const initial = isProduct ? "Consumer" : isData ? "Reader" : isApi ? "Consumer" : isPackage ? (resource.kind === "package" ? "Maintainer" : "Publisher") : "Executor";
   return { roles, initial, isData, isProduct, isApi, isPackage, isKafka };
 }
@@ -97,6 +101,7 @@ export function ObjectTabs({ active, onChange, settings = false, overview = "Ove
 }
 
 const DATA_ROLES = {
+  PlatformContributor: "Change configuration without data access", DataReader: "Read actual data", DataContributor: "Read and modify data", AccessAdministrator: "Manage access without data or configuration rights",
   Viewer: "Discover schema metadata without row or file access.",
   Executor: "Read data in this scope.",
   Manager: "Edit descriptive metadata without data access.",
@@ -229,7 +234,7 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
       <td>{a.principal_id ? <span className="row"><ProductIcon kind={a.principal_kind === "user" ? "user" : "identity"} size={16} />{name} <span className="badge">{a.principal_kind === "user" ? "User" : "Service"} · direct</span>
         {a.principal_active === false && <span className="badge">Inactive</span>}</span>
         : <button className="text-button" onClick={() => openTab({ kind: "access", ref: a.app_group_id!, title: name })}>{name}</button>}</td>
-      <td><span className="badge role-badge">{a.role}</span>
+      <td><span className="badge role-badge">{roleLabel(a.role)}</span>
         {!inherited && (() => { const d = deadlines.find((x) => x.app_group_id === a.app_group_id); return d && <div className="small">
           <span className="error-text">Needs a form by {new Date(d.due_at).toLocaleDateString()}</span>{" "}
           <button className="text-button" disabled={busy} onClick={() => justifyExisting(d)}>Justify</button></div>; })()}</td>
@@ -298,17 +303,17 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
             </div>
             <div className="field"><label htmlFor={`grant-role-${resource.id}`}>Role</label>
               <select id={`grant-role-${resource.id}`} value={role} onChange={(e) => setRole(e.target.value)}>
-                {Object.keys(roles).map((r) => <option key={r}>{r}</option>)}
+                {Object.keys(roles).map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
               </select><span className="hint">{roles[role]}</span>
             </div>
           </div>
           {assignments.some((a) => !a.inherited && (recipientType !== "group" ? a.principal_id === serviceId : a.app_group_id === groupId)) && <p className="hint">This replaces the recipient's direct role. Inherited roles still apply.</p>}
           <div className="form-actions"><button className="btn" disabled={busy || !recipientId}>{busy ? "Saving…" : "Assign role"}</button>
             <button type="button" className="text-button" style={{ marginLeft: "auto" }} onClick={() => openTab({ kind: "access", title: "Groups" })}>Manage groups</button></div>
-        </form> : <p className="muted">An Owner can change permissions on this object. Inherited grants are managed on the parent.</p>}
+        </form> : <p className="muted">An Owner or Access Administrator can change permissions on this object. Inherited grants are managed on the parent.</p>}
         <details className="role-reference"><summary>What each role allows</summary>
           <dl className="kv">{Object.entries(roles).map(([name, description]) => <div className="role-description" key={name}>
-            <dt>{name}</dt><dd>{description}</dd></div>)}</dl>
+            <dt>{roleLabel(name)}</dt><dd>{description}</dd></div>)}</dl>
         </details>
       </>}
   </section>;
