@@ -31,7 +31,7 @@ def snapshot(db, user):
     for grant in assignments:
         target = resources.get(grant.resource_id)
         if not target or not (target.kind in rbac.DATA_OBJECT_KINDS or
-            (target.kind in ('source', 'schema') and grant.role in ('Viewer','Manager','Contributor'))):
+            (target.kind in ('source', 'schema') and grant.role in ('Viewer','Manager','Contributor','PlatformContributor','DataReader','DataContributor','AccessAdministrator'))):
             continue
         if interactive(user) and getattr(grant, 'app_group_id', None) and grant.app_group_id != user.active_group_id:
             continue

@@ -251,7 +251,8 @@ def group_access(group_id: str, db: Session = Depends(get_db), user: User = Depe
         raise HTTPException(403, "group membership, ownership or groups.access.read required")
     assigned = list(db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id == group_id)))
     profile = db.get(AppProfile, group.profile_id) if group.profile_id else None
-    return {"system": group_id == GLOBAL_ADMIN, "grants": access_rows(db, user, assigned, {group.id: group.name}),
+    from ..access_inventory import inventory
+    return {"access_sections": inventory(db,group,assigned), "system": group_id == GLOBAL_ADMIN, "grants": access_rows(db, user, assigned, {group.id: group.name}),
             "compliance_roles": compliance_rows(db, [group_id]), "app_profile": profile.name if profile else None}
 
 
@@ -671,7 +672,7 @@ def require_justification(db, resource, body) -> None:
     if resource.kind in ('source', 'schema'):
         # Legacy read means metadata for Viewer, but payload for Reader/Executor.
         # Coarse role verbs alone must never turn metadata into approved data use.
-        roles = {name: actions | ({'payload.read'} if name in ('Reader', 'Executor', 'Admin', 'Owner') else set())
+        roles = {name: actions | ({'payload.read'} if name in ('Reader', 'Executor', 'DataReader', 'DataContributor', 'Admin', 'Owner') else set())
                  for name, actions in roles.items()}
     if existing is not None and existing.role in roles and body.role in roles and roles[body.role].issubset(roles[existing.role]):
         return  # Reconciliation or reduction adds no authority, for groups or direct identities.
@@ -705,6 +706,8 @@ def require_role_management(db,user,resource,operation):
 def assign(resource_id: str, body: AssignmentIn, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     r = get_resource(db, resource_id)
     require_role_management(db,user,r,"assign")
+    if r.kind in ("backup-plan","backup-dest"):
+        raise HTTPException(422, "use scoped named backup permission assignments for backup plans and destinations")
     if body.role not in rbac.roles_for(r):
         raise HTTPException(422, "choose a valid built-in role for this resource")
     require_justification(db, r, body)

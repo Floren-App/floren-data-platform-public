@@ -20,6 +20,9 @@ from .models import (AccessCase, AccessForm, AccessFormVersion, AlertRule, AppGr
 log = logging.getLogger(__name__)
 MAX_ATTEMPTS = 5
 EVENTS = {
+    "backup.failed": "A backup plan failed",
+    "backup.succeeded": "A backup plan completed and verified",
+    "backup.retention.failed": "A backup retention deletion failed",
     "review.waiting": "A compliance form waits for a review step",
     "review.due": "A review is due within a day",
     "review.overdue": "A review is overdue",
@@ -45,7 +48,7 @@ EVENT_GROUPS = {"Runs and workloads": ["run.failed", "deploy.failed"], "Data qua
                 "Access": ["access.requested", "access.request_decided", "review.waiting", "review.due", "review.overdue", "case.approved",
                            "case.declined", "case.changes_requested", "case.comment", "membership.waiting"],
                 "Grants ending": ["access.renewal_ready", "access.ending", "access.ended", "access.deadline", "access.removed"],
-                "Platform": ["certificate.expiring"]}
+                "Platform": ["certificate.expiring", "backup.failed", "backup.succeeded", "backup.retention.failed"]}
 
 
 def secret_path(webhook_id: str) -> str:

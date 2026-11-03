@@ -15,24 +15,41 @@ from . import backups, recovery_archive as envelope
 from .models import PlatformSetting, Run, Workload, Workspace, SqlQuery, PlatformBackup, AuditEvent, SiemCursor, KafkaSession, utcnow
 
 
-def unpack(archive, root):
+def unpack(archive, root, store=None):
     with tarfile.open(archive, 'r:') as tar:
         members = tar.getmembers()
-        expected = {'metadata.dump','manifest.json','platform-keys.json'}
-        if len(members) != 3 or {m.name for m in members} != expected:
+        expected = {'metadata.dump','manifest.json'}
+        names={m.name for m in members}
+        legacy = names == expected | {'platform-keys.json'} and len(members)==3
+        if not legacy and (len(members) != 2 or names != expected):
             raise ValueError('archive has unexpected or duplicate recovery members')
         for member in members:
             if not member.isfile() or member.size < 0:
                 raise ValueError('recovery archive contains a non-file member')
             if member.name != 'metadata.dump' and member.size > 1024*1024:
                 raise ValueError('recovery manifest or key file exceeds its bound')
+            if member.name == 'platform-keys.json':
+                continue  # Legacy secret values are imported into the selected vault, never extracted.
             with tar.extractfile(member) as source, (root/member.name).open('xb') as output:
                 os.chmod(root/member.name, 0o600)
                 import shutil
                 shutil.copyfileobj(source, output, length=envelope.CHUNK)
     manifest = json.loads((root/'manifest.json').read_text())
-    if manifest.get('schema') != 'fdp.recovery/1' or envelope.checksum(root/'metadata.dump') != manifest.get('metadata_sha256'):
+    if manifest.get('schema') not in ('fdp.recovery/1','fdp.recovery/2') or envelope.checksum(root/'metadata.dump') != manifest.get('metadata_sha256'):
         raise ValueError('unsupported or inconsistent recovery manifest')
+    if legacy:
+        if manifest.get('schema')!='fdp.recovery/1':
+            raise ValueError('unexpected key material in a new-format archive')
+        if store is not None:
+            with tarfile.open(archive,'r:') as tar:
+                keys=json.load(tar.extractfile('platform-keys.json'))
+            if not keys or set(keys)-set(backups.KEY_FIELDS) or any(not isinstance(v,str) for v in keys.values()):
+                raise ValueError('unsupported legacy key material')
+            from .models import new_id
+            reference='platform/recovery/runtime/'+new_id()
+            store.put(reference,keys)
+            manifest={**manifest,'schema':'fdp.recovery/2','platform_keys_ref':reference}
+            (root/'manifest.json').write_text(json.dumps(manifest))
     return manifest
 
 
@@ -56,14 +73,21 @@ def quarantine_connection(connection, archive_sha256=""):
         value={'blocked':True, 'reason':'Restored metadata requires identity, access and dependency reconciliation'}))
 
 
-def write_keys(root, keys_output):
-    # Create atomically with restrictive permissions, including when umask is permissive.
-    descriptor = os.open(keys_output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, 'w') as output:
-        output.write((root/'platform-keys.json').read_text())
+def restore_vault_keys(root, store):
+    """Reconcile runtime keys inside the chosen vault; never export a secret file."""
+    manifest = json.loads((root/'manifest.json').read_text())
+    reference = manifest.get('platform_keys_ref', '')
+    if not reference.startswith('platform/recovery/runtime/') or len(reference.split('/')) != 4:
+        raise ValueError('invalid platform key reference')
+    values = store.read(reference)
+    if not values or set(values)-set(backups.KEY_FIELDS):
+        raise ValueError('recover the referenced platform keys in the configured vault first')
+    from .config import Settings
+    store.put(Settings().runtime_keys_ref or manifest.get('runtime_keys_ref') or 'platform/runtime', values)
 
 
-def restore(root, target_url, keys_output, archive_sha256=''):
+
+def restore(root, target_url, store, archive_sha256=''):
     backups.pg_environment(target_url)  # Reject non-PostgreSQL before creating any connection.
     engine = create_engine(target_url)
     try:
@@ -75,8 +99,10 @@ def restore(root, target_url, keys_output, archive_sha256=''):
                 "AND n.nspname NOT LIKE 'pg_toast%' AND c.relkind IN ('r','p','v','m','f','S'))"))
             if occupied:
                 raise ValueError('restore target must be an empty, dedicated PostgreSQL database')
-        if Path(keys_output).exists():
-            raise ValueError('recovery key output already exists; refusing to overwrite')
+        # Verify key availability before mutating the empty recovery target.
+        manifest = json.loads((root/'manifest.json').read_text())
+        if not store.read(manifest.get('platform_keys_ref','')):
+            raise ValueError('referenced platform keys must be recovered in the selected vault first')
         tool = backups.pg_tool('pg_restore', target_url)
         # A committed independent guard fails closed if restore or finalization crashes.
         with engine.begin() as connection:
@@ -91,7 +117,7 @@ def restore(root, target_url, keys_output, archive_sha256=''):
         with engine.begin() as connection:
             quarantine_connection(connection, archive_sha256)
             connection.execute(text('DROP TABLE fdp_recovery_guard'))
-        write_keys(root, keys_output)
+        restore_vault_keys(root, store)
     finally:
         engine.dispose()
 
@@ -114,22 +140,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('operation', choices=['verify','restore','quarantine','extract-keys'])
     parser.add_argument('--archive', type=Path)
-    parser.add_argument('--private-key-file', type=Path)
+    parser.add_argument('--recovery-key-ref', help='Key path in the configured secret backend; fields private_key and optional password')
     parser.add_argument('--expected-sha256', help='Checksum from trusted backup inventory or external audit evidence')
-    parser.add_argument('--private-key-password-env', default='FDP_RECOVERY_KEY_PASSWORD')
     parser.add_argument('--target-url-env', default='FDP_RESTORE_DATABASE_URL')
-    parser.add_argument('--keys-output', type=Path)
     parser.add_argument('--confirm-empty-target', action='store_true')
     parser.add_argument('--confirm-restored-target', action='store_true')
     args = parser.parse_args()
-    if args.operation != 'quarantine' and not (args.archive and args.private_key_file and args.expected_sha256):
-        parser.error('archive operations require --archive, --private-key-file and --expected-sha256')
-    if args.operation == 'extract-keys' and not args.keys_output:
-        parser.error('extract-keys requires --keys-output')
+    if args.operation != 'quarantine' and not (args.archive and args.recovery_key_ref and args.expected_sha256):
+        parser.error('archive operations require --archive, --recovery-key-ref and --expected-sha256')
     if args.operation == 'quarantine' and not args.confirm_restored_target:
         parser.error('quarantine requires --confirm-restored-target')
-    if args.operation == 'restore' and (not args.confirm_empty_target or not args.keys_output):
-        parser.error('restore requires --confirm-empty-target and --keys-output')
+    if args.operation == 'restore' and not args.confirm_empty_target:
+        parser.error('restore requires --confirm-empty-target')
     try:
         if args.operation == 'quarantine':
             target = os.environ.get(args.target_url_env)
@@ -140,17 +162,21 @@ def main():
             return
         with tempfile.TemporaryDirectory(prefix='fdp-offline-recovery-') as temp:
             root = Path(temp); os.chmod(root, 0o700)
-            password = os.environ.get(args.private_key_password_env)
-            envelope.decrypt(args.archive, root/'recovery.tar', args.private_key_file.read_bytes(),
+            from .secrets import make_secret_store
+            from .config import Settings
+            store = make_secret_store(Settings())
+            key = store.read(args.recovery_key_ref)
+            password = key.get('password')
+            envelope.decrypt(args.archive, root/'recovery.tar', key['private_key'].encode(),
                 args.expected_sha256, password=password.encode() if password else None)
-            manifest = unpack(root/'recovery.tar', root)
+            manifest = unpack(root/'recovery.tar', root, store if args.operation in ('restore','extract-keys') else None)
             if args.operation == 'extract-keys':
-                write_keys(root, args.keys_output)
+                restore_vault_keys(root, store)
             if args.operation == 'restore':
                 target = os.environ.get(args.target_url_env)
                 if not target:
                     parser.error('target database environment variable is not set')
-                restore(root, target, args.keys_output, args.expected_sha256)
+                restore(root, target, store, args.expected_sha256)
             print(json.dumps({'operation':args.operation, 'verified':True,
                 'created_at':manifest['created_at'], 'recovery_quarantine':args.operation == 'restore',
                 'external_dependencies':manifest['customer_backups_required']}))

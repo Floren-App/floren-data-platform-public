@@ -14,7 +14,7 @@ from .authorization_cache import cached
 from .models import CustomPermissionRole, PermissionGrant, Resource
 
 REGISTRY = json.loads(Path(__file__).with_name("permission_registry.json").read_text())
-ROLES = ("Viewer", "Executor", "Contributor", "Manager", "Admin", "Owner")
+ROLES = ("Viewer", "Executor", "Contributor", "Manager", "Admin", "Owner", "PlatformContributor", "DataReader", "DataContributor", "AccessAdministrator")
 
 
 def validate_actions(actions):
@@ -151,7 +151,7 @@ def targets(db, target):
     result={item.id for item in rbac.ancestors(db, resource)} if resource else {target}
     if resource:
         collections={'kafka':'kafka','topic':'kafka','source':'storage','schema':'storage','api':'apis','api-operation':'apis',
-            'api-group':'apis','service':'set-services' if resource.config.get('service_account') else 'workloads'}
+            'api-group':'apis','backup-plan':'set-backups','backup-dest':'set-backups','service':'set-services' if resource.config.get('service_account') else 'workloads'}
         if resource.kind in collections:
             result.add(collections[resource.kind])
     return result
@@ -231,6 +231,14 @@ def can_delegate(db, user, namespace, target, layer, actions):
     if layer == "*":
         return False
     chain = targets(db, target)
+    resource = db.get(Resource,target)
+    # Access administration is explicitly privileged; it can delegate within its
+    # scope without first acquiring the data/configuration permissions itself.
+    if resource and any(item['role']=='AccessAdministrator' for item in rbac.access(db,user,resource)):
+        return True
+    if any(g.role=='AccessAdministrator' and g.namespace==namespace and g.target_id in chain
+           and scope_matches(g.layer_id,layer) for g in grants(db,user)):
+        return True
     owns = any(g.role == "Owner" and g.namespace == namespace and g.target_id in chain
                and scope_matches(g.layer_id, layer) for g in grants(db, user))
     return owns and all(allowed(db, user, action, target, layer) for action in actions)

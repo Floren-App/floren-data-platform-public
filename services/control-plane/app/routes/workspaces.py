@@ -79,6 +79,12 @@ def compliance_roles(db, user):
         return list(ROLES)   # with another group active, an administrator holds what their groups hold
     groups = effective_app_groups(db, user)
     held = set(db.scalars(select(ComplianceRole.role).where(ComplianceRole.app_group_id.in_(groups)))) if groups else set()
+    from ..models import PermissionGrant
+    from ..permissions import grant_actions
+    from ..compliance import REVIEW_PERMISSIONS
+    for grant in db.scalars(select(PermissionGrant).where(PermissionGrant.app_group_id.in_(groups))):
+        actions=grant_actions(db,grant)
+        held.update(role for role,action in REVIEW_PERMISSIONS.items() if action in actions)
     return [r for r in ROLES if r in held]
 
 

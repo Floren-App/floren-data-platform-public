@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { AccessGrantRow, api, ApiError, CaseTarget, ComplianceRoleHeld, JustifyDeadline, Product, Requirement } from "../api";
+import { AccessGrantRow, api, ApiError, CaseTarget, ComplianceRoleHeld, GroupAccessSections, JustifyDeadline, Product, Requirement } from "../api";
 import { JustifyPanel } from "../components/ComplianceForm";
 import { PageHeader } from "../components/Page";
 import type { Hub } from "../hub";
-import { OpenTab, PermissionsPanel, resourcePath, resourceTab, rolesFor } from "../components/Permissions";
+import { OpenTab, PermissionsPanel, resourcePath, resourceTab, rolesFor, roleLabel } from "../components/Permissions";
 import { ProductIcon } from "../components/ProductIcon";
 
 const day = (v: string | null) => v ? new Date(v).toLocaleDateString() : "";
@@ -120,7 +120,7 @@ export function GiveAccess({ group, hub, onDone }: { group: { id: string; name: 
           setResourceId(e.target.value); const r = objects.find((x) => x.id === e.target.value); setRole(r ? rolesFor(r).initial : ""); }}>
           <option value="">Choose an object you own</option>{objects.map((r) => <option key={r.id} value={r.id}>{resourcePath(r, hub.resources) || r.name}</option>)}</select></div>
         {resource && <div className="field"><label htmlFor="give-role">Role</label><select id="give-role" value={role} onChange={(e) => setRole(e.target.value)}>
-          {Object.entries(roles).map(([name, text]) => <option key={name} value={name}>{name} · {text}</option>)}</select></div>}
+          {Object.entries(roles).map(([name, text]) => <option key={name} value={name}>{roleLabel(name)} · {text}</option>)}</select></div>}
       </div>}
       {error && <p className="error" role="alert">{error}</p>}
       <div className="form-actions"><button className="btn" disabled={busy || (what === "product" ? !productId : !resourceId || !role)}>Give access</button></div>
@@ -156,4 +156,36 @@ export function SettingsPermissions({ page, hub, openTab }: { page: string; hub:
     </div>
     {resource && <PermissionsPanel key={resource.id} resource={resource} resources={hub.resources} openTab={openTab} onChanged={hub.refresh} />}
   </details>;
+}
+
+
+export function GroupAccessInventory({ sections }: { sections: GroupAccessSections }) {
+  const [query, setQuery] = useState("");
+  const titles = { data: "Data access", platform: "Platform access", privileged: "Privileged access" };
+  const descriptions = {
+    data: "Read or change actual data, files and messages. Object configuration is listed separately.",
+    platform: "Pages, features, configuration, administration and scoped access-request reviews.",
+    privileged: "Assign roles, change memberships and ownership, or delegate access."
+  };
+  return <>
+    <div className="field"><label htmlFor="group-permission-search">Find a permission, feature, object or role</label>
+      <input id="group-permission-search" type="search" value={query} onChange={e => setQuery(e.target.value)} /></div>
+    <p className="hint">All assigned permissions across all layers. One role can grant permissions in several sections. Grants add together; a narrower child grant does not remove inherited access. Scope and conditions remain part of each grant.</p>
+    {(["data", "platform", "privileged"] as const).map(category => {
+      const all = sections[category];
+      const rows = all.filter(r => `${r.description} ${r.permission} ${r.target_name} ${r.target_id} ${r.role} ${r.layer_name ?? r.layer_id ?? ""}`.toLowerCase().includes(query.toLowerCase()));
+      return <section key={category} aria-label={titles[category]}>
+        <h3>{titles[category]} <span className="muted">({all.length})</span></h3>
+        <p className="hint">{descriptions[category]}</p>
+        <div className="table-scroll"><table aria-label={titles[category]+" permissions"}>
+          <thead><tr><th>Permission / feature</th><th>Scope</th><th>Role</th><th>Granted through</th><th>Conditions</th></tr></thead>
+          <tbody>{rows.map((r,i) => <tr key={`${r.permission}/${r.target_id}/${r.grant_id ?? r.origin}/${i}`}>
+            <td>{r.description}<div className="muted small"><code>{r.permission}</code></div></td>
+            <td>{r.target_name}<div className="muted small">{r.target_id}{r.layer_id ? ` · ${r.layer_name || r.layer_id}` : " · Global"}</div></td>
+            <td>{roleLabel(r.role)}</td><td>{r.origin}</td><td>{r.conditions.filter(Boolean).join(" ") || "—"}</td>
+          </tr>)}{!rows.length && <tr><td colSpan={5} className="muted">{all.length ? "No matching permissions." : "No permissions in this category."}</td></tr>}</tbody>
+        </table></div>
+      </section>;
+    })}
+  </>;
 }

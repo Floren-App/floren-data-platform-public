@@ -30,9 +30,8 @@ RESTORE_GUARD = 'fdp_recovery_guard'
 RECOVERY_EPOCH = 'platform.recovery_epoch'
 LOCK = 73410891
 log = logging.getLogger(__name__)
-KEY_FIELDS = ('session_signing_key', 'session_signing_previous_keys', 'trino_signing_key',
-              'trino_jwt_private_key', 'trino_jwt_previous_keys', 'gateway_config_token',
-              'egress_proxy_token', 'siem_signing_key')
+from .config import RUNTIME_SECRET_FIELDS
+KEY_FIELDS = RUNTIME_SECRET_FIELDS
 
 
 def incomplete_restore(db):
@@ -103,7 +102,7 @@ def destination(db, config):
     value = config.model_dump()
     if config.source_id:
         source = db.get(DataSource, config.source_id)
-        if not source or source.kind != 's3' or source.config.get('managed_rustfs'):
+        if not source or source.kind != 's3':
             raise HTTPException(422, 'backup integration must reference external S3 files storage')
         cfg = source.config
         if config.bucket and config.bucket != cfg.get('bucket'):
@@ -114,6 +113,8 @@ def destination(db, config):
         base = cfg.get('prefix', '').strip('/')
         value['prefix'] = '/'.join(x for x in (base, config.prefix) if x)
         value['credential_path'] = 'datasources/' + source.name + '/provisioner'
+        if source.config.get('managed_rustfs'):
+            value['managed_source_id'] = source.id
         value['role_arn'] = cfg.get('role_arn', '')
         value['sts_endpoint_url'] = cfg.get('sts_endpoint_url', '')
     # Revalidate copied endpoint and prefix as strictly as a direct destination.
@@ -128,13 +129,17 @@ def destination(db, config):
     return value
 
 
-def client(dest, store):
+def client(dest, store, db=None):
     import boto3
     from botocore.config import Config
     auth = {}
     verify = os.environ.get('AWS_CA_BUNDLE') or os.environ.get('SSL_CERT_FILE') or True
     if dest.get('credential_path'):
-        credentials = store.read(dest['credential_path'])
+        if dest.get('managed_source_id'):
+            from .managed_files import provisioning
+            credentials = provisioning(db, db.get(DataSource,dest['managed_source_id']))
+        else:
+            credentials = store.read(dest['credential_path'])
         if not credentials.get('access_key_id') or not credentials.get('secret_access_key'):
             raise ValueError('backup integration credentials are unavailable')
         auth = {'aws_access_key_id':credentials['access_key_id'],
@@ -147,6 +152,8 @@ def client(dest, store):
         policy = {'Version':'2012-10-17', 'Statement':[{'Effect':'Allow',
             'Action':['s3:PutObject', 's3:GetObject', 's3:AbortMultipartUpload', 's3:PutObjectRetention'],
             'Resource':['arn:aws:s3:::' + dest['bucket'] + '/' + prefix + '*']}]}
+        if dest.get('_allow_delete'):
+            policy['Statement'][0]['Action'].extend(['s3:DeleteObject','s3:DeleteObjectVersion'])
         if dest.get('kms_key_id'):
             policy['Statement'].append({'Effect':'Allow', 'Action':['kms:GenerateDataKey','kms:Decrypt'],
                                         'Resource':[dest['kms_key_id']]})
@@ -243,16 +250,25 @@ def inventory(db):
         'keys':list(KEY_FIELDS)}
 
 
-def bundle(db, dump, output, settings):
+def bundle(db, dump, output, settings, store=None):
     manifest = inventory(db)
     manifest['platform_release'] = settings.release
     manifest['metadata_revision'] = db.scalar(text('SELECT version_num FROM alembic_version'))
     manifest['metadata_sha256'] = envelope.checksum(dump)
-    # Encrypted recovery material is never returned by an API or stored in the metadata DB.
+    # Values stay in the installation-selected secret backend, never inside an archive.
+    from .deps import get_secret_store
+    from .models import new_id
+    store = store or get_secret_store()
+    key_ref = 'platform/recovery/runtime/' + new_id()
     keys = {name:getattr(settings, name) for name in KEY_FIELDS if getattr(settings, name, None)}
+    store.put(key_ref, keys)
+    manifest['schema'] = 'fdp.recovery/2'
+    manifest['platform_keys_ref'] = key_ref
+    manifest['secret_backend'] = settings.secrets_backend
+    manifest['runtime_keys_ref'] = settings.runtime_keys_ref or 'platform/runtime'
     with tarfile.open(output, 'w') as archive:
         archive.add(dump, arcname='metadata.dump', recursive=False)
-        for name, value in [('manifest.json', manifest), ('platform-keys.json', keys)]:
+        for name, value in [('manifest.json', manifest)]:
             data = json.dumps(value, sort_keys=True).encode()
             info = tarfile.TarInfo(name); info.size = len(data); info.mode = 0o600
             archive.addfile(info, io.BytesIO(data))
@@ -261,7 +277,8 @@ def bundle(db, dump, output, settings):
 def queue(db, actor):
     # Lock the existing setting row so manual and scheduled admission cannot race.
     db.scalar(select(PlatformSetting).where(PlatformSetting.key == SETTING).with_for_update())
-    active = db.scalar(select(PlatformBackup).where(PlatformBackup.status.in_(['queued','running'])))
+    active = db.scalar(select(PlatformBackup).where(PlatformBackup.status.in_(['queued','running']),
+        PlatformBackup.destination['_plan_id'].as_string().is_(None)))
     if active:
         raise HTTPException(409, 'a platform backup is already queued or running')
     row = PlatformBackup(actor=actor, destination=destination(db, configuration(db)))
@@ -287,11 +304,26 @@ def run_one(factory, store, settings=None):
                     with tempfile.TemporaryDirectory(prefix='fdp-recovery-') as temp:
                         root = Path(temp); os.chmod(root, 0o700)
                         dump, tar, encrypted = root/'metadata.dump', root/'recovery.tar', root/'recovery.fdp'
-                        dump_metadata(settings.database_url, dump)
-                        bundle(db, dump, tar, settings)
+                        if dest.get('_plan_id'):
+                            from . import backup_plans
+                            actor = backup_plans.rbac.resolve_user(db, backup_plans.User(**dest['_actor']))
+                            backup_plans.get(db,backup_plans.PLAN,dest['_plan_id'])
+                            plan = backup_plans.PlanIn.model_validate(dest['_plan'])
+                            if not backup_plans.allowed(db,actor,'backups.plans.run',dest['_plan_id']):
+                                raise ValueError('backup execution permission revoked')
+                            backup_plans.authorize_source(db,actor,plan)
+                            current_destination=backup_plans.resolve_destination(db,actor,plan)
+                            if any(current_destination.get(k)!=dest.get(k) for k in current_destination):
+                                raise ValueError('backup destination changed after admission')
+                        if dest.get('_source',{}).get('kind','control_plane') == 'control_plane':
+                            dump_metadata(settings.database_url, dump)
+                            bundle(db, dump, tar, settings, store)
+                        else:
+                            from . import backup_adapters
+                            backup_adapters.bundle(db,dest['_source'],store,root,tar)
                         envelope.encrypt(tar, encrypted, dest['recovery_public_key'])
                         checksum, size = envelope.checksum(encrypted), encrypted.stat().st_size
-                        key = dest['prefix'] + '/' + ident + '/metadata.fdp'
+                        key = dest['prefix'] + '/' + ident + ('/storage.fdp' if dest.get('_source',{}).get('kind','control_plane')!='control_plane' else '/metadata.fdp')
                         extra = {'ContentType':'application/octet-stream', 'Metadata':{'sha256':checksum, 'format':'fdp-recovery-1'}}
                         if dest.get('server_side_encryption'):
                             extra['ServerSideEncryption'] = dest['server_side_encryption']
@@ -299,7 +331,7 @@ def run_one(factory, store, settings=None):
                             extra['SSEKMSKeyId'] = dest['kms_key_id']
                         if dest.get('object_lock_days'):
                             extra.update(ObjectLockMode='COMPLIANCE', ObjectLockRetainUntilDate=utcnow()+timedelta(days=dest['object_lock_days']))
-                        s3 = client(dest, store)
+                        s3 = client(dest, store, db=db) if dest.get('managed_source_id') else client(dest, store)
                         s3.upload_file(str(encrypted), dest['bucket'], key, ExtraArgs=extra)
                         # Read back the encrypted object before reporting success; an ETag isn't a SHA-256.
                         response = s3.get_object(Bucket=dest['bucket'], Key=key)
@@ -313,6 +345,7 @@ def run_one(factory, store, settings=None):
                             response['Body'].close()
                         if digest.hexdigest() != checksum or received != size:
                             raise ValueError('S3 read-back verification failed')
+                        row.destination={**row.destination,'_archive_version_id':response.get('VersionId')}
                         row.status, row.bucket, row.object_key = 'succeeded', dest['bucket'], key
                         row.sha256, row.size_bytes = checksum, size
                 finally:
@@ -326,6 +359,9 @@ def run_one(factory, store, settings=None):
         from .models import AuditEvent
         db.add(AuditEvent(actor='system:backup', action='backup.'+row.status, target=ident,
             detail={'sha256':row.sha256, 'size_bytes':row.size_bytes, 'object_key':row.object_key}))
+        if dest.get('_plan_id'):
+            from .backup_plans import finish
+            finish(db,row,store)
         db.commit()
 
 
@@ -337,7 +373,7 @@ def tick(factory, store, settings=None):
         for row in stale:
             row.status, row.error, row.finished_at = 'failed', 'backup interrupted or exceeded recovery window', utcnow()
         db.commit()
-        latest = db.scalar(select(PlatformBackup).order_by(PlatformBackup.created_at.desc()))
+        latest = db.scalar(select(PlatformBackup).where(PlatformBackup.destination['_plan_id'].as_string().is_(None)).order_by(PlatformBackup.created_at.desc()))
         last = latest.created_at.replace(tzinfo=utcnow().tzinfo) if latest else None
         if config.enabled and (not last or utcnow()-last >= timedelta(hours=config.interval_hours)):
             try:
@@ -346,6 +382,8 @@ def tick(factory, store, settings=None):
                 db.rollback()
                 if exc.status_code != 409:
                     raise
+    from .backup_plans import schedule
+    schedule(factory)
     run_one(factory, store, settings)
 
 

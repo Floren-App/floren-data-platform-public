@@ -124,7 +124,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "admin-pools": return <><AdminPools hub={hub} /><SettingsPermissions page="set-pools" hub={hub} openTab={openTab} /></>;
     case "admin-workspace-templates": return <><AdminWorkspaceTemplates hub={hub} /><SettingsPermissions page="set-template" hub={hub} openTab={openTab} /></>;
     case "admin-network": return <><AdminNetwork hub={hub} /><SettingsPermissions page="set-network" hub={hub} openTab={openTab} /></>;
-    case "admin-backups": return <BackupsView hub={hub} />;
+    case "admin-backups": return <BackupsView key={`${hub.me?.principal_id}/${hub.me?.active_group_id}/${hub.layerId}`} hub={hub} />;
     case "admin-query-log": return <><QueryLogView key={tab.search ?? ""} hub={hub} initialActor={tab.search} /><SettingsPermissions page="set-querylog" hub={hub} openTab={openTab} /></>;
     case "git-credentials": return <GitCredentialsTab hub={hub} sections={<WorkspaceSections active="git" openTab={openTab} />} />;
     case "packages": return <PackagesView key={tab.ref ?? "all"} hub={hub} openTab={openTab} kind={tab.ref as PackageKind | undefined} />;

@@ -80,7 +80,9 @@ def main():
                     db.commit()
                     row = backups.queue(db, 'test:recovery'); ident = row.id; db.commit()
                 settings = Settings(database_url=urls[0], orchestrator='fake', secrets_backend='memory')
-                backups.run_one(factory, object(), settings)
+                from app.secrets import MemorySecretStore
+                store=MemorySecretStore()
+                backups.run_one(factory, store, settings)
             finally:
                 backups.client = original
             with factory() as db, tempfile.TemporaryDirectory(prefix='fdp-restore-test-') as temp:
@@ -101,7 +103,7 @@ def main():
                         connection.execute(text('DROP TABLE customer_business_data'))
                 envelope.decrypt(archive, root/'archive.tar', key, row.sha256)
                 unpack(root/'archive.tar', root)
-                restore(root, urls[1], root/'restored-keys.json')
+                restore(root, urls[1], store)
                 require_current(target)
                 restored = sessionmaker(bind=target)
                 with restored() as db:
@@ -116,12 +118,66 @@ def main():
                     assert db.get(PlatformSetting, backups.RECOVERY_EPOCH).value['id'] != initial_epoch
                 # Reusing a populated target must refuse, preserving its existing state.
                 try:
-                    restore(root, urls[1], root/'other-keys.json')
+                    restore(root, urls[1], store)
                 except ValueError as exc:
                     assert 'empty' in str(exc)
                 else:
                     raise AssertionError('populated restore target was accepted')
-            print('PASS: serialized real PostgreSQL migrations, pg_dump, encrypted S3 adapter read-back, authenticated decryption, pg_restore, preserved metadata and recovery quarantine; populated restore refused')
+            # Exercise the business-storage adapter separately from the metadata-only archive.
+            from app import backup_adapters, storage_recovery
+            from app.models import DataSource
+            with source.begin() as connection:
+                connection.execute(text('CREATE SCHEMA backup_business'))
+                connection.execute(text('CREATE TABLE backup_business.orders (id INTEGER PRIMARY KEY, name TEXT)'))
+                connection.execute(text("INSERT INTO backup_business.orders VALUES (1, 'native backup'), (2, 'verified restore')"))
+            parsed=make_url(urls[0])
+            with factory() as db, tempfile.TemporaryDirectory(prefix='fdp-native-storage-') as temp:
+                item=DataSource(name='native-recovery-fixture',kind='postgres',config={
+                    'host':parsed.host,'port':parsed.port or 5432,'database':parsed.database})
+                db.add(item);db.flush()
+                store.put('datasources/'+item.name+'/provisioner',{'username':parsed.username,
+                    'password':parsed.password or 'disposable-trust-auth-fixture'})
+                frozen={'id':item.id,'name':item.name,'kind':item.kind,'config':item.config,
+                    'schemas':['backup_business'],'max_bytes':16*1024*1024}
+                root=Path(temp);archive=root/'storage.tar'
+                backup_adapters.bundle(db,frozen,store,root,archive)
+                extracted=root/'verified';extracted.mkdir()
+                manifest=storage_recovery.unpack(archive,extracted)
+                assert manifest['method']=='postgresql-pg-dump'
+                tool=backups.pg_tool('pg_restore',urls[1])
+                result=subprocess.run([tool,'--single-transaction','--exit-on-error','--no-owner','--no-privileges',
+                    '--dbname',make_url(urls[1]).database,str(extracted/'database.dump')],
+                    env=backups.pg_environment(urls[1]),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=60)
+                if result.returncode:raise RuntimeError('isolated native integration restore failed')
+            with target.connect() as connection:
+                assert list(connection.execute(text('SELECT id,name FROM backup_business.orders ORDER BY id')))==[(1,'native backup'),(2,'verified restore')]
+            # Managed Iceberg catalogs use the same JDBC tables as the layer's Trino.
+            from app.iceberg_backup import JdbcCatalog
+            from app.layer_postgres import SCHEMAS
+            for engine in (source,target):
+                with engine.begin() as connection:
+                    for statement in SCHEMAS['iceberg'].split(';'):
+                        if statement.strip():connection.execute(text(statement))
+            catalog=JdbcCatalog(urls[0],'lake');recovered_catalog=JdbcCatalog(urls[1],'lake')
+            try:
+                tables=[{'namespace':['analytics'],'name':'orders',
+                    'metadata_location':'s3://warehouse/analytics/orders/metadata/00001.metadata.json'}]
+                catalog.register(tables,[['analytics'],['empty']])
+                captured,namespaces=catalog.tables([],100)
+                assert captured==tables and namespaces==[['analytics'],['empty']]
+                recovered_catalog.check(captured)
+                recovered_catalog.register(captured,namespaces)
+                recovered_catalog.register(captured,namespaces)  # idempotent
+                assert recovered_catalog.tables([],100)==(captured,namespaces)
+                try:
+                    recovered_catalog.register([{**tables[0],'metadata_location':'s3://warehouse/conflicting.metadata.json'}],namespaces)
+                except ValueError:pass
+                else:raise AssertionError('conflicting JDBC catalog pointer was overwritten')
+                assert recovered_catalog.tables([],100)==(captured,namespaces)
+            finally:
+                catalog.close();recovered_catalog.close()
+            assert store.read('platform/runtime')
+            print('PASS: serialized real PostgreSQL migrations, pg_dump, encrypted S3 adapter read-back, authenticated decryption, pg_restore, preserved metadata, vault-only runtime keys, native storage schema backup/restore, managed Iceberg JDBC catalog capture/recovery and recovery quarantine; populated restore refused')
         finally:
             for engine in engines:
                 engine.dispose()

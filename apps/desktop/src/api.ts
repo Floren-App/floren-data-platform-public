@@ -832,18 +832,47 @@ export interface CatalogGraph { nodes: (CatalogAsset & { distance: number; linea
 export interface OrchestratorRun { dag_id: string; run_id: string; state: string; logical_date: string | null; start_date: string | null; end_date: string | null }
 export interface OrchestratorHistory { runs: OrchestratorRun[]; dags: string[] }
 
+export interface GroupPermissionRow {
+  permission: string; description: string; target_id: string; target_name: string;
+  role: string; origin: string; layer_id: string | null; layer_name?: string | null; conditions: string[]; grant_id: string | null;
+}
+export type GroupAccessSections = Record<"data" | "platform" | "privileged", GroupPermissionRow[]>;
+
+export interface BackupDestination {
+  id: string; name: string; bucket: string; prefix: string; endpoint_url: string; region: string;
+  source_id: string; recovery_key_ref: string; server_side_encryption: string; kms_key_id: string; object_lock_days: number;
+}
+export type BackupDestinationInput = Omit<BackupDestination, "id">;
+export interface BackupPlan {
+  id: string; name: string; capabilities?: string[]; layer_id?: string | null; enabled: boolean; source_kind: "control_plane" | "storage"; source_id: string;
+  destination_id: string; prefix: string; schedule: string; timezone: string; schemas: string[];
+  source_prefix: string; retention_days: number; max_bytes: number; max_objects: number; next_run_at: string;
+}
+export type BackupPlanInput = Omit<BackupPlan, "id" | "next_run_at" | "layer_id" | "capabilities">;
+export interface BackupSource { id: string; name: string; kind: string; supported: boolean; detail: string }
+
 export interface BackupConfiguration {
   enabled: boolean; bucket: string; prefix: string; endpoint_url: string; region: string;
   source_id: string; interval_hours: number; recovery_public_key: string;
   server_side_encryption: string; kms_key_id: string; object_lock_days: number;
 }
 export interface BackupRecord {
-  id: string; created_at: string; finished_at: string | null; actor: string; status: string;
+  id: string; plan_id?: string | null; source_kind?: string; source_name?: string; created_at: string; finished_at: string | null; actor: string; status: string;
   bucket: string; object_key: string; sha256: string; size_bytes: number; error: string;
 }
 
 export const api = {
   backups: {
+    plans: () => request<BackupPlan[]>("GET", "/v1/backups/plans"),
+    sources: () => request<BackupSource[]>("GET", "/v1/backups/sources"),
+    destinations: () => request<BackupDestination[]>("GET", "/v1/backups/destinations"),
+    savePlan: (body: BackupPlanInput, id?: string) => request<BackupPlan>(id ? "PUT" : "POST", id ? `/v1/backups/plans/${id}` : "/v1/backups/plans", body),
+    deletePlan: (id: string) => request<void>("DELETE", `/v1/backups/plans/${id}`),
+    runPlan: (id: string) => request<BackupRecord>("POST", `/v1/backups/plans/${id}/runs`),
+    planHistory: (id: string) => request<BackupRecord[]>("GET", `/v1/backups/plans/${id}/runs`),
+    saveDestination: (body: BackupDestinationInput, id?: string) => request<BackupDestination>(id ? "PUT" : "POST", id ? `/v1/backups/destinations/${id}` : "/v1/backups/destinations", body),
+    deleteDestination: (id: string) => request<void>("DELETE", `/v1/backups/destinations/${id}`),
+    disableConfiguration: () => request<void>("DELETE", "/v1/backups/configuration"),
     configuration: () => request<BackupConfiguration>("GET", "/v1/backups/configuration"),
     configure: (body: BackupConfiguration) => request<BackupConfiguration>("PUT", "/v1/backups/configuration", body),
     history: () => request<BackupRecord[]>("GET", "/v1/backups"),
@@ -927,7 +956,7 @@ export const api = {
   },
   access: {
     groupAssignments: (id: string) => request<{ resource: AccessResource; role: string }[]>("GET", `/v1/rbac/groups/${id}/assignments`),
-    groupAccess: (id: string) => request<{ system: boolean; grants: AccessGrantRow[]; compliance_roles: ComplianceRoleHeld[]; app_profile: string | null }>("GET", `/v1/rbac/groups/${id}/access`),
+    groupAccess: (id: string) => request<{ access_sections?: GroupAccessSections; system: boolean; grants: AccessGrantRow[]; compliance_roles: ComplianceRoleHeld[]; app_profile: string | null }>("GET", `/v1/rbac/groups/${id}/access`),
     principalAccess: (id: string) => request<{ principal: { id: string; name: string; kind: string; active: boolean };
       groups: { id: string; name: string; system: boolean; via: string | null }[]; grants: AccessGrantRow[]; compliance_roles: ComplianceRoleHeld[] }>("GET", `/v1/rbac/principals/${id}/access`),
     roles: () => request<Record<string, Record<string, string[]>>>("GET", "/v1/rbac/roles"),

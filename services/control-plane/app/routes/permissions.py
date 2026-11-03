@@ -63,6 +63,8 @@ def authorize_grant(db, user, body):
         actions = policy.role_actions(body.namespace, body.role)
     else:
         actions = policy.validate_actions(body.actions)
+    if 'backups.sources.export' in actions and not acting_as_admin(rbac.resolve_user(db,user)):
+        raise HTTPException(403, 'Global Admin must approve raw backup export delegation')
     if any(not action.startswith(body.namespace + ".") for action in actions):
         raise HTTPException(422, "every action must belong to the declared namespace")
     if any(action.startswith(('data.sql.','data.files.','data.iceberg.')) for action in actions):
@@ -179,6 +181,8 @@ def update_role(ident: str, body: RoleIn, db=Depends(get_db), user=Depends(get_a
         raise HTTPException(409, "role name is reserved or already exists")
     before = role_output(row)
     actions = policy.validate_actions(body.actions)
+    if 'backups.sources.export' in actions and not acting_as_admin(rbac.resolve_user(db,user)):
+        raise HTTPException(403, 'Global Admin must approve raw backup export delegation')
     for assignment in db.scalars(select(PermissionGrant).where(PermissionGrant.custom_role_id == ident)):
         if not policy.can_delegate(db,user,assignment.namespace,assignment.target_id,assignment.layer_id,actions):
             raise HTTPException(403,'Updating a bound role requires Owner of every affected scope and all resulting actions')

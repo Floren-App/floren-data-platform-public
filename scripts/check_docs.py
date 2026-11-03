@@ -51,7 +51,8 @@ def check(site):
     with (site / 'permission-matrix.csv').open(newline='') as stream:
         matrix = list(csv.DictReader(stream))
     assert matrix and len({row['Permission key'] for row in matrix}) == len(matrix), 'Invalid permission matrix attachment'
-    for role in ('Viewer', 'Executor', 'Contributor', 'Manager', 'Admin', 'Owner'):
+    for role in ('Viewer', 'Executor', 'Contributor', 'Manager', 'Admin', 'Owner',
+                 'PlatformContributor', 'DataReader', 'DataContributor', 'AccessAdministrator'):
         assert role in matrix[0], f'Missing role column: {role}'
     rendered = (site / 'permission-matrix/index.html').read_text()
     assert all(row['Permission key'] in rendered for row in matrix), 'Published matrix is incomplete'

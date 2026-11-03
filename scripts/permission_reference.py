@@ -8,7 +8,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "services/control-plane/app"
-ROLES = ["Viewer", "Executor", "Contributor", "Manager", "Admin", "Owner"]
+ROLES = ["Viewer", "Executor", "Contributor", "Manager", "Admin", "Owner", "PlatformContributor", "DataReader", "DataContributor", "AccessAdministrator"]
 
 
 def generate(check=False):

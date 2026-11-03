@@ -97,7 +97,7 @@ def test_success_requires_s3_readback_and_can_verify_offline(client, recovery_ke
             return {'Body':Body(objects[(Bucket,Key)])}
     monkeypatch.setattr(backups, 'client', lambda *a:S3())
     monkeypatch.setattr(backups, 'dump_metadata', lambda url,path:path.write_bytes(b'PGDMP-test-metadata'))
-    backups.run_one(SessionLocal, object())
+    backups.run_one(SessionLocal, __import__("app.deps",fromlist=["get_secret_store"]).get_secret_store())
     with SessionLocal() as db:
         row = db.get(PlatformBackup, response.json()['id'])
         assert row.status == 'succeeded', row.error
@@ -107,7 +107,10 @@ def test_success_requires_s3_readback_and_can_verify_offline(client, recovery_ke
         manifest = unpack(tar, tmp_path)
         assert manifest['database'] == 'platform metadata only'
         assert (tmp_path/'metadata.dump').read_bytes() == b'PGDMP-test-metadata'
-        assert 'session_signing_key' in json.loads((tmp_path/'platform-keys.json').read_text())
+        assert not (tmp_path/'platform-keys.json').exists()
+        from app.deps import get_secret_store
+        assert get_secret_store().read(manifest['platform_keys_ref'])['session_signing_key']
+        assert manifest['schema']=='fdp.recovery/2'
 
 
 def test_failed_backup_does_not_report_success_or_leak_credentials(client, recovery_keys, monkeypatch):
@@ -117,7 +120,7 @@ def test_failed_backup_does_not_report_success_or_leak_credentials(client, recov
     def fail(*args):
         raise RuntimeError('password=should-never-appear')
     monkeypatch.setattr(backups, 'dump_metadata', fail)
-    backups.run_one(SessionLocal, object())
+    backups.run_one(SessionLocal, __import__("app.deps",fromlist=["get_secret_store"]).get_secret_store())
     result = client.get('/v1/backups', headers=as_('admin')).json()[0]
     assert result['id'] == row['id'] and result['status'] == 'failed'
     assert 'should-never-appear' not in json.dumps(result)
@@ -146,16 +149,15 @@ def test_recovery_quarantine_blocks_actions_until_restart(client):
         app.state.recovery_quarantine = False
 
 
-def test_key_extraction_is_create_only_and_private(tmp_path):
-    from app.recovery import write_keys
-    root = tmp_path/'archive'; root.mkdir()
-    (root/'platform-keys.json').write_text('{"secret":"recovered"}')
-    output = tmp_path/'keys.json'
-    write_keys(root, output)
-    assert output.stat().st_mode & 0o777 == 0o600
-    with pytest.raises(FileExistsError):
-        write_keys(root, output)
-    assert output.read_text() == '{"secret":"recovered"}'
+def test_key_recovery_only_uses_the_selected_vault(tmp_path):
+    from app.recovery import restore_vault_keys
+    from app.secrets import MemorySecretStore
+    store=MemorySecretStore();reference='platform/recovery/runtime/test'
+    store.put(reference,{'session_signing_key':'recovered'})
+    (tmp_path/'manifest.json').write_text(json.dumps({'platform_keys_ref':reference}))
+    restore_vault_keys(tmp_path,store)
+    assert store.read('platform/runtime')=={'session_signing_key':'recovered'}
+    assert [p.name for p in tmp_path.iterdir()]==['manifest.json']
 
 
 def test_libpq_keeps_customer_tls_requirements_without_inheriting_other_target(monkeypatch):
@@ -222,3 +224,21 @@ def test_existing_s3_integration_freezes_destination_and_narrows_assumed_role(cl
     assert policy['Statement'][0]['Resource'] == ['arn:aws:s3:::recovery-store/platform/archives/*']
     assert 's3:DeleteObject' not in policy['Statement'][0]['Action']
     assert 's3:ListBucket' not in policy['Statement'][0]['Action']
+
+
+def test_legacy_archive_secrets_import_to_selected_vault_without_a_secret_file(tmp_path):
+    import hashlib
+    from app.secrets import MemorySecretStore
+    data=b'PGDMP-legacy'
+    manifest={'schema':'fdp.recovery/1','metadata_sha256':hashlib.sha256(data).hexdigest()}
+    archive=tmp_path/'legacy.tar'
+    with tarfile.open(archive,'w') as tar:
+        for name,payload in [('metadata.dump',data),('manifest.json',json.dumps(manifest).encode()),
+                ('platform-keys.json',json.dumps({'session_signing_key':'legacy-secret-value'}).encode())]:
+            info=tarfile.TarInfo(name);info.size=len(payload);tar.addfile(info,io.BytesIO(payload))
+    out=tmp_path/'restored';out.mkdir();store=MemorySecretStore()
+    result=unpack(archive,out,store)
+    assert result['schema']=='fdp.recovery/2'
+    assert store.read(result['platform_keys_ref'])=={'session_signing_key':'legacy-secret-value'}
+    assert not (out/'platform-keys.json').exists()
+    assert b'legacy-secret-value' not in (out/'manifest.json').read_bytes()

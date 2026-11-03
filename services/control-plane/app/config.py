@@ -7,6 +7,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
 
 
+RUNTIME_SECRET_FIELDS = ('session_signing_key', 'session_signing_previous_keys', 'trino_signing_key',
+    'trino_jwt_private_key', 'trino_jwt_previous_keys', 'gateway_config_token', 'egress_proxy_token', 'siem_signing_key')
+
+
 class Settings(BaseSettings):
     """All settings come from FDP_* environment variables."""
 
@@ -225,6 +229,9 @@ class Settings(BaseSettings):
     siem_gap_wait_seconds: int = 60            # wait this long for an out-of-order audit commit before skipping its id
     siem_query_settle_seconds: int = 60        # export a query log row once it is this old
 
+    # Optional single reference in the installation-selected backend. No fallback when configured.
+    runtime_keys_ref: str = ""
+
     # --- Secrets: where secret values live ---
     secrets_backend: Literal["openbao", "vault", "kubernetes", "aws", "azure", "gcp", "memory"] = "openbao"
     k8s_secret_namespace: str = 'fdp-secrets'
@@ -257,4 +264,11 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    if settings.runtime_keys_ref:
+        from .secrets import make_secret_store
+        values = make_secret_store(settings).read(settings.runtime_keys_ref)
+        if not values.get('session_signing_key') or len(values['session_signing_key'])<32 or set(values)-set(RUNTIME_SECRET_FIELDS):
+            raise RuntimeError('runtime key secret is missing or contains unsupported fields')
+        settings = Settings.model_validate({**settings.model_dump(), **{field:values.get(field,Settings.model_fields[field].default) for field in RUNTIME_SECRET_FIELDS}})
+    return settings
