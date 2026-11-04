@@ -61,6 +61,8 @@ def test_migration_keeps_exactly_the_access_each_old_grant_gave(client, repo):
         for resource, role in old:
             db.add(RoleAssignment(resource_id=resource, app_group_id=readers, role=role))
         db.add(PermissionGrant(target_id='workspaces', namespace='workspaces', app_group_id=readers, layer_id='1a0000000002', role='Executor'))
+        # Same name, less meaning: a workspace Contributor edited files; now Contributor only configures.
+        db.add(PermissionGrant(target_id='workspaces', namespace='workspaces', app_group_id=readers, layer_id='1a0000000002', role='Contributor'))
         db.add(PermissionGrant(target_id='set-forms', namespace='compliance.forms', app_group_id=readers, actions=['compliance.forms.read']))
         db.add(AccessRequest(product_id=ids.get('product') or 'p', requester='bob', app_group_id=readers, role='Consumer'))
         db.commit()
@@ -70,7 +72,9 @@ def test_migration_keeps_exactly_the_access_each_old_grant_gave(client, repo):
         assert held == {(ids['public'], 'DataReader'), (folder.id, 'Executor'), (folder.id, 'DataReader'),
                         ('set-forms', 'Contributor'), ('set-network', 'Reader')}
         named = {(g.namespace, g.role) for g in db.scalars(select(PermissionGrant).where(PermissionGrant.app_group_id == readers))}
-        assert ('workspaces', 'Executor') in named and ('workspaces', 'DataReader') in named
+        assert ('workspaces', 'Executor') in named and ('workspaces', 'DataReader') in named and ('workspaces', 'Contributor') in named
+        kept = {a for g in db.scalars(select(PermissionGrant).where(PermissionGrant.app_group_id == readers, PermissionGrant.role.is_(None))) for a in g.actions}
+        assert 'workspaces.files.write' in kept
         assert db.scalar(select(AccessRequest.role).where(AccessRequest.app_group_id == readers)) == 'DataReader'
         assert db.scalar(select(AuditEvent).where(AuditEvent.action == 'migration.role_model'))
         user = rbac.resolve_user(db, USERS['bob'])

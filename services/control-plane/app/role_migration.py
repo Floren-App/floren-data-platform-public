@@ -91,11 +91,12 @@ def migrate_assignments(db, report):
             if resource is None:
                 continue
             renames = RENAMES.get(_family(resource), {})
-            if row.role not in renames:
-                continue
-            new = [r for r in renames[row.role] if r in rbac.roles_for(resource)]
+            # A role that keeps its name can still mean less now (a workspace Contributor no longer edits files).
+            new = [r for r in renames.get(row.role, [row.role]) if r in rbac.roles_for(resource)]
             prefixes = _prefixes(db, resource)
             old, now = old_bundle(prefixes, row.role), new_bundle(prefixes, new)
+            if new == [row.role] and not old - now:
+                continue
             recipient = {key: getattr(row, key)}
             held = set(db.scalars(select(model.role).where(model.resource_id == row.resource_id, getattr(model, key) == recipient[key],
                                                            model.id != row.id)))
@@ -130,11 +131,11 @@ def migrate_named(db, report):
         if not grant.role:
             continue
         renames = RENAMES.get(NAMESPACE_FAMILY.get(grant.namespace.split('.')[0], 'settings'), {})
-        if grant.role not in renames:
-            continue
         prefix = (grant.namespace + '.',)
-        new = [r for r in renames[grant.role] if new_bundle(prefix, [r])]
+        new = [r for r in renames.get(grant.role, [grant.role]) if new_bundle(prefix, [r])]
         old, now = old_bundle(prefix, grant.role), new_bundle(prefix, new)
+        if new == [grant.role] and not old - now:
+            continue
         recipient = {'app_group_id': grant.app_group_id, 'principal_id': grant.principal_id}
         report.append({'grant': grant.id, 'namespace': grant.namespace, 'from': grant.role, 'to': new,
                        'kept_permissions': sorted(old - now), 'gained': sorted(now - old)})
