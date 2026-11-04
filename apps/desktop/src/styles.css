@@ -548,7 +548,11 @@ pre.terminal { background: #181818; color: #cccccc; border: 1px solid var(--bord
 .splash .lime-slice { animation: lime-float 2.4s ease-in-out infinite; }
 @keyframes lime-float { 50% { transform: translateY(-4px) rotate(8deg); } }
 .splash p { margin: 0; }
-.brand-mark { display: grid; place-items: center; height: 40px; margin-bottom: 2px; }
+.brand-mark { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 13px; margin-bottom: 2px; flex-shrink: 0; overflow: hidden; white-space: nowrap; }
+.brand-mark .lime-slice, .brand-mark .wordmark { flex-shrink: 0; }
+.brand-mark .wordmark { opacity: 0; transition: opacity .08s ease-out; }
+@media (hover: hover) { .activity:hover:not(.picked) .brand-mark .wordmark { opacity: 1; transition-delay: .1s; } }
+.activity:focus-within:has(:focus-visible):not(.picked) .brand-mark .wordmark { opacity: 1; }
 .login-brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 8px; }
 .login-brand h1 { margin: 0; }
 /* Loading: the slice whose segments light up in turn, like the opening screen. In a page or panel it stands above

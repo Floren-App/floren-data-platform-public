@@ -2408,13 +2408,22 @@ test("activity bar shows its labels on hover without taking room", async ({ page
   const state = await setup(page);
   const bar = page.getByRole("navigation", { name: "Views" }), sidebar = page.locator(".sidebar");
   const sidebarLeft = (await sidebar.boundingBox())!.x;
+  const wordmark = bar.locator(".brand-mark .wordmark");
+  await expect(bar.getByRole("img", { name: "limoon.", exact: true })).toBeVisible();
+  await expect(wordmark).toHaveText("limoon.");
+  await expect(wordmark).toHaveCSS("opacity", "0");
   expect((await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
   await bar.getByRole("button", { name: "Workspaces", exact: true }).hover();
   await expect.poll(async () => (await bar.boundingBox())!.width).toBeGreaterThan(150);
   expect((await sidebar.boundingBox())!.x).toBe(sidebarLeft); // Overlays the sidebar; nothing shifts.
+  await expect(wordmark).toHaveCSS("opacity", "1");
+  const logoBox = (await wordmark.boundingBox())!, barBox = (await bar.boundingBox())!;
+  expect(logoBox.x + logoBox.width).toBeLessThan(barBox.x + barBox.width);
+  await page.screenshot({ path: test.info().outputPath("expanded-limoon-logo.png") });
   await expect(bar.getByRole("button", { name: "Workspaces", exact: true })).toContainText("Workspaces");
   await page.mouse.move(700, 300);
   await expect.poll(async () => (await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
+  await expect(wordmark).toHaveCSS("opacity", "0");
   // Choosing a section closes the labels at once, so the sidebar is usable; they open again on the next hover.
   await bar.getByRole("button", { name: "Workspaces", exact: true }).click();
   await page.waitForTimeout(300);
@@ -3665,6 +3674,8 @@ test("Roles lists what each role on each kind of object carries, grouped by kind
 });
 
 test("the sign-in screen carries the limoon. brand", async ({ page }) => {
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
   await page.addInitScript(() => localStorage.setItem("fdp.server", "https://iam.test"));
   // The opening screen shows while the server answers.
   let answer = () => {};
@@ -3673,9 +3684,14 @@ test("the sign-in screen carries the limoon. brand", async ({ page }) => {
     oidc_scopes: "openid", public_url: "https://iam.test" }, headers: { "Access-Control-Allow-Origin": "*" } }); });
   await page.goto("/");
   await expect(page.locator(".splash .wordmark")).toHaveText("limoon.");
-  await page.waitForTimeout(400);
+  await page.clock.runFor(1000);
   await page.screenshot({ path: test.info().outputPath("splash.png") });
+  const configuration = page.waitForResponse("https://iam.test/api/v1/client-config");
   answer();
+  await configuration;
+  await page.clock.runFor(100);
+  await expect(page.locator(".splash .wordmark")).toBeVisible();
+  await page.clock.runFor(150);
   await expect(page.getByRole("heading", { name: "limoon" })).toBeVisible();
   await expect(page.locator(".login .lime-slice")).toBeVisible();
   await expect(page).toHaveTitle("limoon.");
