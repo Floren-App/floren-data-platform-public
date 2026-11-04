@@ -275,7 +275,7 @@ function Shell({ user }: { user: User }) {
               {hub.layers.map((l) => <option key={l.id} value={l.id}>{l.name}{l.production ? " · production" : ""}</option>)}
             </select>
           </>)}
-          {switchingGroup && <small role="status">Switching group…</small>}
+          {switchingGroup && <small className="loading" role="status">Switching group…</small>}
         </div>
       </aside>
 

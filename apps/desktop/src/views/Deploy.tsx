@@ -287,7 +287,7 @@ function VersionsPanel({ pub }: { pub: Workload }) {
       <dt>Updates</dt><dd>{pub.auto_update ? <>New commits on <b className="mono">{pub.branch}</b> deploy automatically.</> : "Automatic updates are off: Check for updates deploys nothing until they are turned on."}</dd>
     </dl><p className="hint">Git is the source of truth. To change what runs, push to <span className="mono">{pub.branch}</span>; to roll back, revert the commit in Git.</p></section>
     <div className="section-heading"><h2>Commits on {pub.branch}</h2></div>
-    {error ? <p className="error" role="alert">{error}</p> : !versions ? <p className="muted" role="status">Reading the branch…</p>
+    {error ? <p className="error" role="alert">{error}</p> : !versions ? <p className="muted loading" role="status">Reading the branch…</p>
       : <div className="table-scroll"><table aria-label="Versions"><thead><tr><th>Version</th><th>Commit</th><th>Author</th><th>Committed</th><th>Here</th></tr></thead><tbody>
         {versions.commits.map((c) => <tr key={c.sha} className={c.state === "running" ? "current" : ""}>
           <td><span className="mono" title={c.sha}>{short(c.sha)}</span> <button className="icon-btn" aria-label={`Copy commit ${short(c.sha)}`} title="Copy the full commit hash" onClick={() => void navigator.clipboard?.writeText(c.sha)}>⧉</button></td>

@@ -498,6 +498,7 @@ pre.terminal { background: #181818; color: #cccccc; border: 1px solid var(--bord
 .lime-rind { fill: var(--lime-rind); }
 .lime-pith { fill: var(--lime-pith); }
 .lime-segment { fill: var(--lime-flesh); }
+.lime-spokes { stroke: var(--lime-pith); }
 .lime-slice.loading .lime-segment { animation: lime-tick .96s linear infinite; }
 @keyframes lime-tick { 0% { opacity: 1; } 100% { opacity: .3; } }
 .wordmark { font-family: var(--brand-font); font-weight: 600; letter-spacing: -.01em; line-height: 1; color: var(--fg-strong); }
@@ -509,11 +510,10 @@ pre.terminal { background: #181818; color: #cccccc; border: 1px solid var(--bord
 .brand-mark { display: grid; place-items: center; height: 40px; margin-bottom: 2px; }
 .login-brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 8px; }
 .login-brand h1 { margin: 0; }
-/* Any "Loading…" line gets a small slice that ticks round. */
+/* Any "Loading…" line gets a small slice whose segments light up in turn, like the opening screen. */
 .loading::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px;
-  background: url("data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Ccircle cx="32" cy="32" r="30.5" fill="%234a8a1f"/%3E%3Ccircle cx="32" cy="32" r="27.5" fill="%23f2f9dc"/%3E%3Cpath d="M 32.11 28.80 L 32.84 8.01 A 24 24 0 0 1 48.37 14.45 L 34.18 29.66 Z" fill="%23a3d44a" opacity="0.43"/%3E%3Cpath d="M 34.34 29.82 L 49.55 15.63 A 24 24 0 0 1 55.99 31.16 L 35.20 31.89 Z" fill="%23a3d44a" opacity="0.51"/%3E%3Cpath d="M 35.20 32.11 L 55.99 32.84 A 24 24 0 0 1 49.55 48.37 L 34.34 34.18 Z" fill="%23a3d44a" opacity="0.59"/%3E%3Cpath d="M 34.18 34.34 L 48.37 49.55 A 24 24 0 0 1 32.84 55.99 L 32.11 35.20 Z" fill="%23a3d44a" opacity="0.68"/%3E%3Cpath d="M 31.89 35.20 L 31.16 55.99 A 24 24 0 0 1 15.63 49.55 L 29.82 34.34 Z" fill="%23a3d44a" opacity="0.76"/%3E%3Cpath d="M 29.66 34.18 L 14.45 48.37 A 24 24 0 0 1 8.01 32.84 L 28.80 32.11 Z" fill="%23a3d44a" opacity="0.84"/%3E%3Cpath d="M 28.80 31.89 L 8.01 31.16 A 24 24 0 0 1 14.45 15.63 L 29.66 29.82 Z" fill="%23a3d44a" opacity="0.92"/%3E%3Cpath d="M 29.82 29.66 L 15.63 14.45 A 24 24 0 0 1 31.16 8.01 L 31.89 28.80 Z" fill="%23a3d44a" opacity="1.00"/%3E%3Ccircle cx="32" cy="32" r="2.4" fill="%23f2f9dc"/%3E%3C/svg%3E") center / contain no-repeat; animation: lime-turn .96s steps(8) infinite; }
-@keyframes lime-turn { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .lime-slice.loading .lime-segment, .splash .lime-slice, .loading::before { animation: none; } }
+  background: url("/limoon-loading.svg") center / contain no-repeat; }
+@media (prefers-reduced-motion: reduce) { .lime-slice.loading .lime-segment, .splash .lime-slice { animation: none; } }
 
 /* ---------- Roles and kinds of access ---------- */
 .cat-data { --cat: var(--cat-data); }

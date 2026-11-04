@@ -115,7 +115,7 @@ function RecentUpdates({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   }, [hub.runs, hub.me?.username]);
   return <section className="home-card" aria-labelledby="home-updated"><div className="home-card-heading"><h2 id="home-updated"><IconRefresh size={18} />Recently updated runs</h2></div><p className="hint">Latest starts and completions, including jobs started earlier.</p>
     {error && <p role="alert" className="error">{error}</p>}
-    {runs ? <ActivityList runs={runs.filter((r) => inLayer(hub.layerId, r.layer_id))} hub={hub} openTab={openTab} updated /> : !error && <p className="home-empty" role="status">Loading run activity…</p>}
+    {runs ? <ActivityList runs={runs.filter((r) => inLayer(hub.layerId, r.layer_id))} hub={hub} openTab={openTab} updated /> : !error && <p className="home-empty loading" role="status">Loading run activity…</p>}
   </section>;
 }
 

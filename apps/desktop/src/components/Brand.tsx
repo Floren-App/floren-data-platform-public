@@ -1,30 +1,56 @@
+import { useId } from "react";
 import "@fontsource/fredoka/500.css";
 import "@fontsource/fredoka/600.css";
 
 /** limoon: a play on the Dutch "limoen" (lime), pronounced the same by an English speaker. The mark is a lime slice:
- * a rind, its pith and eight segments. */
+ * a rind, its pith and eight segments, divided by spokes of even width so they still read from a distance. */
 const SEGMENTS = 8;
+const SPOKE = 3.4;   // width of the dividing lines, in the 64-unit drawing
+const FLESH = 24;
 
 function polar(r: number, degrees: number) {
   const a = (degrees - 90) * Math.PI / 180;
   return `${(32 + r * Math.cos(a)).toFixed(2)} ${(32 + r * Math.sin(a)).toFixed(2)}`;
 }
 
-/** One segment of the slice: a wedge between two radii, with a small gap to the next. */
-function segment(i: number) {
-  const gap = 4, from = i * 360 / SEGMENTS + gap / 2, to = (i + 1) * 360 / SEGMENTS - gap / 2, inner = 3.2, outer = 24;
-  return `M ${polar(inner, from)} L ${polar(outer, from)} A ${outer} ${outer} 0 0 1 ${polar(outer, to)} L ${polar(inner, to)} Z`;
+/** One segment: a wedge of the flesh. The spokes drawn over it make the gaps. */
+function wedge(from: number, to: number) {
+  return `M 32 32 L ${polar(FLESH, from)} A ${FLESH} ${FLESH} 0 0 1 ${polar(FLESH, to)} Z`;
 }
 
-/** The lime slice. With `loading`, its segments light up one after another. */
-export function LimeSlice({ size = 32, loading = false, title }: { size?: number; loading?: boolean; title?: string }) {
-  return <svg className={`lime-slice${loading ? " loading" : ""}`} width={size} height={size} viewBox="0 0 64 64"
-    role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
-    <circle cx="32" cy="32" r="30.5" className="lime-rind" />
-    <circle cx="32" cy="32" r="27.5" className="lime-pith" />
-    {Array.from({ length: SEGMENTS }, (_, i) => <path key={i} d={segment(i)} className="lime-segment"
-      style={loading ? { animationDelay: `${(i - SEGMENTS) * 0.12}s` } : undefined} />)}
-    <circle cx="32" cy="32" r="2.4" className="lime-pith" />
+/** Half a slice, cut along a line rising 45° to the right (from 225° to 45°); the flesh lies below the cut. */
+const HALF = { start: 45, spokes: [90, 135, 180], segments: 4 };
+
+/** The lime slice, in colour (the logo) or in one colour (`mono`, for icons that take the text colour). `half` draws
+ * the half slice. With `loading`, its segments light up one after another. */
+export function LimeSlice({ size = 32, loading = false, title, half = false, mono = false }: {
+  size?: number; loading?: boolean; title?: string; half?: boolean; mono?: boolean;
+}) {
+  const mask = useId();
+  const count = half ? HALF.segments : SEGMENTS, step = 360 / SEGMENTS;
+  const start = half ? HALF.start : 0;
+  const segments = Array.from({ length: count }, (_, i) => wedge(start + i * step, start + (i + 1) * step));
+  const spokes = half ? HALF.spokes : Array.from({ length: SEGMENTS }, (_, i) => i * step);
+  // The outline of the rind, pith and flesh: whole circles, or halves below the cut.
+  const disc = (r: number) => half
+    ? `M ${polar(r, HALF.start)} A ${r} ${r} 0 0 1 ${polar(r, HALF.start + 180)} Z`
+    : `M ${32 - r} 32 A ${r} ${r} 0 1 0 ${32 + r} 32 A ${r} ${r} 0 1 0 ${32 - r} 32 Z`;
+  const lines = spokes.map((a) => <line key={a} x1="32" y1="32" x2={polar(FLESH + 1, a).split(" ")[0]} y2={polar(FLESH + 1, a).split(" ")[1]} />);
+  const label = { role: title ? "img" : undefined, "aria-label": title, "aria-hidden": title ? undefined : true } as const;
+  if (mono) return <svg className="lime-slice mono" width={size} height={size} viewBox="0 0 64 64" {...label}>
+    <mask id={mask}>
+      <path d={disc(30.5)} fill="white" /><path d={disc(27.5)} fill="black" /><path d={disc(FLESH)} fill="white" />
+      <g stroke="black" strokeWidth={SPOKE} strokeLinecap="round">{lines}</g><circle cx="32" cy="32" r={SPOKE} fill="black" />
+    </mask>
+    <path d={disc(30.5)} fill="currentColor" mask={`url(#${CSS.escape(mask)})`} />
+  </svg>;
+  return <svg className={`lime-slice${loading ? " loading" : ""}`} width={size} height={size} viewBox="0 0 64 64" {...label}>
+    <path d={disc(30.5)} className="lime-rind" />
+    <path d={disc(27.5)} className="lime-pith" />
+    {segments.map((d, i) => <path key={i} d={d} className="lime-segment"
+      style={loading ? { animationDelay: `${(i - count) * 0.12}s` } : undefined} />)}
+    <g className="lime-spokes" strokeWidth={SPOKE} strokeLinecap="round">{lines}</g>
+    <circle cx="32" cy="32" r={SPOKE} className="lime-pith" />
   </svg>;
 }
 
