@@ -8,6 +8,7 @@ import { IconPlus, IconTrash } from "../components/Icons";
 import { Answers, FormRenderer } from "../components/ComplianceForm";
 import type { TabRef } from "./Tabs";
 import { CaseTable, overdue } from "./Cases";
+import { Modal } from "../components/Roles";
 
 const STEP_LABEL = { data_owner: "Data owners", compliance_reviewer: "Compliance reviewers" } as const;
 export const isComplianceAdmin = (hub: Hub) => hub.me?.acting_admin === true;
@@ -260,48 +261,65 @@ const scopeText = (s: ComplianceRoleItem["scope"], layers: { id: string; name: s
 
 /** Who reviews, who approves new members, and who sets this up: roles given to groups, scoped. */
 /** Review duties for every group, or (on a group's Settings) for one group. */
-export function PrivacyRoles({ hub, groupId }: { hub: Hub; groupId?: string }) {
+/** Administration → Review duties: which groups decide on compliance forms and new members, and in what scope.
+ * A duty is access administration, so a group's duties also show on its Has access to page, where they can be given too. */
+export function PrivacyRoles({ hub }: { hub: Hub }) {
   const admin = can(hub.me, "compliance.duties.appoint", "set-duties");
   const [data, setData] = useState<{ roles: ComplianceRoleItem[]; kinds: { key: string; label: string }[] } | null>(null);
-  const [groups, setGroups] = useState<AppGroup[]>([]), [layers, setLayers] = useState<{ id: string; name: string }[]>([]), [levels, setLevels] = useState<ClassificationLevel[]>([]);
-  const [error, setError] = useState(""), [role, setRole] = useState("compliance_reviewer"), [group, setGroup] = useState(groupId ?? "");
-  const [scope, setScope] = useState<Required<ComplianceRoleItem["scope"]>>({ resource_ids: [], layers: [], classifications: [], group_ids: [] });
+  const [groups, setGroups] = useState<AppGroup[]>([]), [layers, setLayers] = useState<{ id: string; name: string }[]>([]);
+  const [error, setError] = useState(""), [message, setMessage] = useState(""), [giving, setGiving] = useState(false);
   const load = useCallback(() => api.compliance.roles().then(setData).catch((e: Error) => setError(e.message)), []);
   useEffect(() => { void load(); api.access.groups().then(setGroups).catch(() => setGroups([]));
-    api.compliance.policies().then((g) => { setLayers(g.layers); setLevels(g.classifications); }).catch(() => undefined); }, [load]);
-  if (!data) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+    api.compliance.policies().then((g) => setLayers(g.layers)).catch(() => undefined); }, [load]);
+  return <>
+    <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="Review duties"
+      subtitle="Give groups a duty: reviewing compliance forms, or approving new members of groups whose access came through a form. Scope a duty to layers, classifications, objects or groups."
+      actions={admin && <button className="btn" onClick={() => { setMessage(""); setGiving(true); }}><IconPlus size={14} />Give a duty</button>} />
+    {error && <p className="error" role="alert">{error}</p>}
+    {message && <p className="success-message" role="status">{message}</p>}
+    {!data ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Review duties"><thead><tr><th>Role</th><th>Group</th><th>Scope</th>{admin && <th />}</tr></thead><tbody>
+      {data.roles.map((r) => <tr key={r.id}><td>{r.label}</td><td>{r.group}</td><td>{scopeText(r.scope, layers, groups)}</td>
+        {admin && <td><button className="icon-btn" aria-label={`Remove ${r.label} from ${r.group}`} onClick={() => { setError("");
+          api.compliance.removeRole(r.id).then(() => void load()).catch((err: Error) => setError(err.message)); }}><IconTrash size={14} /></button></td>}</tr>)}
+      {!data.roles.length && <tr><td colSpan={admin ? 4 : 3} className="muted">No review duties yet. Platform administrators can do everything.</td></tr>}</tbody></table></div>}
+    {giving && <Modal title="Give a duty" onClose={() => setGiving(false)}>
+      <DutyForm hub={hub} onCancel={() => setGiving(false)} onDone={(text) => { setGiving(false); setMessage(text); void load(); }} />
+    </Modal>}
+  </>;
+}
+
+/** Give a group a review duty, with its scope. Without groupId, the group is chosen here. */
+export function DutyForm({ hub, groupId, onDone, onCancel }: { hub: Hub; groupId?: string; onDone: (message: string) => void; onCancel: () => void }) {
+  const [kinds, setKinds] = useState<{ key: string; label: string }[]>([]);
+  const [groups, setGroups] = useState<AppGroup[]>([]), [layers, setLayers] = useState<{ id: string; name: string }[]>([]), [levels, setLevels] = useState<ClassificationLevel[]>([]);
+  const [error, setError] = useState(""), [busy, setBusy] = useState(false), [role, setRole] = useState("compliance_reviewer"), [group, setGroup] = useState(groupId ?? "");
+  const [scope, setScope] = useState<Required<ComplianceRoleItem["scope"]>>({ resource_ids: [], layers: [], classifications: [], group_ids: [] });
+  useEffect(() => { api.compliance.roles().then((d) => setKinds(d.kinds)).catch((e: Error) => setError(e.message));
+    api.access.groups().then(setGroups).catch(() => setGroups([]));
+    api.compliance.policies().then((g) => { setLayers(g.layers); setLevels(g.classifications); }).catch(() => undefined); }, []);
   const toggle = (key: keyof typeof scope, value: string) => setScope({ ...scope, [key]: scope[key].includes(value) ? scope[key].filter((v) => v !== value) : [...scope[key], value] });
-  const add = (e: React.FormEvent) => { e.preventDefault(); setError("");
-    api.compliance.addRole({ role, app_group_id: group, scope }).then(() => { setGroup(groupId ?? ""); setScope({ resource_ids: [], layers: [], classifications: [], group_ids: [] }); void load(); })
-      .catch((err: Error) => setError(err.message)); };
+  const add = (e: React.FormEvent) => { e.preventDefault(); setError(""); setBusy(true);
+    const label = kinds.find((k) => k.key === role)?.label ?? role, name = groups.find((g) => g.id === group)?.name ?? "the group";
+    api.compliance.addRole({ role, app_group_id: group, scope }).then(() => onDone(`${name} now has the duty: ${label}.`))
+      .catch((err: Error) => setError(err.message)).finally(() => setBusy(false)); };
   const checks = (key: keyof typeof scope, items: { id: string; name: string }[], legend: string) => <fieldset className="field form-choices"><legend>{legend}</legend>
     {items.map((i) => <label key={i.id} className="row"><input type="checkbox" checked={scope[key].includes(i.id)} onChange={() => toggle(key, i.id)} />{i.name}</label>)}
     <span className="hint">None chosen: all.</span></fieldset>;
-  const rows = data.roles.filter((r) => !groupId || r.app_group_id === groupId);
-  return <>
-    {groupId ? <h3>Review duties</h3> : <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="Review duties"
-      subtitle="Give groups a duty: reviewing compliance forms, or approving new members of groups whose access came through a form. Scope a duty to layers, classifications, objects or groups." />}
+  return <form aria-label="Give a compliance role" onSubmit={add}>
+    <div className="arg-grid">
+      <div className="field"><label htmlFor="role-kind">Duty</label><select id="role-kind" value={role} onChange={(e) => setRole(e.target.value)}>
+        {kinds.filter((k) => hub.me?.is_admin || k.key !== "compliance_admin").map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}</select></div>
+      {!groupId && <div className="field"><label htmlFor="role-group">To group</label><select id="role-group" value={group} onChange={(e) => setGroup(e.target.value)}>
+        <option value="">Choose a group</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
+    </div>
+    {role === "compliance_reviewer" && <div className="arg-grid">
+      {checks("layers", layers, "Layers")}{checks("classifications", levels.map((l) => ({ id: l.name, name: l.name })), "Classifications")}</div>}
+    {role === "membership_approver" && checks("group_ids", groups.map((g) => ({ id: g.id, name: g.name })), "Groups")}
+    <p className="hint">Scoping a reviewer to specific objects is possible with Terraform or the API (resource_ids). Also configurable with Terraform (fdp_compliance_role).</p>
     {error && <p className="error" role="alert">{error}</p>}
-    <div className="table-scroll"><table aria-label="Review duties"><thead><tr><th>Role</th><th>Group</th><th>Scope</th>{admin && <th />}</tr></thead><tbody>
-      {rows.map((r) => <tr key={r.id}><td>{r.label}</td><td>{r.group}</td><td>{scopeText(r.scope, layers, groups)}</td>
-        {admin && <td><button className="icon-btn" aria-label={`Remove ${r.label} from ${r.group}`} onClick={() => { setError("");
-          api.compliance.removeRole(r.id).then(() => void load()).catch((err: Error) => setError(err.message)); }}><IconTrash size={14} /></button></td>}</tr>)}
-      {!rows.length && <tr><td colSpan={admin ? 4 : 3} className="muted">{groupId ? "This group has no review duties." : "No review duties yet. Platform administrators can do everything."}</td></tr>}</tbody></table></div>
-    {admin && <form className="card" aria-label="Give a compliance role" onSubmit={add}>
-      <h2>Give a duty</h2>
-      <div className="arg-grid">
-        <div className="field"><label htmlFor="role-kind">Role</label><select id="role-kind" value={role} onChange={(e) => setRole(e.target.value)}>
-          {data.kinds.filter((k) => hub.me?.is_admin || k.key !== "compliance_admin").map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}</select></div>
-        {!groupId && <div className="field"><label htmlFor="role-group">To group</label><select id="role-group" value={group} onChange={(e) => setGroup(e.target.value)}>
-          <option value="">Choose a group</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
-      </div>
-      {role === "compliance_reviewer" && <div className="arg-grid">
-        {checks("layers", layers, "Layers")}{checks("classifications", levels.map((l) => ({ id: l.name, name: l.name })), "Classifications")}</div>}
-      {role === "membership_approver" && checks("group_ids", groups.map((g) => ({ id: g.id, name: g.name })), "Groups")}
-      <div className="form-actions"><button className="btn" disabled={!group}>Give duty</button></div>
-      <p className="hint">Scoping a reviewer to specific objects is possible with Terraform or the API (resource_ids). Also configurable with Terraform (fdp_compliance_role).</p>
-    </form>}
-  </>;
+    <div className="form-actions"><button className="btn" disabled={busy || !group}>Give duty</button>
+      <button type="button" className="btn secondary" onClick={onCancel}>Cancel</button></div>
+  </form>;
 }
 
 /** The review queue: what waits for you, oldest deadline first; or every case you may see. */

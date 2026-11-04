@@ -11,7 +11,7 @@ DEDICATED = {'name': 'data-eng', 'cpu': 2, 'memory_gb': 8, 'max_concurrent': 1, 
 def create(client, **changes):
     from .rbac_helpers import grant_group
     client.get('/v1/me',headers=as_('ana')).raise_for_status()
-    grant_group(client,'workloads','Warehouse finance','Viewer',external_groups=['finance'])
+    grant_group(client,'workloads','Warehouse finance','Reader',external_groups=['finance'])
     return client.put('/v1/admin/pools/data-eng', headers=as_('admin'), json={**DEDICATED, **changes})
 
 

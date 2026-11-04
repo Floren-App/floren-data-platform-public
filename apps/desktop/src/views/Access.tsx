@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, AppGroup, AppProfile, DirectoryPrincipal } from "../api";
 import { GroupAccessInventory, GiveAccess, HasAccessTo } from "./AccessArea";
-import { PrivacyRoles } from "./Privacy";
 import type { OpenTab } from "../components/Permissions";
 import type { TabRef } from "./Tabs";
 import type { Hub } from "../hub";
@@ -33,6 +32,7 @@ export function AccessTab({ hub, groupId, section, bindingPrincipalId, onSelect,
   const [name, setName] = useState(""), [desc, setDesc] = useState("");
   const [newProfile, setNewProfile] = useState(""), [newMembers, setNewMembers] = useState<string[]>([]);
   const [profiles, setProfiles] = useState<AppProfile[]>([]), [accessVersion, setAccessVersion] = useState(0), [notice, setNotice] = useState("");
+  const [giving, setGiving] = useState(false);
   useEffect(() => { if (creating) api.appProfiles.list().then((r) => setProfiles(r.profiles)).catch(() => setProfiles([])); }, [creating]);
 
   const load = useCallback(async () => {
@@ -114,16 +114,20 @@ export function AccessTab({ hub, groupId, section, bindingPrincipalId, onSelect,
           {section === "access" && group.can_inspect !== false && <>
             {group.system && <p className="scope-note">Owner on every object, including what is added later.</p>}
             {!access ? <p className="muted" role="status">Loading…</p> : <>
-              <p className="hint">Data, platform and privileged permissions, including named feature grants and inherited object roles.
+              <p className="hint">The roles this group holds, by kind of access. Open an object to see its roles, and a role to see its permissions.
                 {access.app_profile ? <> App profile: <strong>{access.app_profile}</strong>.</> : null}</p>
               {notice && <p className="success-message" role="status">{notice}</p>}
-              {access.access_sections ? <GroupAccessInventory sections={access.access_sections} /> : <HasAccessTo rows={access.grants} hub={hub} openTab={openTab} />}
-              {!group.system && <GiveAccess key={group.id} group={group} hub={hub} onDone={(text) => { setNotice(text); setAccessVersion((v) => v + 1); }} />}
+              {access.access_roles ? <GroupAccessInventory roles={access.access_roles} group={group} hub={hub} openTab={openTab}
+                onChanged={(text) => { setNotice(text); setAccessVersion((v) => v + 1); }} />
+                : <>
+                  <HasAccessTo rows={access.grants} hub={hub} openTab={openTab} />
+                  {!group.system && <button className="btn" onClick={() => setGiving(true)}><IconPlus size={14} />Give access</button>}
+                  {giving && <GiveAccess group={group} hub={hub} onCancel={() => setGiving(false)} onDone={(text) => { setGiving(false); setNotice(text); setAccessVersion((v) => v + 1); }} />}
+                </>}
             </>}
           </>}
           {section === "settings" && group.can_inspect !== false && <>
             {!group.system && <GroupProfile group={group} hub={hub} act={act} openTab={openTab} />}
-            {!group.system && (hub.me?.is_admin || hub.me?.compliance_roles?.includes("compliance_admin")) && <PrivacyRoles hub={hub} groupId={group.id} />}
             {hub.me?.is_admin && !group.system && <form className="card" onSubmit={(e) => { e.preventDefault(); void act(() => api.access.updateGroup(group.id, { name: name.trim(), description: desc, owners: group.owners })); }}>
               <h3>Name and description</h3>
               <div className="arg-grid"><div className="field"><label htmlFor="group-rename">Name</label><input id="group-rename" required value={name} onChange={(e) => setName(e.target.value)} /></div>

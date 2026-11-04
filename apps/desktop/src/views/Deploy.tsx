@@ -378,12 +378,12 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
           {pub.kind === "app" && <PublishButton resourceId={pub.resource_id} openTab={openTab} hub={hub} />}
           {can("workloads.code.sync", pub.can_manage) && <button className="btn secondary" disabled={busy} title="Check the branch for new commits now"
                   onClick={() => act(() => api.syncWorkload(pub.id))}><IconRefresh size={14} />Check for updates</button>}
-          {(pub.kind === "app" || pub.kind === "airflow" || pub.kind === "dbt") && pub.status === "live" && can(pub.kind === "dbt" ? "workloads.execution.docs.open" : "workloads.execution.app.open", pub.actions.includes("execute")) && (
+          {(pub.kind === "app" || pub.kind === "airflow" || pub.kind === "dbt") && pub.status === "live" && can(pub.kind === "dbt" ? "workloads.execution.docs.open" : "workloads.execution.app.open", pub.actions.includes("open")) && (
             <button className="btn" onClick={() => act(() => openInWindow(api.openWorkload(pub.id).then((r) => r.url), pub.title, `pub-${pub.slug}`))}><IconOpen size={14} />{pub.kind === "airflow" ? "Open Airflow" : pub.kind === "dbt" ? "Open docs" : "Open app"}</button>
           )}
         </>} />
 
-      <ObjectTabs active={section} lineage={!!resource} versions={can("workloads.code.versions.read", true)} logs={can("logs.read", pub.actions.includes("execute"))} settings={can("workloads.settings.identity.change", pub.actions.includes("identity")) || can("workloads.settings.execution_mode.change", pub.actions.includes("identity")) || can("workloads.settings.secret.bind", pub.actions.includes("identity")) || !!parent?.actions.includes("delete")}
+      <ObjectTabs active={section} lineage={!!resource} versions={can("workloads.code.versions.read", true)} logs={can("logs.read", pub.actions.includes("open"))} settings={can("workloads.settings.identity.change", pub.actions.includes("identity")) || can("workloads.settings.execution_mode.change", pub.actions.includes("identity")) || can("workloads.settings.secret.bind", pub.actions.includes("identity")) || !!parent?.actions.includes("delete")}
         alerts={!!resource?.actions.includes("assign")} onChange={(s) => openTab({ ...tab, section: s })} />
       {section === "alerts" && resource && <AlertRules hub={hub} resource={resource} />}
       {error && <AccessError error={error} openTab={openTab} />}

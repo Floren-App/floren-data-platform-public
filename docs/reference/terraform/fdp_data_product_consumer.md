@@ -2,7 +2,7 @@
 
 Generated from the current provider schema.
 
-An app group's access to a data product: Consumer on the product with one of its access options (its masks and row filters). The group may then use everything in the product. Destroy takes the access away. Import with "<product id>/<app group id>".
+An app group's access to a data product: Data Reader on the product with one of its access options (its masks and row filters). The group may then use everything in the product. Destroy takes the access away. Import with "<product id>/<app group id>".
 
 | Attribute | Type | Behavior | Description |
 |---|---|---|---|

@@ -33,11 +33,13 @@ def route_inventory(app):
             anchor = '#L'+str(code.co_firstlineno) if code else ''
             lines.append(f'| {", ".join(methods)} | `{route.path}` | '
                 f'[`{endpoint.__name__}`](../services/control-plane/{source}{anchor}) |\n')
-    lines += ['\n## Desktop pages and aliases\n\nEvery tab below requires its page gate before mounting. '
+    lines += ['\n## Desktop pages and aliases\n\nEvery tab below requires its page gate before mounting, except reference pages marked none. '
         'Page visibility and object/function authority are separate.\n\n| Tab kind | Page gate |\n|---|---|\n']
     mapping = (ROOT/'apps/desktop/src/permissions.ts').read_text().split('export const TAB_PAGES', 1)[1].split('};', 1)[0]
     for tab, page in re.findall(r'"([a-z-]+)":\s*"([a-z-]+)"', mapping):
         lines.append(f'| `{tab}` | `{page}` |\n')
+    for tab in re.findall(r'"([a-z-]+)":\s*null', mapping):
+        lines.append(f'| `{tab}` | none: a reference page for everyone signed in |\n')
     lines += ['\n## Other entry points\n\nGateway forward authentication, broker policy callbacks, SQL policy callbacks, '
         'native package indexes and keyed aliases are included above. They require their '
         'own admission, service authentication and live object checks. Framework documentation '

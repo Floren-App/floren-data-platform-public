@@ -158,7 +158,7 @@ class AllowedPackageIn(BaseModel):
 
 
 class PackageAllowlistIn(BaseModel):
-    enabled: bool = Field(default=True, description="Off: Publishers may import any public package")
+    enabled: bool = Field(default=True, description="Off: Data Contributors may import any public package")
     python: List[AllowedPackageIn] = Field(default_factory=list, max_length=5000)
     r: List[AllowedPackageIn] = Field(default_factory=list, max_length=5000)
 
@@ -196,7 +196,7 @@ def set_package_allowlist(body: PackageAllowlistIn, db: Session = Depends(get_db
 
 @router.delete("/allowlist", status_code=204)
 def reset_package_allowlist(db: Session = Depends(get_db), user: User = Depends(package_user)):
-    """Off and empty: Publishers may import any public package."""
+    """Off and empty: Data Contributors may import any public package."""
     from ..models import PlatformSetting
     from .. import package_allowlist as allow
     permissions.require(db,user,"packages.imports.allowlist.reset","packages")
@@ -350,7 +350,7 @@ def simple_index(db: Session = Depends(get_db), _: User = Depends(package_user),
 def simple_project(name: str, db: Session = Depends(get_db), _: User = Depends(package_user), accept: str = Header(default="")):
     package = repo.find(db, "python", repo.key_of("python", name))
     if package is None:
-        raise HTTPException(404, f"no package {name} in the repository; ask a Publisher to import it")
+        raise HTTPException(404, f"no package {name} in the repository; ask a Data Contributor to import it")
     repo.require_permitted(db,_,package)
     if _wants_json(accept):
         return JSONResponse(repo.python_project_json(db, package), media_type=SIMPLE_JSON)

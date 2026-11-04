@@ -31,8 +31,9 @@ import { KafkaClustersView, KafkaView } from "./Kafka";
 import { PrivacyForm, PrivacyForms, PrivacyMemberships, PrivacyPolicies, PrivacyRegister, PrivacyReviews, PrivacyRoles } from "./Privacy";
 import { CaseView } from "./Cases";
 import { DeadlinesView, SettingsPermissions } from "./AccessArea";
+import { RolesView } from "./RolesView";
 
-export type TabKind = "data-permissions" | "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
+export type TabKind = "data-permissions" | "roles" | "kafka" | "kafka-clusters" | "apis" | "api" | "catalog" | "catalog-object" | "users" | "access" | "home" | "workspaces" | "runs" | "workspace" | "run" | "data" | "source" | "schema" | "data-object" | "pool" | "folder" | "service" | "services" | "deploy" | "workload" | "secrets" | "docs" | "git-credentials" | "packages" | "package" | "package-imports"
   | "products" | "product" | "access-requests" | "app-profiles" | "repos" | "deadlines"
   | "privacy-reviews" | "privacy-case" | "case" | "privacy-memberships" | "privacy-register"
   | "privacy-policies" | "privacy-forms" | "privacy-form" | "privacy-roles" | "privacy-classifications"
@@ -60,6 +61,8 @@ export interface TabRef {
   runScope?: RunScope;
   grantPrincipalId?: string;
   data?: DataLocation;
+  /** Roles: the role to show (with ref, the kind of object). */
+  roleName?: string;
   /** A group page's section in the Access area. */
   groupSection?: "members" | "access" | "settings";
 }
@@ -84,6 +87,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "access": return <><AccessTab hub={hub} openTab={openTab} groupId={tab.ref} section={tab.groupSection ?? "members"} bindingPrincipalId={tab.bindingPrincipalId}
       onSelect={(id, name, section) => openTab({ kind: "access", ref: id, title: name, bindingPrincipalId: tab.bindingPrincipalId, groupSection: section })} />
       {!tab.ref && <SettingsPermissions page="set-groups" hub={hub} openTab={openTab} />}</>;
+    case "roles": return <RolesView key={`${tab.ref ?? ""}/${tab.roleName ?? ""}`} hub={hub} typeKey={tab.ref} roleName={tab.roleName} />;
     case "users": return <UsersTab hub={hub} selectedId={tab.ref} openTab={openTab} />;
     case "home": return <Home hub={hub} openTab={openTab} />;
     case "workspaces": return <WorkspacesView hub={hub} openTab={openTab} />;

@@ -165,7 +165,7 @@ def test_fixed_app_does_not_copy_deployer_data_access(client, repo):
     assert legacy["sync_error"] == admin["sync_error"] and legacy["access_issue"] == admin["access_issue"]
     # Binding the service to a granted group repairs deployment; diagnostics then clear.
     from .rbac_helpers import grant_group
-    grant_group(client, source["resource_id"], "Dashboard readers", "Reader", services=[pub["service_principal_id"]])
+    grant_group(client, source["resource_id"], "Dashboard readers", "DataReader", services=[pub["service_principal_id"]])
     repaired = client.post(f"/v1/workloads/{pub['id']}/sync", headers=as_("ana")).json()
     assert repaired["status"] == "live" and repaired["sync_error"] is None and repaired["access_issue"] is None
 

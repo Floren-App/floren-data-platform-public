@@ -49,6 +49,8 @@ class AssignmentIn(BaseModel):
     app_group_id: Optional[str] = None
     principal_id: Optional[str] = None
     role: str
+    replaces: Optional[str] = Field(default=None, max_length=32,
+        description="A role the recipient holds here that this one takes the place of (changing a role); otherwise the role is added")
     justification_id: Optional[str] = Field(default=None, max_length=12,
         description="An approved compliance case for this access, when an access policy applies (API and Terraform)")
 
@@ -106,7 +108,7 @@ def resource_out(db, r, user):
     if r.kind in ("source", "schema"):
         # A data role on the object or a parent, as in data_scope: no platform-admin bypass,
         # and a source listed only to reach an authorized schema does not count.
-        out["data_access"] = bool(browsing_scope(db,user).get(r.id,set()) & rbac.DATA_ROLES.keys())
+        out["data_access"] = bool(browsing_scope(db,user).get(r.id,set()) & rbac.DATA_READ_ROLES)
     return out
 
 
@@ -251,8 +253,8 @@ def group_access(group_id: str, db: Session = Depends(get_db), user: User = Depe
         raise HTTPException(403, "group membership, ownership or groups.access.read required")
     assigned = list(db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id == group_id)))
     profile = db.get(AppProfile, group.profile_id) if group.profile_id else None
-    from ..access_inventory import inventory
-    return {"access_sections": inventory(db,group,assigned), "system": group_id == GLOBAL_ADMIN, "grants": access_rows(db, user, assigned, {group.id: group.name}),
+    from ..access_inventory import assignments
+    return {"access_roles": assignments(db, group, assigned), "system": group_id == GLOBAL_ADMIN, "grants": access_rows(db, user, assigned, {group.id: group.name}),
             "compliance_roles": compliance_rows(db, [group_id]), "app_profile": profile.name if profile else None}
 
 
@@ -663,19 +665,14 @@ def require_justification(db, resource, body) -> None:
     from .. import compliance
     from ..models import AccessCase
     if body.principal_id:
-        existing = db.scalar(select(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id == resource.id,
-                                                                  ServiceRoleAssignment.principal_id == body.principal_id))
+        held = set(db.scalars(select(ServiceRoleAssignment.role).where(ServiceRoleAssignment.resource_id == resource.id,
+                                                                       ServiceRoleAssignment.principal_id == body.principal_id)))
     else:
-        existing = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource.id,
-                                                          RoleAssignment.app_group_id == body.app_group_id)) if body.app_group_id else None
+        held = set(db.scalars(select(RoleAssignment.role).where(RoleAssignment.resource_id == resource.id,
+                                                               RoleAssignment.app_group_id == body.app_group_id))) if body.app_group_id else set()
     roles = rbac.roles_for(resource)
-    if resource.kind in ('source', 'schema'):
-        # Legacy read means metadata for Viewer, but payload for Reader/Executor.
-        # Coarse role verbs alone must never turn metadata into approved data use.
-        roles = {name: actions | ({'payload.read'} if name in ('Reader', 'Executor', 'DataReader', 'DataContributor', 'Admin', 'Owner') else set())
-                 for name, actions in roles.items()}
-    if existing is not None and existing.role in roles and body.role in roles and roles[body.role].issubset(roles[existing.role]):
-        return  # Reconciliation or reduction adds no authority, for groups or direct identities.
+    if body.role in held or any(r in roles and body.role in roles and roles[body.role].issubset(roles[r]) for r in held):
+        return  # Reconciliation or a role within one held adds no authority, for groups or direct identities.
     req = compliance.role_requirement(db, resource, body.role, body.app_group_id)
     if req["policy"] is None:
         return
@@ -728,37 +725,38 @@ def assign(resource_id: str, body: AssignmentIn, db: Session = Depends(get_db), 
             raise HTTPException(422, "choose a valid app group")
         model, recipient = RoleAssignment, {"app_group_id": body.app_group_id}
         condition = RoleAssignment.app_group_id == body.app_group_id
-    a = db.scalar(select(model).where(model.resource_id == r.id, condition))
-    before = a.role if a else None
-    if a is None:
-        a = model(resource_id=r.id, **recipient, role=body.role)
-        db.add(a)
-    a.role = body.role
+    # A recipient can hold several roles on an object (Executor and Data Reader on a folder, say); a role is added,
+    # or takes the place of the one named in replaces.
+    if body.replaces and body.replaces != body.role:
+        db.execute(delete(model).where(model.resource_id == r.id, condition, model.role == body.replaces))
+    if db.scalar(select(model).where(model.resource_id == r.id, condition, model.role == body.role)) is None:
+        db.add(model(resource_id=r.id, **recipient, role=body.role))
     audit(db, user.username, "role.assign", r.id, group=body.app_group_id, principal_id=body.principal_id,
-          before=before, role=body.role)
+          before=body.replaces, role=body.role)
     db.commit()
     return assignments(resource_id, db, user)
 
 
 @router.delete("/resources/{resource_id}/assignments/{app_group_id}", status_code=204)
-def revoke(resource_id: str, app_group_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+def revoke(resource_id: str, app_group_id: str, role: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Remove one role of the group here, or with no role all of its direct roles here."""
     r = get_resource(db, resource_id)
     require_role_management(db,user,r,"revoke")
     if app_group_id == GLOBAL_ADMIN:
         raise HTTPException(409,"Global Admin access cannot be revoked on an object")
-    db.execute(delete(RoleAssignment).where(RoleAssignment.resource_id == r.id,
-                                          RoleAssignment.app_group_id == app_group_id))
-    audit(db, user.username, "role.revoke", r.id, group=app_group_id)
+    query = delete(RoleAssignment).where(RoleAssignment.resource_id == r.id, RoleAssignment.app_group_id == app_group_id)
+    db.execute(query.where(RoleAssignment.role == role) if role else query)
+    audit(db, user.username, "role.revoke", r.id, group=app_group_id, role=role)
     db.commit()
 
 
 @router.delete("/resources/{resource_id}/assignments/services/{principal_id}", status_code=204)
-def revoke_service(resource_id: str, principal_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+def revoke_service(resource_id: str, principal_id: str, role: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     r = get_resource(db, resource_id)
     require_role_management(db,user,r,"revoke")
-    db.execute(delete(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id == r.id,
-                                                  ServiceRoleAssignment.principal_id == principal_id))
-    audit(db, user.username, "role.revoke", r.id, principal_id=principal_id)
+    query = delete(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id == r.id, ServiceRoleAssignment.principal_id == principal_id)
+    db.execute(query.where(ServiceRoleAssignment.role == role) if role else query)
+    audit(db, user.username, "role.revoke", r.id, principal_id=principal_id, role=role)
     db.commit()
 
 

@@ -324,7 +324,7 @@ def test_metric_definition_activation_reporting_and_sla_are_separate(product):
     assert 'metrics.define' in metric['capabilities'] and 'metrics.enable' not in metric['capabilities']
     assert client.post(base+'/metrics',headers=as_('ana'),json={**body,'enabled':True}).status_code==403
     from .rbac_helpers import grant_group
-    viewer=grant_group(client,target,'SLA viewers','Viewer',users=['bob'])
+    viewer=grant_group(client,target,'SLA viewers','Reader',users=['bob'])
     client.put('/v1/me/active-group',headers=as_('bob'),json={'group_id':viewer}).raise_for_status()
     assert client.post(base+'/evaluate-sla',headers=as_('bob')).status_code==403
     grant(['metrics.enable'])

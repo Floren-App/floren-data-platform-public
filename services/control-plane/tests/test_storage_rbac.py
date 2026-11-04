@@ -50,7 +50,7 @@ def test_live_rustfs_sts_reader_and_contributor(client, repo):
                           json={'name': 'finance', 'prefix': 'finance'}).json()
     ready = client.post(f"/v1/rbac/resources/{schema['id']}/provision", headers=as_('admin'))
     assert ready.status_code == 200
-    readers_gid = grant_group(client, schema['id'], 'Storage readers', 'Reader', users=['ana'])
+    readers_gid = grant_group(client, schema['id'], 'Storage readers', 'DataReader', users=['ana'])
     grant_group(client, schema['id'], 'Storage writers', 'Contributor', users=['bob'])
     def scoped(who):
         ws = start_workspace(client, who)

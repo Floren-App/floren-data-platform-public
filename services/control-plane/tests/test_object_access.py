@@ -95,9 +95,9 @@ def test_column_update_requires_the_actual_column_shape(client,objects):
     assert not allow(q,'InsertIntoTable')
 
 
-@pytest.mark.parametrize('role,select,insert', [('Viewer',False,False),('Executor',True,False),
-    ('Contributor',False,True),('Manager',False,False),('Admin',True,True),('Owner',True,True)])
-def test_all_six_object_roles_have_independent_meanings(client,objects,role,select,insert):
+@pytest.mark.parametrize('role,select,insert', [('Reader',False,False),('DataReader',True,False),
+    ('DataContributor',True,True),('Contributor',False,False),('Admin',True,True),('Owner',True,True)])
+def test_object_roles_separate_metadata_from_payload(client,objects,role,select,insert):
     _,table,_,_,_=objects
     grant_group(client,table['id'],'Scoped team',role,users=['bob'])
     q=query()
@@ -199,7 +199,7 @@ def test_data_product_grants_its_table_without_granting_schema_or_sibling(client
     assert product.status_code==201,product.text
     with SessionLocal() as db:
         target=db.get(CatalogProduct,product.json()['id']).access_resource_id
-    grant_group(client,target,'Product consumers','Consumer',users=['bob'])
+    grant_group(client,target,'Product consumers','DataReader',users=['bob'])
     q=query()
     assert allow(q,'SelectFromColumns',columns=['amount'])
     assert not allow(q,'SelectFromColumns','payroll',['salary'])
@@ -220,7 +220,7 @@ def test_broad_access_to_another_schema_does_not_expand_object_grants(client,obj
         hidden=catalog.upsert(db,parent,'object:payroll',kind='table',name='payroll',attributes={'object_path':'payroll'})
         sales_id,hidden_id=sales.id,hidden.id
         db.commit()
-    group=grant_group(client,other['id'],'Other schema readers','Reader',users=['bob'])
+    group=grant_group(client,other['id'],'Other schema readers','DataReader',users=['bob'])
     named(client,table['id'],['data.sql.select','data.queries.results.read'])
     assert client.get('/v1/catalog/assets/'+sales_id,headers=as_('bob')).status_code==200
     assert client.get('/v1/catalog/assets/'+hidden_id,headers=as_('bob')).status_code==404
@@ -230,7 +230,7 @@ def test_another_schemas_reader_grant_cannot_expand_column_metadata(client,objec
     schema,_,column,_,_=objects
     named(client,schema['id'],['catalog.view'])
     other=client.post('/v1/rbac/sources/object-lake/schemas',headers=as_('admin'),json={'name':'other'}).json()
-    grant_group(client,other['id'],'Other readers','Reader',users=['bob'])
+    grant_group(client,other['id'],'Other readers','DataReader',users=['bob'])
     with SessionLocal() as db:
         parent=db.get(Resource,schema['id'])
         catalog.index_children(db,parent,[{'name':'sales','kind':'table'}])
@@ -287,8 +287,8 @@ def test_file_session_endpoint_passes_exact_policy_and_refuses_writes(client,mon
 
 
 @pytest.mark.parametrize('role,select,insert',[
-    ('Viewer',False,False),('Executor',True,False),('Contributor',False,True),
-    ('Manager',False,False),('Admin',True,True),('Owner',True,True),
+    ('Reader',False,False),('DataReader',True,False),('DataContributor',True,True),
+    ('Contributor',False,False),('Admin',True,True),('Owner',True,True),
 ])
 def test_schema_roles_keep_metadata_separate_from_payload(client,objects,role,select,insert):
     schema,_,_,_,_=objects
@@ -296,7 +296,7 @@ def test_schema_roles_keep_metadata_separate_from_payload(client,objects,role,se
     q=query()
     assert allow(q,'SelectFromColumns',columns=['amount']) is select
     assert allow(q,'InsertIntoTable') is insert
-    if role in ('Viewer','Manager'):
+    if role in ('Reader','Contributor'):
         with SessionLocal() as db:
             resource=db.get(Resource,schema['id'])
             user=rbac.resolve_user(db,User('bob'))

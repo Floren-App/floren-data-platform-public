@@ -59,7 +59,7 @@ def test_workloads_cannot_call_another_layers_external_api(client, backend):  # 
     prod = client.post("/v1/apis", headers=as_("admin"), json={"name": "Partner", "slug": "partner", "direction": "external",
         "layer_id": layers.PROD, "outbound": {"base_url": backend}}).json()
     op = client.post(f"/v1/apis/{prod['id']}/operations", headers=as_("admin"), json={"name": "ping", "path": "/ping"}).json()
-    grant_group(client, op["resource_id"], "Partner consumers", "Consumer", users=["bob"])
+    grant_group(client, op["resource_id"], "Partner consumers", "DataReader", users=["bob"])
     assert client.get("/v1/egress/partner/ping", headers=as_("bob")).status_code == 200  # people may test it
     seen = len(Backend.seen)
     _, token = execution_token(start_workspace(client, "bob"))  # bob's workspace is in Non-Prod
@@ -71,7 +71,7 @@ def test_delegated_data_scope_never_includes_another_layers_source(client):
     client.put("/v1/admin/datasources/prod-files", headers=as_("admin"),
                json=integration("prod-files", "s3", layer_id=layers.PROD)).raise_for_status()
     schema = client.post("/v1/rbac/sources/prod-files/schemas", headers=as_("admin"), json={"name": "reports"}).json()
-    grant_group(client, schema["id"], "Prod readers", "Reader", users=["ana"])
+    grant_group(client, schema["id"], "Prod readers", "DataReader", users=["ana"])
     with SessionLocal() as db:
         row = db.get(Resource, schema["id"])
         row.config = {**row.config, "state": "ready"}

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/Floren-App/terraform-provider-fdp/internal/client"
@@ -268,12 +269,14 @@ func (r *roleAssignmentResource) Schema(_ context.Context, _ resource.SchemaRequ
 	replace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 	resp.Schema = schema.Schema{
 		Description: "A built-in role on one object (schema, source, folder, workload, API...) for an app group or " +
-			"directly for a user/service identity. Import as <resource_id>/group/<id> or <resource_id>/principal/<id>.",
+			"directly for a user/service identity. A recipient can hold several roles on one object, one resource each. " +
+			"Import as <resource_id>/group/<id>/<role> or <resource_id>/principal/<id>/<role>.",
 		Attributes: map[string]schema.Attribute{
 			"id":          schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"resource_id": schema.StringAttribute{Required: true, PlanModifiers: replace},
-			"role": schema.StringAttribute{Required: true, Description: "Viewer, Executor, Contributor, Manager, Admin, Owner, PlatformContributor, DataReader, DataContributor or AccessAdministrator (where supported). " +
-				"Legacy Reader, Consumer, Publisher and Maintainer assignments remain supported in their domains. Metadata visibility and payload use are separate; see the role matrix."},
+			"role": schema.StringAttribute{Required: true, Description: "Reader (see the object and its configuration), Contributor (change its settings), " +
+				"DataReader (read its data), DataContributor (change its data), Executor (trigger on-demand workloads), Viewer (find a data product " +
+				"and ask for access), AccessAdministrator, Admin or Owner, where the object offers it. Changing it replaces the role in place."},
 			"app_group_id": schema.StringAttribute{Optional: true, PlanModifiers: replace},
 			"principal_id": schema.StringAttribute{Optional: true, PlanModifiers: replace},
 			"justification_id": schema.StringAttribute{Optional: true,
@@ -289,12 +292,15 @@ func (r *roleAssignmentResource) Configure(_ context.Context, req resource.Confi
 
 func (r *roleAssignmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, "/")
-	if len(parts) != 3 || (parts[1] != "group" && parts[1] != "principal") {
-		resp.Diagnostics.AddError("Invalid import ID", "use <resource_id>/group/<app_group_id> or <resource_id>/principal/<principal_id>")
+	if (len(parts) != 3 && len(parts) != 4) || (parts[1] != "group" && parts[1] != "principal") {
+		resp.Diagnostics.AddError("Invalid import ID", "use <resource_id>/group/<app_group_id>/<role> or <resource_id>/principal/<principal_id>/<role>")
 		return
 	}
 	m := roleAssignmentModel{ID: types.StringValue(req.ID), ResourceID: types.StringValue(parts[0]),
 		AppGroupID: types.StringNull(), PrincipalID: types.StringNull(), Role: types.StringNull(), Justification: types.StringNull()}
+	if len(parts) == 4 {
+		m.Role = types.StringValue(parts[3])
+	}
 	if parts[1] == "group" {
 		m.AppGroupID = types.StringValue(parts[2])
 	} else {
@@ -305,17 +311,21 @@ func (r *roleAssignmentResource) ImportState(ctx context.Context, req resource.I
 
 func (m *roleAssignmentModel) key() string {
 	if !m.AppGroupID.IsNull() {
-		return m.ResourceID.ValueString() + "/group/" + m.AppGroupID.ValueString()
+		return m.ResourceID.ValueString() + "/group/" + m.AppGroupID.ValueString() + "/" + m.Role.ValueString()
 	}
-	return m.ResourceID.ValueString() + "/principal/" + m.PrincipalID.ValueString()
+	return m.ResourceID.ValueString() + "/principal/" + m.PrincipalID.ValueString() + "/" + m.Role.ValueString()
 }
 
-func (r *roleAssignmentResource) put(ctx context.Context, m *roleAssignmentModel, d *diagSink) {
+// put gives the role; with replaces (a role change) it takes the place of that role.
+func (r *roleAssignmentResource) put(ctx context.Context, m *roleAssignmentModel, replaces string, d *diagSink) {
 	if m.AppGroupID.IsNull() == m.PrincipalID.IsNull() {
 		d.d.AddError("Choose one recipient", "set exactly one of app_group_id or principal_id")
 		return
 	}
 	body := map[string]any{"role": m.Role.ValueString()}
+	if replaces != "" && replaces != m.Role.ValueString() {
+		body["replaces"] = replaces
+	}
 	if !m.Justification.IsNull() && m.Justification.ValueString() != "" {
 		body["justification_id"] = m.Justification.ValueString()
 	}
@@ -337,7 +347,7 @@ func (r *roleAssignmentResource) Create(ctx context.Context, req resource.Create
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	r.put(ctx, &plan, &diagSink{&resp.Diagnostics})
+	r.put(ctx, &plan, "", &diagSink{&resp.Diagnostics})
 	if !resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
@@ -353,25 +363,39 @@ func (r *roleAssignmentResource) Read(ctx context.Context, req resource.ReadRequ
 		}
 		return
 	}
+	var held []string
 	for _, a := range all {
 		if a.Inherited || a.ResourceID != state.ResourceID.ValueString() {
 			continue
 		}
 		if (!state.AppGroupID.IsNull() && a.AppGroupID != nil && *a.AppGroupID == state.AppGroupID.ValueString()) ||
 			(!state.PrincipalID.IsNull() && a.PrincipalID != nil && *a.PrincipalID == state.PrincipalID.ValueString()) {
-			state.Role = types.StringValue(a.Role)
+			held = append(held, a.Role)
+		}
+	}
+	for _, role := range held {
+		if role == state.Role.ValueString() {
 			state.ID = types.StringValue(state.key())
 			resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 			return
 		}
 	}
+	// A role renamed on the server (the November 2026 role model) or imported without a role: when the recipient
+	// holds exactly one role here, that is this resource's role.
+	if len(held) == 1 {
+		state.Role = types.StringValue(held[0])
+		state.ID = types.StringValue(state.key())
+		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+		return
+	}
 	resp.State.RemoveResource(ctx)
 }
 
 func (r *roleAssignmentResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan roleAssignmentModel
+	var plan, state roleAssignmentModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	r.put(ctx, &plan, &diagSink{&resp.Diagnostics})
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	r.put(ctx, &plan, state.Role.ValueString(), &diagSink{&resp.Diagnostics})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -384,6 +408,7 @@ func (r *roleAssignmentResource) Delete(ctx context.Context, req resource.Delete
 	} else {
 		target += "services/" + state.PrincipalID.ValueString()
 	}
+	target += "?role=" + url.QueryEscape(state.Role.ValueString())
 	if err := r.api.Do(ctx, "DELETE", target, nil, nil); err != nil && !client.IsNotFound(err) {
 		apiError(&resp.Diagnostics, fmt.Sprintf("revoking role %s", state.Role.ValueString()), err)
 	}

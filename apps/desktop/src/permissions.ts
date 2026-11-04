@@ -1,7 +1,8 @@
 import type { Me } from "./api";
 import type { TabKind } from "./views/Tabs";
 
-export const TAB_PAGES: Record<TabKind, string> = {
+/** The page gate of each tab; null for reference pages anyone signed in may read. */
+export const TAB_PAGES: Record<TabKind, string | null> = {
   "home": "home",
   "catalog": "catalog",
   "catalog-object": "catalog",
@@ -10,6 +11,7 @@ export const TAB_PAGES: Record<TabKind, string> = {
   "access-requests": "requests",
   "users": "people",
   "access": "set-groups",
+  "roles": null,
   "workspaces": "workspaces",
   "workspace": "workspaces",
   "runs": "runs",
@@ -64,8 +66,8 @@ export const TAB_PAGES: Record<TabKind, string> = {
   "deadlines": "deadlines",
 };
 
-export function pageVisible(me: Me | null, page: string): boolean {
-  return !!me && (me.acting_admin === true || me.pages?.[page] === true);
+export function pageVisible(me: Me | null, page: string | null): boolean {
+  return !!me && (page === null || me.acting_admin === true || me.pages?.[page] === true);
 }
 
 export function can(me: Me | null, action: string, target: string, layer?: string | null): boolean {

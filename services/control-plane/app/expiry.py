@@ -36,21 +36,20 @@ def _product_of(db, resource_id: str) -> Optional[CatalogProduct]:
     return db.scalar(select(CatalogProduct).where(CatalogProduct.access_resource_id == resource_id))
 
 
-def remove_access(db, resource_id: str, group_id: str, previous_role: Optional[str] = None) -> None:
-    """Take the justified access away: a product's consumer stops being one; a role goes back to what it was."""
+def remove_access(db, resource_id: str, group_id: str, role: Optional[str] = None, previous_role: Optional[str] = None) -> None:
+    """Take the justified access away: a product's user stops being one; the justified role goes, the group's other
+    roles stay. Grants approved before a group could hold several roles go back to the role they replaced."""
     product = _product_of(db, resource_id)
     if product is not None:
         db.execute(delete(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == group_id,
-                                                RoleAssignment.role == "Consumer"))
+                                                RoleAssignment.role == "DataReader"))
         db.execute(delete(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == group_id))
         return
-    current = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == group_id))
-    if current is None:
-        return
-    if previous_role:
-        current.role = previous_role
-    else:
-        db.delete(current)
+    query = delete(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == group_id)
+    db.execute(query.where(RoleAssignment.role == role) if role else query)
+    if previous_role and db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == group_id,
+                                                                RoleAssignment.role == previous_role)) is None:
+        db.add(RoleAssignment(resource_id=resource_id, app_group_id=group_id, role=previous_role))
 
 
 def _tell_owners(db, event: str, resource_id: str, group_id: str, subject: str, text: str, key: Optional[str] = None,
@@ -69,7 +68,7 @@ def _what(db, resource_id: str, group_id: str, role: str) -> str:
     product = _product_of(db, resource_id)
     resource = db.get(Resource, resource_id)
     name = product.title if product else (resource.name if resource else resource_id)
-    return f"{'the data product ' + name if product else role + ' on ' + name} for {group.name if group else group_id}"
+    return f"{'the data product ' + name if product else rbac.label(role) + ' on ' + name} for {group.name if group else group_id}"
 
 
 # --- the end of justified access ------------------------------------------------------------------------
@@ -81,7 +80,7 @@ def expire(db, now: datetime) -> int:
             continue
         case = db.get(AccessCase, grant.case_id)
         what = _what(db, grant.resource_id, grant.app_group_id, grant.role)
-        remove_access(db, grant.resource_id, grant.app_group_id, grant.previous_role)
+        remove_access(db, grant.resource_id, grant.app_group_id, grant.role, grant.previous_role)
         if case is not None and case.status == "approved":
             case.status = "expired"
         _audit(db, "compliance.expired", grant.resource_id, group=grant.app_group_id, role=grant.role, case=grant.case_id)
@@ -181,7 +180,7 @@ def uncovered(db) -> dict:
             continue
         if resource.kind == "product":
             product = _product_of(db, resource.id)
-            if product is None or assignment.role != "Consumer":
+            if product is None or assignment.role != "DataReader":
                 continue
             access = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == group))
             option = db.get(ProductOption, access.option_id) if access and access.option_id else None
@@ -211,7 +210,7 @@ def deadlines(db, now: datetime) -> None:
             continue
         if _aware(item.due_at) <= now:
             what = _what(db, item.resource_id, item.app_group_id, item.role)
-            remove_access(db, item.resource_id, item.app_group_id)
+            remove_access(db, item.resource_id, item.app_group_id, item.role)
             _audit(db, "compliance.unjustified_removed", item.resource_id, group=item.app_group_id, role=item.role,
                    due_at=item.due_at.isoformat())
             _tell_owners(db, "access.removed", item.resource_id, item.app_group_id, f"Access removed: {what}",

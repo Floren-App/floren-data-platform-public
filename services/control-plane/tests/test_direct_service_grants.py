@@ -38,12 +38,12 @@ def test_direct_service_data_roles_reach_trino_catalog_and_snapshots_without_a_g
         schema_id = db.scalar(select(Resource.id).where(Resource.parent_id == parent))
         group_count = db.scalar(select(func.count()).select_from(AppGroup))
         assert sql_access.scopes(db, sql_access.SqlActor(actor, 'test')) == {}
-    assert assign(client, parent, actor.principal_id, 'Contributor').status_code == 200
-    assert assign(client, schema_id, actor.principal_id, 'Reader').status_code == 200
+    assert assign(client, parent, actor.principal_id, 'DataContributor').status_code == 200
+    assert assign(client, schema_id, actor.principal_id, 'DataReader').status_code == 200
     with SessionLocal() as db:
         source = db.get(DataSource, source_id)
         assert rbac.data_scope(db, actor, source) == {'reporting': 'Contributor'}
-        assert sql_access.scopes(db, sql_access.SqlActor(actor, 'test'))['finance']['schemas'] == {'reporting': 'Reader'}
+        assert sql_access.scopes(db, sql_access.SqlActor(actor, 'test'))['finance']['schemas'] == {'reporting': 'Contributor'}
         assert data_access.snapshot(db, actor)[source.id] == {'reporting': 'Contributor'}
         _, actions = catalog.permissions(db, actor)
         assert {'read', 'write'} <= actions[schema_id] and 'create' not in actions[schema_id]
@@ -67,12 +67,13 @@ def test_registered_workload_identity_can_be_granted_data_directly(client, repo)
     # A schema Owner can use the service picker without being an IdP directory admin/group owner.
     picked = client.get(f"/v1/rbac/resources/{schema['id']}/service-principals", headers=as_('admin')).json()
     assert any(p['id'] == pid and p['name'] == pub['title'] for p in picked)
-    first = assign(client, schema['id'], pid, 'Reader')
+    first = assign(client, schema['id'], pid, 'DataReader')
     assert first.status_code == 200, first.text
     second = assign(client, schema['id'], pid, 'Admin')
     assert second.status_code == 200
+    # Roles add up: the identity holds both, directly.
     grants = [g for g in second.json() if g['principal_id'] == pid]
-    assert len(grants) == 1 and grants[0]['role'] == 'Admin' and grants[0]['app_group_id'] is None
+    assert {g['role'] for g in grants} == {'DataReader', 'Admin'} and all(g['app_group_id'] is None for g in grants)
     repaired = client.post(f"/v1/workloads/{pub['id']}/sync", headers=as_('ana')).json()
     assert repaired['status'] == 'live' and repaired['access_issue'] is None
     with SessionLocal() as db:
@@ -89,20 +90,20 @@ def test_direct_grants_require_resource_owner_and_only_accept_active_users_or_se
     assert client.delete(f"/v1/rbac/resources/{schema['id']}/assignments/services/{actor.principal_id}", headers=as_('ana')).status_code == 403
     directory = client.get('/v1/rbac/directory', headers=as_('admin')).json()
     human = next(p for p in directory if p['kind'] == 'user')
-    assert assign(client, schema['id'], human['id'], 'Reader').status_code == 200
-    assert assign(client, schema['id'], 'missing', 'Reader').status_code == 422
-    assert assign(client, schema['id'], actor.principal_id, 'Executor').status_code == 200
+    assert assign(client, schema['id'], human['id'], 'DataReader').status_code == 200
+    assert assign(client, schema['id'], 'missing', 'DataReader').status_code == 422
+    assert assign(client, schema['id'], actor.principal_id, 'DataContributor').status_code == 200
     assert assign(client, schema['id'], actor.principal_id, 'UndefinedRole').status_code == 422
     assert client.put(f"/v1/rbac/resources/{schema['id']}/assignments", headers=as_('admin'),
-                      json={'principal_id': actor.principal_id, 'app_group_id': 'also-set', 'role': 'Reader'}).status_code == 422
+                      json={'principal_id': actor.principal_id, 'app_group_id': 'also-set', 'role': 'DataReader'}).status_code == 422
     # An object Owner need not be a group owner to discover service identities.
     grant_group(client, schema['id'], 'Schema owners', 'Owner', users=['bob'])
     assert client.get('/v1/rbac/directory', headers=as_('bob')).status_code == 403
     assert client.get(url, headers=as_('bob')).status_code == 200
-    assert assign(client, schema['id'], actor.principal_id, 'Reader', 'bob').status_code == 200
+    assert assign(client, schema['id'], actor.principal_id, 'DataReader', 'bob').status_code == 200
     assert client.delete('/v1/admin/service-accounts/direct-etl', headers=as_('admin')).status_code == 204
     assert actor.principal_id not in {p['id'] for p in client.get(url, headers=as_('admin')).json()}
-    assert assign(client, schema['id'], actor.principal_id, 'Reader').status_code == 422
+    assert assign(client, schema['id'], actor.principal_id, 'DataReader').status_code == 422
     with SessionLocal() as db, pytest.raises(HTTPException):
         rbac.resolve_user(db, User('service:' + actor.principal_id))
 

@@ -10,11 +10,11 @@ resource "fdp_permission_assignment" "engineer_workspace_pages" {
   namespace    = "pages"
   layer_id     = var.layer_id
   app_group_id = var.engineers_group_id
-  role         = "Viewer"
+  role         = "Reader"
 }
 
 resource "fdp_permission_assignment" "engineer_workspace_functions" {
-  for_each     = local.developer_workspaces ? toset(["Manager", "Contributor", "Executor"]) : toset([])
+  for_each     = local.developer_workspaces ? toset(["Contributor", "DataContributor", "Executor"]) : toset([])
   target_id    = "workspaces"
   namespace    = "workspaces"
   layer_id     = var.layer_id
@@ -37,7 +37,7 @@ resource "fdp_permission_assignment" "engineer_workspace_content" {
   namespace    = each.value
   layer_id     = var.layer_id
   app_group_id = var.engineers_group_id
-  role         = "Executor"
+  role         = "DataReader"
 }
 
 resource "fdp_permission_assignment" "engineer_private_credentials" {

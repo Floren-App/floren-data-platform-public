@@ -402,7 +402,7 @@ def set_egress_allowlist(body: EgressAllowlistIn, layer_id: Optional[str] = None
         from ..egress_proxy import package_index
         if package_index(host):
             raise HTTPException(422, f"{host} is a public package index; workspaces install packages from the platform's "
-                                     "package repository (Packages), where Publishers import what is needed")
+                                     "package repository (Packages), where Data Contributors import what is needed")
         if host in seen:
             raise HTTPException(422, f"{host} is listed twice")
         if layer_id and not egress.within_ceiling(db, host):

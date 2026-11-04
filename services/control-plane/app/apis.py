@@ -427,6 +427,14 @@ def _template(path: str) -> re.Pattern:
     return re.compile("".join(f"(?P<{p[1:-1]}>[^/]+)" if p.startswith("{") else re.escape(p) for p in parts) + "/?")
 
 
+READ_METHODS = ("GET", "HEAD", "OPTIONS")
+
+
+def call_permission(method: str) -> str:
+    """Data Readers call operations that read (GET, HEAD, OPTIONS); the others change data and need Data Contributor."""
+    return "apis.calls.read" if (method or "").upper() in READ_METHODS else "apis.calls.write"
+
+
 def match_rest(ops: List[ApiOperation], method: str, path: str) -> Tuple[Optional[ApiOperation], Dict[str, str]]:
     path = "/" + path.lstrip("/")
     for op in sorted(ops, key=lambda o: (o.path.count("{"), -len(o.path))):   # literal paths win

@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
-| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
-| `POST` | `/v1/egress/{slug}/{path}` | Egress |
 | `GET` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
+| `POST` | `/v1/egress/{slug}/{path}` | Egress |
+| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -371,6 +371,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `PUT` | `/v1/permissions/assignments/{ident}` | Update |
 | `DELETE` | `/v1/permissions/assignments/{ident}` | Remove |
 | `GET` | `/v1/permissions/capabilities` | Capabilities |
+| `GET` | `/v1/permissions/catalog` | Catalog |
 | `GET` | `/v1/permissions/registry` | Registry |
 | `POST` | `/v1/permissions/roles` | Create Role |
 | `GET` | `/v1/permissions/roles/{ident}` | Read Role |
@@ -422,8 +423,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/info` | Info |
-| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/pages/{token}` | Page |
+| `DELETE` | `/v1/sql/pages/{token}` | Page |
 | `GET` | `/v1/sql/queries/{query_id}` | Query Status |
 | `POST` | `/v1/sql/query` | Query Request |
 | `POST` | `/v1/statement` | Statement |

@@ -4,7 +4,7 @@ understand and request. A dashboard bundled with the tables it uses is a typical
 A product's card (name, summary, owner, domain, what is in it, freshness) is visible to everyone in its layer,
 with or without access. Its lineage from the sources shows the steps by name, kind and owner only; details
 (columns, preview, SQL) stay behind each object's own permissions. One access request covers the whole
-product. Access is a role on the product itself: groups with Consumer on it may read or use everything in it
+product. Access is a role on the product itself: groups with Data Reader on it may read or use everything in it
 (rbac.product_grants), so revoking it, removing an object or unpublishing ends that access everywhere."""
 from __future__ import annotations
 
@@ -182,7 +182,7 @@ class _Viewer:
             path = asset.attributes.get('object_path') or asset.name
             return ('data.files.read' in file_actions(rules,path)) if source.kind == 's3' else ('data.sql.select' in actions_for(rules,path))
         if resource.kind == 'service':
-            return self.can(resource.id,'execute')
+            return self.can(resource.id,'open')
         return self.can(resource.id,'read')
 
 
@@ -199,7 +199,7 @@ def members(db: Session, product: CatalogProduct) -> List[tuple]:
 
 
 def _grants(db, parts) -> List[dict]:
-    """Consumer access on each actual object, never an implied whole-schema grant."""
+    """Data Reader access on each actual object, never an implied whole-schema grant."""
     seen, out = set(), []
     for asset, resource in parts:
         from ..object_access import target_for_asset
@@ -208,7 +208,7 @@ def _grants(db, parts) -> List[dict]:
         if resource.id not in seen:
             seen.add(resource.id)
             out.append({"resource_id": resource.id, "kind": resource.kind, "name": resource.name,
-                        "role": "Executor" if resource.kind in rbac.DATA_OBJECT_KINDS else READER_ROLE.get(resource.kind, "Reader"), "object": asset.name})
+                        "role": READER_ROLE.get(resource.kind, "DataReader"), "object": asset.name})
     return out
 
 
@@ -418,7 +418,7 @@ def _hold_new_objects(db, product, before) -> None:
     from .. import compliance, product_options
     from ..models import ProductAccess
     db.flush()
-    for a in db.scalars(select(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id, RoleAssignment.role == "Consumer")):
+    for a in db.scalars(select(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id, RoleAssignment.role == "DataReader")):
         access = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == a.app_group_id))
         if access is not None and access.approved_assets is not None:
             continue  # already limited to what was approved
@@ -640,7 +640,7 @@ def product_detail(product_id: str, db: Session = Depends(get_db), user: User = 
         from .. import product_options
         out["access_resource"] = resource_out(db, access, viewer.user)
         consumers = []
-        for a in db.scalars(select(RoleAssignment).where(RoleAssignment.resource_id == access.id, RoleAssignment.role == "Consumer")):
+        for a in db.scalars(select(RoleAssignment).where(RoleAssignment.resource_id == access.id, RoleAssignment.role == "DataReader")):
             group, option = db.get(AppGroup, a.app_group_id), product_options.option_for_group(db, product.id, a.app_group_id)
             consumers.append({"group_id": a.app_group_id, "group": group.name if group else a.app_group_id,
                               "option_id": option.id if option else None, "option": option.name if option else None})
@@ -686,9 +686,9 @@ def request_access(product_id: str, body: RequestIn, db: Session = Depends(get_d
         raise HTTPException(403, "people request access; service identities are granted by owners")
     if body.app_group_id not in viewer.groups:
         raise HTTPException(422, "choose one of your own groups")
-    permissions.require_domain(db,viewer.user,"products.requests.own.create",db.get(Resource,product.access_resource_id),"use")
+    permissions.require_domain(db,viewer.user,"products.requests.own.create",db.get(Resource,product.access_resource_id),"read")
     if body.submit:
-        permissions.require_domain(db,viewer.user,"products.requests.own.submit",db.get(Resource,product.access_resource_id),"use")
+        permissions.require_domain(db,viewer.user,"products.requests.own.submit",db.get(Resource,product.access_resource_id),"read")
     parts = members(db, product)
     from ..models import ProductAccess
     held = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == body.app_group_id))
@@ -704,7 +704,7 @@ def request_access(product_id: str, body: RequestIn, db: Session = Depends(get_d
     if option is None or option.product_id != product.id:
         raise HTTPException(422, "choose one of the product's access options")
     r = AccessRequest(product_id=product.id, requester=viewer.user.username, requester_principal_id=viewer.user.principal_id or "",
-                      app_group_id=body.app_group_id, reason=body.reason.strip(), role="Consumer", option_id=option.id)
+                      app_group_id=body.app_group_id, reason=body.reason.strip(), role="DataReader", option_id=option.id)
     db.add(r)
     db.flush()
     from .. import compliance
@@ -772,12 +772,12 @@ def decide(request_id: str, body: DecisionIn, db: Session = Depends(get_db), use
     if body.approve:
         if not db.get(AppGroup, r.app_group_id):
             raise HTTPException(409, "the requested group no longer exists")
-        # Consumer on the product itself; what that gives on each object is derived (rbac.product_grants).
+        # Data Reader on the product itself; what that gives on each object is derived (rbac.product_grants).
         current = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id,
-                                                         RoleAssignment.app_group_id == r.app_group_id))
+                                                         RoleAssignment.app_group_id == r.app_group_id, RoleAssignment.role == "DataReader"))
         if current is None:
-            db.add(RoleAssignment(resource_id=product.access_resource_id, app_group_id=r.app_group_id, role="Consumer"))
-            audit(db, viewer.user.username, "role.assign", product.access_resource_id, group=r.app_group_id, role="Consumer", request=r.id)
+            db.add(RoleAssignment(resource_id=product.access_resource_id, app_group_id=r.app_group_id, role="DataReader"))
+            audit(db, viewer.user.username, "role.assign", product.access_resource_id, group=r.app_group_id, role="DataReader", request=r.id)
         from .. import product_options
         option = db.get(ProductOption, r.option_id) if r.option_id else None
         option = option if option is not None and option.product_id == product.id else product_options.default_option(db, product.id)
@@ -797,7 +797,7 @@ def withdraw(request_id: str, db: Session = Depends(get_db), user: User = Depend
     if not r or r.requester_principal_id != viewer.user.principal_id:
         raise HTTPException(404, "request not found")
     product=db.get(CatalogProduct,r.product_id)
-    permissions.require_domain(db,viewer.user,"products.requests.own.withdraw",db.get(Resource,product.access_resource_id),"use")
+    permissions.require_domain(db,viewer.user,"products.requests.own.withdraw",db.get(Resource,product.access_resource_id),"read")
     if r.status == "pending":
         r.status, r.decided_at = "withdrawn", utcnow()
         audit(db, viewer.user.username, "catalog.access_withdrawn", r.product_id, request=r.id)
@@ -826,9 +826,9 @@ def put_consumer(product_id: str, group_id: str, body: ConsumerIn, db: Session =
             raise HTTPException(409, {"code": "justification_required", "message": "this option needs an approved compliance form",
                                       "requirement": compliance.requirement_out(db, req)})
     current = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id,
-                                                     RoleAssignment.app_group_id == group_id))
+                                                     RoleAssignment.app_group_id == group_id, RoleAssignment.role == "DataReader"))
     if current is None:
-        db.add(RoleAssignment(resource_id=product.access_resource_id, app_group_id=group_id, role="Consumer"))
+        db.add(RoleAssignment(resource_id=product.access_resource_id, app_group_id=group_id, role="DataReader"))
     product_options.set_option(db, product.id, group_id, option.id)
     audit(db, viewer.user.username, "catalog.consumer", product.access_resource_id, product=product.id, group=group_id, option=option.name)
     db.commit()
@@ -843,7 +843,7 @@ def delete_consumer(product_id: str, group_id: str, db: Session = Depends(get_db
     product = _product(db, product_id, viewer)
     _require_manager(db, product, viewer, "take access away", "products.requests.review.consumer.revoke")
     db.execute(delete(RoleAssignment).where(RoleAssignment.resource_id == product.access_resource_id,
-                                            RoleAssignment.app_group_id == group_id, RoleAssignment.role == "Consumer"))
+                                            RoleAssignment.app_group_id == group_id, RoleAssignment.role == "DataReader"))
     db.execute(delete(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == group_id))
     audit(db, viewer.user.username, "catalog.consumer_removed", product.access_resource_id, product=product.id, group=group_id)
     db.commit()

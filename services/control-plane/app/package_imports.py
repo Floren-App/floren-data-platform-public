@@ -1,4 +1,4 @@
-"""Imports from PyPI and CRAN, on request of a Publisher: the package and its missing dependencies.
+"""Imports from PyPI and CRAN, on request of a Data Contributor: the package and its missing dependencies.
 
 Python: `pip download` of built packages (wheels) only, for every Python version and CPU type the platform
 runs, so no package code runs during an import. A package that only exists as source is reported; build a

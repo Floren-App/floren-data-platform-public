@@ -1,0 +1,2994 @@
+{
+"alerts.rules.acknowledge": [
+"Executor",
+"Admin",
+"Owner"
+],
+"alerts.rules.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"alerts.rules.delete": [
+"Manager",
+"Admin",
+"Owner"
+],
+"alerts.rules.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"alerts.rules.enable": [
+"Manager",
+"Admin",
+"Owner"
+],
+"alerts.rules.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"alerts.rules.update": [
+"Manager",
+"Admin",
+"Owner"
+],
+"apis.calls.details.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"apis.calls.export": [
+"Executor",
+"Admin",
+"Owner"
+],
+"apis.calls.invoke": [
+"Executor",
+"Admin",
+"Owner"
+],
+"apis.calls.retention.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"apis.calls.status.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"apis.collection.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"apis.collection.register": [
+"Manager",
+"Admin",
+"Owner"
+],
+"apis.object.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"apis.object.credentials.change": [
+"Owner"
+],
+"apis.object.delete": [
+"Admin",
+"Owner"
+],
+"apis.object.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"apis.object.identity.change": [
+"Owner"
+],
+"apis.object.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"apis.object.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"apis.object.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"apis.object.trust.change": [
+"Owner"
+],
+"apis.operations.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"apis.operations.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"apis.operations.delete": [
+"Admin",
+"Owner"
+],
+"apis.operations.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"apis.operations.move": [
+"Manager",
+"Admin",
+"Owner"
+],
+"apis.operations.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"apis.operations.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"apis.operations.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"artifacts.delete": [
+"Admin",
+"Owner"
+],
+"artifacts.download": [
+"Executor",
+"Admin",
+"Owner"
+],
+"artifacts.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"artifacts.open": [
+"Executor",
+"Admin",
+"Owner"
+],
+"artifacts.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"audit.details.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"audit.export": [
+"Executor",
+"Admin",
+"Owner"
+],
+"audit.export_policy.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"audit.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"audit.retention.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"backups.archives.delete": [
+"Admin",
+"Owner"
+],
+"backups.configuration.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"backups.configuration.update": [
+"Owner"
+],
+"backups.create": [
+"Executor",
+"Admin",
+"Owner"
+],
+"backups.destinations.create": [
+"Owner"
+],
+"backups.destinations.delete": [
+"Owner"
+],
+"backups.destinations.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"AccessAdministrator"
+],
+"backups.destinations.update": [
+"Owner"
+],
+"backups.destinations.use": [
+"Executor",
+"Manager",
+"Admin",
+"Owner"
+],
+"backups.history.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"backups.plans.create": [
+"Contributor",
+"PlatformContributor",
+"Admin",
+"Owner"
+],
+"backups.plans.delete": [
+"Admin",
+"Owner"
+],
+"backups.plans.destination.change": [
+"Owner"
+],
+"backups.plans.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"AccessAdministrator"
+],
+"backups.plans.retention.change": [
+"Admin",
+"Owner"
+],
+"backups.plans.run": [
+"Executor",
+"Admin",
+"Owner"
+],
+"backups.plans.schedule.change": [
+"Manager",
+"Admin",
+"Owner"
+],
+"backups.plans.source.change": [
+"Owner"
+],
+"backups.plans.update": [
+"Contributor",
+"PlatformContributor",
+"Admin",
+"Owner"
+],
+"backups.recovery.resume": [
+"Owner"
+],
+"backups.sources.export": [
+"Owner"
+],
+"catalog.search": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"catalog.suggest": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"catalog.view": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"certificates.anchors.change": [
+"Owner"
+],
+"certificates.chain.rotate": [
+"Manager",
+"Admin",
+"Owner"
+],
+"certificates.private_key.bind": [
+"Owner"
+],
+"certificates.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"certificates.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"certificates.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"certificates.use": [
+"Executor",
+"Admin",
+"Owner"
+],
+"classification.binding.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"classification.binding.downgrade": [
+"Owner"
+],
+"classification.binding.propose": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"classification.binding.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"classification.dictionary.delete_unused": [
+"Admin",
+"Owner"
+],
+"classification.dictionary.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"classification.dictionary.publish": [
+"Manager",
+"Admin",
+"Owner"
+],
+"classification.dictionary.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.cases.answers.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.cases.approve": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compliance.cases.attachment.add": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.cases.attachment.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.cases.changes.request": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compliance.cases.comment": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.cases.create": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.cases.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.cases.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.cases.reject": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compliance.cases.renew": [
+"Executor",
+"Admin",
+"Owner"
+],
+"compliance.cases.submit": [
+"Executor",
+"Admin",
+"Owner"
+],
+"compliance.cases.withdraw": [
+"Executor",
+"Admin",
+"Owner"
+],
+"compliance.deadlines.decide": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compliance.deadlines.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.deadlines.renew": [
+"Executor",
+"Admin",
+"Owner"
+],
+"compliance.duties.appoint": [
+"Owner"
+],
+"compliance.duties.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.duties.revoke": [
+"Owner"
+],
+"compliance.forms.create": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.forms.delete": [
+"Admin",
+"Owner"
+],
+"compliance.forms.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.forms.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.forms.publish": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compliance.forms.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.forms.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"compliance.forms.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"compliance.memberships.approve": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compliance.memberships.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.memberships.reject": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compliance.policies.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compliance.policies.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.policies.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compliance.policies.remove": [
+"Owner"
+],
+"compliance.policies.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"compliance.policies.weaken": [
+"Owner"
+],
+"compliance.register.export": [
+"Executor",
+"Admin",
+"Owner"
+],
+"compliance.register.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compute.defaults.consume": [
+"Executor",
+"Admin",
+"Owner"
+],
+"compute.defaults.limits.reset": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compute.defaults.limits.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compute.defaults.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compute.defaults.warehouse.reset": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compute.defaults.warehouse.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compute.pools.capacity.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compute.pools.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compute.pools.delete": [
+"Admin",
+"Owner"
+],
+"compute.pools.engines.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"compute.pools.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"compute.pools.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"compute.pools.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"compute.pools.use": [
+"Executor",
+"Admin",
+"Owner"
+],
+"connections.admin_lease": [
+"Admin",
+"Owner"
+],
+"connections.discover": [
+"Executor",
+"Admin",
+"Owner"
+],
+"connections.identity.bind": [
+"Owner"
+],
+"connections.read_lease": [
+"Executor",
+"Admin",
+"Owner"
+],
+"connections.write_lease": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"data.files.create": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"data.files.delete": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"data.files.download": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.files.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.files.namespace.create": [
+"Admin",
+"Owner"
+],
+"data.files.namespace.delete": [
+"Admin",
+"Owner"
+],
+"data.files.overwrite": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"data.files.read": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.files.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"data.files.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"data.iceberg.commit": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"data.iceberg.drop": [
+"Admin",
+"Owner"
+],
+"data.iceberg.maintain": [
+"Admin",
+"Owner"
+],
+"data.iceberg.metadata.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.iceberg.read": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.iceberg.schema.change": [
+"Admin",
+"Owner"
+],
+"data.policies.apply_restrictive": [
+"Manager",
+"Admin",
+"Owner"
+],
+"data.policies.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"data.policies.exemptions.change": [
+"Owner"
+],
+"data.policies.normalize": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"data.policies.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"data.policies.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"data.policies.weaken": [
+"Owner"
+],
+"data.queries.cancel_others": [
+"Manager",
+"Admin",
+"Owner"
+],
+"data.queries.cancel_own": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.queries.results.read": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.queries.status.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor"
+],
+"data.queries.text.read": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.routines.alter": [
+"Admin",
+"Owner"
+],
+"data.routines.create": [
+"Admin",
+"Owner"
+],
+"data.routines.drop": [
+"Admin",
+"Owner"
+],
+"data.routines.execute": [
+"Executor",
+"Admin",
+"Owner"
+],
+"data.routines.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"data.routines.sequence.use": [
+"Executor",
+"Admin",
+"Owner"
+],
+"data.sql.ddl": [
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"data.sql.delete": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"data.sql.insert": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"data.sql.preview": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.sql.results.export": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.sql.select": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"data.sql.truncate": [
+"Admin",
+"Owner",
+"DataContributor"
+],
+"data.sql.update": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"delegation.files.read": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"delegation.files.write": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"delegation.query": [
+"Executor",
+"Admin",
+"Owner"
+],
+"delegation.query.write": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"directory.people.access.export": [
+"Executor",
+"Admin",
+"Owner"
+],
+"directory.people.access.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"directory.people.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"directory.people.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"git.credentials.binding.change": [
+"Owner"
+],
+"git.credentials.create": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"git.credentials.delete": [
+"Admin",
+"Owner"
+],
+"git.credentials.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"git.credentials.update": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"git.credentials.use": [
+"Executor",
+"Admin",
+"Owner"
+],
+"governance.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"governance.owner.change": [
+"Owner"
+],
+"governance.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"governance.status.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"groups.access.details.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"groups.access.export": [
+"Executor",
+"Admin",
+"Owner"
+],
+"groups.access.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"groups.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"groups.delete": [
+"Admin",
+"Owner"
+],
+"groups.idp.bind": [
+"Owner",
+"AccessAdministrator"
+],
+"groups.idp.unbind": [
+"Owner"
+],
+"groups.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"groups.members.add": [
+"Owner",
+"AccessAdministrator"
+],
+"groups.members.remove": [
+"Owner",
+"AccessAdministrator"
+],
+"groups.metadata.edit": [
+"Manager",
+"Admin",
+"Owner"
+],
+"groups.owners.change": [
+"Owner",
+"AccessAdministrator"
+],
+"groups.profile.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"groups.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"home.view": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"identities.bindings.change": [
+"Owner"
+],
+"identities.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"identities.delete": [
+"Admin",
+"Owner"
+],
+"identities.disable": [
+"Admin",
+"Owner"
+],
+"identities.execution.binding.change": [
+"Owner"
+],
+"identities.execution.use": [
+"Executor",
+"Admin",
+"Owner"
+],
+"identities.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"identities.metadata.edit": [
+"Manager",
+"Admin",
+"Owner"
+],
+"identities.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"identities.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"identities.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"identities.tokens.create": [
+"Owner"
+],
+"identities.tokens.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"identities.tokens.revoke": [
+"Owner"
+],
+"identities.tokens.rotate": [
+"Owner"
+],
+"kafka.clusters.configure": [
+"Manager",
+"Admin",
+"Owner"
+],
+"kafka.clusters.identity.change": [
+"Owner"
+],
+"kafka.clusters.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"kafka.clusters.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"kafka.clusters.register": [
+"Manager",
+"Admin",
+"Owner"
+],
+"kafka.clusters.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"kafka.clusters.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"kafka.clusters.unregister": [
+"Admin",
+"Owner"
+],
+"kafka.data.consume": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"kafka.data.offsets.commit_own": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"kafka.data.offsets.reset_others": [
+"Manager",
+"Admin",
+"Owner"
+],
+"kafka.data.produce": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"kafka.data.session.create": [
+"Executor",
+"Contributor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"kafka.topics.configure": [
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"kafka.topics.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"kafka.topics.delete": [
+"Admin",
+"Owner"
+],
+"kafka.topics.deletion.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"kafka.topics.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"kafka.topics.partitions.change": [
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"kafka.topics.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"kafka.topics.retention.change": [
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"kafka.topics.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"kafka.topics.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"layer_infrastructure.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"layer_infrastructure.destroy": [
+"Admin",
+"Owner"
+],
+"layer_infrastructure.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"layer_infrastructure.history.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"layer_infrastructure.identity.change": [
+"Owner"
+],
+"layer_infrastructure.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"layer_infrastructure.retire": [
+"Admin",
+"Owner"
+],
+"layer_infrastructure.retry": [
+"Manager",
+"Admin",
+"Owner"
+],
+"layer_infrastructure.trust.change": [
+"Owner"
+],
+"layers.collection.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"layers.collection.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"layers.object.delete_unused": [
+"Admin",
+"Owner"
+],
+"layers.object.production.set": [
+"Owner"
+],
+"layers.object.quota.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"layers.object.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"layers.object.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"layers.object.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"layers.object.settings.edit": [
+"Manager",
+"Admin",
+"Owner"
+],
+"layers.object.trust.change": [
+"Owner"
+],
+"layers.object.workspaces.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"lineage.import_airflow": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"lineage.import_dbt": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"lineage.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"logs.export": [
+"Executor",
+"Admin",
+"Owner"
+],
+"logs.metadata.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"logs.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"metrics.define": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"metrics.enable": [
+"Manager",
+"Admin",
+"Owner"
+],
+"metrics.history.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"metrics.measure": [
+"Executor",
+"Admin",
+"Owner"
+],
+"metrics.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"metrics.report": [
+"Executor",
+"Admin",
+"Owner"
+],
+"metrics.schedule.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"metrics.versions.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"network.api_destinations.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"network.api_destinations.ceiling.change": [
+"Owner"
+],
+"network.api_destinations.delete": [
+"Manager",
+"Admin",
+"Owner"
+],
+"network.api_destinations.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"network.api_destinations.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"network.editor_allowlist.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"network.editor_allowlist.ceiling.change": [
+"Owner"
+],
+"network.editor_allowlist.delete": [
+"Manager",
+"Admin",
+"Owner"
+],
+"network.editor_allowlist.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"network.editor_allowlist.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"network.policies.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"network.policies.baseline.change": [
+"Owner"
+],
+"network.policies.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"network.policies.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"network.policies.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"network.policies.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"network.policies.remove": [
+"Manager",
+"Admin",
+"Owner"
+],
+"network.policies.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"network.policies.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"network.policies.validate": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"packages.download": [
+"Executor",
+"Admin",
+"Owner"
+],
+"packages.imports.allowlist.reset": [
+"Manager",
+"Admin",
+"Owner"
+],
+"packages.imports.allowlist.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"packages.imports.approve": [
+"Manager",
+"Admin",
+"Owner"
+],
+"packages.imports.execute": [
+"Manager",
+"Admin",
+"Owner"
+],
+"packages.imports.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"packages.imports.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"packages.imports.request": [
+"Manager",
+"Admin",
+"Owner"
+],
+"packages.imports.source_trust.change": [
+"Owner"
+],
+"packages.install": [
+"Executor",
+"Admin",
+"Owner"
+],
+"packages.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"packages.publish": [
+"Manager",
+"Admin",
+"Owner"
+],
+"packages.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"packages.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"packages.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"packages.unyank": [
+"Manager",
+"Admin",
+"Owner"
+],
+"packages.upload": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"packages.version.delete": [
+"Admin",
+"Owner"
+],
+"packages.yank": [
+"Manager",
+"Admin",
+"Owner"
+],
+"pages.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"pages.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"pages.view": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"permissions.actions.assign": [
+"Owner"
+],
+"permissions.actions.revoke": [
+"Owner"
+],
+"permissions.bindings.read": [
+"Owner"
+],
+"permissions.effective.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"permissions.principals.select": [
+"Owner"
+],
+"permissions.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"permissions.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"platform.defaults.default_layer.reset": [
+"Manager",
+"Admin",
+"Owner"
+],
+"platform.defaults.default_layer.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"platform.defaults.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"products.collection.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"products.collection.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"products.object.delete": [
+"Admin",
+"Owner"
+],
+"products.object.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"products.object.live.update": [
+"Manager",
+"Admin",
+"Owner"
+],
+"products.object.publish": [
+"Manager",
+"Admin",
+"Owner"
+],
+"products.object.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"products.object.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"products.object.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"products.object.unpublish": [
+"Admin",
+"Owner"
+],
+"products.object.use": [
+"Executor",
+"Admin",
+"Owner"
+],
+"products.options.activate": [
+"Manager",
+"Admin",
+"Owner"
+],
+"products.options.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"products.options.privileges.widen": [
+"Owner"
+],
+"products.options.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"products.requests.own.create": [
+"Executor",
+"Admin",
+"Owner"
+],
+"products.requests.own.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"products.requests.own.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"products.requests.own.renew": [
+"Executor",
+"Admin",
+"Owner"
+],
+"products.requests.own.submit": [
+"Executor",
+"Admin",
+"Owner"
+],
+"products.requests.own.withdraw": [
+"Executor",
+"Admin",
+"Owner"
+],
+"products.requests.review.approve": [
+"Manager",
+"Admin",
+"Owner"
+],
+"products.requests.review.consumer.grant": [
+"Owner"
+],
+"products.requests.review.consumer.revoke": [
+"Owner"
+],
+"products.requests.review.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"products.requests.review.reject": [
+"Manager",
+"Admin",
+"Owner"
+],
+"profiles.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"profiles.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"profiles.default.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"profiles.delete": [
+"Admin",
+"Owner"
+],
+"profiles.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"profiles.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"query_log.details.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"query_log.export": [
+"Executor",
+"Admin",
+"Owner"
+],
+"query_log.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"query_log.recording.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"query_log.reset": [
+"Manager",
+"Admin",
+"Owner"
+],
+"query_log.retention.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"query_log.text.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"repositories.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"repositories.branches.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"repositories.credential.bind": [
+"Owner"
+],
+"repositories.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"repositories.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"repositories.manifest.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"repositories.pull": [
+"Executor",
+"Admin",
+"Owner"
+],
+"repositories.refresh": [
+"Executor",
+"Admin",
+"Owner"
+],
+"repositories.register": [
+"Manager",
+"Admin",
+"Owner"
+],
+"repositories.remove": [
+"Admin",
+"Owner"
+],
+"repositories.trust.change": [
+"Owner"
+],
+"reviews.configuration.manage": [
+"Executor",
+"Admin",
+"Owner"
+],
+"reviews.forms.review": [
+"Executor",
+"Admin",
+"Owner"
+],
+"reviews.memberships.approve": [
+"Executor",
+"Admin",
+"Owner"
+],
+"roles.custom.create": [
+"Owner"
+],
+"roles.custom.delete": [
+"Owner"
+],
+"roles.custom.draft.edit": [
+"Contributor",
+"Admin",
+"Owner"
+],
+"roles.custom.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"roles.custom.update": [
+"Owner"
+],
+"runs.cancel_others": [
+"Manager",
+"Admin",
+"Owner"
+],
+"runs.cancel_own": [
+"Executor",
+"Admin",
+"Owner"
+],
+"runs.create": [
+"Executor",
+"Admin",
+"Owner"
+],
+"runs.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"runs.queue.manage": [
+"Manager",
+"Admin",
+"Owner"
+],
+"runs.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"runs.retry": [
+"Executor",
+"Admin",
+"Owner"
+],
+"runtimes.default.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"runtimes.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"runtimes.enable": [
+"Manager",
+"Admin",
+"Owner"
+],
+"runtimes.layer.approve": [
+"Manager",
+"Admin",
+"Owner"
+],
+"runtimes.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"runtimes.register": [
+"Manager",
+"Admin",
+"Owner"
+],
+"runtimes.remove": [
+"Admin",
+"Owner"
+],
+"runtimes.use": [
+"Executor",
+"Admin",
+"Owner"
+],
+"secrets.binding.change": [
+"Owner"
+],
+"secrets.create": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"secrets.delete": [
+"Admin",
+"Owner"
+],
+"secrets.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"secrets.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"secrets.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"secrets.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"secrets.rotate": [
+"Manager",
+"Admin",
+"Owner"
+],
+"secrets.update": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"secrets.use": [
+"Executor",
+"Admin",
+"Owner"
+],
+"session.context.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"session.context.select": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"session.context.select_layer": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"siem.credentials.change": [
+"Owner"
+],
+"siem.endpoint.change": [
+"Owner"
+],
+"siem.export.configure": [
+"Manager",
+"Admin",
+"Owner"
+],
+"siem.status.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"slas.acknowledge": [
+"Executor",
+"Admin",
+"Owner"
+],
+"slas.activate": [
+"Manager",
+"Admin",
+"Owner"
+],
+"slas.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"slas.evaluate": [
+"Executor",
+"Admin",
+"Owner"
+],
+"slas.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"storage.access.effective.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"storage.access.provision": [
+"Admin",
+"Owner"
+],
+"storage.access.reconcile": [
+"Admin",
+"Owner"
+],
+"storage.access.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"storage.access.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"storage.connection.credentials.change": [
+"Owner"
+],
+"storage.connection.destination.change": [
+"Owner"
+],
+"storage.connection.edit": [
+"Manager",
+"Admin",
+"Owner"
+],
+"storage.connection.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"storage.connection.secret.bind": [
+"Owner"
+],
+"storage.connection.trust.change": [
+"Owner"
+],
+"storage.objects.alter": [
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"storage.objects.create": [
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"storage.objects.describe": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"storage.objects.drop": [
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"storage.objects.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"storage.objects.metadata.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"storage.objects.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"storage.objects.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"storage.schemas.create_native": [
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"storage.schemas.deregister": [
+"Admin",
+"Owner"
+],
+"storage.schemas.drop_native": [
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"storage.schemas.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"storage.schemas.owner.change": [
+"Owner"
+],
+"storage.schemas.register": [
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"storage.sources.deregister": [
+"Admin",
+"Owner"
+],
+"storage.sources.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor",
+"DataReader",
+"DataContributor",
+"AccessAdministrator"
+],
+"storage.sources.register": [
+"Manager",
+"Admin",
+"Owner"
+],
+"usage.export": [
+"Executor",
+"Admin",
+"Owner"
+],
+"usage.occupants.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"usage.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"webhooks.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"webhooks.credentials.change": [
+"Owner"
+],
+"webhooks.delete": [
+"Manager",
+"Admin",
+"Owner"
+],
+"webhooks.delivery.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"webhooks.endpoint.change": [
+"Owner"
+],
+"webhooks.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"webhooks.status.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"webhooks.test": [
+"Executor",
+"Admin",
+"Owner"
+],
+"webhooks.update": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.code.auto_update.set": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.code.deploy": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.code.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workloads.code.source.read": [
+"Executor",
+"Admin",
+"Owner"
+],
+"workloads.code.sync": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.code.versions.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workloads.deployments.candidates.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workloads.deployments.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.deployments.deploy": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.execution.app.open": [
+"Executor",
+"Admin",
+"Owner"
+],
+"workloads.execution.docs.open": [
+"Executor",
+"Admin",
+"Owner"
+],
+"workloads.execution.orchestrate": [
+"Executor",
+"Admin",
+"Owner"
+],
+"workloads.execution.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workloads.execution.restart_service": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.execution.run": [
+"Executor",
+"Admin",
+"Owner"
+],
+"workloads.execution.stop_others": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.execution.stop_own": [
+"Executor",
+"Admin",
+"Owner"
+],
+"workloads.folders.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.folders.delete": [
+"Admin",
+"Owner"
+],
+"workloads.folders.inheritance.change": [
+"Owner"
+],
+"workloads.folders.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workloads.folders.move": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.folders.rename": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.folders.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"workloads.folders.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"workloads.settings.edit": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workloads.settings.execution_mode.change": [
+"Owner"
+],
+"workloads.settings.identity.change": [
+"Owner"
+],
+"workloads.settings.owner.change": [
+"Owner"
+],
+"workloads.settings.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workloads.settings.roles.assign": [
+"Owner",
+"AccessAdministrator"
+],
+"workloads.settings.roles.revoke": [
+"Owner",
+"AccessAdministrator"
+],
+"workloads.settings.secret.bind": [
+"Owner"
+],
+"workloads.settings.undeploy": [
+"Admin",
+"Owner"
+],
+"workspace_templates.apply": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workspace_templates.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workspace_templates.delete": [
+"Admin",
+"Owner"
+],
+"workspace_templates.draft.edit": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workspace_templates.group.bind": [
+"Owner"
+],
+"workspace_templates.identity.bind": [
+"Owner"
+],
+"workspace_templates.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workspace_templates.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workspace_templates.secret.bind": [
+"Owner"
+],
+"workspaces.collection.create": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workspaces.collection.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workspaces.files.checkout": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workspaces.files.delete": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"workspaces.files.download": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"workspaces.files.list": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workspaces.files.pull": [
+"Contributor",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workspaces.files.read": [
+"Executor",
+"Admin",
+"Owner",
+"DataReader",
+"DataContributor"
+],
+"workspaces.files.write": [
+"Contributor",
+"Admin",
+"Owner",
+"DataContributor"
+],
+"workspaces.object.delete": [
+"Admin",
+"Owner"
+],
+"workspaces.object.editor.open": [
+"Admin",
+"Owner"
+],
+"workspaces.object.read": [
+"Viewer",
+"Executor",
+"Contributor",
+"Manager",
+"Admin",
+"Owner",
+"PlatformContributor"
+],
+"workspaces.object.settings.edit": [
+"Manager",
+"Admin",
+"Owner"
+],
+"workspaces.object.share": [
+"Owner"
+],
+"workspaces.object.start": [
+"Executor",
+"Admin",
+"Owner"
+],
+"workspaces.object.stop": [
+"Executor",
+"Admin",
+"Owner"
+]
+}

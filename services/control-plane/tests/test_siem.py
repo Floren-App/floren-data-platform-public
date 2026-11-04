@@ -62,7 +62,7 @@ def verify(events, key=None):
 
 def test_events_carry_a_verifiable_signed_chain_and_tampering_is_detected(factory):
     add_audit(factory, ('secret.create', 'ana', 'env/user/ana/token', {}),
-              ('rbac.assign', 'admin', 'schema-1', {'role': 'Reader', 'group': 'analysts'}),
+              ('rbac.assign', 'admin', 'schema-1', {'role': 'DataReader', 'group': 'analysts'}),
               ('api.call_denied', 'service:crm', 'crm/customers', {}))
     sink, cfg = Collect(), settings(siem_signing_key='k' * 32)
     assert siem.export_once(factory, sink, cfg) == 3

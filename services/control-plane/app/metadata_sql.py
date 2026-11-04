@@ -151,11 +151,12 @@ def mutate(db, user, node, table):
         resource, recipient = (values["resource_id"], values[key]) if inserting else (row.resource_id, getattr(row, key))
         if deleting:
             if key == "app_group_id":
-                commands.revoke(resource, recipient, db, user)
+                commands.revoke(resource, recipient, row.role, db, user)
             else:
-                commands.revoke_service(resource, recipient, db, user)
+                commands.revoke_service(resource, recipient, row.role, db, user)
         else:
-            commands.assign(resource, commands.AssignmentIn(**{key: recipient, "role": values.get("role", row.role if row else None)}), db, user)
+            commands.assign(resource, commands.AssignmentIn(**{key: recipient, "role": values.get("role", row.role if row else None),
+                                                                      "replaces": row.role if row and not inserting else None}), db, user)
     elif table == "identity_bindings":
         fields({"app_group_id", "principal_id"})
         if deleting:
@@ -188,7 +189,7 @@ def execute(db, who, statement, catalog="", schema="", prepared=""):
         fail("SQL syntax is not supported by the shared gateway")
     # A small, explicit management grammar. Names are quoted; IDs remain stable
     # even if objects are renamed. Native Trino privilege management stays denied.
-    grant = re.fullmatch(r'\s*(GRANT|REVOKE)\s+(Owner|Admin|Contributor|Reader|Executor|Consumer)\s+ON\s+RESOURCE\s+\'([^\']+)\'\s+(?:TO|FROM)\s+(GROUP|SERVICE|USER)\s+\'([^\']+)\'\s*;?\s*', text, re.I)
+    grant = re.fullmatch(r'\s*(GRANT|REVOKE)\s+(Owner|Admin|AccessAdministrator|DataContributor|DataReader|Contributor|Reader|Executor|Viewer)\s+ON\s+RESOURCE\s+\'([^\']+)\'\s+(?:TO|FROM)\s+(GROUP|SERVICE|USER)\s+\'([^\']+)\'\s*;?\s*', text, re.I)
     node = None
     if grant:
         required = "TO" if grant.group(1).upper() == "GRANT" else "FROM"
@@ -222,7 +223,8 @@ def execute(db, who, statement, catalog="", schema="", prepared=""):
     try:
         if grant:
             op, role, resource, kind, recipient = grant.groups()
-            role = role.capitalize()
+            from .permissions import ROLES
+            role = next(r for r in ROLES if r.lower() == role.lower())
             kind = kind.upper()
             if kind == "GROUP":
                 group = db.get(AppGroup, recipient) or db.scalar(select(AppGroup).where(AppGroup.name == recipient))
@@ -238,15 +240,15 @@ def execute(db, who, statement, catalog="", schema="", prepared=""):
                 commands.assign(resource, commands.AssignmentIn(role=role, **{
                     "app_group_id" if kind == "GROUP" else "principal_id": recipient}), db, who.user)
             elif kind == "GROUP":
-                existing = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource, RoleAssignment.app_group_id == recipient))
-                if existing and existing.role != role:
-                    fail("The direct assignment has a different role")
-                commands.revoke(resource, recipient, db, who.user)
+                if not db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource, RoleAssignment.app_group_id == recipient,
+                                                              RoleAssignment.role == role)):
+                    fail("The group does not hold that role here")
+                commands.revoke(resource, recipient, role, db, who.user)
             else:
-                existing = db.scalar(select(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id == resource, ServiceRoleAssignment.principal_id == recipient))
-                if existing and existing.role != role:
-                    fail("The direct assignment has a different role")
-                commands.revoke_service(resource, recipient, db, who.user)
+                if not db.scalar(select(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id == resource,
+                                                                     ServiceRoleAssignment.principal_id == recipient, ServiceRoleAssignment.role == role)):
+                    fail("The identity does not hold that role here")
+                commands.revoke_service(resource, recipient, role, db, who.user)
             count = 1
         else:
             count = mutate(db, who.user, node, target.name)

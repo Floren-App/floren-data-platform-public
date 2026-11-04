@@ -65,11 +65,11 @@ def test_the_log_says_who_or_what_ran_each_query_and_keeps_sql_only_when_asked(c
     # Own-query inspection is an explicit page gate plus a principal-scoped capability.
     from .test_permissions import grant, page
     page(client, 'set-querylog')
-    grant(client, target_id=bob, namespace='query_log', layer_id=None, role='Viewer')
+    grant(client, target_id=bob, namespace='query_log', layer_id=None, role='Reader')
     client.post('/v1/permissions/assignments', headers=ADMIN, json={
-        'target_id': 'set-querylog', 'namespace': 'pages', 'principal_id': ana, 'role': 'Viewer'}).raise_for_status()
+        'target_id': 'set-querylog', 'namespace': 'pages', 'principal_id': ana, 'role': 'Reader'}).raise_for_status()
     client.post('/v1/permissions/assignments', headers=ADMIN, json={
-        'target_id': ana, 'namespace': 'query_log', 'principal_id': ana, 'role': 'Viewer'}).raise_for_status()
+        'target_id': ana, 'namespace': 'query_log', 'principal_id': ana, 'role': 'Reader'}).raise_for_status()
     assert [r["query_id"] for r in client.get("/v1/query-log", headers=as_("ana")).json()] == ["q1"]
     assert {r["query_id"] for r in client.get("/v1/query-log?state=failed", headers=ADMIN).json()} == {"q2"}
     assert {r["query_id"] for r in client.get("/v1/query-log?table=orders", headers=ADMIN).json()} == {"q1", "q2"}

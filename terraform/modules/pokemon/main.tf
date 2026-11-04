@@ -84,15 +84,15 @@ locals {
     bootstrap_raw     = { job = "bootstrap", resource = fdp_schema.raw.id, role = "Admin" }
     bootstrap_history = { job = "bootstrap", resource = fdp_schema.history.id, role = "Admin" }
     bootstrap_product = { job = "bootstrap", resource = var.product_schema_id, role = "Admin" }
-    extract_landing   = { job = "extract", resource = fdp_schema.landing.id, role = "Contributor" }
-    load_landing      = { job = "load", resource = fdp_schema.landing.id, role = "Reader" }
-    load_raw          = { job = "load", resource = fdp_schema.raw.id, role = "Contributor" }
-    models_raw        = { job = "models", resource = fdp_schema.raw.id, role = "Reader" }
+    extract_landing   = { job = "extract", resource = fdp_schema.landing.id, role = "DataContributor" }
+    load_landing      = { job = "load", resource = fdp_schema.landing.id, role = "DataReader" }
+    load_raw          = { job = "load", resource = fdp_schema.raw.id, role = "DataContributor" }
+    models_raw        = { job = "models", resource = fdp_schema.raw.id, role = "DataReader" }
     models_history    = { job = "models", resource = fdp_schema.history.id, role = "Admin" }
     models_product    = { job = "models", resource = var.product_schema_id, role = "Admin" }
-    events_raw        = { job = "process-event", resource = fdp_schema.raw.id, role = "Contributor" }
-    monitor_raw       = { job = "monitor", resource = fdp_schema.raw.id, role = "Reader" }
-    monitor_history   = { job = "monitor", resource = fdp_schema.history.id, role = "Reader" }
+    events_raw        = { job = "process-event", resource = fdp_schema.raw.id, role = "DataContributor" }
+    monitor_raw       = { job = "monitor", resource = fdp_schema.raw.id, role = "DataReader" }
+    monitor_history   = { job = "monitor", resource = fdp_schema.history.id, role = "DataReader" }
   }
 }
 # Each workload owns one built-in managed identity. Inline grants avoid a
@@ -110,9 +110,9 @@ resource "fdp_workload" "job" {
   execution_mode = each.key == "explorer" ? "caller" : "fixed"
   auto_update    = true
   managed_identity_grants = merge(
-    { packages = "Executor" },
+    { packages = "DataReader" },
     { for grant in local.data_grants : grant.resource => grant.role if grant.job == each.key },
-    each.key == "extract" ? { (fdp_api.tcgdex.resource_id) = "Consumer" } : {},
+    each.key == "extract" ? { (fdp_api.tcgdex.resource_id) = "DataReader" } : {},
     { for grant in local.price_grants : grant.resource => grant.role if grant.job == each.key }
   )
   depends_on = [fdp_api_operation.get]
@@ -128,14 +128,14 @@ resource "fdp_workload" "pipelines" {
   folder_id      = fdp_folder.this.id
   execution_mode = "fixed"
   env            = { POKEMON_STREAMING_ENABLED = !var.streaming_enabled ? "false" : "true" }
-  managed_identity_grants = merge({ packages = "Executor" }, {
+  managed_identity_grants = merge({ packages = "DataReader" }, {
     for name in concat(["extract", "load", "models", "process-event"], !var.streaming_enabled ? [] : ["price-publish", "price-await", "price-models"]) : fdp_workload.job[name].resource_id => "Executor"
   })
 }
 resource "fdp_role_assignment" "analysts_dashboard" {
   resource_id  = fdp_workload.job["explorer"].resource_id
   app_group_id = var.analysts_group_id
-  role         = "Executor"
+  role         = "DataReader" # opening the dashboard
 }
 
 locals {

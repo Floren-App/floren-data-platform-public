@@ -52,6 +52,8 @@ def upgrade(engine, adopt_legacy=False):
         factory = sessionmaker(bind=connection)
         upgrade_data(factory)
         upgrade_git_credentials(factory)
+        from .role_migration import upgrade_role_model
+        upgrade_role_model(factory)
 
 
 def baseline_table(name, *elements, **kwargs):

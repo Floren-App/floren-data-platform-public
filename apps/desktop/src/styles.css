@@ -45,6 +45,10 @@
   --info: #3794ff;
   --warn: #cca700;
   --err: #f85149;
+  /* Kinds of access (data, platform, privileged): quiet colors of their own, apart from the status colors. */
+  --cat-data: #4fb3bf;
+  --cat-platform: #9d9d9d;
+  --cat-privileged: #c586c0;
   --shadow: 0 4px 16px #0000005c;
   --radius: 3px;
   --radius-lg: 5px;
@@ -82,6 +86,9 @@
     --info: #0969da;
     --warn: #9a6700;
     --err: #cf222e;
+    --cat-data: #0e7c86;
+    --cat-platform: #6e6e6e;
+    --cat-privileged: #94368d;
     --shadow: 0 4px 16px #00000024;
     color-scheme: light;
   }
@@ -479,6 +486,65 @@ pre.terminal { background: #181818; color: #cccccc; border: 1px solid var(--bord
 .empty-state h2 { font-size: 14px; }
 .idp-groups details { padding: 8px 0; border-top: 1px solid var(--border); }
 .idp-groups summary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* ---------- Roles and kinds of access ---------- */
+.cat-data { --cat: var(--cat-data); }
+.cat-platform { --cat: var(--cat-platform); }
+.cat-privileged { --cat: var(--cat-privileged); }
+.badge.cat-badge { color: var(--cat); border-color: color-mix(in srgb, var(--cat) 45%, transparent); background: color-mix(in srgb, var(--cat) 10%, transparent); }
+.role-link { padding: 0; }
+.grants-table .category-row th { background: var(--bg-side); color: var(--fg); border-left: 2px solid var(--cat); white-space: normal; }
+.role-picker { border: 0; padding: 0; margin: 0 0 12px; min-width: 0; }
+.role-picker > legend { font-size: 12px; color: var(--fg-muted); padding: 0; margin-bottom: 8px; }
+.role-group { border-left: 2px solid var(--cat, var(--border-strong)); padding: 2px 0 2px 10px; margin-bottom: 12px; }
+.role-group-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.role-option { display: flex; align-items: flex-start; gap: 8px; padding: 5px 6px; border-radius: var(--radius); cursor: pointer; }
+.role-option:hover { background: var(--bg-hover); }
+.role-option input { margin-top: 2px; flex: none; }
+.role-option > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.role-option strong { color: var(--fg-strong); font-weight: 500; }
+.disclosure { display: inline-flex; align-items: center; gap: 8px; min-width: 0; margin: 0; padding: 4px 6px; border: 0; border-radius: var(--radius); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.disclosure:hover { background: var(--bg-hover); }
+.disclosure-chevron { display: inline-grid; flex: none; color: var(--fg-muted); transition: transform .1s ease-out; }
+.disclosure-chevron.open { transform: rotate(90deg); }
+.access-inventory .access-search { width: 420px; }
+.access-category { border: 1px solid var(--border); border-left: 2px solid var(--cat); border-radius: var(--radius-lg); margin: 10px 0; }
+.access-category-heading { width: 100%; flex-wrap: wrap; padding: 10px 12px; }
+.access-category-heading h3 { margin: 0; font-size: 13px; }
+.access-objects, .access-roles, .role-list { list-style: none; margin: 0; padding: 0; }
+.access-object { border-top: 1px solid var(--border); }
+.access-object-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 4px 12px 4px 8px; }
+.access-object-row > .disclosure { flex: 1 1 260px; }
+.access-object-row .object-name { overflow-wrap: anywhere; }
+.access-object-roles { flex-wrap: wrap; gap: 4px; }
+.access-roles { padding: 0 12px 8px 34px; }
+.access-role { border-left: 1px solid var(--border-strong); margin: 4px 0; padding-left: 8px; }
+.access-role-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.access-role-meta { flex: 1 1 240px; color: var(--fg-muted); }
+.access-role-actions { gap: 10px; }
+.access-empty { margin: 0; padding: 0 12px 10px 34px; }
+.permission-list { margin: 2px 0 8px; }
+.permission-list td { padding-top: 4px; padding-bottom: 4px; }
+.permission-list td:nth-child(2) { width: 1%; }
+.role-category { margin-top: 18px; }
+.role-category > h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 2px; }
+.role-list > li { border-top: 1px solid var(--border); padding: 6px 0; }
+.role-list > li.highlight { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.role-list .disclosure .muted { margin-left: 4px; }
+.role-summary { margin: 0 0 4px 26px; }
+.role-list .table-scroll { margin-left: 26px; }
+.role-reference-group h4 { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; font-size: 12px; font-weight: 500; }
+.group-list > div > .section-title { padding-left: 2px; margin-top: 6px; }
+.group-list > div:first-child > .section-title { margin-top: 0; }
+dialog.modal { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow: auto; padding: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-lg); background: var(--bg); color: var(--fg); box-shadow: var(--shadow); }
+dialog.modal.wide { width: min(780px, calc(100vw - 32px)); }
+dialog.modal::backdrop { background: #00000080; }
+.modal-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.modal-header h2 { margin: 0; font-size: 14px; }
+.modal-body { padding: 16px; }
+.modal-body > .segmented { margin-bottom: 14px; }
+.modal-body .form-actions { position: sticky; bottom: -16px; z-index: 1; margin: 12px -16px -16px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); }
+.cat-name { color: var(--cat); font-weight: 500; }
+@media (max-width: 800px) { .access-inventory .access-search { width: 100%; } .access-roles { padding-left: 16px; } }
 .role-reference { margin-top: 20px; }
 .role-reference summary { color: var(--fg-muted); }
 .role-reference[open] summary { margin-bottom: 10px; }

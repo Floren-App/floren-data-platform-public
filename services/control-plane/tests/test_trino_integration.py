@@ -90,7 +90,7 @@ def live_sql(client, monkeypatch):
                 response = client.post('/v1/rbac/resources/' + schema['id'] + '/provision', headers=as_('admin'))
                 assert response.status_code == 200, response.text
                 if schema_name == 'reporting':
-                    grant_group(client, schema['id'], name + '-reader', 'Reader', users=('ana',))
+                    grant_group(client, schema['id'], name + '-reader', 'DataReader', users=('ana',))
         yield client
     finally:
         server.should_exit = True
@@ -258,7 +258,7 @@ def test_live_revocation_retains_jobs_and_binds_viewers(live_sql):
         source = db.scalar(select(DataSource).where(DataSource.name == 'finance'))
         resource_id = db.scalar(select(Resource.id).where(Resource.object_id == source.id, Resource.name == 'reporting'))
         db.commit()
-    grant_group(client, resource_id, 'App service readers', 'Reader', services=(pub.service_principal_id,))
+    grant_group(client, resource_id, 'App service readers', 'DataReader', services=(pub.service_principal_id,))
     response = client.post('/v1/sql/query', headers={'Authorization': 'Bearer ' + app_token}, json=body)
     assert response.status_code == 200, response.text
 

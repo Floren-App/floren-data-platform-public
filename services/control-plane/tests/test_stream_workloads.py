@@ -40,7 +40,7 @@ def test_stream_deploys_under_managed_identity_with_readiness_but_no_public_app_
         record=db.get(Workload,pub['id'])
         pid=record.service_principal_id
     granted=client.put('/v1/rbac/resources/'+topic['id']+'/assignments',headers=as_('admin'),
-        json={'principal_id':pid,'role':'Contributor'})
+        json={'principal_id':pid,'role':'DataContributor'})
     assert granted.status_code==200,granted.text
     issued=client.post('/v1/kafka/topics/'+topic['id']+'/session',headers=headers,json={'mode':'produce'})
     assert issued.status_code==200,issued.text

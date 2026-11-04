@@ -671,21 +671,22 @@ class Resource(Base):
 
 class RoleAssignment(Base):
     __tablename__ = "role_assignments"
-    __table_args__ = (UniqueConstraint("resource_id", "app_group_id"),)
+    # A group can hold several roles on one object (Executor and Data Reader on a folder, say).
+    __table_args__ = (UniqueConstraint("resource_id", "app_group_id", "role", name="uq_role_assignments_recipient_role"),)
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
     resource_id: Mapped[str] = mapped_column(ForeignKey("rbac_resources.id"), index=True)
     app_group_id: Mapped[str] = mapped_column(ForeignKey("app_groups.id"))
-    role: Mapped[str] = mapped_column(String(16))
+    role: Mapped[str] = mapped_column(String(32))
 
 
 class ServiceRoleAssignment(Base):
     """Direct grants to managed identities; existing app-group grants stay independent."""
     __tablename__ = "service_role_assignments"
-    __table_args__ = (UniqueConstraint("resource_id", "principal_id"),)
+    __table_args__ = (UniqueConstraint("resource_id", "principal_id", "role", name="uq_service_role_assignments_recipient_role"),)
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
     resource_id: Mapped[str] = mapped_column(ForeignKey("rbac_resources.id"), index=True)
     principal_id: Mapped[str] = mapped_column(ForeignKey("directory_principals.id"), index=True)
-    role: Mapped[str] = mapped_column(String(16))
+    role: Mapped[str] = mapped_column(String(32))
 
 
 class PermissionGrant(Base):
@@ -756,7 +757,7 @@ class CatalogProduct(Base):
     # The lead object (first member): it sets the card's icon. An object leads at most one product.
     asset_id: Mapped[str] = mapped_column(ForeignKey("catalog_assets.id", ondelete="CASCADE"), unique=True)
     resource_id: Mapped[str] = mapped_column(String(12), index=True)   # the lead's RBAC resource (a table's schema)
-    # The product's own RBAC resource: Consumer on it gives read or use of everything in the product.
+    # The product's own RBAC resource: Data Reader on it gives read or use of everything in the product.
     access_resource_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
     layer_id: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200))
@@ -793,7 +794,7 @@ class ProductOption(Base):
 
 
 class ProductAccess(Base):
-    """Which option a consuming group has (its Consumer role on the product is an ordinary role assignment)."""
+    """Which option a consuming group has (its Data Reader role on the product is an ordinary role assignment)."""
     __tablename__ = "catalog_product_access"
     __table_args__ = (UniqueConstraint("product_id", "app_group_id"),)
 

@@ -22,14 +22,14 @@ resource "fdp_schema" "prices" {
 }
 locals {
   price_grants = !var.streaming_enabled ? {} : {
-    monitor          = { job = "price-monitor", resource = fdp_schema.prices[0].id, role = "Reader" }
-    await            = { job = "price-await", resource = fdp_schema.prices[0].id, role = "Reader" }
+    monitor          = { job = "price-monitor", resource = fdp_schema.prices[0].id, role = "DataReader" }
+    await            = { job = "price-await", resource = fdp_schema.prices[0].id, role = "DataReader" }
     bootstrap        = { job = "price-bootstrap", resource = fdp_schema.prices[0].id, role = "Admin" }
     bootstrap_market = { job = "price-bootstrap", resource = fdp_schema.market[0].id, role = "Admin" }
-    publish          = { job = "price-publish", resource = fdp_kafka_topic.prices[0].id, role = "Contributor" }
-    consume          = { job = "price-sink", resource = fdp_kafka_topic.prices[0].id, role = "Reader" }
-    land             = { job = "price-sink", resource = fdp_schema.prices[0].id, role = "Contributor" }
-    read             = { job = "price-models", resource = fdp_schema.prices[0].id, role = "Reader" }
+    publish          = { job = "price-publish", resource = fdp_kafka_topic.prices[0].id, role = "DataContributor" }
+    consume          = { job = "price-sink", resource = fdp_kafka_topic.prices[0].id, role = "DataReader" }
+    land             = { job = "price-sink", resource = fdp_schema.prices[0].id, role = "DataContributor" }
+    read             = { job = "price-models", resource = fdp_schema.prices[0].id, role = "DataReader" }
     build            = { job = "price-models", resource = fdp_schema.market[0].id, role = "Admin" }
   }
   operator_jobs = !var.stream_operators_enabled || !var.streaming_enabled ? toset([]) : toset(concat(

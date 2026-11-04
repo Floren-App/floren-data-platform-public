@@ -22,12 +22,15 @@ def setup_finance_db(client):
     client.get("/v1/me", headers=as_("ana"))
     schema = client.post("/v1/rbac/sources/finance-dw/schemas", headers=as_("admin"), json={"name": "public"})
     assert schema.status_code == 201, schema.text
-    grant_group(client, schema.json()["id"], "Finance data", "Reader", external_groups=["finance"])
+    grant_group(client, schema.json()["id"], "Finance data", "DataReader", external_groups=["finance"])
     finance_group=grant_group(client, "workloads", "Finance data", "Owner", external_groups=["finance"])
     from .rbac_helpers import secret_permissions
     secret_permissions(client,'ana')
     secret_permissions(client,'ana',scope='group',owner='finance',group_id=finance_group)
-    grant_group(client, "workloads", "Deployed executors", "Executor", users=["bob"])
+    # Running workloads and opening apps are separate roles; this group has both, as migrated Executors do.
+    executors = grant_group(client, "workloads", "Deployed executors", "Executor", users=["bob"])
+    client.put("/v1/rbac/resources/workloads/assignments", headers=as_("admin"),
+               json={"app_group_id": executors, "role": "DataReader"}).raise_for_status()
     assert deps.get_orchestrator().egress["finance-dw"] == ["10.0.0.5/32"]
 
 

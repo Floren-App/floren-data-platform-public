@@ -54,13 +54,13 @@ func (r *dataProductResource) Metadata(_ context.Context, req resource.MetadataR
 func (r *dataProductResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "A data product: tables and views, dashboards, APIs or Kafka topics you own, published together. Everyone " +
-			"in its layer sees its card; groups get access as Consumers of the product (fdp_data_product_consumer) with one " +
+			"in its layer sees its card; groups get access as Data Readers of the product (fdp_data_product_consumer) with one " +
 			"of its access options. The first member leads (the card's icon). Domain and classification come from the " +
 			"members' governance (fdp_catalog_governance, fdp_column_classification). Import by product ID.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{Computed: true, PlanModifiers: keepComputed},
 			"access_resource_id": schema.StringAttribute{Computed: true, PlanModifiers: keepComputed,
-				Description: "The product's own RBAC resource (Consumer and Owner roles)."},
+				Description: "The product's own RBAC resource (Viewer, Data Reader and Owner roles)."},
 			"title":   schema.StringAttribute{Required: true},
 			"summary": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("")},
 			"members": schema.ListNestedAttribute{Required: true, Description: "Objects in the product, lead first.",
@@ -229,7 +229,7 @@ func (r *productConsumerResource) Metadata(_ context.Context, req resource.Metad
 
 func (r *productConsumerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "An app group's access to a data product: Consumer on the product with one of its access options (its " +
+		Description: "An app group's access to a data product: Data Reader on the product with one of its access options (its " +
 			"masks and row filters). The group may then use everything in the product. Destroy takes the access away. " +
 			"Import with \"<product id>/<app group id>\".",
 		Attributes: map[string]schema.Attribute{

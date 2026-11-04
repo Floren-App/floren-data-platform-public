@@ -35,12 +35,11 @@ PAGES: Dict[str, tuple] = {
     "set-querylog": ("Query log", "adm-access"),
 }
 KINDS = ("settings-root", "settings-section", "setting")
-# Viewer and Manager are given to groups; Owner is Global Admin's protected access to every object, so platform
-# administrators see these pages in listings like any other object.
-ROLES = {"Viewer": {"read"}, "Executor": {"read"}, "Contributor": {"read"},
-         "Manager": {"read", "manage"}, "Admin": {"read", "manage"}, "Owner": {"read", "manage", "assign"}}
-ROLES["AccessAdministrator"] = {"read", "assign"}
-ROLES["PlatformContributor"] = {"read", "manage"}
+# Reader sees a page, Contributor changes what it configures, Data Reader also reads the records it holds (log
+# contents, exports). Owner is Global Admin's protected access to every object, so platform administrators see these
+# pages in listings like any other object.
+ROLES = {"Reader": {"read"}, "Contributor": {"read", "manage"}, "DataReader": {"read"}, "AccessAdministrator": {"read", "assign"},
+         "Admin": {"read", "manage"}, "Owner": {"read", "manage", "assign"}}
 ACTIONS = {"view": "read", "manage": "manage"}
 NAMESPACES = {
     "set-backups": "backups",
@@ -102,7 +101,7 @@ def allowed(db, user, page: str, action: str = "manage", layer_id=None) -> bool:
 
 def require(db, user, page: str, action: str = "manage", layer_id=None):
     if not allowed(db, user, page, action, layer_id):
-        label = 'Manager' if action == 'manage' else 'Viewer' if action == 'view' else action
+        label = 'Contributor' if action == 'manage' else 'Reader' if action == 'view' else action
         raise HTTPException(403, f"{label} on {PAGES[page][0]} required")
     return rbac.resolve_user(db, user)
 

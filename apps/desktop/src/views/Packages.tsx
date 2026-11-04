@@ -118,7 +118,7 @@ export function PackageView({ hub, openTab, reference }: { hub: Hub; openTab: Op
     {error && <p className="error" role="alert">{error}</p>}
     {section === "permissions" ? (resource ? <PermissionsPanel resource={resource} resources={[...hub.resources.filter((r) => r.id !== resource.id), resource]} openTab={openTab} onChanged={reload} /> : <p className="muted">Loading permissions…</p>) : <>
       <p>Install: <code className="mono">{item.install}</code>{item.kind === "r" && <span className="muted"> · a specific version: <code>{`renv::install("${item.name}@<version>")`}</code></span>}</p>
-      {item.origin !== "internal" && root && <p className="muted">Imported packages follow the repository's roles: Publishers import new versions.</p>}
+      {item.origin !== "internal" && root && <p className="muted">Imported packages follow the repository's roles: Data Contributors import new versions.</p>}
       <table aria-label="Versions"><thead><tr><th>Version</th><th>Files</th><th>Requires</th><th /></tr></thead><tbody>
         {item.versions.map((v) => <tr key={v.version} className={v.yanked ? "muted" : ""}>
           <td className="mono">{v.version}{v.yanked && <> <span className="badge">Yanked</span><div className="muted">{v.files[0]?.yanked_reason}</div></>}</td>

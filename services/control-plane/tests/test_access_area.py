@@ -8,7 +8,7 @@ from .test_products import setup_products
 def test_group_and_person_access_show_roles_products_and_where_they_come_from(client, repo):  # noqa: F811
     ids = setup_products(client, repo)
     # bob reaches Readers through his IdP group, and Viewers directly.
-    readers = grant_group(client, ids["public"], "Readers", "Reader", external_groups=["marketing"])
+    readers = grant_group(client, ids["public"], "Readers", "DataReader", external_groups=["marketing"])
     viewers = grant_group(client, "workloads", "Viewers", "Executor", users=["bob"])
     product = client.post("/v1/catalog/products", headers=as_("ana"), json={"asset_ids": [ids["dash"], ids["sales"]], "title": "Sales"})
     assert product.status_code == 201, product.text
@@ -16,9 +16,9 @@ def test_group_and_person_access_show_roles_products_and_where_they_come_from(cl
 
     group = client.get(f"/v1/rbac/groups/{viewers}/access", headers=as_("admin")).json()
     rows = {(r["resource"]["name"], r["role"], r["via"], (r["product"] or {}).get("title")) for r in group["grants"]}
-    assert ("Sales", "Consumer", "direct", None) in rows                 # the product itself
-    assert ("sales", "Executor", "product", "Sales") in rows              # only its table, through the product
-    assert any(r[2] == "product" and r[1] == "Executor" for r in rows)   # its dashboard
+    assert ("Sales", "DataReader", "direct", None) in rows               # the product itself
+    assert ("sales", "DataReader", "product", "Sales") in rows            # only its table, through the product
+    assert any(r[2] == "product" and r[1] == "DataReader" for r in rows) # its dashboard
     assert group["compliance_roles"] == [] and group["app_profile"] is None
     assert client.get(f"/v1/rbac/groups/{viewers}/access", headers=as_("ana")).status_code == 403
 
@@ -57,7 +57,7 @@ def test_each_access_and_administration_page_is_granted_on_its_own(client):
     refused = client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels})
     assert refused.status_code == 403 and "classification.dictionary.publish" in refused.text
     # Viewer on the audit log reads it and changes nothing.
-    grant_group(client, "set-auditlog", "Auditors", "Viewer", users=["ana"])
+    grant_group(client, "set-auditlog", "Auditors", "Reader", users=["ana"])
     assert client.get("/v1/admin/audit", headers=as_("ana")).status_code == 200
     assert client.put("/v1/admin/settings/egress", headers=as_("ana"), json={"hosts": []}).status_code == 403
     # A section covers its pages.

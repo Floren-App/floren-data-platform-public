@@ -1,7 +1,7 @@
 # Scoped permissions and Terraform
 
 FDP has an explicit capability registry, scoped permission assignments, custom action roles,
-and Viewer gates for all desktop pages. These are separate from the existing data/workload
+and Reader gates for all desktop pages. These are separate from the existing data/workload
 resource roles during migration. The registry also contains planned operations, including
 separate drafts and exports that have no dedicated API. A registry entry alone does not
 create such an operation. Use the route inventory and source-reference column to review
@@ -17,7 +17,7 @@ roles that remain in use for workloads, data, APIs, packages and products.
 | Area | Behavior |
 |---|---|
 | Named grants | Default-deny action checks on a target, globally, in one layer, or explicitly all layers. Known resource layers override caller-supplied scope. |
-| Roles | Viewer, Executor, Contributor, Manager, Admin and Owner plus PlatformContributor, DataReader, DataContributor and AccessAdministrator bundles from the registry; an explicit action set or custom role can replace a built-in bundle. |
+| Roles | Viewer, Reader, Contributor, Executor, DataReader, DataContributor, AccessAdministrator, Admin and Owner bundles from the registry; an explicit action set or custom role can replace a built-in bundle. |
 | Page visibility | All desktop tab kinds and aliases require their page gate. Hidden pages do not mount their content components. Navigation and open tab labels are filtered; page changes invalidate the object cache. |
 | Administration | Named checks cover the administration handlers identified in the matrix, including form drafting/publication, classification changes, layer settings/infrastructure, pools, runtime registration and log configuration. |
 | Privacy reads | Forms and drafts, policy inventory and review-duty inventory require explicit page/capability access. The `compliance_admin` role no longer grants access to Privacy administration pages. |
@@ -26,7 +26,7 @@ roles that remain in use for workloads, data, APIs, packages and products.
 | Administrator context | Global Admin privileges apply with Global Admin active. Selecting another group also restricts backend administrator checks; this is no longer a UI-only preview. |
 | Object data | Table/column and file/directory targets; governed Trino column checks, narrowed S3 sessions, product grants limited to included objects. See [object permissions](data-object-permissions.md). |
 | Workload functions | Separate named checks for settings fields, identity/mode/secret changes, deployment, sync, execution and app/docs opening; the gateway rechecks opening permission. Existing resource roles remain compatibility grants. |
-| Package downloads | Explicit package or repository grants; Viewer metadata access does not permit native Python/R downloads. |
+| Package downloads | Explicit package or repository grants; Reader metadata access does not permit native Python/R downloads; Data Reader does. |
 | Recovery | Independent control-plane, PostgreSQL, S3 and Iceberg v1/v2 backup plans, vault-referenced destinations, local-time schedules, scoped retention, offline restore and quarantine; see [platform recovery](platform-recovery.md). |
 | Query log | Explicit global, layer, or own-principal read scope. SQL text needs separate permission; a page gate alone is insufficient. |
 
@@ -38,17 +38,20 @@ Existing workload/data/API/package/product roles continue to apply at their exis
 
 | Role | Meaning |
 |---|---|
-| Viewer | Read permitted metadata; does not inherently read payloads or execute. |
-| Executor | Viewer plus relevant use/run/read-content actions. |
-| Contributor | Viewer plus relevant draft/content editing. |
-| Manager | Viewer plus relevant operational configuration and publication. |
-| Admin | Combines Executor, Contributor and Manager, plus the listed administrative/destructive actions. |
+| Viewer | Data products only: discover them in the catalog and request access. |
+| Reader | See the object or page and its configuration; no data, no preview, no access from code. |
+| Contributor | Reader plus changing settings, configuration and metadata (drafting, publishing, applying, deploying, DDL). |
+| Executor | Reader plus triggering on-demand work: runs, workspace start/stop, execution as a service identity. |
+| DataReader | Reader plus reading data: SELECT, preview, files, Kafka subscribe, API reads, opening apps, outputs and logs. |
+| DataContributor | DataReader plus changing data: writes, Kafka publish, API writes, publishing packages. |
+| AccessAdministrator | Giving and removing access in its scope, without data or configuration. |
+| Admin | Everything above plus the listed administrative/destructive actions, without delegation. |
 | Owner | Admin plus delegation and listed protected controls, within the target scope. |
 
-Executor, Contributor and Manager do not automatically include one another. Use multiple
-grants, Admin, or a custom action set where a person needs several powers. The matrix is the
+Contributor, Executor and DataReader do not include one another. A group can hold several roles on
+one object, or use Admin or a custom action set where it needs several powers. The matrix is the
 precise bundle definition. Personal ownership, reviewer duty, mandatory data policies, and
-layer isolation remain additional constraints. Stored secret values are never Viewer metadata.
+layer isolation remain additional constraints. Stored secret values are never Reader metadata.
 
 ## Assignment fields
 
@@ -79,7 +82,7 @@ resource "fdp_permission_assignment" "engineer_network_page" {
   target_id    = "set-network"
   namespace    = "pages"
   app_group_id = var.engineer_group_id
-  role         = "Viewer"
+  role         = "Reader"
 }
 
 resource "fdp_permission_assignment" "engineer_dev_network" {
@@ -87,7 +90,7 @@ resource "fdp_permission_assignment" "engineer_dev_network" {
   namespace    = "network.editor_allowlist"
   layer_id     = var.dev_layer_id
   app_group_id = var.engineer_group_id
-  role         = "Manager"
+  role         = "Contributor"
 }
 ```
 
@@ -124,8 +127,8 @@ does not implement arbitrary editable Kubernetes NetworkPolicy objects. See [lay
 
 ## Privacy form editing and publication
 
-Give a group page Viewer on `set-forms`, then an assignment in `compliance.forms` on target
-`set-forms`, globally. Contributor drafts forms; Manager publishes. To delegate only publication:
+Give a group page Reader on `set-forms`, then an assignment in `compliance.forms` on target
+`set-forms`, globally. Contributor drafts and publishes forms. To delegate only publication:
 
 ```hcl
 resource "fdp_permission_assignment" "publish_forms" {
@@ -137,7 +140,7 @@ resource "fdp_permission_assignment" "publish_forms" {
 ```
 
 This does not grant Layers, Network, form deletion, or reviewer appointment. An explicit page
-Viewer grant is still required. Form permissions are currently checked on the form collection;
+Reader grant is still required. Form permissions are currently checked on the form collection;
 individual form-resource enforcement from the design remains migration work.
 
 `fdp_custom_role` declares a named action set. Assign it using `custom_role_id`; all actions must
@@ -186,7 +189,7 @@ column is generated from source to make this gap visible. Do not deploy on the a
 
 ## Private workspace functions
 
-Workspace navigation needs `pages` Viewer on `workspaces`. Function grants use
+Workspace navigation needs `pages` Reader on `workspaces`. Function grants use
 namespace `workspaces`, collection target `workspaces`, and an explicit layer.
 Individual grants use `workspace:<id>`; the server derives the layer from that
 workspace and rejects a conflicting layer. Grants never share another person's
@@ -194,20 +197,21 @@ private files.
 
 | Role | Workspace functions |
 |---|---|
-| Viewer | List and inspect own workspace metadata; no file contents |
-| Contributor | Change files; opening an executable editor also requires Executor |
-| Executor | Start/stop and read files; opening an executable editor also requires Contributor |
-| Manager | Create workspaces and edit ordinary settings; no execution |
+| Reader | List and inspect own workspace metadata; no file contents |
+| Contributor | Create workspaces and edit ordinary settings; no execution or files |
+| Executor | Start and stop; opening an executable editor also requires DataContributor |
+| DataReader | Read and download files |
+| DataContributor | Change files; opening an executable editor also requires Executor |
 | Admin | All listed operational functions including deletion |
 | Owner | Administrative functions and permission delegation |
 
 Job submission additionally requires `runs.create` in namespace `runs` on the workspace
-or collection target, scoped to its layer. A workspace Manager grant alone does not
+or collection target, scoped to its layer. A workspace Contributor grant alone does not
 submit jobs.
 
 Editor access is rechecked by the gateway, and queued starts recheck captured-group
 authority before dispatch. Use Terraform permission assignments to grant both
-Contributor and Executor for development, plus Manager when developers may create
+DataContributor and Executor for development, plus Contributor when developers may create
 their own environments. Give these grants in dev only when production editors are
 not permitted. Interactive editors necessarily expose their private filesystem;
 checkout/pull inside the editor cannot be isolated from arbitrary shell execution.
@@ -217,7 +221,7 @@ checkout/pull inside the editor cannot be isolated from arbitrary shell executio
 Run ownership is a privacy boundary, not permission to read its contents. Named grants
 can target `run:<id>`, its private `workspace:<id>`, the `workspaces` collection, or
 its workload parent. The server derives the run's layer and rejects conflicting grants.
-Use namespace `artifacts` Viewer for output names/sizes and Executor for content and
+Use namespace `artifacts` Reader for output names/sizes and DataReader for content and
 rendered app access. Logs require `logs.read`; cancellation requires `runs.cancel_own`
 or `runs.cancel_others`. The app gateway rechecks `artifacts.open` on each authorization.
 Legacy explicit workload execution still supplies its previous run-content authority
@@ -228,33 +232,25 @@ not hide a file from someone separately authorized to open that editor.
 
 ## Data, platform and privileged access
 
-Access → Groups → Has access to now lists three searchable sections across **all
-layers**. Named feature grants, object roles, inherited administrative scopes,
-product-derived grants and review permissions appear together. Each row shows its
-scope, role, origin and conditions, including approval expiry and profile limits.
-A mixed role appears in every applicable category; viewing a grant is not a bypass
-of active-group, profile, reviewed-access or execution-layer checks.
+Access → Groups → Has access to lists every role a group holds across **all layers**, once, under
+**Data access**, **Platform access** or **Privileged access**: object roles, roles through data
+products, roles on Administration pages, named feature grants, custom roles and review duties. Each
+role shows its object, origin, layer and conditions (approval expiry, a form deadline, a duty's
+scope) and opens to the permissions it carries, each with its own kind. Access → Roles lists the
+same for every role each kind of object offers (`GET /v1/permissions/catalog`). Viewing a grant is
+not a bypass of active-group, profile, reviewed-access or execution-layer checks.
 
-| Role family | Intended scope |
-|---|---|
-| `PlatformContributor` | Object/configuration changes without payload read/write or role administration. |
-| `DataReader` | Read actual data in the assigned scope without configuration or delegation. |
-| `DataContributor` | Read and modify actual data without configuration or delegation. |
-| `AccessAdministrator` | Manage access assignments without reading data or changing object configuration. |
+The roles that read and change data are separate from the ones that configure an object, and from
+the ones that give access: a Contributor cannot read or write rows, a Data Contributor cannot alter
+tables or give access, and an Access Administrator can give access without reading data. Use the
+matrix for each concrete function.
 
-Existing `Contributor`, `Executor`, `Manager`, `Admin` and `Owner` assignments retain
-their existing capabilities for compatibility. In particular, legacy storage
-Contributor is write-only; it is not silently relabeled as configuration-only or
-upgraded to a read/write data role. Prefer the explicit families for new object
-grants and use the matrix for each concrete function. New families coexist with
-existing roles rather than widening them.
-
-Review authority is a platform permission. New assignments can use namespace
+Review authority is privileged access: deciding who gets access. New assignments can use namespace
 `reviews`, with `reviews.forms.review`, `reviews.memberships.approve` or
 `reviews.configuration.manage`, scoped to the case/object/group and layer. Matching
 case/membership function permissions, self-review restrictions and review-step
 checks still apply. Existing review assignments retain their classification/group
-conditions and appear as scoped platform assignments in the same inventory.
+conditions and appear as privileged roles in the same inventory.
 The new namespace prevents existing broad compliance function roles from silently
 acquiring review-step eligibility.
 

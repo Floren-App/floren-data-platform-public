@@ -53,7 +53,7 @@ def test_browsing_and_direct_access_follow_active_group_with_inheritance(client,
         assert result.status_code==201,result.text
         client.put('/v1/admin/datasources/'+suffix,headers=as_('admin'),json=integration(suffix,'postgres',layer_id=layer)).raise_for_status()
         schema=client.post('/v1/rbac/sources/'+suffix+'/schemas',headers=as_('admin'),json={'name':'analytics'}).json()
-        client.put('/v1/rbac/resources/'+schema['id']+'/assignments',headers=as_('admin'),json={'app_group_id':group,'role':'Reader'}).raise_for_status()
+        client.put('/v1/rbac/resources/'+schema['id']+'/assignments',headers=as_('admin'),json={'app_group_id':group,'role':'DataReader'}).raise_for_status()
         with SessionLocal() as db:
             from app import catalog
             catalog.index_children(db,db.get(Resource,schema['id']),[{'kind':'table','name':suffix+'_cards'}])
@@ -162,7 +162,7 @@ def test_sql_uses_selected_group_and_services_keep_direct_grants(client):
     _,alpha,beta = groups(client)
     client.put('/v1/admin/datasources/primary-db',headers=as_('admin'),json=integration('primary-db','postgres')).raise_for_status()
     schema = client.post('/v1/rbac/sources/primary-db/schemas',headers=as_('admin'),json={'name':'analytics'}).json()
-    for group,role in ((alpha,'Admin'),(beta,'Reader')):
+    for group,role in ((alpha,'Admin'),(beta,'DataReader')):
         client.put(f'/v1/rbac/resources/{schema["id"]}/assignments',headers=as_('admin'),json={'app_group_id':group,'role':role}).raise_for_status()
     with SessionLocal() as db:
         db.get(Resource,schema['id']).config={'state':'ready'}
@@ -233,7 +233,7 @@ def test_job_keeps_admitted_primary_creation_rights_after_switch_and_revocation(
     workspace_permissions(client,alpha)
     client.put('/v1/admin/datasources/snap-db',headers=as_('admin'),json=integration('snap-db','postgres')).raise_for_status()
     schema=client.post('/v1/rbac/sources/snap-db/schemas',headers=as_('admin'),json={'name':'analytics'}).json()
-    for group,role in ((alpha,'Admin'),(beta,'Reader')):
+    for group,role in ((alpha,'Admin'),(beta,'DataReader')):
         client.put(f'/v1/rbac/resources/{schema["id"]}/assignments',headers=as_('admin'),json={'app_group_id':group,'role':role}).raise_for_status()
     with SessionLocal() as db:
         db.get(Resource,schema['id']).config={'state':'ready'};db.commit()
@@ -265,7 +265,7 @@ def test_workspace_functions_are_explicit_layer_scoped_and_private(client):
             'namespace':'workspaces','target_id':target,'layer_id':layer,'app_group_id':alpha,'role':role})
         assert response.status_code==201,response.text
         return response.json()['id']
-    grant('Manager')
+    grant('Contributor')
     response=client.post('/v1/workspaces',headers=as_('ana'),json=body)
     assert response.status_code==201,response.text
     ws=response.json(); path='/v1/workspaces/'+ws['id']
@@ -281,7 +281,7 @@ def test_workspace_functions_are_explicit_layer_scoped_and_private(client):
     grant('Executor',target='workspace:'+ws['id'])
     assert client.post(path+'/start',headers=as_('ana')).status_code==200
     assert client.post(path+'/open',headers=as_('ana')).status_code==403
-    grant('Contributor',target='workspace:'+ws['id'])
+    grant('DataContributor',target='workspace:'+ws['id'])
     assert client.post(path+'/open',headers=as_('ana')).status_code==200
     assert client.delete(path,headers=as_('ana')).status_code==403
     bob=client.get('/v1/me',headers=as_('bob')).json()
@@ -332,7 +332,7 @@ def test_run_owner_needs_separate_logs_artifacts_and_cancel_functions(client):
     assert client.post(path+'/open',headers=as_('ana')).status_code==403
     me=client.get('/v1/me',headers=as_('ana')).json()
     assignment=client.post('/v1/permissions/assignments',headers=as_('admin'),json={
-        'target_id':'run:'+run['id'],'namespace':'artifacts','role':'Viewer',
+        'target_id':'run:'+run['id'],'namespace':'artifacts','role':'Reader',
         'layer_id':run['layer_id'],'principal_id':me['principal_id']})
     assert assignment.status_code==201,assignment.text
     assert client.get(path+'/outputs',headers=as_('ana')).status_code==200
@@ -340,7 +340,7 @@ def test_run_owner_needs_separate_logs_artifacts_and_cancel_functions(client):
     own=client.get(path,headers=as_('ana')).json()
     assert 'artifacts.list' in own['capabilities'] and 'artifacts.read' not in own['capabilities']
     body={k:v for k,v in assignment.json().items() if k!='id'}
-    body['role']='Executor'
+    body['role']='DataReader'
     client.put('/v1/permissions/assignments/'+assignment.json()['id'],headers=as_('admin'),json=body).raise_for_status()
     ticket=client.post(path+'/open',headers=as_('ana'))
     assert ticket.status_code==200,ticket.text
@@ -402,7 +402,7 @@ def test_run_metadata_and_retry_are_separate_live_permissions(client):
     pid=client.get('/v1/me',headers=as_('ana')).json()['principal_id']
     grant=client.post('/v1/permissions/assignments',headers=as_('admin'),json={
         'target_id':'run:'+run['id'],'namespace':'runs','layer_id':run['layer_id'],
-        'principal_id':pid,'role':'Viewer'})
+        'principal_id':pid,'role':'Reader'})
     assert grant.status_code==201,grant.text
     assert client.get(path,headers=as_('ana')).status_code==200
     assert client.post(path+'/retry',headers=as_('ana')).status_code==403

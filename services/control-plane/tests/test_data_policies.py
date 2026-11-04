@@ -59,8 +59,8 @@ def governed(client, monkeypatch):
     monkeypatch.setattr(sql_access, 'check_native_relations', lambda query: None)
     client.put('/v1/admin/datasources/finance', headers=as_('admin'), json=integration('finance', 'postgres')).raise_for_status()
     schema = client.post('/v1/rbac/sources/finance/schemas', headers=as_('admin'), json={'name': 'reporting'}).json()
-    readers = grant_group(client, schema['id'], 'finance-readers', 'Reader', users=('ana', 'bob'))
-    auditors = grant_group(client, schema['id'], 'finance-auditors', 'Reader', users=('bob',))
+    readers = grant_group(client, schema['id'], 'finance-readers', 'DataReader', users=('ana', 'bob'))
+    auditors = grant_group(client, schema['id'], 'finance-auditors', 'DataReader', users=('bob',))
     with SessionLocal() as db:
         resource = db.get(Resource, schema['id'])
         resource.config = {**resource.config, 'state': 'ready'}

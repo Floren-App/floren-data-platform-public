@@ -150,7 +150,7 @@ def test_source_scoped_operator_can_manage_only_its_layer_plans(client,recovery_
     from app.models import PermissionGrant,Resource
     from .rbac_helpers import grant_group
     dest=destination(client,recovery_keys)
-    group=grant_group(client,'set-backups','Database backup operators','Viewer',users=['bob'])
+    group=grant_group(client,'set-backups','Database backup operators','Reader',users=['bob'])
     with SessionLocal() as db:
         item=DataSource(name='dev-orders',kind='postgres',config={'host':'db.internal','database':'orders','layer_id':layers.NON_PROD})
         db.add(item);db.flush();source_id=item.id;target=rbac.source_resource(db,item)

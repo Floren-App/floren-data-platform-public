@@ -209,7 +209,8 @@ def describe(db, case: AccessCase) -> str:
         person = db.get(DirectoryPrincipal, case.principal_id) if case.principal_id else None
         return f"{person.name if person else 'someone'} joining {name}"
     resource = db.get(Resource, case.resource_id) if case.resource_id else None
-    return f"{case.role} on {resource.name if resource else case.resource_id} for {name}"
+    from .rbac import label
+    return f"{label(case.role)} on {resource.name if resource else case.resource_id} for {name}"
 
 
 def _facts(db, case: AccessCase) -> str:

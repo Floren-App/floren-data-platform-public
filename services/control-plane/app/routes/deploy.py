@@ -481,7 +481,7 @@ def undeploy(pub_id: str, db: Session = Depends(get_db), orch: Orchestrator = De
 @router.post("/workloads/{pub_id}/open", response_model=OpenOut)
 def open_workload(pub_id: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
     pub = _visible(db, pub_id, user)
-    permissions.require_domain(db, user, "workloads.execution.docs.open" if pub.kind == "dbt" else "workloads.execution.app.open", rbac.workload_resource(db, pub), "execute")
+    permissions.require_domain(db, user, "workloads.execution.docs.open" if pub.kind == "dbt" else "workloads.execution.app.open", rbac.workload_resource(db, pub), "open")
     if pub.kind not in ("app", "airflow", "dbt") or pub.status != "live":
         raise HTTPException(409, "only live apps, Airflow deployments and dbt docs can be opened")
     ticket = mint_token("ticket", user.username, 60, target=f"p:{pub.slug}", groups=user.groups, pid=user.principal_id)
@@ -493,7 +493,7 @@ def orchestrator_runs(pub_id: str, limit: int = Query(5, ge=1, le=25), dag_id: s
                       db: Session = Depends(get_db), user: User = Depends(get_actor),
                       store: SecretStore = Depends(get_secret_store)):
     pub = _visible(db, pub_id, user)
-    permissions.require_domain(db, user, "workloads.execution.read", rbac.workload_resource(db, pub), "execute")
+    permissions.require_domain(db, user, "workloads.execution.read", rbac.workload_resource(db, pub), "read")
     if pub.kind != "airflow":
         raise HTTPException(409, "this workload is not an orchestrator")
     from ..airflow_history import recent_runs

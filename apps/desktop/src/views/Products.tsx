@@ -3,7 +3,7 @@ import { AccessCaseItem, AccessRequestItem, ago, api, ApiError, openInWindow, Ap
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
 import { ProductIcon } from "../components/ProductIcon";
-import { PermissionsPanel } from "../components/Permissions";
+import { PermissionsPanel, roleLabel } from "../components/Permissions";
 import { Answers, FormRenderer, JustifyPanel, uploadFiles } from "../components/ComplianceForm";
 import { CaseTable } from "./Cases";
 import { AlertRules } from "./Alerts";
@@ -26,9 +26,9 @@ export function contents(members: Pick<ProductMember, "kind">[]): string {
   return [...counts].map(([kind, n]) => n === 1 ? kindLabel(kind) : `${n} ${KIND[kind]?.[1] ?? kindLabel(kind).toLowerCase() + "s"}`).join(" · ");
 }
 
-/** What Consumer on the product gives, in words: "Executor on Sales app, Reader on schema public (all its tables)". */
+/** What Data Reader on the product gives, in words: "Data Reader on Sales app, on schema public (all its tables)". */
 function grantsText(grants: ProductGrant[]) {
-  return grants.map((g, i) => <span key={g.resource_id}>{i > 0 && ", "}{g.role} on {g.kind === "schema" ? <>schema <strong>{g.name}</strong> (all its tables)</> : <strong>{g.name}</strong>}</span>);
+  return grants.map((g, i) => <span key={g.resource_id}>{i > 0 && ", "}{roleLabel(g.role)} on {g.kind === "schema" ? <>schema <strong>{g.name}</strong> (all its tables)</> : <strong>{g.name}</strong>}</span>);
 }
 
 /** Where to open an object itself: the dashboard, the table, the API or the topic (only with access). */
@@ -226,7 +226,7 @@ function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDon
   };
   return <form className="card" aria-label={`Request access to ${p.title}`} onSubmit={(e) => void submit(e)}>
     <h2>Request access</h2>
-    <p className="muted">{p.owner_group_name ?? "The owners"} decide. Approval makes the group you choose a Consumer of this product: {grantsText(p.grants)}.</p>
+    <p className="muted">{p.owner_group_name ?? "The owners"} decide. Approval gives the group you choose Data Reader on this product: {grantsText(p.grants)}.</p>
     <div className="arg-grid">
       <div className="field"><label htmlFor="request-group">For your group</label>
         <select id="request-group" value={group} onChange={(e) => setGroup(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>
@@ -265,7 +265,7 @@ function EditForm({ detail, hub, onSaved, onCancel, openTab }: { detail: Product
     <div className="arg-grid"><div className="field"><label htmlFor="product-title">Name in the catalog</label><input id="product-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} /></div>
       <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="product-summary">Summary</label><textarea id="product-summary" rows={2} maxLength={600} value={summary} onChange={(e) => setSummary(e.target.value)} /></div></div>
     <MemberPicker hub={hub} chosen={chosen} onChange={setChosen} />
-    <p className="hint">Consumers get the use of what you add, and lose what you remove.</p>
+    <p className="hint">Its Data Readers get the use of what you add, and lose what you remove.</p>
     <OptionsEditor detail={detail} options={options} onChange={setOptions} />
     {error && <p className="error" role="alert">{error}</p>}
     <div className="form-actions"><button className="btn" disabled={!title.trim() || !chosen.length}>Save</button><button type="button" className="btn secondary" onClick={onCancel}>Cancel</button>
@@ -321,7 +321,7 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
           <dt>Certification</dt><dd>{words(detail.status)}</dd>
           <dt>Freshness</dt><dd>{detail.updated_at ? <>Updated {ago(detail.updated_at)}</> : "—"}{detail.sla_status && detail.sla_status !== "not_configured" && <> · SLA {words(detail.sla_status)}</>}</dd>
           <dt>Published</dt><dd>{ago(detail.published_at)} by {detail.published_by}</dd>
-          {managing ? <><dt>Access</dt><dd>Consumers of this product get {grantsText(detail.grants)}.</dd></>
+          {managing ? <><dt>Access</dt><dd>Data Readers of this product get {grantsText(detail.grants)}.</dd></>
             : <><dt>Your access</dt><dd><AccessState p={detail} /></dd></>}
         </dl></section>
       <div className="section-heading"><h2>In this product</h2></div>

@@ -108,7 +108,7 @@ def actor(db, authorization, viewer=""):
                 raise HTTPException(403, "viewer context does not belong to this caller-mode app")
             user = rbac.resolve_user(db, bind(db, User(delegated["sub"], principal_id=delegated.get("pid", "")), rbac.workload_resource(db, pub)))
             from .permissions import require_domain
-            require_domain(db,user,"delegation.query",rbac.workload_resource(db,pub),"execute")
+            require_domain(db,user,"delegation.query",rbac.workload_resource(db,pub),"open")
             return SqlActor(user, binding + ":viewer:" + user.principal_id + ":group:" + (user.active_group_id or ""), execution, viewer, pub.id)
         if execution.workload_id:
             pub = db.get(Workload, execution.workload_id)
@@ -140,10 +140,8 @@ def scopes(db, who):
         if not db.scalar(select(DirectoryPrincipal.active).where(DirectoryPrincipal.id == who.user.principal_id)):
             raise HTTPException(401, "identity is inactive")
         for grant in rbac.role_grants(db, who.user):
-            if grant.role=='Contributor':
-                continue
-            role = 'Reader' if grant.role == 'Executor' else grant.role
-            if role in LEVELS and LEVELS[role] > LEVELS.get(grants.get(grant.resource_id), 0):
+            role = rbac.DATA_LEVELS.get(grant.role)
+            if role and LEVELS[role] > LEVELS.get(grants.get(grant.resource_id), 0):
                 grants[grant.resource_id] = role
     schemas = list(db.scalars(select(Resource).where(Resource.kind == "schema")))
     from .ownership import creation_data_snapshot
@@ -337,7 +335,7 @@ def query_function_allowed(query, action):
     from .permissions import REGISTRY
     for scope in query.scope.values():
         for role in scope.get('schemas', {}).values():
-            canonical = {'Reader':'Executor'}.get(role,role)
+            canonical = {'Reader':'DataReader','Contributor':'DataContributor'}.get(role,role)
             if canonical in REGISTRY[action]['roles']:
                 return True
         for rules in scope.get('named_objects', {}).values():

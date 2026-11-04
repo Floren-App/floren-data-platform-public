@@ -239,7 +239,7 @@ def _allowed(db: Session, kind: str, item_id: str, username: str, groups: list, 
         from ..permissions import domain_allowed
         return pub is not None and domain_allowed(db, user,
             "workloads.execution.docs.open" if pub.kind == "dbt" else "workloads.execution.app.open",
-            workload_resource(db, pub), "execute")
+            workload_resource(db, pub), "open")
     item = db.get(Workspace if kind == "ws" else Run, item_id)
     from ..rbac import same_identity
     if item is None or not (same_identity(item,user) or user.is_admin):
