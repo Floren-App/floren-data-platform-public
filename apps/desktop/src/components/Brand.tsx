@@ -40,7 +40,7 @@ export function LimeSlice({ size = 32, loading = false, title, half = false, mon
   if (mono) return <svg className="lime-slice mono" width={size} height={size} viewBox="0 0 64 64" {...label}>
     <mask id={mask}>
       <path d={disc(30.5)} fill="white" /><path d={disc(27.5)} fill="black" /><path d={disc(FLESH)} fill="white" />
-      <g stroke="black" strokeWidth={SPOKE} strokeLinecap="round">{lines}</g><circle cx="32" cy="32" r={SPOKE} fill="black" />
+      <g stroke="black" strokeWidth={SPOKE} strokeLinecap="butt">{lines}</g><path d={disc(SPOKE)} fill="black" />
     </mask>
     <path d={disc(30.5)} fill="currentColor" mask={`url(#${CSS.escape(mask)})`} />
   </svg>;
@@ -49,8 +49,9 @@ export function LimeSlice({ size = 32, loading = false, title, half = false, mon
     <path d={disc(27.5)} className="lime-pith" />
     {segments.map((d, i) => <path key={i} d={d} className="lime-segment"
       style={loading ? { animationDelay: `${(i - count) * 0.12}s` } : undefined} />)}
-    <g className="lime-spokes" strokeWidth={SPOKE} strokeLinecap="round">{lines}</g>
-    <circle cx="32" cy="32" r={SPOKE} className="lime-pith" />
+    <g className="lime-spokes" strokeWidth={SPOKE} strokeLinecap="butt">{lines}</g>
+    {/* The centre, cut in half with the slice. */}
+    <path d={disc(SPOKE)} className="lime-pith" />
   </svg>;
 }
 

@@ -40,23 +40,24 @@ def parts(half):
 
 def colour(half=False, loading=False):
     segments, spokes = parts(half)
-    style = ('<style>.s{animation:t .96s linear infinite}@keyframes t{from{opacity:1}to{opacity:.3}}'
-             '@media (prefers-reduced-motion:reduce){.s{animation:none}}</style>') if loading else ''
-    flesh = ''.join(f'<path class="s" d="{d}" fill="{FLESH_COLOUR}"'
-                    + (f' style="animation-delay:{(i - len(segments)) * 0.12:.2f}s"' if loading else '') + '/>'
+    # Only the loading slice moves; the class is unique to it, so a page with several marks keeps the others still.
+    style = ('<style>.limoon-tick{animation:limoon-tick .96s linear infinite}@keyframes limoon-tick{from{opacity:1}to{opacity:.3}}'
+             '@media (prefers-reduced-motion:reduce){.limoon-tick{animation:none}}</style>') if loading else ''
+    flesh = ''.join(f'<path d="{d}" fill="{FLESH_COLOUR}"'
+                    + (f' class="limoon-tick" style="animation-delay:{(i - len(segments)) * 0.12:.2f}s"' if loading else '') + '/>'
                     for i, d in enumerate(segments))
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">{style}'
             f'<path d="{disc(30.5, half)}" fill="{RIND}"/><path d="{disc(27.5, half)}" fill="{PITH}"/>{flesh}'
-            f'<g stroke="{PITH}" stroke-width="{SPOKE}" stroke-linecap="round">{spokes}</g>'
-            f'<circle cx="32" cy="32" r="{SPOKE}" fill="{PITH}"/></svg>\n')
+            f'<g stroke="{PITH}" stroke-width="{SPOKE}" stroke-linecap="butt">{spokes}</g>'
+            f'<path d="{disc(SPOKE, half)}" fill="{PITH}"/></svg>\n')
 
 
 def mono(half=False, colour='currentColor'):
     _, spokes = parts(half)
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><mask id="m">'
             f'<path d="{disc(30.5, half)}" fill="white"/><path d="{disc(27.5, half)}" fill="black"/>'
-            f'<path d="{disc(FLESH, half)}" fill="white"/><g stroke="black" stroke-width="{SPOKE}" stroke-linecap="round">{spokes}</g>'
-            f'<circle cx="32" cy="32" r="{SPOKE}" fill="black"/></mask>'
+            f'<path d="{disc(FLESH, half)}" fill="white"/><g stroke="black" stroke-width="{SPOKE}" stroke-linecap="butt">{spokes}</g>'
+            f'<path d="{disc(SPOKE, half)}" fill="black"/></mask>'
             f'<path d="{disc(30.5, half)}" fill="{colour}" mask="url(#m)"/></svg>\n')
 
 
