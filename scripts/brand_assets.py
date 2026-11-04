@@ -23,8 +23,9 @@ def wedge(start, end):
     return f'M 32 32 L {polar(FLESH, start)} A {FLESH} {FLESH} 0 0 1 {polar(FLESH, end)} Z'
 
 
-# The half slice has a closed outline: the rind and pith also run along the cut, set in by these distances.
-HALF_INSET = {30.5: 0, 27.5: 3, FLESH: 6.5}
+# The half slice: the rind only on the curved outside; along the cut a band of pith, so the flesh and its lines stop
+# short of the edge. The values set each layer in from the cut.
+HALF_INSET = {30.5: 0, 27.5: 0, FLESH: 3}
 # Moves the half slice back towards the middle of its square (it lies on one side of the centre).
 HALF_SHIFT = 'translate(-4.6 -4.6)'
 

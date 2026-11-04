@@ -18,9 +18,10 @@ function wedge(from: number, to: number) {
   return `M 32 32 L ${polar(FLESH, from)} A ${FLESH} ${FLESH} 0 0 1 ${polar(FLESH, to)} Z`;
 }
 
-/** Half a slice, cut along a line rising 45° to the right (from 225° to 45°); the flesh lies below the cut. Its outline
- * is closed: the rind and pith also run along the cut (`inset` from it), so nothing reaches past the edge. */
-const HALF = { start: 45, spokes: [90, 135, 180], segments: 4, inset: { 30.5: 0, 27.5: 3, [FLESH]: 6.5 } as Record<number, number> };
+/** Half a slice, cut along a line rising 45° to the right (from 225° to 45°); the flesh lies below the cut. The rind
+ * covers only the curved outside; along the cut runs a band of pith (`inset`), so the flesh and its lines stop short
+ * of the edge. */
+const HALF = { start: 45, spokes: [90, 135, 180], segments: 4, inset: { 30.5: 0, 27.5: 0, [FLESH]: 3 } as Record<number, number> };
 
 /** The part of a circle beyond a chord `d` from the centre, on the flesh side of the cut. */
 function halfDisc(r: number, d: number) {
