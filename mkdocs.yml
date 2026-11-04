@@ -1,5 +1,5 @@
-site_name: Floren Data Platform
-site_description: Install, operate and develop governed data products with FDP.
+site_name: limoon.
+site_description: Install, operate and develop governed data products with Limoon.
 site_url: https://floren-app.github.io/floren-data-platform-public/
 repo_url: https://github.com/Floren-App/floren-data-platform-public
 repo_name: Floren-App/floren-data-platform-public
@@ -8,18 +8,20 @@ strict: true
 theme:
   name: material
   custom_dir: docs/overrides
+  logo: assets/limoon.svg
+  favicon: assets/limoon.svg
   language: en
   font: false
   palette:
     - scheme: default
-      primary: teal
-      accent: teal
+      primary: light green
+      accent: lime
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - scheme: slate
-      primary: teal
-      accent: teal
+      primary: light green
+      accent: lime
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode

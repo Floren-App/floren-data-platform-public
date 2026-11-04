@@ -117,7 +117,7 @@ export function useHub(enabled: boolean): Hub {
       const failure = results.find((r): r is PromiseRejectedResult => r.status === "rejected" && !(r.reason instanceof SessionExpiredError));
       if (failure) {
         pollFailed.current = true;
-        setError(`Cannot reach Floren Data Platform: ${(failure.reason as Error).message}`);
+        setError(`Cannot reach Limoon: ${(failure.reason as Error).message}`);
       } else if (pollFailed.current && results.every((r) => r.status === "fulfilled")) {
         pollFailed.current = false;
         setError(null);

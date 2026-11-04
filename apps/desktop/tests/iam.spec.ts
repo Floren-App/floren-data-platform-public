@@ -1648,7 +1648,7 @@ test("storage connections are added on Storage by choosing a type and its requir
   await main.getByRole("button", { name: "Add connection", exact: true }).click();
   await page.screenshot({ path: test.info().outputPath("storage-types.png") });
   await main.getByRole("button", { name: /^PostgreSQL/ }).click();
-  await expect(main.getByText("Configure outside Floren Data Platform first.")).toBeVisible();
+  await expect(main.getByText("Configure outside Limoon first.")).toBeVisible();
   await expect(main.getByLabel("Port *", { exact: true })).toHaveValue("5432");
   await main.getByLabel("Name *", { exact: true }).fill("sales-dw");
   await main.getByLabel("Database *", { exact: true }).fill("sales");
@@ -1767,7 +1767,7 @@ test("an expired sign-in asks to sign in again instead of reporting an outage", 
   const state = await setup(page, "owner", undefined, 30).catch(() => null);
   const dialog = page.getByRole("alertdialog", { name: "Session expired" });
   await expect(dialog).toBeVisible();
-  await expect(page.getByText(/Cannot reach Floren Data Platform/)).toHaveCount(0);
+  await expect(page.getByText(/Cannot reach Limoon/)).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Sign in again", exact: true })).toBeFocused();
   expect(state?.errors ?? []).toEqual([]);
 });
@@ -2223,7 +2223,7 @@ test("Home starts with scoped activity and submits global search into the catalo
   await expect(main.getByRole("region", { name: "Your workspaces", exact: true })).toContainText("Pokemon Test workspace");
   await expect(main.getByRole("region", { name: "Recent runs", exact: true }).locator("li").first()).toContainText("Daily report");
   await expect(main.getByRole("region", { name: "Recently updated runs", exact: true }).locator("li").first()).toContainText("older-job");
-  const search = main.getByRole("combobox", { name: "Search across Floren Data Platform", exact: true });
+  const search = main.getByRole("combobox", { name: "Search across Limoon", exact: true });
   await search.fill("Revenue"); await search.press("Enter");
   await expect(main.getByRole("combobox", { name: "Search the catalog", exact: true })).toHaveValue("Revenue");
   await expect(main.getByRole("table", { name: "Catalog results" })).toContainText("Revenue");
@@ -3198,6 +3198,10 @@ test("groups show members, what they reach and settings; connections and service
       assignment("r2", "Owner", "privileged", ["sales-service", "Sales app", "service"], "object", [["workloads.roles.assign", "Give roles on workloads", "privileged"], ["artifacts.read", "Read run outputs", "data"]]),
       assignment("duty:duty1", "Forms reviewer", "privileged", ["cases", "Access requests", ""], "duty", [["reviews.forms.review", "Review compliance forms", "privileged"]],
         { layer_id: null, layer_name: null, duty_id: "duty1", conditions: ["Classifications: restricted"], description: "Review compliance forms in scope" }),
+      // Feature permissions come one per feature and layer.
+      ...[["n1", "Product list", "1a0000000001", "Prod"], ["n2", "Product list", "1a0000000002", "Non-Prod"], ["n3", "Your requests", "1a0000000001", "Prod"]].map(([id, feature, layer, name]) =>
+        assignment(id, "Viewer", "platform", ["products", "Data products", ""], "named", [["products.collection.list", feature, "platform"]],
+          { grant_id: id, layer_id: layer, layer_name: name, feature, namespace: "products.collection" })),
     ] } }));
   await page.getByRole("button", { name: "Access", exact: true }).click();
   await sidebar.getByRole("button", { name: "Groups", exact: true }).click();
@@ -3211,7 +3215,15 @@ test("groups show members, what they reach and settings; connections and service
   await expect(data).toContainText("Data Reader");
   await expect(privileged).toContainText("Sales app");
   await expect(privileged).toContainText("Access requests");
-  await expect(main.getByRole("region", { name: "Platform access" })).toContainText("No roles of this kind.");
+  // Several feature grants of one role on one object show as one row: what they cover, and where.
+  const platform = main.getByRole("region", { name: "Platform access" });
+  await expect(platform.locator(".access-object-roles .badge")).toHaveText(["Viewer"]);
+  await platform.getByRole("button", { name: "Show roles on Data products" }).click();
+  await expect(platform.locator(".access-role")).toHaveCount(1);
+  await expect(platform).toContainText("Features: Product list, Your requests · Prod, Non-Prod (3 grants, one per feature and layer)");
+  // Access is not tied to a layer: the picker says so.
+  await expect(page.locator(".context-picker")).toContainText("All layers");
+  await expect(page.getByRole("combobox", { name: "Layer mode" })).toHaveCount(0);
   await data.getByRole("button", { name: "Show roles on finance-dw / reporting" }).click();
   await expect(data).toContainText("Approved until 2027-01-31");
   await data.getByRole("button", { name: /Show the permissions of Data Reader/ }).click();
@@ -3650,4 +3662,22 @@ test("Roles lists what each role on each kind of object carries, grouped by kind
   await page.getByRole("region", { name: "Permissions for reporting" }).getByRole("button", { name: "Data Reader", exact: true }).click();
   await expect(main.getByRole("region", { name: "Roles of data-sql" }).locator("li.highlight")).toContainText("Data Reader");
   expect(state.errors).toEqual([]);
+});
+
+test("the sign-in screen carries the limoon. brand", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("fdp.server", "https://iam.test"));
+  // The opening screen shows while the server answers.
+  let answer = () => {};
+  const answered = new Promise<void>((resolve) => { answer = resolve; });
+  await page.route("https://iam.test/api/**", async (route) => { await answered; await route.fulfill({ json: { oidc_issuer: "https://idp.test", oidc_client_id: "desktop",
+    oidc_scopes: "openid", public_url: "https://iam.test" }, headers: { "Access-Control-Allow-Origin": "*" } }); });
+  await page.goto("/");
+  await expect(page.locator(".splash .wordmark")).toHaveText("limoon.");
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: test.info().outputPath("splash.png") });
+  answer();
+  await expect(page.getByRole("heading", { name: "limoon" })).toBeVisible();
+  await expect(page.locator(".login .lime-slice")).toBeVisible();
+  await expect(page).toHaveTitle("limoon.");
+  await page.screenshot({ path: test.info().outputPath("sign-in.png") });
 });

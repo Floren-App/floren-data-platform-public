@@ -37,6 +37,7 @@ def test_group_inventory_lists_each_role_once_with_its_permissions(client,repo):
     named=by('Selected permissions')[0]
     assert named['category']=='platform' and named['layer_id']==layers.PROD and named['origin']=='named'
     assert [p['key'] for p in named['permissions']]==['network.editor_allowlist.read']
+    assert named['feature']=='Editor HTTPS allowlist' and named['namespace']=='network.editor_allowlist'
     duty=by('Forms reviewer')[0]
     assert duty['category']=='privileged' and duty['origin']=='duty' and duty['duty_id']
     assert [p['key'] for p in duty['permissions']]==['reviews.forms.review']

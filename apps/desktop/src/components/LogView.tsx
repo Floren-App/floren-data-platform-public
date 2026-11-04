@@ -42,7 +42,7 @@ export function LogView({ scope, layerId, openTab, showWorkload = true, label = 
       <label className="row muted"><input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} />Live</label>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
-    {!entries ? <p className="muted" role="status">Loading the log…</p>
+    {!entries ? <p className="muted loading" role="status">Loading the log…</p>
       : !entries.length ? <p className="muted">{query || level !== "debug" ? "No log lines match." : <>Nothing logged yet. Runs, deploys and Airflow DAG runs appear here; programs add lines with <code>fdp.log.info(…)</code> (Python) or <code>fdp::log_info(…)</code> (R).</>}</p>
       : <div className="table-scroll"><table className="log-table" aria-label="Log lines"><thead><tr><th>Time</th><th>Level</th>{showWorkload && <th>Workload</th>}<th>Message</th><th>Version</th><th /></tr></thead><tbody>
         {entries.map((e) => <tr key={e.id} className={`log-${e.level}`}>

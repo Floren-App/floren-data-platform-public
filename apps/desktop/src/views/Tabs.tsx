@@ -412,7 +412,7 @@ function RunTab({ id, hub, openTab }: { id: string; hub: Hub; openTab: (t: TabRe
           )}
           {(run.kind === "app" || run.kind === "airflow") && run.status === "running" && runCan(run,"artifacts.open") && (
             <button className="btn" onClick={() => hub.act(() =>
-              openInWindow(api.openApp(run.id).then((r) => r.url), `${title} — Floren Data Platform`, `app-${run.id}`))}><IconOpen size={14} />{run.kind === "airflow" ? "Open Airflow" : "Open app"}</button>
+              openInWindow(api.openApp(run.id).then((r) => r.url), `${title} — Limoon`, `app-${run.id}`))}><IconOpen size={14} />{run.kind === "airflow" ? "Open Airflow" : "Open app"}</button>
           )}
         </>}>
         {argList.length > 0 && (
@@ -458,7 +458,7 @@ function Outputs({ run, workspaceRunning }: { run: Run; workspaceRunning: boolea
         {!run.workload_id && <span className="muted" style={{ fontSize: 12 }}>In the editor: <code>.fdp/runs/{run.id}/outputs</code></span>}</div>
       {!workspaceRunning ? <p className="muted">Start the workspace to browse this run's outputs (they live on its volume).</p>
         : error ? <p className="error" role="alert">{error}</p>
-        : files === null ? <p className="muted">Loading…</p>
+        : files === null ? <p className="muted loading">Loading…</p>
         : files.length === 0 ? <p className="muted">No output files. Programs write them to <code>$FDP_OUTPUT_DIR</code> (<code>fdp.output_dir()</code>).</p>
         : (
           <div className="outputs">
@@ -510,6 +510,6 @@ function DocsTab({ runId }: { runId: string }) {
       .catch((e: Error) => setError(e.message.includes("not found") ? "This run produced no docs (did dbt fail before docs generate?)." : e.message));
   }, [runId]);
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (html === null) return <p className="muted">Loading docs…</p>;
+  if (html === null) return <p className="muted loading">Loading docs…</p>;
   return <iframe title="dbt docs" srcDoc={html} sandbox="allow-scripts allow-popups" style={{ width: "100%", height: "calc(100vh - 140px)", border: 0, background: "#fff" }} />;
 }

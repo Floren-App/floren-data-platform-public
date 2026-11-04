@@ -93,7 +93,7 @@ export function DataListing({ schema, location = { schemaId: schema.id }, openTa
     <div className="object-toolbar"><input type="search" aria-label={columns ? "Find column" : "Find data object"} placeholder="Filter this page…" value={search} onChange={(e) => setSearch(e.target.value)} />
       <div className="toolbar-group"><span className="hint" role="status">{state.refreshing ? "Showing the last listing · refreshing…" : state.error ? `Showing the last listing · ${state.error}` : state.status === "ready" ? "Metadata cached for this session" : "Loads when opened"}</span>
         <button className="btn secondary" disabled={state.status === "loading" || state.refreshing} onClick={state.refresh}><IconRefresh size={14} />Refresh {columns ? "columns" : "objects"}</button></div></div>
-    {state.status === "idle" || state.status === "loading" ? <p className="muted" role="status">Loading {columns ? "columns" : "objects"}…</p>
+    {state.status === "idle" || state.status === "loading" ? <p className="muted loading" role="status">Loading {columns ? "columns" : "objects"}…</p>
       : state.status === "error" ? <p className="error" role="alert">{state.error}</p>
       : <div className="table-scroll"><table><thead><tr><th>Name</th><th>{columns ? "Data type" : "Type"}</th>{columns && <th>Nullable</th>}</tr></thead><tbody>
         {items.map((child) => <tr key={child.name}>
@@ -143,7 +143,7 @@ function DataPreview({ schema, table }: { schema: AccessResource; table: string 
   return <section aria-label={`Data preview of ${table}`}>
     <div className="section-heading" style={{ marginTop: 0 }}><div><h2>Data preview</h2><p className="muted">Up to 25 rows using your current data permissions. Row order is not guaranteed.</p></div>
       <button className="btn secondary" disabled={state.status === "loading"} onClick={state.refresh}><IconRefresh size={14} />Refresh preview</button></div>
-    {state.status === "loading" || state.status === "idle" ? <p className="muted" role="status">Loading preview…</p> : state.error ? <p className="error" role="alert">{state.error}</p> : <>
+    {state.status === "loading" || state.status === "idle" ? <p className="muted loading" role="status">Loading preview…</p> : state.error ? <p className="error" role="alert">{state.error}</p> : <>
       <div className="preview-table"><table><thead><tr>{state.data?.columns.map((c, i) => <th key={i}>{c}</th>)}</tr></thead>
         <tbody>{state.data?.rows.map((row, i) => <tr key={i}>{row.map((v, j) => <td key={j} title={typeof v === "string" ? v : undefined}>{value(v)}</td>)}</tr>)}</tbody></table></div>
       <p className="hint">{state.data?.rows.length ?? 0} rows shown.</p>
@@ -162,7 +162,7 @@ function FilePreviewPanel({ schema, path }: { schema: AccessResource; path: stri
     <div className="section-heading" style={{ marginTop: 0 }}><div><h2>Preview</h2>
       <p className="muted">The start of the file, read with your data permissions and recorded in the audit log. To work with all of it, read it in code (Overview).</p></div>
       <button className="btn secondary" disabled={state.status === "loading"} onClick={state.refresh}><IconRefresh size={14} />Refresh</button></div>
-    {state.status === "loading" || state.status === "idle" ? <p className="muted" role="status">Loading preview…</p>
+    {state.status === "loading" || state.status === "idle" ? <p className="muted loading" role="status">Loading preview…</p>
       : state.error ? <p className="error" role="alert">{state.error}</p>
       : !p ? null
       : p.kind === "table" ? <>

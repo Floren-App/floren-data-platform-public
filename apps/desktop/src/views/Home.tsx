@@ -47,11 +47,11 @@ function ViewerHome({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
     api.products.list({ layer_id: hub.layerId, accessible: true }).then((d) => setProducts(d.items)).catch((e: Error) => setError(e.message));
   }, [hub.layerId]); // eslint-disable-line react-hooks/exhaustive-deps
   return <div className="home-dashboard">
-    <div className="home-intro"><PageHeader icon={<IconHome size={22} />} title={hub.me ? `Welcome back, ${hub.me.username}` : "Welcome to Floren Data Platform"}
+    <div className="home-intro"><PageHeader icon={<IconHome size={22} />} title={hub.me ? `Welcome back, ${hub.me.username}` : "Welcome to Limoon"}
       subtitle="The data products and dashboards you can use."
       actions={hub.has("products.browse") && <button className="btn" onClick={() => openTab({ kind: "products", title: "Data products" })}>Find data products</button>} /></div>
     {error && <p className="error" role="alert">{error}</p>}
-    {!products ? <p className="muted" role="status">Loading…</p> : products.length
+    {!products ? <p className="muted loading" role="status">Loading…</p> : products.length
       ? <div className="product-grid" aria-label="Your data products">{products.map((p) => <ProductCard key={p.id} p={p} hub={hub} openTab={openTab} />)}</div>
       : <p className="home-empty">{hub.has("products.browse") ? "Nothing shared with your group yet. Find data products and ask for access." : "Your group's app profile gives no access to data yet. Ask an administrator."}</p>}
   </div>;
@@ -73,10 +73,10 @@ function FullHome({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const newWorkspace = () => openTab({ kind: "workspaces", title: "Workspaces", intent: "create" });
   const W = hub.has("workspaces"), L = hub.has("workloads.view");  // the app profile decides which cards show
   return <div className="home-dashboard">
-    <div className="home-intro"><PageHeader icon={<IconHome size={22} />} title={hub.me ? `Welcome back, ${hub.me.username}` : "Welcome to Floren Data Platform"}
+    <div className="home-intro"><PageHeader icon={<IconHome size={22} />} title={hub.me ? `Welcome back, ${hub.me.username}` : "Welcome to Limoon"}
       subtitle="Pick up your work, follow your pipelines, and find what you need."
       actions={<><button className="btn secondary" onClick={() => void hub.refresh()}><IconRefresh size={14} />Refresh</button>{W && workspaceCreateLayers(hub).length > 0 && <button className="btn" onClick={newWorkspace}><IconPlus size={14} />New workspace</button>}</>} />
-      {hub.has("catalog.objects") && <><div className="home-search"><CatalogSearchBox id="home-search" label="Search across Floren Data Platform" autoFocus={false} value={query} onChange={setQuery} openTab={openTab} onSubmit={search} /><button className="btn secondary" onClick={search}>Search</button></div>
+      {hub.has("catalog.objects") && <><div className="home-search"><CatalogSearchBox id="home-search" label="Search across Limoon" autoFocus={false} value={query} onChange={setQuery} openTab={openTab} onSubmit={search} /><button className="btn secondary" onClick={search}>Search</button></div>
       <p className="hint">Find workloads, datasets, APIs, columns, owners, and tags in the catalog.</p></>}
     </div>
     <div className="home-stats" aria-label="Your activity at a glance">
@@ -178,7 +178,7 @@ function OrchestratorCard({ pub, dag, refresh, hub, openTab, onDag }: { pub: Wor
   }), pub.title, `orchestrator-${pub.id}`));
   return <article className="home-orchestrator" aria-label={pub.title}><div className="home-card-heading"><div><button className="text-button home-strong" onClick={() => openTab({ kind: "workload", ref: pub.id, title: pub.title })}>{pub.title}</button><small className="muted">{pub.branch} · {workloadStatus(pub)}</small></div><button className="icon-btn" aria-label={`Open ${pub.title} in Airflow`} title="Open Airflow" onClick={() => void open()}><IconOpen size={16} /></button></div>
     <select aria-label={`DAG for ${pub.title}`} value={dag} onChange={(e) => onDag(e.target.value)}><option value="">All DAGs</option>{[...new Set([...(history?.dags || []), ...(dag ? [dag] : [])])].map((id) => <option key={id}>{id}</option>)}</select>
-    {error ? <p role="alert" className="error">{error}{history && " Showing the last successful refresh."}</p> : !history && <p className="muted" role="status">Loading DAG runs…</p>}
+    {error ? <p role="alert" className="error">{error}{history && " Showing the last successful refresh."}</p> : !history && <p className="muted loading" role="status">Loading DAG runs…</p>}
     {history && <ul className="home-list">{history.runs.map((run) => <li key={`${run.dag_id}:${run.run_id}`}><button className="home-list-link" title={run.run_id} onClick={() => void open(run)}><span className="home-item-text"><strong>{run.dag_id}</strong><small>{time(run.end_date || run.start_date || run.logical_date)} · {run.run_id}</small></span><Status value={run.state} /></button></li>)}{!history.runs.length && <li className="home-empty">No DAG runs recorded{dag ? ` for ${dag}` : ""}.</li>}</ul>}
     {fetched && <small className="muted home-checked">Checked {time(fetched)}</small>}
   </article>;

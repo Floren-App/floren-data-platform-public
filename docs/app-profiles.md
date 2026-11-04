@@ -5,6 +5,12 @@ An **app profile** additionally curates which parts of the app
 a group gets at all: its pages, its navigation and the actions behind them. The platform
 enforces profiles: a feature that is off is refused by the API too, not only hidden.
 
+Profiles are for **kinds of work**, not for teams or projects. Someone in privacy, security or
+access administration has no use for workspaces or workloads, and a smaller app is easier to
+find your way in. What people may reach (a project's data, its dashboards, its workloads) comes
+from their groups and roles, never from a profile. For example: *Engineering*, *Analysis*,
+*Data consumer*, *Data stewardship*, *Privacy*, *Security* and *Access administration*.
+
 People get the profile of their **active group**, chosen at the bottom of the sidebar.
 Switching group switches the app, just as it switches what the lists show. Running programs,
 workspaces and service identities are not limited by app profiles; their object permissions apply

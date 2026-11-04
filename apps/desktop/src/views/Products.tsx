@@ -111,7 +111,7 @@ export function ProductsView({ hub, openTab, tab }: { hub: Hub; openTab: OpenTab
       {!mine && <label className="row muted"><input type="checkbox" checked={accessible} onChange={(e) => setAccessible(e.target.checked)} />Only what I can use</label>}
     </div>
     {error && <p className="error" role="alert">{error}</p>}
-    {!data ? <p className="muted" role="status">Loading data products…</p>
+    {!data ? <p className="muted loading" role="status">Loading data products…</p>
       : !data.items.length ? <div className="empty-state"><p>{q || domain || kind || accessible ? "No products match." : mine ? "You do not own a product in this layer yet."
           : "Nothing is published in this layer yet."}</p><p className="muted">A product bundles what you share: for example a dashboard with the tables it uses. Publish from an object's page, or with Publish a product.</p></div>
       : <div className="product-grid">{data.items.map((p) => <ProductCard key={p.id} p={p} openTab={openTab} hub={hub} managing={mine} />)}</div>}
@@ -284,7 +284,7 @@ export function ProductView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; open
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (tab.intent === "request") setRequesting(true); }, [tab.intent]);
   if (error && !detail) return <p className="error" role="alert">{error}</p>;
-  if (!detail) return <p className="muted" role="status">Loading…</p>;
+  if (!detail) return <p className="muted loading" role="status">Loading…</p>;
   const managing = !!tab.productManagement && detail.can_manage && hub.has("products.publish");
   const section = !managing && ["permissions", "alerts"].includes(tab.productSection ?? "") ? "overview" : tab.productSection ?? "overview";
   const target = openTarget(detail.open, detail.name, detail.kind);
@@ -479,7 +479,7 @@ export function AccessRequestsView({ hub, openTab, tab }: { hub: Hub; openTab: O
       <button className={box === "mine" ? "active" : ""} aria-current={box === "mine" ? "page" : undefined} onClick={() => openTab({ kind: "access-requests", ref: "mine", title: "My requests" })}>My requests</button>
     </nav>
     {error && <p className="error" role="alert">{error}</p>}
-    {!rows ? <p className="muted" role="status">Loading…</p> : !rows.length ? <p className="muted">{box === "approve" ? "No requests for your products." : "You have not requested access to anything."}</p>
+    {!rows ? <p className="muted loading" role="status">Loading…</p> : !rows.length ? <p className="muted">{box === "approve" ? "No requests for your products." : "You have not requested access to anything."}</p>
       : <div className="table-scroll"><table aria-label={box === "approve" ? "Requests to approve" : "My requests"}><thead><tr><th>Product</th><th>{box === "approve" ? "Requested by" : "Requested"}</th><th>For group · why</th><th>Status</th><th /></tr></thead><tbody>
         {rows.map((r) => <tr key={r.id}>
           <td><button className="text-button" onClick={() => openTab({ kind: "product", ref: r.product_id, title: r.product })}>{r.product}</button>

@@ -67,7 +67,7 @@ export function DeadlinesView({ hub, openTab }: { hub: Hub; openTab: OpenTab }) 
     <PageHeader icon={<ProductIcon kind="identity" size={22} />} title="Needs a form"
       subtitle="Access that needs an approved compliance form and has none: it existed before its policy, or its data was classified higher since. It stays until the deadline, then it is removed. Justify opens where you fill in the form." />
     {error && <p className="error" role="alert">{error}</p>}
-    {!rows ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Needs a form"><thead><tr>
+    {!rows ? <p className="muted loading" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Needs a form"><thead><tr>
       <th>Group</th><th>Access</th><th>Data</th><th>Deadline</th><th /></tr></thead><tbody>
       {rows.map((d) => <tr key={d.resource_id + d.app_group_id}>
         <td><button className="text-button" onClick={() => openTab({ kind: "access", ref: d.app_group_id, title: d.group, groupSection: "access" })}>{d.group}</button></td>
@@ -171,7 +171,31 @@ export function SettingsPermissions({ page, hub, openTab }: { page: string; hub:
 
 const ORIGIN: Record<GroupRoleAssignment["origin"], string> = { object: "Role on the object", product: "Through a data product", named: "Feature permission",
   custom: "Custom role", duty: "Review duty", system: "Protected" };
-type ObjectGroup = { key: string; name: string; icon: string; resource?: AccessResource; roles: GroupRoleAssignment[] };
+type ShownRole = GroupRoleAssignment & { features?: string[]; layers?: string[]; grant_ids?: string[] };
+type ObjectGroup = { key: string; name: string; icon: string; resource?: AccessResource; roles: ShownRole[] };
+
+const layerLabel = (a: GroupRoleAssignment) => !a.layer_id ? "Global" : a.layer_id === "*" ? "All layers" : a.layer_name ?? a.layer_id;
+
+/** Feature permissions are given one per feature and layer. On one object, each role shows once, with the features
+ * and layers it covers, instead of a row per grant. */
+function mergeFeatureGrants(roles: GroupRoleAssignment[]): ShownRole[] {
+  const out: ShownRole[] = [], merged = new Map<string, ShownRole>();
+  for (const a of roles) {
+    if (a.origin !== "named" && a.origin !== "custom") { out.push(a); continue; }
+    const key = `${a.origin}:${a.role}`, seen = merged.get(key);
+    if (!seen) {
+      const first: ShownRole = { ...a, features: a.feature ? [a.feature] : [], layers: [layerLabel(a)], grant_ids: a.grant_id ? [a.grant_id] : [] };
+      merged.set(key, first); out.push(first); continue;
+    }
+    seen.id += "+" + a.id;
+    if (a.feature && !seen.features!.includes(a.feature)) seen.features!.push(a.feature);
+    if (!seen.layers!.includes(layerLabel(a))) seen.layers!.push(layerLabel(a));
+    if (a.grant_id) seen.grant_ids!.push(a.grant_id);
+    const keys = new Set(seen.permissions.map((p) => p.key));
+    seen.permissions = [...seen.permissions, ...a.permissions.filter((p) => !keys.has(p.key))];
+  }
+  return out;
+}
 
 /** A group's Has access to: every role it holds, under data, platform or privileged access; by object, each role
  * with the permissions it carries. One search covers objects, roles and permissions. */
@@ -205,14 +229,14 @@ export function GroupAccessInventory({ roles, group, hub, openTab, onChanged }: 
         icon: String(resource?.config.source_kind ?? a.target_kind ?? (a.origin === "duty" ? "groups" : "layer")) };
       entry.roles.push(a); groups.set(a.target_id, entry);
     }
-    return [...groups.values()];
+    return [...groups.values()].map((o) => ({ ...o, roles: mergeFeatureGrants(o.roles) }));
   };
   const all = CATEGORIES.flatMap((c) => objectsOf(c).map((o) => `${o.key}`));
-  const remove = async (a: GroupRoleAssignment) => {
+  const remove = async (a: ShownRole) => {
     setBusy(true); setError("");
     try {
       if (a.origin === "duty") await api.compliance.removeRole(a.duty_id!);
-      else if (a.origin === "named" || a.origin === "custom") await api.access.removePermission(a.grant_id!);
+      else if (a.origin === "named" || a.origin === "custom") for (const id of a.grant_ids ?? [a.grant_id!]) await api.access.removePermission(id);
       else await api.access.revoke(a.target_id, group.id, a.role);
       await hub.refresh(); onChanged(`Removed ${roleLabel(a.role)} on ${a.target_name} from ${group.name}.`);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
@@ -225,7 +249,7 @@ export function GroupAccessInventory({ roles, group, hub, openTab, onChanged }: 
     : a.origin === "object" || a.origin === "product" ? { kind: "roles" as const, title: "Roles", roleName: a.role,
         ref: catalogTypeKey(resourceOf(a.target_id) ?? { id: a.target_id, kind: a.target_kind ?? "", parent_id: null }, hub.resources) } : null;
 
-  const roleRow = (a: GroupRoleAssignment) => { const open = openRoles.has(a.id), only = permissionOnly(a) ? permissionMatches(a) : a.permissions, link = rolesTab(a);
+  const roleRow = (a: ShownRole) => { const open = openRoles.has(a.id), only = permissionOnly(a) ? permissionMatches(a) : a.permissions, link = rolesTab(a);
     return <li key={a.id} className="access-role">
       <div className="access-role-row">
         <Disclosure open={open} onToggle={() => toggle(setOpenRoles, a.id)} label={`${open ? "Hide" : "Show"} the permissions of ${roleLabel(a.role)} on ${a.target_name}`}>
@@ -233,8 +257,10 @@ export function GroupAccessInventory({ roles, group, hub, openTab, onChanged }: 
           <span className="muted small">{a.permissions.length} permission{a.permissions.length === 1 ? "" : "s"}</span>
         </Disclosure>
         <span className="access-role-meta small">
-          {a.origin === "product" && a.product ? <>Through <button className="text-button" onClick={() => openTab({ kind: "product", ref: a.product!.id, title: a.product!.title })}>{a.product.title}</button></> : ORIGIN[a.origin]}
-          {a.layer_id && <> · {a.layer_id === "*" ? "All layers" : a.layer_name ?? a.layer_id}</>}
+          {a.origin === "product" && a.product ? <>Through <button className="text-button" onClick={() => openTab({ kind: "product", ref: a.product!.id, title: a.product!.title })}>{a.product.title}</button></>
+            : a.features ? <>{a.features.length === 1 ? "Feature" : "Features"}: {a.features.join(", ")}</> : ORIGIN[a.origin]}
+          {a.layers ? <> · {a.layers.join(", ")}{(a.grant_ids?.length ?? 0) > 1 && <span className="muted"> ({a.grant_ids!.length} grants, one per feature and layer)</span>}</>
+            : a.layer_id && <> · {layerLabel(a)}</>}
           {a.description && <> · {a.description}</>}
           {a.conditions.map((c) => <span key={c} className={c.startsWith("Needs") ? "error-text" : "muted"}> · {c}</span>)}
         </span>
@@ -258,7 +284,10 @@ export function GroupAccessInventory({ roles, group, hub, openTab, onChanged }: 
     {error && <p className="error" role="alert">{error}</p>}
     {CATEGORIES.map((category) => {
       const objects = objectsOf(category), count = objects.reduce((n, o) => n + o.roles.length, 0), open = !closed.has(category);
-      const total = roles.filter((r) => r.category === category).length;
+      // Counted as shown: feature grants of one role on one object are one row.
+      const byObject = new Map<string, GroupRoleAssignment[]>();
+      for (const r of roles.filter((x) => x.category === category)) byObject.set(r.target_id, [...(byObject.get(r.target_id) ?? []), r]);
+      const total = [...byObject.values()].reduce((n, list) => n + mergeFeatureGrants(list).length, 0);
       return <section key={category} className={`access-category cat-${category}`} aria-label={CATEGORY_INFO[category].title}>
         <Disclosure open={open} onToggle={() => toggle(setClosed, category)} className="access-category-heading">
           <h3>{CATEGORY_INFO[category].title}</h3>
@@ -272,7 +301,7 @@ export function GroupAccessInventory({ roles, group, hub, openTab, onChanged }: 
                 <Disclosure open={isOpen} onToggle={() => toggle(setOpenObjects, o.key)} label={`${isOpen ? "Hide" : "Show"} roles on ${o.name}`}>
                   <ProductIcon kind={o.icon} size={16} /><span className="object-name">{o.name}</span>
                 </Disclosure>
-                <span className="row access-object-roles">{o.roles.map((a) => <span key={a.id} className="badge role-badge">{roleLabel(a.role)}</span>)}</span>
+                <span className="row access-object-roles">{[...new Set(o.roles.map((a) => a.role))].map((r) => <span key={r} className="badge role-badge">{roleLabel(r)}</span>)}</span>
                 {o.resource && <button className="btn sm secondary" onClick={() => openTab(resourceTab(o.resource!, "permissions"))}>Permissions</button>}
               </div>
               {isOpen && <ul className="access-roles">{o.roles.map(roleRow)}</ul>}

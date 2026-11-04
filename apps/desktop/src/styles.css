@@ -46,6 +46,11 @@
   --warn: #cca700;
   --err: #f85149;
   /* Kinds of access (data, platform, privileged): quiet colors of their own, apart from the status colors. */
+  /* limoon: a lime slice. The same colours in both themes. */
+  --lime-rind: #4a8a1f;
+  --lime-pith: #f2f9dc;
+  --lime-flesh: #a3d44a;
+  --brand-font: "Fredoka", var(--font);
   --cat-data: #4fb3bf;
   --cat-platform: #9d9d9d;
   --cat-privileged: #c586c0;
@@ -148,6 +153,8 @@ button:focus-visible, summary:focus-visible, [role="tab"]:focus-visible { outlin
 .context-picker select { width: 100%; height: 24px; }
 .context-picker small { grid-column: 1 / -1; color: var(--fg-muted); font-size: 11px; }
 .sidebar-content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 12px; }
+.context-label { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
+.context-static { display: flex; align-items: center; height: var(--control); padding: 0 8px; border: 1px dashed var(--border-strong); border-radius: var(--radius); color: var(--fg-muted); cursor: help; }
 .sidebar h2 { position: sticky; top: 0; z-index: 2; background: var(--bg-side); margin: 0; padding: 0 12px 0 20px; height: 35px; font-size: 11px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-muted); display: flex; align-items: center; justify-content: space-between; }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; padding: 6px 12px 2px 20px; font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--fg); }
 .section-title .icon-btn { margin-right: -4px; }
@@ -472,20 +479,42 @@ pre.terminal { background: #181818; color: #cccccc; border: 1px solid var(--bord
 .tree-more { padding: 4px 4px 4px 22px; font-size: 12px; }
 
 /* ---------- Identity ---------- */
-.master-detail { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); border: 1px solid var(--border); border-radius: var(--radius-lg); min-height: 400px; margin-top: 16px; overflow: hidden; }
-.group-list { border-right: 1px solid var(--border); background: var(--bg-side); padding: 10px; }
+/* The list stays in view while the details scroll with the page (overflow: clip keeps sticky working). */
+.master-detail { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); border: 1px solid var(--border); border-radius: var(--radius-lg); min-height: 400px; margin-top: 16px; overflow: clip; background: var(--bg-side); }
+.group-list { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; background: var(--bg-side); padding: 10px; }
 .group-list input { width: 100%; }
-.group-list ul { margin: 10px -10px 0; padding: 0; list-style: none; max-height: 65vh; overflow-y: auto; }
+.group-list ul { margin: 10px -10px 0; padding: 0; list-style: none; }
 .group-list li button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; background: none; border: 0; border-left: 2px solid transparent; padding: 8px 12px; cursor: pointer; text-align: left; overflow-wrap: anywhere; }
 .group-list li button .muted { font-size: 12px; }
 .group-list li button:hover { background: var(--bg-hover); }
 .group-list li button.active { background: var(--bg-selected); border-left-color: var(--accent); }
-.group-detail { padding: 16px 20px; min-width: 0; }
+.group-detail { padding: 16px 20px; min-width: 0; background: var(--bg); border-left: 1px solid var(--border); }
 .group-detail .section-heading { margin-top: 0; }
 .empty-state { padding: 40px 16px; text-align: center; }
 .empty-state h2 { font-size: 14px; }
 .idp-groups details { padding: 8px 0; border-top: 1px solid var(--border); }
 .idp-groups summary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* ---------- Brand ---------- */
+.lime-rind { fill: var(--lime-rind); }
+.lime-pith { fill: var(--lime-pith); }
+.lime-segment { fill: var(--lime-flesh); }
+.lime-slice.loading .lime-segment { animation: lime-tick .96s linear infinite; }
+@keyframes lime-tick { 0% { opacity: 1; } 100% { opacity: .3; } }
+.wordmark { font-family: var(--brand-font); font-weight: 600; letter-spacing: -.01em; line-height: 1; color: var(--fg-strong); }
+.wordmark-dot { color: var(--accent); }
+.splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: var(--bg); }
+.splash .lime-slice { animation: lime-float 2.4s ease-in-out infinite; }
+@keyframes lime-float { 50% { transform: translateY(-4px) rotate(8deg); } }
+.splash p { margin: 0; }
+.brand-mark { display: grid; place-items: center; height: 40px; margin-bottom: 2px; }
+.login-brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 8px; }
+.login-brand h1 { margin: 0; }
+/* Any "Loading…" line gets a small slice that ticks round. */
+.loading::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px;
+  background: url("data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Ccircle cx="32" cy="32" r="30.5" fill="%234a8a1f"/%3E%3Ccircle cx="32" cy="32" r="27.5" fill="%23f2f9dc"/%3E%3Cpath d="M 32.11 28.80 L 32.84 8.01 A 24 24 0 0 1 48.37 14.45 L 34.18 29.66 Z" fill="%23a3d44a" opacity="0.43"/%3E%3Cpath d="M 34.34 29.82 L 49.55 15.63 A 24 24 0 0 1 55.99 31.16 L 35.20 31.89 Z" fill="%23a3d44a" opacity="0.51"/%3E%3Cpath d="M 35.20 32.11 L 55.99 32.84 A 24 24 0 0 1 49.55 48.37 L 34.34 34.18 Z" fill="%23a3d44a" opacity="0.59"/%3E%3Cpath d="M 34.18 34.34 L 48.37 49.55 A 24 24 0 0 1 32.84 55.99 L 32.11 35.20 Z" fill="%23a3d44a" opacity="0.68"/%3E%3Cpath d="M 31.89 35.20 L 31.16 55.99 A 24 24 0 0 1 15.63 49.55 L 29.82 34.34 Z" fill="%23a3d44a" opacity="0.76"/%3E%3Cpath d="M 29.66 34.18 L 14.45 48.37 A 24 24 0 0 1 8.01 32.84 L 28.80 32.11 Z" fill="%23a3d44a" opacity="0.84"/%3E%3Cpath d="M 28.80 31.89 L 8.01 31.16 A 24 24 0 0 1 14.45 15.63 L 29.66 29.82 Z" fill="%23a3d44a" opacity="0.92"/%3E%3Cpath d="M 29.82 29.66 L 15.63 14.45 A 24 24 0 0 1 31.16 8.01 L 31.89 28.80 Z" fill="%23a3d44a" opacity="1.00"/%3E%3Ccircle cx="32" cy="32" r="2.4" fill="%23f2f9dc"/%3E%3C/svg%3E") center / contain no-repeat; animation: lime-turn .96s steps(8) infinite; }
+@keyframes lime-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .lime-slice.loading .lime-segment, .splash .lime-slice, .loading::before { animation: none; } }
+
 /* ---------- Roles and kinds of access ---------- */
 .cat-data { --cat: var(--cat-data); }
 .cat-platform { --cat: var(--cat-platform); }

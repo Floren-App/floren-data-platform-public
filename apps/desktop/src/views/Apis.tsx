@@ -16,8 +16,8 @@ type OpenTab = (t: TabRef) => void;
 type Errors = Record<string, string>;
 
 const DIRECTION_TEXT: Record<ApiDirection, { title: string; text: string }> = {
-  internal: { title: "Internal", text: "Endpoints that outside systems call to run deployed programs inside Floren Data Platform. Callers prove who they are with JWT and/or mTLS; programs run as the API's own managed identity. Never direct data access." },
-  external: { title: "External", text: "Outside REST and SOAP services that programs call through Floren Data Platform, as their own identity. Credentials, headers and client certificates come from secrets and never reach the program." },
+  internal: { title: "Internal", text: "Endpoints that outside systems call to run deployed programs inside Limoon. Callers prove who they are with JWT and/or mTLS; programs run as the API's own managed identity. Never direct data access." },
+  external: { title: "External", text: "Outside REST and SOAP services that programs call through Limoon, as their own identity. Credentials, headers and client certificates come from secrets and never reach the program." },
 };
 
 const defaultInbound = (): InboundConfig => ({
@@ -303,7 +303,7 @@ export function ApiView({ tab, hub, openTab }: { tab: TabRef; hub: Hub; openTab:
         : <p className="notice">You can view this API; changing its settings requires the Contributor role.</p>}
     </>}
     {section === "calls" && <CallsPanel item={item} />}
-    {section === "permissions" && (resource ? <PermissionsPanel resource={resource} resources={hub.resources} openTab={openTab} onChanged={hub.refresh} /> : <p className="muted">Loading permissions…</p>)}
+    {section === "permissions" && (resource ? <PermissionsPanel resource={resource} resources={hub.resources} openTab={openTab} onChanged={hub.refresh} /> : <p className="muted loading">Loading permissions…</p>)}
   </>;
 }
 
@@ -351,7 +351,7 @@ function OperationsPanel({ item, hub, openTab, focus, onChanged }: { item: ApiDe
           <OperationEditor key={op.id + op.name + op.path} item={item} hub={hub} op={op} initial={opInput(op)} onSaved={onChanged} onDeleted={async () => { await onChanged(); setSelected("new"); }} />
           {item.direction === "external" ? <TryIt item={item} op={op} /> : <CallIt item={item} op={op} hub={hub} />}
           <details className="card"><summary>Permissions for {op.name}</summary>
-            {hub.resources.find((r) => r.id === op.resource_id) ? <PermissionsPanel resource={hub.resources.find((r) => r.id === op.resource_id)!} resources={hub.resources} openTab={openTab} onChanged={hub.refresh} /> : <p className="muted">Loading…</p>}
+            {hub.resources.find((r) => r.id === op.resource_id) ? <PermissionsPanel resource={hub.resources.find((r) => r.id === op.resource_id)!} resources={hub.resources} openTab={openTab} onChanged={hub.refresh} /> : <p className="muted loading">Loading…</p>}
           </details>
         </>
         : group ? <>
@@ -458,7 +458,7 @@ function TryIt({ item, op }: { item: ApiDefinition; op: ApiOperation }) {
   try { if (result && result.headers["content-type"]?.includes("json")) pretty = JSON.stringify(JSON.parse(result.body), null, 2); } catch { /* raw */ }
   return <section className="card" aria-label="Try it">
     <h2>Try it</h2>
-    <p className="hint" style={{ marginTop: -4 }}>Calls the backend through Floren Data Platform as you, with the API's configured credentials. Programs use
+    <p className="hint" style={{ marginTop: -4 }}>Calls the backend through Limoon as you, with the API's configured credentials. Programs use
       <code>{soap ? ` fdp.api("${item.slug}").soap("${op.name}", body)` : ` fdp.api("${item.slug}").${op.method.toLowerCase()}("${op.path}")`}</code>.</p>
     {!canCall ? <p className="notice">Calling requires {["GET", "HEAD", "OPTIONS"].includes(op.method.toUpperCase()) ? "Data Reader" : "Data Contributor"} on this operation, its group or the API.</p> : <>
       <div className="row" style={{ alignItems: "flex-end" }}>

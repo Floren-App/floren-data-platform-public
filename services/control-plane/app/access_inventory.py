@@ -108,6 +108,15 @@ def _settings_actions(target_id, role):
     return sorted(found)
 
 
+def feature_label(namespace, actions):
+    """What a feature permission is about, in words (the registry's target of its permissions)."""
+    if namespace == 'pages':
+        return 'Seeing the page'
+    from collections import Counter
+    targets = Counter(permissions.REGISTRY[a].get('target') for a in actions if permissions.REGISTRY.get(a, {}).get('target'))
+    return targets.most_common(1)[0][0] if targets else namespace
+
+
 def permission_rows(actions):
     return [{'key':a,'description':permissions.REGISTRY.get(a,{}).get('description',a),'category':category(a),
              'constraint':permissions.REGISTRY.get(a,{}).get('constraint','')} for a in sorted(actions)]
@@ -147,8 +156,8 @@ def assignments(db, group, assigned):
         role=grant.role or (custom.name if custom else 'Selected permissions')
         cat=role_category(grant.role) if grant.role else actions_category(actions)
         add(role,cat,grant.target_id,target.name if target else grant.target_id,target.kind if target else None,
-            'custom' if custom else 'named',actions,grant.layer_id,['Feature: '+grant.namespace],grant.id,
-            grant_id=grant.id,custom_role_id=grant.custom_role_id)
+            'custom' if custom else 'named',actions,grant.layer_id,[],grant.id,
+            grant_id=grant.id,custom_role_id=grant.custom_role_id,namespace=grant.namespace,feature=feature_label(grant.namespace,actions))
     # Product-derived object grants as well as direct role assignments.
     for grant in list(assigned)+list(rbac.product_grants(db,assigned)):
         target=db.get(Resource,grant.resource_id)

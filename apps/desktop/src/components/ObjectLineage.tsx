@@ -17,9 +17,9 @@ export function ObjectLineage({ resourceId, objectPath, openTab }: {
     return () => { stale = true; };
   }, [resourceId, objectPath]);
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!asset) return <p className="muted" role="status">Loading object lineage…</p>;
+  if (!asset) return <p className="muted loading" role="status">Loading object lineage…</p>;
   return <>
     <p className="hint">This is the same object and lineage shown in the catalog. <button className="text-button" onClick={() => openTab({ kind: "catalog-object", ref: asset.id, title: asset.name, catalogSection: "lineage" })}>Open in catalog</button></p>
-    <Suspense fallback={<p className="muted" role="status">Loading lineage explorer…</p>}><Explorer asset={asset} openTab={openTab} version={0} /></Suspense>
+    <Suspense fallback={<p className="muted loading" role="status">Loading lineage explorer…</p>}><Explorer asset={asset} openTab={openTab} version={0} /></Suspense>
   </>;
 }

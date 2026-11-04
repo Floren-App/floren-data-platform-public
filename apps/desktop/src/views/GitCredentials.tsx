@@ -107,7 +107,7 @@ function GitChoiceDialog({ ws, onDone }: { ws: Workspace; onDone: (go: boolean) 
           onKeyDown={(e) => { if (e.key === "Escape") onDone(false); }}>
       <h2 id="git-choice-title">Git for {ws.name}</h2>
       <p className="muted">Which of your Git credentials should this workspace use? It is set up when the workspace starts: no tokens or settings to type in the editor. You can change it later on the workspace's page.</p>
-      {rows === null ? <p className="muted">Loading…</p> : <fieldset className="plain" aria-label="Git credential">
+      {rows === null ? <p className="muted loading">Loading…</p> : <fieldset className="plain" aria-label="Git credential">
         {rows.map((r) => <label key={r.id} className="row"><input type="radio" name="git-choice" checked={choice === r.id} onChange={() => setChoice(r.id)} />
           <span><strong>{r.label}</strong> <span className="muted">{r.username} on {r.host}{r.commit_email && ` · commits as ${r.commit_email}`}</span></span></label>)}
         <label className="row"><input type="radio" name="git-choice" checked={choice === "new"} onChange={() => setChoice("new")} />Add a new credential</label>

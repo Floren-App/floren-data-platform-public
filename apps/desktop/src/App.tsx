@@ -13,6 +13,7 @@ import { GitChoiceHost } from "./views/GitCredentials";
 import { openInWindow, type AppFeature } from "./api";
 import { documentationUrl } from "./documentation";
 import { pageVisible, TAB_PAGES } from "./permissions";
+import { LimeSlice, Splash, Wordmark } from "./components/Brand";
 
 const HOME: TabRef = { kind: "home", title: "Home" };
 type EditorTab = TabRef & { pinned: boolean };
@@ -40,6 +41,14 @@ const viewForTab = (tab: TabRef): View => {
 };
 const key = (t: TabRef) => t.kind === "access" || t.kind === "users" || t.kind === "catalog" || t.kind === "apis" ? `${t.kind}:` : `${t.kind}:${t.ref ?? ""}`;
 
+// Pages that are not tied to a layer: the layer picker shows "All layers" there.
+const LAYERLESS_VIEWS: View[] = ["access", "admin", "packages"];
+const LAYERLESS_NOTE: Partial<Record<View, string>> = {
+  access: "Access covers every layer: people, groups and their roles in all layers.",
+  admin: "Administration covers every layer; pages that configure one layer ask which.",
+  packages: "Packages are shared by every layer.",
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [booting, setBooting] = useState(true);
@@ -52,7 +61,7 @@ export default function App() {
       .finally(() => setBooting(false));
   }, []);
 
-  if (booting) return <div className="login muted" role="status">Connecting…</div>;
+  if (booting) return <Splash status="Connecting…" />;
   if (!user) return <Login error={bootError} />;
   return <ObjectCacheProvider key={user.profile.sub}><Shell user={user} /></ObjectCacheProvider>;
 }
@@ -77,8 +86,8 @@ function Login({ error }: { error: string | null }) {
   return (
     <div className="login">
       <div className="card">
-        <h1>Floren Data Platform</h1>
-        <p className="muted">Sign in to your organisation's Floren Data Platform. Code and data stay on the server.</p>
+        <div className="login-brand"><LimeSlice size={56} /><h1 aria-label="limoon"><Wordmark size={40} /></h1></div>
+        <p className="muted">Sign in to your organisation's Limoon. Code and data stay on the server.</p>
         <form onSubmit={(e) => { e.preventDefault(); void go(); }}>
           {!WEB_MODE && <div className="field">
             <label htmlFor="server">Server</label>
@@ -223,6 +232,7 @@ function Shell({ user }: { user: User }) {
     <div className="shell">
       <nav className={`activity ${picked ? "picked" : ""}`} aria-label="Views" onMouseLeave={() => setPicked(false)} onKeyDown={() => setPicked(false)}
         onClick={(e) => { if ((e.target as HTMLElement).closest(".activity-group > button, .activity > button")) setPicked(true); }}>
+        <div className="brand-mark" title="limoon."><LimeSlice size={22} /></div>
         {groups.filter((g) => g.items.length).map((g, i) => <div key={g.label} className="activity-group" role="group" aria-label={g.label}>
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />
@@ -230,7 +240,7 @@ function Shell({ user }: { user: User }) {
           {(can.requests || can.reviews || can.newMembers || can.who || can.services || can.register || can.audit || can.queries || can.secrets) && activityButton({ id: "access", label: "Access", icon: <IconAdmin /> })}
           {(can.platform || can.security || can.privacy) && activityButton({ id: "admin", label: "Administration", icon: <IconSettings /> })}</>; })()}
         <button aria-label="Documentation" onClick={() => {
-          void hub.act(() => openInWindow(documentationUrl(view), "FDP documentation", `fdp-help-${view}`));
+          void hub.act(() => openInWindow(documentationUrl(view), "Limoon documentation", `fdp-help-${view}`));
         }}><IconBook /><span className="activity-label">Documentation</span></button>
         <MenuButton id="account-menu" label="Account" menuLabel="Account" className="" icon={<><IconAccount /><span className="activity-label">Account</span></>}>
           {(close) => <>
@@ -253,14 +263,18 @@ function Shell({ user }: { user: User }) {
             <option value="" disabled>{hub.me?.available_groups?.length ? "Choose active group" : "No groups available"}</option>
             {hub.me?.available_groups?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
-          {!!hub.layers.length && <>
+          {!!hub.layers.length && (LAYERLESS_VIEWS.includes(view) ? <>
+            {/* These pages are not tied to a layer: say so instead of offering a choice that changes nothing. */}
+            <span className="context-label">Layer</span>
+            <span className="context-static" title={LAYERLESS_NOTE[view]}>All layers</span>
+          </> : <>
             <label htmlFor="active-layer">Layer</label>
             <select id="active-layer" aria-label="Layer mode" value={hub.layerId} title="Lists show this layer; what you create lands in it."
               onChange={(e) => void hub.selectActiveLayer(e.target.value)}>
               {!hub.layerId && <option value="" disabled>Choose a layer</option>}
               {hub.layers.map((l) => <option key={l.id} value={l.id}>{l.name}{l.production ? " · production" : ""}</option>)}
             </select>
-          </>}
+          </>)}
           {switchingGroup && <small role="status">Switching group…</small>}
         </div>
       </aside>

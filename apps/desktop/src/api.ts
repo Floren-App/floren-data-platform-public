@@ -843,6 +843,8 @@ export interface GroupRoleAssignment {
   origin: "object" | "product" | "named" | "custom" | "duty" | "system";
   layer_id: string | null; layer_name: string | null; conditions: string[]; permissions: PermissionRow[];
   product?: { id: string; title: string } | null; grant_id?: string; custom_role_id?: string | null; duty_id?: string; description?: string;
+  /** Feature permissions: the feature (namespace) they are given in, and what it is about. */
+  namespace?: string; feature?: string;
 }
 export interface CatalogRole { name: string; category: AccessCategory; permissions: string[] }
 export interface RoleCatalogType { key: string; label: string; family: string; target_id?: string; pages?: string[]; roles: CatalogRole[] }

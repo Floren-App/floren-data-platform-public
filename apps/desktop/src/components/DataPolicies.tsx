@@ -124,7 +124,7 @@ export function DataPoliciesPanel({ schema }: { schema: AccessResource }) {
         <button type="button" className="btn secondary" onClick={() => { setDraft(null); setError(""); }}>Cancel</button></div>
     </form>}
 
-    {policies === null ? <p className="muted">Loading…</p> : <div className="table-scroll"><table>
+    {policies === null ? <p className="muted loading">Loading…</p> : <div className="table-scroll"><table>
       <thead><tr><th>Table</th><th>Applies to</th><th>What people see</th><th>Exempt</th>{manage && <th />}</tr></thead>
       <tbody>{policies.map((p) => <tr key={p.id}>
         <td className="mono">{p.table}</td>

@@ -1,9 +1,12 @@
-# Floren Data Platform
+# limoon.
 
-An open-source, governed compute layer for data teams. Private editor workspaces (VS Code,
+**Limoon** (a play on the Dutch *limoen*, lime; an English speaker says it the same way) is an open-source, governed compute layer for data teams. Private editor workspaces (VS Code,
 RStudio or SQL), compute pools that start on demand, governed SQL over your own databases
 and buckets, and programs, dashboards, dbt projects and Airflow pipelines deployed from Git
 (GitOps), with a catalog, lineage, quality checks and SLAs.
+
+Technical names keep their `fdp` prefix: images `fdp-*`, the `fdp` SDK, `FDP_*` settings and the
+Terraform provider `floren-app/fdp`.
 
 Supports Python, Jupyter notebooks, Streamlit, R, Shiny, dbt and Airflow, in versions admins choose.
 

@@ -27,7 +27,8 @@ def on_config(config):
 
 
 def on_files(files, config):
-    public = set(_pages(config['nav'])) | {'reference/openapi.json', 'reference/fdp.schema.json', 'permission-matrix.csv'}
+    public = set(_pages(config['nav'])) | {'reference/openapi.json', 'reference/fdp.schema.json', 'permission-matrix.csv',
+                                           'assets/limoon.svg'}
     # Do not publish progress logs, verification evidence, scripts or arbitrary new files.
     # Theme/plugin assets are not authored docs and must remain available for
     # rendering and the browser search worker. Only docs_dir is allowlisted.

@@ -65,7 +65,7 @@ export function CaseView({ id, hub, openTab }: { id: string; hub: Hub; openTab: 
   const [editing, setEditing] = useState(false), [answers, setAnswers] = useState<Answers>({}), [files, setFiles] = useState<Record<string, File>>({}), [complete, setComplete] = useState(false);
   const load = useCallback(() => api.compliance.case(id).then((x) => { setCase(x); setAnswers(x.answers ?? {}); }).catch((e: Error) => setError(e.message)), [id]);
   useEffect(() => { void load(); }, [load]);
-  if (!c) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  if (!c) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading" role="status">Loading…</p>;
   const act = (p: Promise<unknown>, text: string) => { setBusy(true); setError(""); setMessage("");
     return p.then(() => { setMessage(text); setNote(""); setComment(""); setEditing(false); void load(); void hub.refresh(); })
       .catch((e: Error) => setError(e.message)).finally(() => setBusy(false)); };
