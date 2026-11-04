@@ -47,7 +47,7 @@ variable "levels" {
 variable "consumer_group_ids" {
   type        = list(string)
   default     = []
-  description = "Further app groups that use the Pokemon cards product with its Standard option, such as dashboard viewers."
+  description = "Further app groups pre-approved to consume the products. Use catalog_group_ids for discovery and requests without data access."
 }
 
 variable "kafka_cluster_id" {
@@ -112,4 +112,10 @@ variable "developer_workspaces" {
   default     = null
   nullable    = true
   description = "Explicit private workspace and job-submission grants for engineers in this layer. Defaults to enabled in test and disabled in prod. Does not grant deletion or permission delegation."
+}
+
+variable "catalog_group_ids" {
+  type        = list(string)
+  default     = []
+  description = "Additional groups that discover products and request access; no data access is pre-granted."
 }

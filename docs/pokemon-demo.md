@@ -63,7 +63,7 @@ are the newer permission model; they do not replace object roles.
 |---|---|---|---|---|
 | Data engineers | Home, Catalog, Products, Workspaces, Workloads, Runs, Storage, Kafka, APIs, Repositories, Packages | Lake Admin; Pokémon folder Admin; landing/raw/history Admin; API Admin; package browse | Standard product only if separately assigned | Prod lake/folder, global workload administration, network policy administration |
 | Analysts | Home, Products, Requests, Catalog, Workspaces, Storage, Packages | Standard cards and price product Consumer; own analysis workspace | Standard cards and optional price product Consumer | Raw/history, producer/consumer identities, topic IAM, deployment |
-| Viewers | Home, Products, Requests | Standard products and caller-bound explorer | Standard products and caller-bound explorer | SQL page, workspaces, Kafka, pipelines, administration |
+| Viewers | Home, Products, Requests | Discover products and request access; no pre-approved data | Discover products and request access; no pre-approved data | SQL page, workspaces, Kafka, pipelines, administration |
 | Pokémon release managers | Home, Repositories, Workloads, Runs | — | Pokémon folder Contributor and allowed repository group | Direct lake/raw/schema and API administration; global workloads Admin |
 | Pokémon data owners | Home, Products, Reviews, Cases | Cards and price product Owner | Cards and optional price product Owner | Layer/network administration, unrelated products, workload deployment |
 | Pokémon stream operators | Home, Kafka, Workloads, Runs | Price topic Admin; selected price jobs and price monitor Executor | Same, only when Prod Kafka is enabled | Bootstrap/DDL, other topics, raw SQL access, deployment edits, privacy review |
@@ -111,7 +111,7 @@ cross-layer service grant.
 | `pokemon_raw` DDL | `bootstrap` | Raw schema Admin | Test engineers / trusted Prod release managers execute bootstrap |
 | `pokemon_raw` insertion | `load`, `process-event` | Raw Contributor | Execute through the corresponding pipeline |
 | SCD2 and card marts | `models` | Raw Reader, history Admin, reporting Admin | Test engineers; trusted Prod releases |
-| `reporting.cards_current`, `set_summary` | Card data product | Standard Consumer with illustrator mask; optional row/price policies in Test | Analysts and viewers; product Owners govern options |
+| `reporting.cards_current`, `set_summary` | Card data product | Standard Consumer with illustrator mask; optional row/price policies in Test | Analysts pre-approved; Viewers request access; product Owners govern options |
 | Explorer dashboard | Current viewer | **No fixed reporting Reader grant**; delegated SQL uses viewer token on every query | Product consumers; no shared cross-viewer query cache |
 | Process monitor | `monitor` | Raw/history Reader | Test engineers / trusted Prod releases only |
 | Price operations monitor | `price-monitor` | `pokemon_prices` Reader, synthetic events only | Explicit stream operator Executor; no personal raw/history access |
@@ -120,7 +120,7 @@ cross-layer service grant.
 | Continuous Kafka ingestion | `price-sink` | Own topic Reader, append-only `pokemon_prices` Contributor | Engineers/releases and explicit stream operators Executor |
 | Wait for this batch to land | `price-await` | `pokemon_prices` Reader | Pipeline identity Executor; no raw access passed to the orchestrator |
 | Materialize current prices | `price-models` | `pokemon_prices` Reader, `pokemon_market` Admin | Engineers/releases and explicit stream operators Executor |
-| `pokemon_market.card_prices_current` | Price data product | Separate schema, Consumer access; no personal card schema implied | Analysts/viewers Consumer; data owners Owner |
+| `pokemon_market.card_prices_current` | Price data product | Separate schema, Consumer access; no personal card schema implied | Analysts Consumer; Viewers request access; data owners Owner |
 | Orchestration | `pipelines` | Executor only on its ingestion, models, result and enabled executable price steps | Test engineers / trusted Prod releases |
 | Price quality | dbt and market-schema metric | Unique/non-null cards/events, EUR and synthetic label checks; minimum three quoted cards | Installation operator defines schema metric; authorised consumers inspect/measure |
 | Price-model service level | SLA evaluator | 99% job success over 24 hours | Trusted workload owners; Unknown until evidence exists |
