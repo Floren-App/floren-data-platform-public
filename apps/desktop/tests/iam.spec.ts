@@ -1068,6 +1068,42 @@ test("a schema shows its last listing at once while the live listing loads", asy
   expect(state.errors).toEqual([]);
 });
 
+test("a stalled metadata refresh stops and can be retried from the tree or listing", async ({ page }) => {
+  await page.clock.install();
+  const state = await setup(page);
+  let release!: () => void;
+  const stalled = new Promise<void>((resolve) => { release = resolve; });
+  let reads = 0;
+  await page.route(/\/v1\/data\/schemas\/[^/]+\/children/, async (route) => {
+    if (new URL(route.request().url()).searchParams.get("cached") === "true")
+      return route.fulfill({ json: { children: [{ name: "sales", kind: "table" }], next_cursor: null } });
+    reads++;
+    if (reads === 1) {
+      await stalled;
+      return route.abort();
+    }
+    return route.fulfill({ json: { children: [{ name: "sales", kind: "table" }, { name: "recovered", kind: "table" }], next_cursor: null } });
+  });
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  const sidebar = page.locator(".sidebar"), main = page.locator(".main");
+  await sidebar.getByRole("button", { name: "finance-dw", exact: true }).click();
+  await sidebar.getByRole("button", { name: "Expand schema reporting", exact: true }).click();
+  await main.getByRole("button", { name: "reporting", exact: true }).click();
+  await expect(main.getByText("Showing the last listing · refreshing…", { exact: true })).toBeVisible();
+  await page.clock.fastForward(45_001);
+  await expect(sidebar.getByRole("alert")).toContainText("timed out after 45 seconds");
+  await expect(sidebar.getByText("Refreshing…", { exact: true })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Refresh objects", exact: true })).toBeEnabled();
+  await expect(main.getByRole("button", { name: "sales", exact: true })).toBeVisible();
+  release();
+  await sidebar.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(sidebar.getByRole("button", { name: "recovered", exact: true })).toBeVisible();
+  await expect(main.getByRole("button", { name: "recovered", exact: true })).toBeVisible();
+  await expect(sidebar.getByRole("alert")).toHaveCount(0);
+  expect(reads).toBe(2);
+  expect(state.errors).toEqual([]);
+});
+
 test("runtime polling does not query data objects or reload the resource hierarchy", async ({ page }) => {
   await page.clock.install();
   const state = await setup(page);

@@ -45,6 +45,7 @@ export function DataTreeChildren({ schema, location = { schemaId: schema.id }, o
       : state.status === "error" ? <li className="tree-message"><span className="error">{state.error}</span> <button className="text-button" onClick={state.refresh}>Retry</button></li>
       : <>
         {state.refreshing && <li className="tree-message muted" role="status">Refreshing…</li>}
+        {state.error && <li className="tree-message"><span className="error" role="alert">{state.error}</span> <button className="text-button" onClick={state.refresh}>Retry</button></li>}
         {state.data?.children.map((child) => <DataTreeItem key={`${child.kind}:${child.path ?? child.name}`} schema={schema} child={child} openTab={openTab} />)}
         {!state.data?.children.length && <li className="tree-message muted">No {location.table ? "columns" : "objects"}.</li>}
         {state.data?.next_cursor && (more ? <li><DataTreeChildren key={state.data.next_cursor} schema={schema} location={location} openTab={openTab} after={state.data.next_cursor} /></li>
