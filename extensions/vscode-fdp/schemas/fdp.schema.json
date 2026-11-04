@@ -321,7 +321,7 @@
             }
           ],
           "default": null,
-          "description": "Optional manual dependencies for access outside Floren Data Platform. SQL, managed API calls, SDK files, dbt and Airflow capture lineage automatically. Does not grant data access."
+          "description": "Optional manual dependencies for access outside Limoon. SQL, managed API calls, SDK files, dbt and Airflow capture lineage automatically. Does not grant data access."
         },
         "kind": {
           "default": "script",
@@ -485,7 +485,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Environment variables filled from Floren Data Platform secrets: {\"API_KEY\": \"<ref>\"}, where <ref> is me/<name> (yours or the service account running it), group:<group>/<name> or sa:<account>/<name>.",
+          "description": "Environment variables filled from Limoon secrets: {\"API_KEY\": \"<ref>\"}, where <ref> is me/<name> (yours or the service account running it), group:<group>/<name> or sa:<account>/<name>.",
           "title": "Secrets",
           "type": "object"
         },
@@ -641,7 +641,7 @@
       "type": "object"
     }
   },
-  "title": "Floren Data Platform workspace config",
+  "title": "Limoon workspace config",
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "fdp.schema.json"

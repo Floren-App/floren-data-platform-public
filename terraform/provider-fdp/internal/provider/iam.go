@@ -45,7 +45,7 @@ func (r *appGroupResource) Metadata(_ context.Context, req resource.MetadataRequ
 
 func (r *appGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "A Floren Data Platform app group: the unit that receives roles. Members are directory identities (managed " +
+		Description: "A Limoon app group: the unit that receives roles. Members are directory identities (managed " +
 			"by SCIM/your IdP) bound with fdp_app_group_member. Import by ID.",
 		Attributes: map[string]schema.Attribute{
 			"id":          schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},

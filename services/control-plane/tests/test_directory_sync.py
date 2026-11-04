@@ -121,6 +121,6 @@ def test_only_the_allow_listed_automation_service_account_is_provisioned(client,
     sync.synchronize(kc, client, 'fdp', service_clients=('fdp-automation',))
     names = {u['userName'] for u in sync.scim_inventory(client, 'Users')}
     assert 'service-account-fdp-automation' in names
-    assert 'service-account-fdp-provisioner' not in names  # the IdP's own reader is never a Floren Data Platform user
+    assert 'service-account-fdp-provisioner' not in names  # the IdP's own reader is never a Limoon user
     with SessionLocal() as db:
         assert rbac.resolve_user(db, User('service-account-fdp-automation')).is_admin

@@ -65,8 +65,10 @@
   color-scheme: dark;
 }
 
+/* Themes: dark is the default palette. Light applies when the system prefers it, unless someone chose dark in the
+   app; a choice of light or dark (data-theme on the root) always wins over the system. */
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --bg: #ffffff;
     --bg-side: #f8f8f8;
     --bg-activity: #f8f8f8;
@@ -98,6 +100,38 @@
     color-scheme: light;
   }
 }
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-side: #f8f8f8;
+  --bg-activity: #f8f8f8;
+  --bg-elevated: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: #f0f0f0;
+  --bg-button: #f3f3f3;
+  --bg-button-hover: #e8e8e8;
+  --border: #e5e5e5;
+  --border-strong: #cecece;
+  --fg: #3b3b3b;
+  --fg-muted: #6e6e6e;
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236e6e6e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --fg-strong: #1f1f1f;
+  --link: #3b7a12;
+  --accent: #6cb52e;
+  --accent-hover: #5ea326;
+  --focus: #4e9a1f;
+  --status-bg: #6cb52e;
+  --bg-selected: #e3ecdb;
+  --ok: #1a7f37;
+  --info: #0969da;
+  --warn: #9a6700;
+  --err: #cf222e;
+  --cat-data: #0e7c86;
+  --cat-platform: #6e6e6e;
+  --cat-privileged: #94368d;
+  --shadow: 0 4px 16px #00000024;
+  color-scheme: light;
+}
+:root[data-theme="dark"] { color-scheme: dark; }
 
 /* ---------- Base ---------- */
 * { box-sizing: border-box; }
@@ -385,7 +419,10 @@ ul.error { padding-left: 28px; }
 .role-badge { color: var(--fg); }
 .origin-badge.idp-origin { color: #709fce; }
 .origin-badge.app-origin { color: #87ac78; }
-@media (prefers-color-scheme: light) { .origin-badge.idp-origin { color: #2f6aa8; } .origin-badge.app-origin { color: #3f7a2c; } }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .origin-badge.idp-origin { color: #2f6aa8; } }
+:root[data-theme="light"] .origin-badge.idp-origin { color: #2f6aa8; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .origin-badge.app-origin { color: #3f7a2c; } }
+:root[data-theme="light"] .origin-badge.app-origin { color: #3f7a2c; }
 .catalog-status { white-space: nowrap; }
 .catalog-status.certified, .catalog-status.healthy { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
 .catalog-status.breached, .catalog-status.restricted, .catalog-status.deprecated { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); background: color-mix(in srgb, var(--err) 10%, transparent); }
@@ -439,6 +476,10 @@ pre.terminal { background: #181818; color: #cccccc; border: 1px solid var(--bord
 .menu button { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; border: 0; border-radius: var(--radius); background: none; padding: 0 10px; text-align: left; cursor: pointer; color: var(--fg); white-space: nowrap; }
 .menu button:hover, .menu button:focus-visible { background: var(--accent); color: var(--accent-fg); outline: none; }
 .menu button:disabled { opacity: .5; cursor: default; background: none; color: var(--fg); }
+.menu-section { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 4px 0; padding: 4px 0; }
+.menu-label { display: block; padding: 2px 10px 4px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
+.menu-check { display: inline-block; width: 12px; color: var(--accent); }
+.menu button:hover .menu-check, .menu button:focus-visible .menu-check { color: inherit; }
 .menu-header { padding: 6px 10px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; font-size: 12px; }
 .menu-header strong { display: block; color: var(--fg-strong); font-size: 13px; }
 
@@ -610,7 +651,8 @@ dialog.modal::backdrop { background: #00000080; }
 
 /* ---------- Lineage ---------- */
 .lineage-explorer { height: 620px; min-height: 420px; position: relative; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; --lineage-mask: #181818aa; }
-@media (prefers-color-scheme: light) { .lineage-explorer { --lineage-mask: #f8f8f8aa; } }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .lineage-explorer { --lineage-mask: #f8f8f8aa; } }
+:root[data-theme="light"] .lineage-explorer { --lineage-mask: #f8f8f8aa; }
 .lineage-explorer .react-flow { background: var(--bg-side); --xy-node-background-color: var(--bg); --xy-node-color: var(--fg); --xy-node-border: 1px solid var(--border); --xy-controls-button-background-color-default: var(--bg-elevated); --xy-controls-button-background-color-hover-default: var(--bg-hover); --xy-controls-button-color-default: var(--fg); --xy-controls-button-border-color-default: var(--border-strong); --xy-minimap-background-color-default: var(--bg); --xy-edge-label-background-color-default: var(--bg); }
 .lineage-explorer .react-flow__controls { box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; }
 .lineage-explorer .react-flow__minimap { border: 1px solid var(--border); border-radius: var(--radius); }

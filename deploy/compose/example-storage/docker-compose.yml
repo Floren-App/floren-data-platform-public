@@ -1,8 +1,8 @@
-# Example external storage for local testing. Not part of Floren Data Platform: it stands in for the
+# Example external storage for local testing. Not part of Limoon: it stands in for the
 # databases and buckets an organisation already runs. Used with the platform file:
 #   docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/example-storage/docker-compose.yml up -d
 # (the Makefile does this only with EXAMPLE_STORAGE=1 POKEMON_STORAGE=0). Then `make storage-example` registers it in
-# Floren Data Platform as three storage integrations. Paths are relative to deploy/compose (the project dir).
+# Limoon as three storage integrations. Paths are relative to deploy/compose (the project dir).
 
 volumes:
   warehouse-data:

@@ -22,7 +22,7 @@ from .common import audit
 
 router = APIRouter(prefix="/v1/packages", tags=["packages"])
 SIMPLE_JSON = "application/vnd.pypi.simple.v1+json"
-CHALLENGE = {"WWW-Authenticate": 'Basic realm="Floren Data Platform packages"'}
+CHALLENGE = {"WWW-Authenticate": 'Basic realm="Limoon packages"'}
 
 
 def package_user(request: Request, authorization: Optional[str] = Header(default=None)) -> User:
@@ -48,7 +48,7 @@ def package_user(request: Request, authorization: Optional[str] = Header(default
         elif scheme.lower() == "bearer":
             token = value.strip()
     if not token:
-        raise HTTPException(401, "sign in with a Floren Data Platform token (as the password)", headers=CHALLENGE)
+        raise HTTPException(401, "sign in with a Limoon token (as the password)", headers=CHALLENGE)
     claims = _execution_claims(token)
     if claims is not None:
         user = _active_execution(claims)

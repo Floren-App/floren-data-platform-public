@@ -1,7 +1,7 @@
 # Editor tier for Python / Jupyter / Streamlit users. Tiny by design: heavy work goes to warehouses.
 # Build from the repo root: docker build -f images/workspace-vscode/Dockerfile -t fdp/workspace-vscode:dev .
 
-# --- Floren Data Platform runner extension (sidebar + live run consoles) ---
+# --- Limoon runner extension (sidebar + live run consoles) ---
 FROM node:20-bookworm-slim AS extension
 WORKDIR /build/extensions/vscode-fdp
 COPY schemas /build/schemas

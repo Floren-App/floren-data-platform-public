@@ -1,6 +1,6 @@
 # API management
 
-Open **APIs** in Floren Data Platform. Internal and External are directions relative to the
+Open **APIs** in Limoon. Internal and External are directions relative to the
 platform, and both support REST and SOAP 1.1/1.2. Configuration, operations, recent
 calls, permissions and an interactive test console live on the API's page.
 
@@ -134,7 +134,7 @@ response <- fdp::api_call("crm", "GET", "/customers/7")
 httr2::resp_status(response)
 ```
 
-SOAP callers use the operation name as the SDK path; Floren Data Platform forwards its declared
+SOAP callers use the operation name as the SDK path; Limoon forwards its declared
 backend path, wraps a body element if necessary, and sets the SOAP action/version.
 The API helpers return HTTP responses, so callers should check status codes.
 
@@ -153,7 +153,7 @@ at a child add access; they do not block inherited permissions.
 Platform admins create APIs. Owners assign roles directly to service identities or through app groups,
 which bind IdP users/groups or app-managed identities. A grant only on one operation
 shows its API and containing group for navigation, without exposing sibling operations
-or their call records. External Consumer checks apply to Floren Data Platform identities; outside
+or their call records. External Consumer checks apply to Limoon identities; outside
 callers of Internal APIs are governed by that API's configured JWT/mTLS requirements.
 
 Configuration changes, denied calls and outbound calls are audited. The Calls tab

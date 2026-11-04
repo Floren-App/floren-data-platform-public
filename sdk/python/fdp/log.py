@@ -12,7 +12,7 @@
 Each line also prints to the console. The platform stamps the run, workload, code version (commit) and
 layer; lines appear under the workload, the run and in the Workloads log. Sending happens in the
 background, in batches, and never raises: a logging outage does not fail your program.
-Outside Floren Data Platform (no FDP_API), lines only print.
+Outside Limoon (no FDP_API), lines only print.
 """
 from __future__ import annotations
 

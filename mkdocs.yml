@@ -39,6 +39,8 @@ plugins:
   - search
 hooks:
   - scripts/docs_hooks.py
+extra_css:
+  - stylesheets/limoon.css
 markdown_extensions:
   - admonition
   - attr_list

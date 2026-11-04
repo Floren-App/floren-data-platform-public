@@ -1,7 +1,7 @@
 {
   "realm": {{ .Values.keycloak.realm | toJson }},
   "enabled": true,
-  "displayName": "Floren Data Platform",
+  "displayName": "Limoon",
   "accessTokenLifespan": 900,
   "roles": {"realm": [{"name": {{ .Values.oidc.adminRole | toJson }}}]},
   "groups": [{"name": "platform-admins", "realmRoles": [{{ .Values.oidc.adminRole | toJson }}]}],

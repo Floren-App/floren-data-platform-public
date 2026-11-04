@@ -1,4 +1,4 @@
-"""Measurements use the caller's managed identity and layer through Floren Data Platform."""
+"""Measurements use the caller's managed identity and layer through Limoon."""
 from urllib.parse import quote
 from . import _client
 

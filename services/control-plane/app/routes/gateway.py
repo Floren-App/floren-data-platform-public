@@ -350,7 +350,7 @@ def workspace_waiting(ws_id: str, path: str, request: Request, db: Session = Dep
     from html import escape
     cookie = request.cookies.get(f"dc_ws_{ws_id}")
     if not cookie:
-        raise HTTPException(401,"Sign in to Floren Data Platform and open this workspace again.")
+        raise HTTPException(401,"Sign in to Limoon and open this workspace again.")
     claims = read_token(cookie,"gateway")
     if claims.get("target") != f"ws:{ws_id}" or not _allowed(db,"ws",ws_id,claims["sub"],[],claims.get("pid","")):
         raise HTTPException(403)
@@ -359,12 +359,12 @@ def workspace_waiting(ws_id: str, path: str, request: Request, db: Session = Dep
         raise HTTPException(404,"workspace not found")
     loading = ws.status in ("starting","running")
     title = "Starting your workspace" if ws.status == "starting" else "Connecting to your editor" if loading else "Workspace could not start" if ws.status == "failed" else "Workspace is stopped"
-    message = "The editor is preparing. This page will open it automatically when it is ready." if loading else ws.startup_error or "Return to Floren Data Platform and start this workspace. Your files are kept."
+    message = "The editor is preparing. This page will open it automatically when it is ready." if loading else ws.startup_error or "Return to Limoon and start this workspace. Your files are kept."
     headers = {"Cache-Control":"no-store","Retry-After":"3"}
     if path and not path.endswith((".html","/")):
         return Response(status_code=503,content="Workspace editor is not ready.",headers=headers)
     refresh = '<meta http-equiv="refresh" content="3">' if loading else ""
-    body = f'''<!doctype html><html><head><meta charset="utf-8">{refresh}<meta name="viewport" content="width=device-width, initial-scale=1"><title>{escape(title)} · Floren Data Platform</title>
+    body = f'''<!doctype html><html><head><meta charset="utf-8">{refresh}<meta name="viewport" content="width=device-width, initial-scale=1"><title>{escape(title)} · Limoon</title>
 <style>body{{font:16px system-ui;margin:0;background:#f7f8fa;color:#20242a;display:grid;min-height:100vh;place-items:center}}main{{max-width:560px;padding:32px}}small{{color:#657080}}h1{{font-size:24px}}p{{line-height:1.6}}</style></head>
 <body><main><small>FLOREN DATA PLATFORM · {escape(ws.name)}</small><h1>{escape(title)}</h1><p>{escape(message)}</p></main></body></html>'''
     return HTMLResponse(body,status_code=503,headers=headers)

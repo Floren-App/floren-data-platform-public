@@ -35,7 +35,7 @@
     else if (m.type === "error") { error = m.message; fieldErrors = m.fieldErrors || {}; busy = false; }
     else if (m.type === "started") { busy = false; fieldErrors = {}; error = null; }
     else if (m.type === "unavailable") {
-      app.replaceChildren(h("p", { class: "muted" }, "Floren Data Platform is not available in this window (no session token)."));
+      app.replaceChildren(h("p", { class: "muted" }, "Limoon is not available in this window (no session token)."));
       return;
     }
     render();

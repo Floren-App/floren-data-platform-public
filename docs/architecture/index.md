@@ -1,6 +1,6 @@
 # Design principles
 
-Floren Data Platform (FDP) is the **governed compute layer** of a data platform. It runs
+Limoon (FDP) is the **governed compute layer** of a data platform. It runs
 workspaces, programs, dashboards, dbt and Airflow on Kubernetes. It decides who and what
 may touch which data, and records what happened. It does not ask you to move your data
 into it, adopt a particular cloud or buy a particular identity or secrets product.
@@ -75,7 +75,7 @@ highly available services where you need high availability.
 ```mermaid
 flowchart TB
     people(["People and automation"])
-    subgraph fdp["Floren Data Platform: the compute layer"]
+    subgraph fdp["Limoon: the compute layer"]
         direction TB
         cp["<b>Control plane</b><br/>gateway · API · IAM · catalog · lineage · admission"]
         layers["<b>Isolated layers</b><br/>workspaces · jobs · apps · dbt · Airflow · Trino"]

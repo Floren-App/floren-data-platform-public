@@ -1,7 +1,7 @@
 [project]
 name = "fdp-control-plane"
 version = "0.1.0"
-description = "Floren Data Platform control plane: workspaces, compute pools, data catalog and secrets broker"
+description = "Limoon control plane: workspaces, compute pools, data catalog and secrets broker"
 requires-python = ">=3.9"
 license = { text = "Apache-2.0" }
 dependencies = [

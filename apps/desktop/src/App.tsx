@@ -14,6 +14,7 @@ import { openInWindow, type AppFeature } from "./api";
 import { documentationUrl } from "./documentation";
 import { pageVisible, TAB_PAGES } from "./permissions";
 import { LimeSlice, Splash, Wordmark } from "./components/Brand";
+import { applyTheme, savedTheme, type Theme } from "./theme";
 
 const HOME: TabRef = { kind: "home", title: "Home" };
 type EditorTab = TabRef & { pinned: boolean };
@@ -102,6 +103,7 @@ function Login({ error }: { error: string | null }) {
 }
 
 function Shell({ user }: { user: User }) {
+  const [theme, setTheme] = useState<Theme>(savedTheme);
   const [expired, setExpired] = useState(false);
   useEffect(() => onSessionExpired(() => setExpired(true)), []);
   const hub = useHub(!expired);
@@ -247,6 +249,10 @@ function Shell({ user }: { user: User }) {
             <div className="menu-header"><strong>{user.profile.preferred_username ?? hub.me?.username}</strong>
               <span className="muted">{new URL(getServer()).host}</span></div>
             {pageVisible(hub.me, "git-creds") && <button role="menuitem" onClick={() => { close(); openTab({ kind: "git-credentials", title: "Git credentials" }); }}>Git credentials</button>}
+            <div className="menu-section" role="group" aria-label="Theme"><span className="menu-label">Theme</span>
+              {(["system", "light", "dark"] as Theme[]).map((t) => <button key={t} role="menuitemradio" aria-checked={theme === t}
+                onClick={() => { applyTheme(t); setTheme(t); }}><span className="menu-check">{theme === t ? "✓" : ""}</span>
+                {t === "system" ? "Same as the system" : t === "light" ? "Light" : "Dark"}</button>)}</div>
             <button role="menuitem" onClick={() => { close(); void signOut(); }}>Sign out</button>
           </>}
         </MenuButton>

@@ -1,4 +1,4 @@
-"""Authentication for humans (OIDC access tokens) and executions (Floren Data Platform session tokens)."""
+"""Authentication for humans (OIDC access tokens) and executions (Limoon session tokens)."""
 
 from __future__ import annotations
 
@@ -123,7 +123,7 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-# --- Floren Data Platform-issued tokens (HS256, signed with session_signing_key) ---
+# --- Limoon-issued tokens (HS256, signed with session_signing_key) ---
 
 def mint_token(kind: str, subject: str, ttl: int, **extra: Any) -> str:
     now = int(time.time())

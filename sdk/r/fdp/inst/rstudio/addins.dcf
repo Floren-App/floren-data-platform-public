@@ -1,4 +1,4 @@
-Name: Floren Data Platform runner
+Name: Limoon runner
 Description: Run fdp.json programs on a warehouse and follow their console.
 Binding: runner
 Interactive: false

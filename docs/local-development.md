@@ -12,8 +12,8 @@ its bundled PostgreSQL by default. Select Global Admin to browse **Storage →
 fdp-metadata → public**, query live metadata, and make validated SQL changes in
 its SQL tab. See [Metadata SQL](metadata-sql.md) for configuration and supported commands.
 
-Floren Data Platform's application metadata is separate from the storage integrations registered in
-Storage. A program's Postgres/Iceberg tables do not contain Floren Data Platform's IAM or configuration.
+Limoon's application metadata is separate from the storage integrations registered in
+Storage. A program's Postgres/Iceberg tables do not contain Limoon's IAM or configuration.
 
 Compose stores its data in these Docker volumes:
 
@@ -42,7 +42,7 @@ under `deploy/` in this checkout.
 The local Keycloak service has no persistent data volume or database.
 Its mutable identity data lives in the container's writable storage: an ordinary restart
 keeps it, but recreating/removing that container does not. The mounted realm JSON is a
-bootstrap import, not a backup of account changes. Floren Data Platform's SCIM directory remains in
+bootstrap import, not a backup of account changes. Limoon's SCIM directory remains in
 its own PostgreSQL database. The Kubernetes chart's bundled Keycloak stores its data in
 PostgreSQL.
 
@@ -66,7 +66,7 @@ Managed Kubernetes layers use their own namespaces and enforced network policies
 
 CloudBeaver's URI prefix uses its documented
 [`CLOUDBEAVER_ROOT_URI`](https://dbeaver.com/docs/cloudbeaver/Server-configuration/) setting;
-SQL query access continues through Floren Data Platform's governed gateway and its workspace identity.
+SQL query access continues through Limoon's governed gateway and its workspace identity.
 
 ## Project subdirectory
 

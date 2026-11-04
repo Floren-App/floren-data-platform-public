@@ -5,8 +5,8 @@ Each workspace can have a `fdp.json` in its root (`/workspace/fdp.json`). It lis
 **requirements** and default **warehouse**. A workspace can define as many programs as it needs.
 
 The same programs appear in three places:
-- **Floren Data Platform app:** workspace tab → Programs
-- **VS Code:** the Floren Data Platform icon in the activity bar → Runner (each run opens a live console terminal)
+- **Limoon app:** workspace tab → Programs
+- **VS Code:** Limoon icon in the activity bar → Runner (each run opens a live console terminal)
 - **RStudio:** the runner in the Viewer pane (opens at session start; reopen with `fdp::runner()`)
 
 VS Code autocompletes and validates the file using [schemas/fdp.schema.json](../schemas/fdp.schema.json).
@@ -54,7 +54,7 @@ A complete example with a Python script, an R script, a notebook and a Streamlit
 | `entrypoint` | (required) | File relative to the workspace root. A directory is treated as a Shiny app. |
 | `kind` | `script` | `script` runs to completion; `notebook` executes an `.ipynb` with papermill; `app` serves Streamlit (`.py`) or Shiny (`.R`/directory) until stopped; `dbt` and `airflow`: see [dbt and Airflow](dbt-and-airflow.md). |
 | `python`, `r`, `dbt_version`, `airflow` | catalog default | Runtime version, also settable for the whole file at the top level. |
-| `secrets` | `{}` | Environment variables from Floren Data Platform secrets: `{"API_KEY": "me/openai"}`. A certificate secret also sets `<VAR>_KEY` and `<VAR>_CA` ([details](deploying.md#service-accounts-and-secrets)). |
+| `secrets` | `{}` | Environment variables from Limoon secrets: `{"API_KEY": "me/openai"}`. A certificate secret also sets `<VAR>_KEY` and `<VAR>_CA` ([details](deploying.md#service-accounts-and-secrets)). |
 | `runtime` | inferred | `python` or `r`; inferred from the entrypoint's extension. |
 | `description` | `""` | Shown in the runners. |
 | `layer` | file default | Required execution layer, by name or stable ID. Other-layer programs are hidden from workspace runners and refused on execution or workload. |

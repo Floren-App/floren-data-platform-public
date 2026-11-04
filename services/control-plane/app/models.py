@@ -1137,7 +1137,7 @@ class QueryLog(Base):
 
 class ApiDefinition(Base):
     """An API in API management. internal: outside callers start deployed programs here (never data);
-    external: an outside service that programs call through Floren Data Platform with their own identity."""
+    external: an outside service that programs call through Limoon with their own identity."""
 
     __tablename__ = "api_definitions"
 

@@ -27,7 +27,7 @@ These lines are written automatically, whichever way the work was started:
 | `dag.started`, `dag.succeeded` | info | A DAG run of a deployed Airflow starts or succeeds |
 | `dag.failed`, `task.failed` | error | A DAG run or one of its tasks fails |
 
-Airflow lines come from a listener in the Floren Data Platform SDK, installed in the platform's
+Airflow lines come from a listener in Limoon SDK, installed in the platform's
 Airflow image. It only reports in deployments, never from a workspace's own Airflow.
 
 ## Logging from your code
@@ -61,7 +61,7 @@ fdp::log_error("upload failed", attempt = 2)
 ```
 
 Every line also prints to the run's console. Python sends lines in the background, in batches; a
-logging outage never fails your program. Outside Floren Data Platform the lines only print.
+logging outage never fails your program. Outside Limoon the lines only print.
 
 ## What each line carries
 

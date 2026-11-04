@@ -1,6 +1,6 @@
 name: lake
 version: "1.0.0"
-# Floren Data Platform generates this profile from the "lake" data source (Iceberg on RustFS via Trino).
+# Limoon generates this profile from the "lake" data source (Iceberg on RustFS via Trino).
 profile: lake
 model-paths: ["models"]
 models:

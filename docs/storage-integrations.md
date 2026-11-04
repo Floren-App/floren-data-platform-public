@@ -1,15 +1,15 @@
 # Storage integrations
 
-Floren Data Platform does not host data. It governs databases and buckets that are operated elsewhere,
+Limoon does not host data. It governs databases and buckets that are operated elsewhere,
 and each one it governs is an explicit **storage integration**. Until an administrator adds
-one, there is no storage in Floren Data Platform at all.
+one, there is no storage in Limoon at all.
 
 Add one under **Storage → Add connection** (administrators). First choose the type, then
 describe the location. Change it later on the connection's **Settings** tab, which also removes it. The form asks for exactly what that type needs, and the
 control plane validates the same rules (`GET /v1/admin/storage-types` serves them; see
 `services/control-plane/app/storage_types.py`).
 
-| Type | Location you configure | Credentials Floren Data Platform keeps (secret store, write-only) | Must exist outside Floren Data Platform |
+| Type | Location you configure | Credentials Limoon keeps (secret store, write-only) | Must exist outside Limoon |
 |---|---|---|---|
 | **PostgreSQL** | host, port, database, Trino catalog name; optional SSL mode | access-setup login (creates roles, grants schema privileges); the engine login | the database. In an unmanaged layer, also a Trino catalog (`connector.name=postgresql`) for it |
 | **Iceberg tables on S3** | Trino catalog name, warehouse (`s3://bucket/path`), REST catalog URL; optional S3 endpoint, region | the engine's S3 keys; optional separate backup storage/catalog login in the same vault | an Iceberg REST catalog and the bucket. In an unmanaged layer, also a Trino catalog (`connector.name=iceberg`, REST type) |
@@ -89,9 +89,9 @@ own storage:
 make storage-example   # deploy/compose/example-storage/setup.sh
 ```
 
-1. **Outside Floren Data Platform:** prepare the storage (here, it creates example warehouse
+1. **Outside Limoon:** prepare the storage (here, it creates example warehouse
    schemas; the Compose services and catalog files already exist).
-2. **In Floren Data Platform:** register three integrations through the admin API
+2. **In Limoon:** register three integrations through the admin API
    (`example-storage/register.py`):
 
    | Integration | Type | Location |

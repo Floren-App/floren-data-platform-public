@@ -3,7 +3,7 @@ import json
 import sys
 from pathlib import Path
 
-AUTH = {"id":"fdp","provider":"reverseProxy","displayName":"Floren Data Platform","disabled":False,
+AUTH = {"id":"fdp","provider":"reverseProxy","displayName":"Limoon","disabled":False,
         "parameters":{"user-header":"X-FDP-User","team-header":"X-FDP-Team",
                       "full-name-header":"X-FDP-Display-Name","auto-user-provisioning":True}}
 

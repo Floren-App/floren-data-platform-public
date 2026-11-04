@@ -1,6 +1,6 @@
-# Floren Data Platform provider for OpenTofu
+# Limoon provider for OpenTofu
 
-Configure Floren Data Platform declaratively: layers (including isolated infrastructure), storage
+Configure Limoon declaratively: layers (including isolated infrastructure), storage
 integrations, schemas, app groups and role assignments, compute pools, Git repositories and
 workloads, independent backup plans and vault-referenced S3 recovery destinations. Every change goes through the same validated API as the desktop app.
 

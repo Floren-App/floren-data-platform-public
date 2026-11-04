@@ -119,7 +119,7 @@ def preflight():
 def tls_material(directory):
     now = datetime.now(timezone.utc)
     ca_key = ec.generate_private_key(ec.SECP256R1())
-    ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Floren Data Platform e2e root')])
+    ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Limoon e2e root')])
     ca = (x509.CertificateBuilder().subject_name(ca_name).issuer_name(ca_name).public_key(ca_key.public_key())
           .serial_number(x509.random_serial_number()).not_valid_before(now - timedelta(days=1))
           .not_valid_after(now + timedelta(days=7)).add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
@@ -283,7 +283,7 @@ class Platform:
         self.token = self.login()
         me = wait(lambda: (lambda r: r.json() if r.status_code == 200 else None)(self.api('GET', '/v1/me')),
                   'SCIM provisioning of the admin', 180)
-        require(me.get('is_admin'), 'the bundled admin is not a Floren Data Platform administrator')
+        require(me.get('is_admin'), 'the bundled admin is not a Limoon administrator')
         return me
 
     def login(self):

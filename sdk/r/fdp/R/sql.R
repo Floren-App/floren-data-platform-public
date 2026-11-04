@@ -1,4 +1,4 @@
-# A DBI client for the standard Trino HTTP protocol through Floren Data Platform.
+# A DBI client for the standard Trino HTTP protocol through Limoon.
 methods::setClass("FDPConnection", contains = "DBIConnection", slots = c(state = "environment"))
 methods::setClass("FDPResult", contains = "DBIResult", slots = c(state = "environment"))
 

@@ -1,0 +1,4 @@
+/* limoon.: the site title in the brand's typeface (Fredoka, SIL OFL 1.1, served from this site) and lime links. */
+@font-face { font-family: "Fredoka"; font-weight: 600; font-display: swap; src: url("../assets/Fredoka-SemiBold.woff2") format("woff2"); }
+.md-header__title, .md-nav__title { font-family: "Fredoka", var(--md-text-font-family); font-weight: 600; letter-spacing: -.01em; }
+.md-header__button.md-logo img { height: 1.6rem; }

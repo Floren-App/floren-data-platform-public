@@ -24,19 +24,19 @@ software, and they are optional.
 dbt and Airflow do not depend on R.
 
 Running these images does not change the license of your own programs, data or the platform: they run as
-separate programs, and nothing links them into Floren Data Platform's code.
+separate programs, and nothing links them into Limoon's code.
 
 ## Per image
 
 | Image | Main components (license) |
 |---|---|
 | `control-plane` (also the egress proxy and layer controller) | Python (PSF), FastAPI, Starlette, Pydantic (MIT), SQLAlchemy (MIT), uvicorn (BSD-3), httpx (BSD-3), PyJWT (MIT), cryptography (Apache-2.0/BSD), psycopg (LGPL-3.0, unmodified, dynamically used), kubernetes client (Apache-2.0), hvac (Apache-2.0), boto3 (Apache-2.0), Azure Identity and Key Vault Secrets client libraries (MIT), Google Cloud Secret Manager client and gRPC (Apache-2.0), sqlglot (MIT), packaging (Apache-2.0/BSD), python-multipart (Apache-2.0), Git (GPL-2.0, used as a separate program), Debian (various free licenses) |
-| `workspace-vscode` | code-server and VS Code OSS (MIT); from Open VSX: Python and Jupyter extensions (MIT), Ruff (MIT), basedpyright (MIT); Python (PSF), Jupyter, ipykernel, pandas (BSD-3), Streamlit (Apache-2.0), Ruff (MIT); Floren Data Platform extension and SDK (Apache-2.0) |
+| `workspace-vscode` | code-server and VS Code OSS (MIT); from Open VSX: Python and Jupyter extensions (MIT), Ruff (MIT), basedpyright (MIT); Python (PSF), Jupyter, ipykernel, pandas (BSD-3), Streamlit (Apache-2.0), Ruff (MIT); Limoon extension and SDK (Apache-2.0) |
 | `workspace-sql` | CloudBeaver Community (Apache-2.0); Python (PSF) |
-| `web` (the app in the browser) | nginx (BSD-2-Clause); the app's own code (Apache-2.0) with React, React DOM (MIT), oidc-client-ts (Apache-2.0), the Fredoka typeface for the limoon. wordmark (SIL OFL-1.1, via @fontsource/fredoka), and their dependencies (MIT, ISC, BSD) |
-| `workspace-rstudio` *(optional, R)* | RStudio Server Open Source (AGPL-3.0); R (GPL-2/3); rocker images (GPL-2.0); Shiny, RPostgres (GPL-3.0); DBI (LGPL-2.1+); httr2, dplyr, ggplot2, jsonlite, rstudioapi, rappdirs (MIT); Floren Data Platform R SDK (Apache-2.0) |
-| `compute-python` | Python (PSF); Floren Data Platform SDK (Apache-2.0) with its optional extras |
-| `compute-r` *(optional, R)* | R (GPL-2/3); rocker images (GPL-2.0); Shiny, RPostgres (GPL-3.0); DBI (LGPL-2.1+); bslib, httr2, dplyr, ggplot2, jsonlite, rappdirs (MIT); data.table (MPL-2.0); Floren Data Platform R SDK (Apache-2.0) |
+| `web` (the app in the browser) | nginx (BSD-2-Clause); the app's own code (Apache-2.0) with React, React DOM (MIT), oidc-client-ts (Apache-2.0), the Fredoka typeface for the limoon. wordmark (SIL OFL-1.1, via @fontsource/fredoka; also in `brand/font` and on the docs site), and their dependencies (MIT, ISC, BSD) |
+| `workspace-rstudio` *(optional, R)* | RStudio Server Open Source (AGPL-3.0); R (GPL-2/3); rocker images (GPL-2.0); Shiny, RPostgres (GPL-3.0); DBI (LGPL-2.1+); httr2, dplyr, ggplot2, jsonlite, rstudioapi, rappdirs (MIT); Limoon R SDK (Apache-2.0) |
+| `compute-python` | Python (PSF); Limoon SDK (Apache-2.0) with its optional extras |
+| `compute-r` *(optional, R)* | R (GPL-2/3); rocker images (GPL-2.0); Shiny, RPostgres (GPL-3.0); DBI (LGPL-2.1+); bslib, httr2, dplyr, ggplot2, jsonlite, rappdirs (MIT); data.table (MPL-2.0); Limoon R SDK (Apache-2.0) |
 | `compute-dbt` | dbt Core and dbt-trino (Apache-2.0); Python (PSF) |
 | `airflow` | Apache Airflow (Apache-2.0); Python (PSF) |
 

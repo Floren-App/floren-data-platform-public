@@ -1,4 +1,4 @@
--- Sample governed data. Analysts get a read-only role; the admin registers it in Floren Data Platform.
+-- Sample governed data. Analysts get a read-only role; the admin registers it in Limoon.
 CREATE TABLE sales (
     id         serial PRIMARY KEY,
     sold_at    date NOT NULL,
@@ -19,7 +19,7 @@ GRANT CONNECT ON DATABASE finance TO analyst_ro;
 GRANT USAGE ON SCHEMA public TO analyst_ro;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO analyst_ro;
 
--- dbt builds here (Floren Data Platform data source finance-dw-transform). Analysts can read what it builds.
+-- dbt builds here (Limoon data source finance-dw-transform). Analysts can read what it builds.
 CREATE ROLE transformer LOGIN PASSWORD 'transformer';
 GRANT CONNECT, CREATE ON DATABASE finance TO transformer;
 GRANT USAGE ON SCHEMA public TO transformer;

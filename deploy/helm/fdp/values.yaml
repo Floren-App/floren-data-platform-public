@@ -1,4 +1,4 @@
-# How Floren Data Platform is INSTALLED: images, cluster resources, storage, networks, identity provider, secrets.
+# How Limoon is INSTALLED: images, cluster resources, storage, networks, identity provider, secrets.
 # What the platform contains (layers, warehouses, limits, groups, roles, data sources, allowlists, extra runtimes)
 # is configured with OpenTofu or in the app, never here. A Helm upgrade never changes that configuration; where a
 # value below is only a default for it, that is said next to the value. See docs/configuration.md.

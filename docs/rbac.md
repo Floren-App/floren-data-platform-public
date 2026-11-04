@@ -8,7 +8,7 @@ the resource roles below still describe the workload/data/API model in use.
 See [active groups and ownership](active-groups.md) for primary-group creation,
 selected-group authority and the protected Global Admin group.
 
-Floren Data Platform has one policy layer for schema access, nested workload folders, deployed
+Limoon has one policy layer for schema access, nested workload folders, deployed
 services, and service accounts:
 
 `resource permission -> fixed app role on app group -> IdP group/role/user or service principal`
@@ -208,7 +208,7 @@ available, and no native shared-secret fallback is issued.
 ## Set up schema access
 
 1. Configure PostgreSQL and Iceberg catalogs on the Trino infrastructure. Register a
-   Floren Data Platform source with its matching `catalog`. For PostgreSQL also set host/port/
+   Limoon source with its matching `catalog`. For PostgreSQL also set host/port/
    database and an engine-only connection secret matching the catalog, plus a separate
    write-only **Native provisioning credential** at `datasources/<source>/provisioner`.
 2. Open **Storage**, open the source, and register a schema from **Schemas & usage**. Open
@@ -291,7 +291,7 @@ stale JWT group/role claims cannot restore removed SCIM memberships. For OIDC-on
 development, verified claims populate the directory. SCIM can adopt those records without
 changing their IDs. The configured issuer scopes the directory. Initial userName matching
 binds the verified OIDC subject once; subsequent names cannot rebind an existing subject.
-IdP role values are directory bindings, not names of Floren Data Platform permission bundles.
+IdP role values are directory bindings, not names of Limoon permission bundles.
 
 ## Revocation
 

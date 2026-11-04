@@ -7,7 +7,7 @@ ARG PYTHON_VERSION=3.12
 FROM apache/airflow:slim-${AIRFLOW_VERSION}-python${PYTHON_VERSION}
 
 USER root
-# /app: deployed source; group 0 writable so the container can run as uid 1000 (Floren Data Platform's user).
+# /app: deployed source; group 0 writable so the container can run as uid 1000 (Limoon's user).
 RUN mkdir -p /app && chown 1000:0 /app && chmod 2775 /app
 USER airflow
 

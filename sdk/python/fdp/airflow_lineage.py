@@ -14,7 +14,7 @@ class FDPLineageBackend(LineageBackend):
             airflow_dag(operator.dag, operator, inlets, outlets)
         except Exception:
             # Metadata outages cannot turn a successful data task into a failed task.
-            logging.getLogger(__name__).warning("Floren Data Platform catalog lineage upload failed", exc_info=False)
+            logging.getLogger(__name__).warning("Limoon catalog lineage upload failed", exc_info=False)
 
 
 def sync_serialized_dags(seen):
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         try:
             sync_serialized_dags(seen)
         except Exception:
-            logging.getLogger(__name__).warning("Floren Data Platform serialized DAG metadata sync failed", exc_info=False)
+            logging.getLogger(__name__).warning("Limoon serialized DAG metadata sync failed", exc_info=False)
         if not args.watch:
             break
         time.sleep(30)

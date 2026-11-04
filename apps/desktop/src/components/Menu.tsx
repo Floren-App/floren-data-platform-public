@@ -10,7 +10,7 @@ export function MenuButton({ label, icon, id, menuLabel, className = "icon-btn",
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
-    anchor.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus();
+    anchor.current?.querySelector<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)')?.focus();
     const dismiss = (event: PointerEvent) => { if (!anchor.current?.contains(event.target as Node)) setOpen(false); };
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); } };
     document.addEventListener("pointerdown", dismiss);
@@ -26,7 +26,7 @@ export function MenuButton({ label, icon, id, menuLabel, className = "icon-btn",
     {open && <div id={id} className="menu" role="menu" aria-label={menuLabel} onKeyDown={(e) => {
       if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
       e.preventDefault();
-      const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'));
+      const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)'));
       const index = items.indexOf(document.activeElement as HTMLButtonElement);
       const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : (index + (e.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
       items[next]?.focus();

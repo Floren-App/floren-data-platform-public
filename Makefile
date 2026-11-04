@@ -1,4 +1,4 @@
-# Floren Data Platform itself, with optional example storage for local testing (a PostgreSQL warehouse and
+# Limoon itself, with optional example storage for local testing (a PostgreSQL warehouse and
 # RustFS with Iceberg). Opt in with EXAMPLE_STORAGE=1 when running the examples.
 EXAMPLE_STORAGE ?= 0
 COMPOSE := docker compose -f deploy/compose/docker-compose.yml $(if $(filter 1,$(EXAMPLE_STORAGE)),-f deploy/compose/example-storage/docker-compose.yml)
@@ -134,7 +134,7 @@ test-terraform:
 	$(CP)/.venv/bin/python terraform/provider-fdp/acceptance/run_acceptance.py
 
 # Real helm install/upgrade, then workspace, job, app and Airflow in a managed layer (~25 min).
-# A local Kubernetes lab for trying Floren Data Platform by hand (Helm + OpenTofu); see deploy/lab/fdp-lab.py.
+# A local Kubernetes lab for trying Limoon by hand (Helm + OpenTofu); see deploy/lab/fdp-lab.py.
 .PHONY: lab-up lab-status lab-tofu lab-down
 lab-up:
 	$(CP)/.venv/bin/python deploy/lab/fdp-lab.py up

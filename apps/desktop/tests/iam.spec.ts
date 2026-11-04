@@ -3681,3 +3681,30 @@ test("the sign-in screen carries the limoon. brand", async ({ page }) => {
   await expect(page).toHaveTitle("limoon.");
   await page.screenshot({ path: test.info().outputPath("sign-in.png") });
 });
+
+test("the account menu switches between light, dark and the system theme, and remembers it", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  const state = await setup(page);
+  const root = page.locator("html");
+  await expect(root).not.toHaveAttribute("data-theme", /.+/);
+  const choose = async (name: string) => {
+    await page.getByRole("button", { name: "Account", exact: true }).click();
+    await page.getByRole("menuitemradio", { name: name }).click();
+  };
+  await choose("Dark");
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(31, 31, 31)");
+  await page.screenshot({ path: test.info().outputPath("dark.png") });
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByRole("menuitemradio", { name: "Dark" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await expect(page.getByRole("menuitemradio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitemradio", { name: "Light" }).click();
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await page.screenshot({ path: test.info().outputPath("light.png") });
+  // The menu stays open while trying themes.
+  await page.getByRole("menuitemradio", { name: "Same as the system" }).click();
+  await expect(root).not.toHaveAttribute("data-theme", /.+/);
+  expect(state.errors).toEqual([]);
+});

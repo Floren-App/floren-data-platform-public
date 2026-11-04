@@ -1,6 +1,6 @@
-# Floren Data Platform Helm chart
+# Limoon Helm chart
 
-Installs the Floren Data Platform control plane, gateway and optional components. Every supporting
+Installs Limoon control plane, gateway and optional components. Every supporting
 service can be bundled or brought from outside: Keycloak or any OIDC/SCIM identity provider, PostgreSQL
 for platform metadata, OpenBao or another secret store, and per-layer PostgreSQL and RustFS. The optional
 layer controller provisions isolated layers with their own Trino, workspace volumes and artifact storage.
@@ -274,7 +274,7 @@ layer provisioning reports its own detailed prerequisite failures.
 
 Managed layers can provision a separate single-instance PostgreSQL database, with
 its own retained PVC. This is independent of `metadataDatabase` and never hosts
-Floren Data Platform's operational metadata or Keycloak data. Configure the layer's
+Limoon's operational metadata or Keycloak data. Configure the layer's
 infrastructure API, for example:
 
 ```yaml
@@ -504,7 +504,7 @@ publicly exposed. The chart derives issuer/JWKS configuration and certificate SA
 The single-replica provisioning adapter runs without a Kubernetes API token. It
 receives only its read-only IdP client secret and the SCIM bearer, not IdP admin,
 database, signing, or application user passwords. It provisions users, effective
-realm roles, and nested groups through Floren Data Platform's standard SCIM API. It preserves
+realm roles, and nested groups through Limoon's standard SCIM API. It preserves
 stable IDs, skips unchanged records, propagates disabled users, and retires only
 its own realm-scoped external IDs after reading a complete snapshot. Empty,
 truncated, repeated, or failed inventories do not retire identities.

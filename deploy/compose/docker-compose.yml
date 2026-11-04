@@ -4,7 +4,7 @@
 # Safari and the Tauri app (WebKit) only accept over HTTPS, even on localhost.
 # Gateway host port is overridable: GATEWAY_PORT=9090 make dev
 # NOT for production: dev-mode OpenBao, Docker socket mounted into the control plane.
-# Storage is not part of this file: Floren Data Platform governs databases and buckets that are operated
+# Storage is not part of this file: Limoon governs databases and buckets that are operated
 # elsewhere. example-storage/docker-compose.yml adds a local PostgreSQL warehouse and RustFS for
 # testing (opt in with EXAMPLE_STORAGE=1).
 
@@ -80,7 +80,7 @@ services:
       - openbao-keys:/openbao/keys
     restart: "no"
 
-  # Self-hosted git for local development (MIT). In production, point Floren Data Platform at your own git.
+  # Self-hosted git for local development (MIT). In production, point Limoon at your own git.
   #   http://localhost:3000 · integration service account fdp/fdp123
   gitea:
     image: gitea/gitea:1.22.3
@@ -110,7 +110,7 @@ services:
     restart: "no"
 
   # Shared SQL engine. It holds one catalog per SQL storage integration (trino/catalog/*.properties);
-  # the storage itself is external to Floren Data Platform. example-storage/ swaps in its own catalogs.
+  # the storage itself is external to Limoon. example-storage/ swaps in its own catalogs.
   trino:
     image: trinodb/trino:484
     networks: [data, metadata]

@@ -1,6 +1,6 @@
 # Releases and verification
 
-Floren Data Platform is built and released by one pipeline in the public repository
+Limoon is built and released by one pipeline in the public repository
 (`.github/workflows/pipeline.yml`). Every pull request and push runs the full test suite; images and
 releases are only produced from tested commits.
 

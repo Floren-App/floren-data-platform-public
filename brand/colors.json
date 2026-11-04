@@ -1,0 +1,26 @@
+{
+  "rind": {
+    "value": "#4a8a1f",
+    "use": "The outside of the slice"
+  },
+  "pith": {
+    "value": "#f2f9dc",
+    "use": "The pale lines and pith"
+  },
+  "flesh": {
+    "value": "#a3d44a",
+    "use": "The segments"
+  },
+  "accent": {
+    "value": "#6cb52e",
+    "use": "The wordmark's period and the app's controls"
+  },
+  "ink": {
+    "value": "#1d2414",
+    "use": "The wordmark on light backgrounds"
+  },
+  "ink-on-dark": {
+    "value": "#f2f2f2",
+    "use": "The wordmark on dark backgrounds"
+  }
+}

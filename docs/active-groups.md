@@ -1,7 +1,7 @@
 # Active groups and ownership
 
 The selector at the bottom of every sidebar chooses the user's **primary app group**.
-It persists in Floren Data Platform for the stable directory identity, across pages and sign-ins.
+It persists in Limoon for the stable directory identity, across pages and sign-ins.
 Only app groups available through the user's live identity bindings can be selected.
 Designated group ownership alone does not imply membership. IdP users, groups and roles
 continue to enter through SCIM and bind into application-owned groups.

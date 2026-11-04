@@ -142,7 +142,7 @@ class Program(BaseModel):
 
     description: str = ""
     layer: Optional[LayerReference] = Field(default=None, description="Layer name or stable ID. Only available in a matching workspace/workload layer; never grants access. Inherits the file's layer when omitted.")
-    lineage: Optional[ProgramLineage] = Field(default=None, description="Optional manual dependencies for access outside Floren Data Platform. SQL, managed API calls, SDK files, dbt and Airflow capture lineage automatically. Does not grant data access.")
+    lineage: Optional[ProgramLineage] = Field(default=None, description="Optional manual dependencies for access outside Limoon. SQL, managed API calls, SDK files, dbt and Airflow capture lineage automatically. Does not grant data access.")
     kind: Literal["script", "notebook", "app", "dbt", "airflow", "stream"] = Field(
         default="script",
         description="script = run to completion; notebook = execute with papermill; app = Streamlit/Shiny server; "
@@ -168,7 +168,7 @@ class Program(BaseModel):
     env: Dict[str, str] = Field(default_factory=dict, description="Extra environment variables (no secret values here).")
     secrets: Dict[str, str] = Field(
         default_factory=dict,
-        description='Environment variables filled from Floren Data Platform secrets: {"API_KEY": "<ref>"}, where <ref> is '
+        description='Environment variables filled from Limoon secrets: {"API_KEY": "<ref>"}, where <ref> is '
                     'me/<name> (yours or the service account running it), group:<group>/<name> or sa:<account>/<name>.')
     args: List[Arg] = Field(default_factory=list)
 
@@ -250,7 +250,7 @@ class Program(BaseModel):
 class WorkspaceConfig(BaseModel):
     """fdp.json — programs this workspace can run on a warehouse."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True, title="Floren Data Platform workspace config")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True, title="Limoon workspace config")
 
     schema_: Optional[str] = Field(default=None, alias="$schema")
     version: Literal[1] = 1
@@ -549,7 +549,7 @@ _AIRFLOW = """
   export AIRFLOW__WEBSERVER__BASE_URL="$FDP_PUBLIC_URL{base}"
   export AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX=True
   export AIRFLOW__WEBSERVER__EXPOSE_CONFIG=False
-  # No Airflow login: the Floren Data Platform gateway already decides who may open this deployment.
+  # No Airflow login: Limoon gateway already decides who may open this deployment.
   printf 'AUTH_ROLE_PUBLIC = "Admin"\\n' > "$AIRFLOW_HOME/webserver_config.py"
   wait_for_db() {{ until airflow db check-migrations -t 0 >/dev/null 2>&1; do echo "[fdp] waiting for the metadata database..."; sleep 5; done; }}
   role="${{FDP_AIRFLOW_ROLE:-standalone}}"

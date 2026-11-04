@@ -1,6 +1,6 @@
 name: finance
 version: "1.0.0"
-# Floren Data Platform generates the "finance" profile from the data source in fdp.json.
+# Limoon generates the "finance" profile from the data source in fdp.json.
 profile: finance
 
 model-paths: ["models"]

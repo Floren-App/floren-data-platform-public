@@ -2,7 +2,7 @@
 
 Generated from the current provider schema.
 
-A Floren Data Platform app group: the unit that receives roles. Members are directory identities (managed by SCIM/your IdP) bound with fdp_app_group_member. Import by ID.
+A Limoon app group: the unit that receives roles. Members are directory identities (managed by SCIM/your IdP) bound with fdp_app_group_member. Import by ID.
 
 | Attribute | Type | Behavior | Description |
 |---|---|---|---|

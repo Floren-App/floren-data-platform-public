@@ -1,4 +1,4 @@
-# Floren Data Platform runner for RStudio's Viewer pane: pick a fdp.json program, fill in its
+# Limoon runner for RStudio's Viewer pane: pick a fdp.json program, fill in its
 # arguments, choose a warehouse, run, and follow the console. Started by fdp::runner().
 library(shiny)
 
@@ -29,7 +29,7 @@ safely <- function(expr, default = NULL) tryCatch(expr, error = function(e) defa
 
 ui <- fluidPage(
   tags$head(tags$style(HTML(css)), tags$script(HTML(scroll_js))),
-  div(class = "hdr", "Floren Data Platform runner", actionLink("reload", "reload")),
+  div(class = "hdr", "Limoon runner", actionLink("reload", "reload")),
   uiOutput("picker"),
   uiOutput("form"),
   uiOutput("error"),
@@ -48,7 +48,7 @@ server <- function(input, output, session) {
   current <- reactiveVal(NULL)
 
   load <- function() {
-    cfg(safely(dc$programs(), list(exists = FALSE, errors = list("cannot reach Floren Data Platform"))))
+    cfg(safely(dc$programs(), list(exists = FALSE, errors = list("cannot reach Limoon"))))
     pools(safely(dc$warehouses(), list()))
     srcs(safely(dc$sources(), data.frame(name = character())))
   }

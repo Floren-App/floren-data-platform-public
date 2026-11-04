@@ -74,7 +74,7 @@ def get_actor(authorization: Optional[str] = Header(default=None),
 
 
 def service_token_user(token: str) -> User:
-    """A service account's API token (external tools, Airflow outside Floren Data Platform, …)."""
+    """A service account's API token (external tools, Airflow outside Limoon, …)."""
     from .db import SessionLocal
     from .identity import user_for_token
 

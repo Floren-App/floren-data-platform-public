@@ -125,7 +125,7 @@ follow <- function(run_id, interval = 2) {
   }
 }
 
-#' Open the Floren Data Platform runner in RStudio's Viewer pane (runs as a background job).
+#' Open Limoon runner in RStudio's Viewer pane (runs as a background job).
 runner <- function() {
   if (!requireNamespace("rstudioapi", quietly = TRUE) || !rstudioapi::isAvailable()) {
     stop("the runner panel needs RStudio; use run_program() from the console instead", call. = FALSE)
@@ -135,7 +135,7 @@ runner <- function() {
   writeLines(sprintf(
     "shiny::runApp(system.file('runner', package = 'fdp'), port = %dL, host = '127.0.0.1', launch.browser = FALSE)",
     port), script)
-  rstudioapi::jobRunScript(script, name = "Floren Data Platform runner", workingDir = "/workspace")
+  rstudioapi::jobRunScript(script, name = "Limoon runner", workingDir = "/workspace")
   address <- sprintf("http://127.0.0.1:%d", port)
   is_up <- function() {
     con <- url(address)

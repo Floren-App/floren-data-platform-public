@@ -4,7 +4,7 @@ Status: accepted (2026-10-30) with the recommended decisions below; progress in 
 
 ## Goal
 
-Streams become a first-class part of Floren Data Platform, governed exactly like tables: the platform owns
+Streams become a first-class part of Limoon, governed exactly like tables: the platform owns
 identity, authorization, lineage and configuration; Kafka enforces them. Nobody handles a Kafka password, and
 integration (databases, the lake, external systems) is a supported, governed path rather than custom glue.
 

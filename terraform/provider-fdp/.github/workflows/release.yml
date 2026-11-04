@@ -1,5 +1,5 @@
 # Publishes a signed release for the OpenTofu and Terraform registries when a v* tag arrives. Tags are pushed
-# by the Floren Data Platform pipeline, which owns the source (terraform/provider-fdp in the platform repository).
+# by Limoon pipeline, which owns the source (terraform/provider-fdp in the platform repository).
 name: release
 
 on:

@@ -1,0 +1,8 @@
+:root {
+  --limoon-rind: #4a8a1f; /* The outside of the slice */
+  --limoon-pith: #f2f9dc; /* The pale lines and pith */
+  --limoon-flesh: #a3d44a; /* The segments */
+  --limoon-accent: #6cb52e; /* The wordmark's period and the app's controls */
+  --limoon-ink: #1d2414; /* The wordmark on light backgrounds */
+  --limoon-ink-on-dark: #f2f2f2; /* The wordmark on dark backgrounds */
+}

@@ -1,4 +1,4 @@
-"""Floren Data Platform SDK.
+"""Limoon SDK.
 
     import fdp
     engine = fdp.connect("finance-dw")          # SQLAlchemy engine
@@ -71,7 +71,7 @@ def _auth_token(token: Optional[str] = None) -> str:
     api = os.environ.get("FDP_API")
     token = token or os.environ.get("FDP_TOKEN") or os.environ.get("FDP_SESSION_TOKEN")
     if not api or not token:
-        raise RuntimeError("set FDP_API and pass token= (a service token) outside Floren Data Platform")
+        raise RuntimeError("set FDP_API and pass token= (a service token) outside Limoon")
     if token == os.environ.get("FDP_SESSION_TOKEN"):
         import base64, json, time
         try:
@@ -123,7 +123,7 @@ def connect(name: str, token: Optional[str] = None, schema: Optional[str] = None
             viewer_token: Optional[str] = None, **kwargs: Any) -> Any:
     """Returns a ready client: SQLAlchemy engine for SQL sources, boto3 client for S3.
 
-    token: a service token, to connect as that service account (e.g. from outside Floren Data Platform)."""
+    token: a service token, to connect as that service account (e.g. from outside Limoon)."""
     info = credentials(name, token, schema=schema, viewer_token=viewer_token)
     kind, cfg, cred = info["kind"], info["config"], info["credentials"]
     if kind == "trino":
@@ -289,7 +289,7 @@ def certificate(var: str) -> Certificate:
 class Api:
     """An external API from API management, called as this program's identity.
 
-    Floren Data Platform adds the API's headers, credentials and client certificate; the program never holds them, and
+    Limoon adds the API's headers, credentials and client certificate; the program never holds them, and
     only declared operations can be called (with the Consumer role on them).
     """
 

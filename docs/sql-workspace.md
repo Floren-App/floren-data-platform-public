@@ -23,8 +23,8 @@ browser ──gateway (sign-in, path cookie)──▶ CloudBeaver ──JDBC─�
   CloudBeaver uses a stable `dc-<directory-id>` account to avoid collisions between human
   names such as `admin` and CloudBeaver's built-in team names. Its display name remains
   the workspace owner's username. The gateway clears client-supplied proxy identity/team
-  headers and supplies a regular user team; Floren Data Platform IAM still governs SQL access.
-- **Connection:** CloudBeaver has one managed connection, **Floren Data Platform SQL**. It uses
+  headers and supplies a regular user team; Limoon IAM still governs SQL access.
+- **Connection:** CloudBeaver has one managed connection, **Limoon SQL**. It uses
   Trino's JDBC driver against a small proxy inside the container
   (`images/workspace-sql/fdp-sql-proxy.py`). The proxy adds this workspace's token
   and forwards only the Trino client protocol.
@@ -33,7 +33,7 @@ browser ──gateway (sign-in, path cookie)──▶ CloudBeaver ──JDBC─�
   roles, policy checks, row filters and the audit log are unchanged, and queries are
   recorded against this workspace.
 - **Browsing:** the schema tree reads Trino's `system.jdbc` tables. Trino builds those rows
-  through Floren Data Platform's access-control filters, so the tree lists only objects you have a
+  through Limoon's access-control filters, so the tree lists only objects you have a
   data role on.
 
 ## Where scripts live
