@@ -51,12 +51,13 @@ def snapshot(db, user):
         for grant, actions in grants:
             if grant.target_id not in ids or not permissions.scope_matches(grant.layer_id, layer):
                 continue
-            if not getattr(grant, 'legacy_reviewed', False) and any(a.startswith(('data.sql.','data.files.','data.iceberg.')) for a in actions):
-                from .compliance import role_requirement
+            from .compliance import needs_no_form, reveals_data, role_requirement
+            if not getattr(grant, 'legacy_reviewed', False) and any(reveals_data(a) for a in actions) \
+                    and not needs_no_form(db, getattr(grant, 'principal_id', None)):
                 req = role_requirement(db, resource, 'DataReader', getattr(grant, 'app_group_id', None))
                 if req['policy'] is not None:
-                    # Mandatory reviews cannot be bypassed with a parallel named grant.
-                    actions = {a for a in actions if not a.startswith(('data.sql.','data.files.','data.iceberg.'))}
+                    # Mandatory reviews cannot be bypassed with a parallel named grant; writing reveals nothing.
+                    actions = {a for a in actions if not reveals_data(a)}
             held.update(actions)
         if not held:
             continue

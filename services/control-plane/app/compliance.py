@@ -230,6 +230,22 @@ def owns(db, resource: Resource, group_id: Optional[str]) -> bool:
     return False
 
 
+def reveals_data(action: str) -> bool:
+    """A permission that shows what data holds (reading rows, files or messages, running routines over them).
+    Only these need an approved compliance form under an access policy; writing does not reveal data."""
+    from .access_inventory import category
+    from .permissions import REGISTRY
+    return action == 'data.routines.execute' or (category(action) == 'data' and 'DataReader' in REGISTRY.get(action, {}).get('roles', []))
+
+
+def needs_no_form(db, principal_id: Optional[str]) -> bool:
+    """Compliance forms are for people. A service identity's data access is decided by whoever may give access to
+    the data (its Owner or Access Administrator), and audited, without a form."""
+    from .models import DirectoryPrincipal
+    principal = db.get(DirectoryPrincipal, principal_id) if principal_id else None
+    return principal is not None and principal.kind == 'service'
+
+
 def role_requirement(db, resource: Resource, role: str, group_id: Optional[str]) -> dict:
     # Only roles that read the data need a form; the data's owners do not justify their own use of it (becoming an
     # owner does need a form).
