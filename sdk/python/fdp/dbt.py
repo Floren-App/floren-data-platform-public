@@ -1,6 +1,6 @@
-"""profiles.yml for dbt, built from a Floren Data Platform data source (credentials never stored in the repo).
+"""profiles.yml for dbt, built from a Limoon data source (credentials never stored in the repo).
 
-Inside runs, Floren Data Platform sets FDP_DBT_SOURCE/_TARGET/_SCHEMA/_THREADS. In a workspace terminal:
+Inside runs, Limoon sets FDP_DBT_SOURCE/_TARGET/_SCHEMA/_THREADS. In a workspace terminal:
 
     fdp dbt-profile --source finance-dw --write   # ~/.dbt/profiles.yml, your dev schema
 """

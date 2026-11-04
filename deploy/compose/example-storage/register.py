@@ -1,7 +1,7 @@
 """Registers the local example storage as three storage integrations (idempotent).
 
 This is what an administrator does under Administration → Storage integrations, scripted. Every
-value describes a location that exists outside Floren Data Platform, in example-storage/docker-compose.yml.
+value describes a location that exists outside Limoon, in example-storage/docker-compose.yml.
 """
 import os
 import sys

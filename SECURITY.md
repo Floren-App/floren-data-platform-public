@@ -14,6 +14,6 @@ Fixes go into the latest release. Until 1.0, older releases are not patched.
 
 ## Scope
 
-Floren Data Platform's own code: the control plane, egress proxy, layer controller, desktop app, editor
+Limoon's own code: the control plane, egress proxy, layer controller, desktop app, editor
 extension, SDKs, Helm chart and OpenTofu provider. For problems in bundled third-party software (see
 THIRD_PARTY_LICENSES.md), report them to that project too; we rebuild our images when they release a fix.

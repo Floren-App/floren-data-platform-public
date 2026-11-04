@@ -102,7 +102,7 @@ also values set before the levels were configured.
 **All objects** searches registered data sources/schemas, known tables, deployed
 apps/programs, and imported dbt/Airflow objects you may open. Files and folders are not
 listed: Storage and Workloads show them.
-Everything runs inside Floren Data Platform: its metadata database, API, UI, login, and IAM. There
+Everything runs inside Limoon: its metadata database, API, UI, login, and IAM. There
 is no DataHub deployment or separate metadata login. PostgreSQL uses a native GIN text
 index; SQLite uses FTS5. The lineage explorer uses React Flow and Dagre for interaction
 and layout.
@@ -177,7 +177,7 @@ successful-run percentages are not inferred from every job that reads that datas
 
 ## Lineage evidence
 
-Lineage collection is automatic for programs using Floren Data Platform's managed connections.
+Lineage collection is automatic for programs using Limoon's managed connections.
 There is no required `lineage` section in `fdp.json`, and no opt-in flag:
 
 | Access path | Automatically collected evidence |
@@ -279,7 +279,7 @@ Files work the same way. In a deployed job, reads and writes through `fdp.files(
 reported when the program exits. For example, `put("finance/2026/sales.csv")` records an
 output to that file. Workspaces record nothing; only deployed runs produce lineage.
 
-For an external connector that bypasses Floren Data Platform, optionally declare known dependencies
+For an external connector that bypasses Limoon, optionally declare known dependencies
 in `fdp.json` (the same format works for R programs):
 
 ```json

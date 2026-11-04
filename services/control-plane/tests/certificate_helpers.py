@@ -10,7 +10,7 @@ def certificate_pair(hostname, *, ca=None, expired=False):
     now = datetime.now(timezone.utc)
     if ca is None:
         ca_key = ec.generate_private_key(ec.SECP256R1())
-        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Disposable Floren Data Platform test CA')])
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Disposable Limoon test CA')])
         ca_cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(ca_key.public_key())
             .serial_number(x509.random_serial_number()).not_valid_before(now-timedelta(days=1))
             .not_valid_after(now+timedelta(days=30)).add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)

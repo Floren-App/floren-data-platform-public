@@ -146,7 +146,7 @@ export function CatalogObject({ tab, hub, openTab }: { tab: TabRef; hub: Hub; op
     {section === "governance" && <GovernanceEditor key={asset.id} asset={asset} onSaved={setAsset} />}
     {section === "sla" && <SLAEditor key={asset.id} asset={asset} onSaved={setAsset} />}
     {section === "metrics" && <MetricsPanel key={`${asset.id}:${hub.me?.active_group_id}`} asset={asset} />}
-    {section === "lineage" && <><Suspense fallback={<p className="muted">Loading lineage explorer…</p>}><LineageExplorer asset={asset} openTab={openTab} version={version} /></Suspense><NativeImport asset={asset} onImported={() => setVersion((v) => v + 1)} /></>}
+    {section === "lineage" && <><Suspense fallback={<p className="muted loading">Loading lineage explorer…</p>}><LineageExplorer asset={asset} openTab={openTab} version={version} /></Suspense><NativeImport asset={asset} onImported={() => setVersion((v) => v + 1)} /></>}
   </>;
 }
 

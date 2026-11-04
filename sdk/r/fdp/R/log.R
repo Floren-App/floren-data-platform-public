@@ -5,7 +5,7 @@
 #   fdp::log_error("upload failed", attempt = 2)
 #
 # Each line also prints to the console. The platform stamps the run, workload, code version (commit)
-# and layer. Sending never stops your program; outside Floren Data Platform lines only print.
+# and layer. Sending never stops your program; outside Limoon lines only print.
 
 .log <- function(level, message, ...) {
   fields <- list(...)

@@ -1,5 +1,5 @@
 #!/usr/bin/with-contenv bash
-# RStudio sessions don't inherit the container environment; write the Floren Data Platform vars to Renviron.site.
+# RStudio sessions don't inherit the container environment; write Limoon vars to Renviron.site.
 for var in FDP_API FDP_SESSION_TOKEN FDP_WORKSPACE_ID FDP_USER GIT_CONFIG_GLOBAL \
            HTTPS_PROXY HTTP_PROXY NO_PROXY https_proxy http_proxy no_proxy \
            FDP_CRAN RENV_CONFIG_REPOS_OVERRIDE PIP_INDEX_URL PIP_TRUSTED_HOST; do

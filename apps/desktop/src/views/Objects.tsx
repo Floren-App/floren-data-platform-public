@@ -100,7 +100,7 @@ export function SourceView({ tab, hub, openTab }: ObjectProps) {
       </tbody></table></div>
       {source.config.system_metadata ? <section className="card"><h2>Platform metadata</h2>
         <p>Open the public schema and its SQL tab to query metadata or manage permissions. Access requires Global Admin as your active group.</p>
-        <p className="muted">The database connection is deployment managed through FDP_DATABASE_URL. The local default uses Floren Data Platform’s PostgreSQL instance.</p>
+        <p className="muted">The database connection is deployment managed through FDP_DATABASE_URL. The local default uses Limoon’s PostgreSQL instance.</p>
       </section> : <details className="card"><summary>Connect from a workspace</summary>
         <p className="muted">Each request uses the current execution identity and its schema roles.</p>
         <h3 style={{ marginTop: 12 }}>Python</h3><pre className="code">{`import fdp\n\nengine = fdp.connect(${JSON.stringify(source.name)})`}</pre>
@@ -338,7 +338,7 @@ function ServiceAccess({ principalId, hub, openTab }: { principalId: string; hub
   const [data, setData] = useState<Awaited<ReturnType<typeof api.access.principalAccess>> | null>(null), [error, setError] = useState("");
   useEffect(() => { api.access.principalAccess(principalId).then(setData).catch((e: Error) => setError(e.message)); }, [principalId]);
   return <section><div className="section-heading"><h2>Has access to</h2></div>
-    {error ? <p className="muted">{error}</p> : !data ? <p className="muted" role="status">Loading…</p> : <>
+    {error ? <p className="muted">{error}</p> : !data ? <p className="muted loading" role="status">Loading…</p> : <>
       {!!data.groups.length && <p className="hint">Member of {data.groups.map((g) => g.name).join(", ")}.</p>}
       <HasAccessTo rows={data.grants} hub={hub} openTab={openTab} showGroup label="What this identity can reach" /></>}
   </section>;

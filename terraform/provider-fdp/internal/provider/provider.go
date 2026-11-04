@@ -34,7 +34,7 @@ func (p *fdpProvider) Metadata(_ context.Context, _ provider.MetadataRequest, re
 
 func (p *fdpProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Configures Floren Data Platform through its API. Authenticate with a token, or with OAuth client " +
+		Description: "Configures Limoon through its API. Authenticate with a token, or with OAuth client " +
 			"credentials of an automation identity (for example the chart's fdp-automation client).",
 		Attributes: map[string]schema.Attribute{
 			"endpoint":       schema.StringAttribute{Optional: true, Description: "API base URL, e.g. https://fdp.example.com/api. Env: FDP_ENDPOINT."},
@@ -68,7 +68,7 @@ func (p *fdpProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		ActiveGroupID: pick(cfg.ActiveGroupID, "FDP_OWNER_GROUP_ID"),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Invalid Floren Data Platform provider configuration", err.Error())
+		resp.Diagnostics.AddError("Invalid Limoon provider configuration", err.Error())
 		return
 	}
 	resp.ResourceData, resp.DataSourceData = c, c

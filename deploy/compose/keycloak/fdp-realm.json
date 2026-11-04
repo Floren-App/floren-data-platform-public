@@ -1,7 +1,7 @@
 {
   "realm": "fdp",
   "enabled": true,
-  "displayName": "Floren Data Platform (test realm)",
+  "displayName": "Limoon (test realm)",
   "accessTokenLifespan": 900,
   "ssoSessionIdleTimeout": 28800,
   "ssoSessionMaxLifespan": 43200,
@@ -17,13 +17,13 @@
   "clients": [
     {
       "clientId": "fdp-api",
-      "name": "Floren Data Platform API",
+      "name": "Limoon API",
       "enabled": true,
       "bearerOnly": true
     },
     {
       "clientId": "fdp-desktop",
-      "name": "Floren Data Platform desktop app",
+      "name": "Limoon desktop app",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,

@@ -114,7 +114,7 @@ def test_webhook(name: str, db: Session = Depends(get_db), user: User = Depends(
     """Post a test message now and say how it went."""
     hook = _hook(db, name)
     item = Notification(webhook_id=hook.id, event="test", payload={
-        "event": "test", "subject": "Test from the Floren Data Platform", "text": f"{user.username} sent a test to {hook.name}.",
+        "event": "test", "subject": "Test from Limoon", "text": f"{user.username} sent a test to {hook.name}.",
         "link": None, "recipients": [], "case": None})
     db.add(item)
     db.flush()

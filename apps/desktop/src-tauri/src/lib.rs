@@ -5,5 +5,5 @@
 pub fn run() {
     tauri::Builder::default()
         .run(tauri::generate_context!())
-        .expect("error while running Floren Data Platform");
+        .expect("error while running Limoon");
 }

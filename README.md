@@ -1,9 +1,15 @@
-# Floren Data Platform
+<h1><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/logos/limoon-lockup-on-dark.svg">
+  <img src="brand/logos/limoon-lockup.svg" alt="limoon." height="64">
+</picture></h1>
 
-An open-source, governed compute layer for data teams. Private editor workspaces (VS Code,
+**Limoon** (a play on the Dutch *limoen*, lime; an English speaker says it the same way) is an open-source, governed compute layer for data teams. Private editor workspaces (VS Code,
 RStudio or SQL), compute pools that start on demand, governed SQL over your own databases
 and buckets, and programs, dashboards, dbt projects and Airflow pipelines deployed from Git
 (GitOps), with a catalog, lineage, quality checks and SLAs.
+
+Technical names keep their `fdp` prefix: images `fdp-*`, the `fdp` SDK, `FDP_*` settings and the
+Terraform provider `floren-app/fdp`. Logos, colours and the typeface are in [`brand/`](brand/).
 
 Supports Python, Jupyter notebooks, Streamlit, R, Shiny, dbt and Airflow, in versions admins choose.
 
@@ -77,7 +83,7 @@ For interactive SQL, create a **SQL workspace**: CloudBeaver (open source, the w
 with a schema browser, completion, result grids and saved `.sql` scripts, querying through the same
 governed engine. See [SQL workspace](docs/sql-workspace.md).
 
-Floren Data Platform does not host data: every database or bucket is an explicit storage integration that
+Limoon does not host data: every database or bucket is an explicit storage integration that
 points at storage configured elsewhere. See [storage integrations](docs/storage-integrations.md).
 
 The local stack starts with one application account: **admin/admin**, with platform
@@ -122,7 +128,7 @@ address and certificates as described in [API management](docs/api-management.md
 
 ## License
 
-Floren Data Platform is licensed under the [Apache License 2.0](LICENSE). It uses only free, OSI-approved
+Limoon is licensed under the [Apache License 2.0](LICENSE). It uses only free, OSI-approved
 open-source components; the container images' third-party software and its licenses are listed in
 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). R support (RStudio Server Open Source under AGPL-3.0, R and
 Shiny under the GPL) is an optional part of an installation, off unless `r.enabled` is set. Contributions are

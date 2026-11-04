@@ -27,7 +27,7 @@ func configured(data any, diags *diag.Diagnostics) *client.Client {
 }
 
 func apiError(diags *diag.Diagnostics, action string, err error) {
-	diags.AddError("Floren Data Platform: "+action, err.Error())
+	diags.AddError("Limoon: "+action, err.Error())
 }
 
 // jsonSubset reports whether every value the user declared equals the server's. The server adds defaults

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check a Kubernetes cluster before installing Floren Data Platform.
+"""Check a Kubernetes cluster before installing Limoon.
 
 Usage: fdp-preflight.py [--kubeconfig PATH] [--context NAME] [--image IMAGE] [--cert-manager]
 
@@ -128,7 +128,7 @@ def main():
     args = parser.parse_args()
     base = (['--kubeconfig', args.kubeconfig] if args.kubeconfig else []) + (['--context', args.context] if args.context else [])
     context = kubectl(['config', 'current-context'], base, check=False).stdout.strip()
-    print(f'Floren Data Platform preflight for context {args.context or context!r}\n', flush=True)
+    print(f'Limoon preflight for context {args.context or context!r}\n', flush=True)
     try:
         version(base)
     except RuntimeError as exc:

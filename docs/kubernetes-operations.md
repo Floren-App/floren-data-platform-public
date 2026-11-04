@@ -1,4 +1,4 @@
-# Operating Floren Data Platform on Kubernetes
+# Operating Limoon on Kubernetes
 
 Upgrades, rollback, backup and restore, key rotation, retiring layers and diagnostics. Every
 procedure here is exercised by `make test-e2e-install` on a disposable cluster, as noted.

@@ -1,4 +1,4 @@
-// Talks to the Floren Data Platform control plane with this workspace's session token (injected by Floren Data Platform).
+// Talks to the Limoon control plane with this workspace's session token (injected by Limoon).
 
 export interface Arg {
   name: string;

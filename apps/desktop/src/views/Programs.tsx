@@ -129,14 +129,14 @@ export function ProgramRunner({ workspaceId, running, hub, onStarted, openTab }:
   );
 
   if (error) return <div className="card">{header}<p className="error" role="alert">{error}</p></div>;
-  if (!cfg) return <div className="card">{header}<p className="muted">Loading…</p></div>;
+  if (!cfg) return <div className="card">{header}<p className="muted loading">Loading…</p></div>;
   if (!cfg.exists) {
     return (
       <div className="card">
         {header}
         <p className="muted">
           {running
-            ? <>No <code>fdp.json</code> in this workspace yet. Create one from the editor (VS Code: <i>Floren Data Platform: Create fdp.json</i>; RStudio: <code>fdp::init()</code>) to list the programs you can run here.</>
+            ? <>No <code>fdp.json</code> in this workspace yet. Create one from the editor (VS Code: <i>Limoon: Create fdp.json</i>; RStudio: <code>fdp::init()</code>) to list the programs you can run here.</>
             : <>Start the workspace to read its <code>fdp.json</code>.</>}
         </p>
       </div>

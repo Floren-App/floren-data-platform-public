@@ -21,13 +21,13 @@ COPY sdk/r/fdp /tmp/fdp
 RUN R CMD INSTALL /tmp/fdp && rm -rf /tmp/fdp
 
 COPY images/workspace-rstudio/rsession.conf /etc/rstudio/rsession.conf
-# Opens the Floren Data Platform runner (Viewer pane) at session start.
+# Opens Limoon runner (Viewer pane) at session start.
 # Packages install from the platform's package repository (FDP_CRAN) instead of rocker's default.
 COPY images/workspace-rstudio/Rprofile.site /usr/local/lib/R/etc/Rprofile.site.fdp
 COPY images/common/Rprofile-packages.site /usr/local/lib/R/etc/Rprofile.site.packages
 RUN cat /usr/local/lib/R/etc/Rprofile.site.fdp /usr/local/lib/R/etc/Rprofile.site.packages >> /usr/local/lib/R/etc/Rprofile.site
 
-# The rstudio user is uid 1000, same as every other Floren Data Platform image, so /workspace is shared cleanly.
+# The rstudio user is uid 1000, same as every other Limoon image, so /workspace is shared cleanly.
 RUN mkdir -p /workspace && chown 1000:1000 /workspace \
  && ln -s /workspace /home/rstudio/workspace
 

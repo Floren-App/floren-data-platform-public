@@ -19,14 +19,14 @@ RStudio, deploying from git with GitOps, and per-identity data access.
 | Field | Meaning |
 |---|---|
 | `entrypoint` | Folder containing `dbt_project.yml`. |
-| `dbt.data_source` | The Floren Data Platform data source dbt builds in. Grant the execution identity Admin on its target schema and Reader on input schemas through RBAC; register/provision development schemas first. See [RBAC](rbac.md). |
+| `dbt.data_source` | Limoon data source dbt builds in. Grant the execution identity Admin on its target schema and Reader on input schemas through RBAC; register/provision development schemas first. See [RBAC](rbac.md). |
 | `dbt.schema` | Production schema (deployed runs). Default `analytics`. |
 | `dbt.dev_schema` | Schema for workspace runs. Default `dbt_{user}`, so everyone develops in their own schema and never touches production. |
 | `dbt.threads` | dbt threads (default 4). |
 | `dbt_version` | Version from the runtime catalog (default: the catalog's default). |
 
 Both PostgreSQL and Iceberg use `dbt-trino` with the shared governed SQL executor.
-Floren Data Platform generates `profiles.yml` at run time from the connection metadata and a
+Limoon generates `profiles.yml` at run time from the connection metadata and a
 execution token. Native database and storage credentials remain in the infrastructure.
 The project's `profile:` name is used automatically.
 

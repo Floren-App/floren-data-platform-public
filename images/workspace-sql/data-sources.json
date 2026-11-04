@@ -4,8 +4,8 @@
     "fdp-trino": {
       "provider": "generic",
       "driver": "trino_jdbc",
-      "name": "Floren Data Platform SQL",
-      "description": "Every catalog and schema you have a data role on, through the governed Floren Data Platform gateway.",
+      "name": "Limoon SQL",
+      "description": "Every catalog and schema you have a data role on, through the governed Limoon gateway.",
       "save-password": true,
       "read-only": false,
       "configuration": {

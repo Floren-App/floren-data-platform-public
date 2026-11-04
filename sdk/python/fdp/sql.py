@@ -1,4 +1,4 @@
-"""Standard Trino clients with Floren Data Platform authentication and execution-token renewal."""
+"""Standard Trino clients with Limoon authentication and execution-token renewal."""
 import os
 from urllib.parse import urlsplit
 

@@ -1,10 +1,10 @@
 """API management, modelled on Azure API Management: API (service) → endpoint group → operation.
 
-internal APIs: outside callers start *deployed programs* inside Floren Data Platform (never data). Callers prove who they
+internal APIs: outside callers start *deployed programs* inside Limoon (never data). Callers prove who they
     are with JWT and/or mTLS; the program runs as the API's own managed service identity, which gets its access
     the usual way (app groups with roles on workloads and data).
-external APIs: definitions of outside REST/SOAP services. Programs call them through Floren Data Platform as their own
-    identity; Floren Data Platform adds the configured headers, credentials and client certificate from secrets, so
+external APIs: definitions of outside REST/SOAP services. Programs call them through Limoon as their own
+    identity; Limoon adds the configured headers, credentials and client certificate from secrets, so
     programs never hold them. Every API, endpoint group and operation is its own permission scope.
 """
 from __future__ import annotations

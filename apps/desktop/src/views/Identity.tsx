@@ -375,7 +375,7 @@ export function TokensCard({ sa, onError, canList = true, canCreate = true, canR
   return (
     <div className="card">
       <h2>Tokens</h2>
-      <p className="muted">For tools outside Floren Data Platform (external schedulers, BI): <code>fdp.connect("finance-dw", token=…)</code> or <code>Authorization: Bearer dcs_…</code>.</p>
+      <p className="muted">For tools outside Limoon (external schedulers, BI): <code>fdp.connect("finance-dw", token=…)</code> or <code>Authorization: Bearer dcs_…</code>.</p>
       {fresh?.token && (
         <div className="notice warn" role="status">
           <b>Copy this token now; it won't be shown again.</b>

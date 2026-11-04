@@ -32,7 +32,7 @@ export function PackagesView({ hub, openTab, kind }: { hub: Hub; openTab: OpenTa
     {panel === "import" && data && <ImportForm upstream={data.upstream} kinds={data.kinds ?? KINDS} initialKind={kind} openTab={openTab} onDone={() => setPanel("")} />}
     {panel === "upload" && data && <UploadForm maxMb={data.max_upload_mb} kinds={data.kinds ?? KINDS} initialKind={kind} openTab={openTab} onDone={() => { setPanel(""); void reload(); }} />}
     {panel === "allowlist" && data && <AllowlistPanel kinds={data.kinds ?? KINDS} canEdit={!!hub.me?.is_admin} />}
-    {panel === "permissions" && (root ? <PermissionsPanel resource={root} resources={hub.resources} openTab={openTab} onChanged={async () => { await hub.refresh(); await reload(); }} /> : <p className="muted">Loading…</p>)}
+    {panel === "permissions" && (root ? <PermissionsPanel resource={root} resources={hub.resources} openTab={openTab} onChanged={async () => { await hub.refresh(); await reload(); }} /> : <p className="muted loading">Loading…</p>)}
     <div className="row" style={{ margin: "12px 0" }}>
       <input type="search" aria-label="Search packages" placeholder="Search packages…" value={query} onChange={(e) => setQuery(e.target.value)} />
       <button className="icon-btn" aria-label="Refresh packages" title="Refresh" onClick={() => void reload()}><IconRefresh /></button>
@@ -108,7 +108,7 @@ export function PackageView({ hub, openTab, reference }: { hub: Hub; openTab: Op
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => { if (section === "permissions" && item?.resource_id) api.access.resource(item.resource_id).then(setResource).catch((e: Error) => setError(e.message)); }, [section, item?.resource_id]);
   const act = async (fn: () => Promise<unknown>) => { setError(""); try { await fn(); await reload(); } catch (e) { setError((e as Error).message); } };
-  if (!item) return error ? <p className="error" role="alert">{error}</p> : <p className="muted">Loading…</p>;
+  if (!item) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading">Loading…</p>;
   const can = (a: string) => item.actions.includes(a);
   const root = hub.resources.find((r) => r.kind === "package-root");
   return <>
@@ -116,7 +116,7 @@ export function PackageView({ hub, openTab, reference }: { hub: Hub; openTab: Op
       subtitle={<>{PACKAGE_KIND_LABEL[item.kind]} · <span className="badge">{PACKAGE_ORIGIN_LABEL[item.origin]}</span>{item.owner_group && <> · owned by {item.owner_group}</>}{item.summary && <> · {item.summary}</>}</>} />
     {item.origin === "internal" && <ObjectTabs active={section} onChange={(s) => setSection(s as "overview" | "permissions")} overview="Versions" />}
     {error && <p className="error" role="alert">{error}</p>}
-    {section === "permissions" ? (resource ? <PermissionsPanel resource={resource} resources={[...hub.resources.filter((r) => r.id !== resource.id), resource]} openTab={openTab} onChanged={reload} /> : <p className="muted">Loading permissions…</p>) : <>
+    {section === "permissions" ? (resource ? <PermissionsPanel resource={resource} resources={[...hub.resources.filter((r) => r.id !== resource.id), resource]} openTab={openTab} onChanged={reload} /> : <p className="muted loading">Loading permissions…</p>) : <>
       <p>Install: <code className="mono">{item.install}</code>{item.kind === "r" && <span className="muted"> · a specific version: <code>{`renv::install("${item.name}@<version>")`}</code></span>}</p>
       {item.origin !== "internal" && root && <p className="muted">Imported packages follow the repository's roles: Data Contributors import new versions.</p>}
       <table aria-label="Versions"><thead><tr><th>Version</th><th>Files</th><th>Requires</th><th /></tr></thead><tbody>
@@ -162,7 +162,7 @@ export function PackageImportsView() {
 function AllowlistPanel({ kinds, canEdit }: { kinds: PackageKind[]; canEdit: boolean }) {
   const [list, setList] = useState<PackageAllowlist | null>(null), [error, setError] = useState(""), [saved, setSaved] = useState("");
   useEffect(() => { api.packages.allowlist().then(setList).catch((e: Error) => setError(e.message)); }, []);
-  if (!list) return error ? <p className="error" role="alert">{error}</p> : <p className="muted">Loading…</p>;
+  if (!list) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading">Loading…</p>;
   const edit = (kind: PackageKind, rows: AllowedPackage[]) => { setList({ ...list, [kind]: rows }); setSaved(""); };
   const save = async () => {
     setError(""); setSaved("");

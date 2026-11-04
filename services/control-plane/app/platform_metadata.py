@@ -71,7 +71,7 @@ def setup(db):
             raise RuntimeError("fdp-metadata is reserved for the platform metadata catalog")
         source = DataSource(id=SOURCE_ID, name=SOURCE_NAME, kind="postgres")
         db.add(source)
-    source.description = "Floren Data Platform platform metadata. Global Admin only; SQL changes use validated management operations."
+    source.description = "Limoon platform metadata. Global Admin only; SQL changes use validated management operations."
     source.config = {"system_metadata": True, "catalog": settings.metadata_catalog, "host": url.host,
                      "port": url.port or 5432, "database": url.database}
     source.egress = []

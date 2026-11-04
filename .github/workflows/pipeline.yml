@@ -361,7 +361,7 @@ jobs:
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes \
-            --title "Floren Data Platform ${GITHUB_REF_NAME}"
+            --title "Limoon ${GITHUB_REF_NAME}"
 
   provider-release:
     name: Provider ${{ github.ref_name }}

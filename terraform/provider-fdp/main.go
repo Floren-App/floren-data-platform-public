@@ -1,4 +1,4 @@
-// Floren Data Platform provider for OpenTofu (and Terraform-compatible tools): declarative layers, storage, IAM,
+// Limoon provider for OpenTofu (and Terraform-compatible tools): declarative layers, storage, IAM,
 // compute and workloads through the same validated API as the desktop app.
 package main
 

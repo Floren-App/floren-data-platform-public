@@ -1,4 +1,4 @@
-"""Storage integration types: the external locations Floren Data Platform can govern, and what each one requires.
+"""Storage integration types: the external locations Limoon can govern, and what each one requires.
 
 An integration points at an external database/bucket or optional layer-local PostgreSQL.
 SQL sources must also be configured as a catalog in the layer's Trino engine. The desktop renders
@@ -26,7 +26,7 @@ TYPES = {
         "summary": "A PostgreSQL database. Queries run through the shared SQL engine; schema roles are enforced there "
                    "and, after access setup, as native database roles.",
         "external": "Create a Trino catalog (connector postgresql) for this database with the same host and database, "
-                    "using a read/write service login. Floren Data Platform references it by catalog name.",
+                    "using a read/write service login. Limoon references it by catalog name.",
         "config": [
             field("host", "Host", placeholder="warehouse.internal"),
             field("port", "Port", kind="port", default=5432),
@@ -84,7 +84,7 @@ TYPES = {
         "summary": "Plain files under a prefix of an S3-compatible bucket. Readers and contributors receive short-lived "
                    "credentials scoped to their namespaces' prefixes.",
         "external": "Create a role that can access the bucket and that the provisioning login may assume (STS "
-                    "AssumeRole). Floren Data Platform narrows each session to the granted prefixes.",
+                    "AssumeRole). Limoon narrows each session to the granted prefixes.",
         "config": [
             field("bucket", "Bucket", kind="bucket", placeholder="files"),
             field("prefix", "Base prefix", required=False, placeholder="finance",

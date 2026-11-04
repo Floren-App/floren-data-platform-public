@@ -29,7 +29,7 @@ export function RolesView({ typeKey, roleName }: { hub: Hub; typeKey?: string; r
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set(roleName ? [`${typeKey}/${roleName}`] : []));
   useEffect(() => { if (roleName) document.getElementById(`role-${typeKey}/${roleName}`)?.scrollIntoView({ block: "center" }); }, [catalog, typeKey, roleName]);
-  if (!catalog) return <><Header /><p className="muted" role="status">Loading roles…</p></>;
+  if (!catalog) return <><Header /><p className="muted loading" role="status">Loading roles…</p></>;
 
   const settings = catalog.types.filter((t) => t.family === "settings");
   const entries: { key: string; label: string; icon: string; roles: Role[]; note?: string }[] = [

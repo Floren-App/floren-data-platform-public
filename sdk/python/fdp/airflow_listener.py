@@ -1,6 +1,6 @@
 """Airflow listener: a deployed Airflow's DAG runs and failed tasks go to the central workload log.
 
-Registered as an Airflow plugin (entry point fdp_log). It is silent outside a Floren Data Platform
+Registered as an Airflow plugin (entry point fdp_log). It is silent outside a Limoon
 deployment (no FDP_WORKLOAD_ID) and never blocks or fails the scheduler: lines are sent in the background.
 """
 import os

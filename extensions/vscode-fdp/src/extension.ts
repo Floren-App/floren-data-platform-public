@@ -50,7 +50,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(watcher);
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  status.text = "$(play-circle) Floren Data Platform";
+  status.text = "$(play-circle) Limoon";
   status.tooltip = "Run programs on a warehouse";
   status.command = "fdp.showRunner";
   status.show();

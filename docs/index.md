@@ -1,6 +1,6 @@
-# Floren Data Platform
+# limoon.
 
-FDP is an open-source, governed compute layer for data teams. It brings workspaces,
+**Limoon** (from the Dutch *limoen*, lime) is an open-source, governed compute layer for data teams. It brings workspaces,
 compute, governed SQL, published workloads and a catalog together on Kubernetes.
 Develop in a private workspace, share code through Git, and publish repeatable jobs or
 dashboards with their own managed identities.

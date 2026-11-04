@@ -35,7 +35,7 @@ let manager: UserManager | null = null;
 export async function getManager(): Promise<UserManager> {
   if (manager) return manager;
   const res = await fetch(`${getServer()}/api/v1/client-config`);
-  if (!res.ok) throw new Error(`cannot reach Floren Data Platform at ${getServer()} (${res.status})`);
+  if (!res.ok) throw new Error(`cannot reach Limoon at ${getServer()} (${res.status})`);
   const cfg: ClientConfig = await res.json();
   manager = new UserManager({
     authority: cfg.oidc_issuer,

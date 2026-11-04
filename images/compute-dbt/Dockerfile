@@ -1,4 +1,4 @@
-# Compute tier for dbt projects (dbt-core, Apache-2.0). Profiles come from Floren Data Platform data sources.
+# Compute tier for dbt projects (dbt-core, Apache-2.0). Profiles come from Limoon data sources.
 # Build from the repo root: docker build -f images/compute-dbt/Dockerfile -t fdp/compute-dbt:dev .
 # Other versions for the runtime catalog: make runtime KIND=dbt VERSION=1.8
 ARG PYTHON_VERSION=3.12

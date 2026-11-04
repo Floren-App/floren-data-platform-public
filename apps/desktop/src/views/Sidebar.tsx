@@ -93,7 +93,7 @@ function OtherLayers({ count, groups = false }: { count: number; groups?: boolea
 }
 
 export async function openEditor(hub: Hub, id: string, name: string) {
-  await hub.act(() => openInWindow(api.openWorkspace(id).then((r) => r.url), `${name} — Floren Data Platform`, `ws-${id}`));
+  await hub.act(() => openInWindow(api.openWorkspace(id).then((r) => r.url), `${name} — Limoon`, `ws-${id}`));
 }
 
 function WorkspacesPanel({ hub, openTab, activeKey, activeIntent }: Props) {

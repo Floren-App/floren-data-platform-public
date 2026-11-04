@@ -75,7 +75,7 @@ function SettingField({ id, f, value, error, onChange, keep, disabled }: {
   </div>;
 }
 
-/** Admin: the external databases and buckets Floren Data Platform governs. Nothing here hosts storage. */
+/** Admin: the external databases and buckets Limoon governs. Nothing here hosts storage. */
 /** Add or change a storage connection: its type, location and write-only credentials (platform administrators). */
 export function StorageConnectionForm({ hub, existing, onDone, onCancel }: { hub: Hub; existing?: DataSource; onDone: (name: string) => void; onCancel: () => void }) {
   const { data: types } = useLoad(api.admin.storageTypes, [] as StorageType[]);
@@ -129,7 +129,7 @@ export function StorageConnectionForm({ hub, existing, onDone, onCancel }: { hub
       <h3 className="row" style={{ margin: 0 }}><ProductIcon kind={TYPE_ICON[spec.kind]} size={18} />{editing ? "Connection settings" : `New ${spec.label} connection`}</h3>
       {!editing && <button type="button" className="text-button" onClick={() => setKind(null)}>Change type</button>}
     </div>
-    <p className="scope-note"><strong>Configure outside Floren Data Platform first.</strong> {spec.external}</p>
+    <p className="scope-note"><strong>Configure outside Limoon first.</strong> {spec.external}</p>
     {error && <p className="error" role="alert">{error}</p>}
     <div className="arg-grid">
       <div className="field"><label htmlFor="si-name">Name *</label>
@@ -166,7 +166,7 @@ export function StorageConnectionSettings({ hub, name, openTab }: { hub: Hub; na
   const { data: sources, error, setError } = useLoad(api.admin.sources, [] as DataSource[]);
   const [message, setMessage] = useState(""), [formKey, setFormKey] = useState(0);
   const ds = sources.find((s) => s.name === name);
-  if (!ds) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  if (!ds) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading" role="status">Loading…</p>;
   return <>
     {message && <p className="success-message" role="status">{message}</p>}
     {ds.groups.length > 0 && <p className="scope-note">Legacy grants to review: {ds.groups.join(", ")}</p>}
@@ -450,7 +450,7 @@ export function AdminAppProfiles() {
   const load = useCallback(() => api.appProfiles.list().then((d) => { setData(d); setDrafts(Object.fromEntries(d.profiles.map((p) => [p.id, p]))); })
     .catch((e: Error) => setError(e.message)), []);
   useEffect(() => { void load(); }, [load]);
-  if (!data) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  if (!data) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading" role="status">Loading…</p>;
   const profiles = data.profiles;
   const changed = (p: AppProfile) => JSON.stringify(drafts[p.id]) !== JSON.stringify(p);
   const toggle = (p: AppProfile, f: AppFeature) => { const d = drafts[p.id];
@@ -460,7 +460,7 @@ export function AdminAppProfiles() {
       .then(() => { setMessage(`Saved ${d.name}.`); return load(); }).catch((e: Error) => setError(e.message)); };
   return <>
     <PageHeader icon={<ProductIcon kind="groups" size={22} />} title="App profiles"
-      subtitle="Which parts of the app a group gets: pages, navigation and the actions behind them, enforced by the platform. People get the profile of their active group; object permissions still decide what they may open. Global Admin always has everything." />
+      subtitle="Which parts of the app a group gets, for a kind of work: someone in privacy, security or access administration has no use for workspaces or workloads. Profiles are not for teams or projects; what people may reach comes from their groups and roles. People get the profile of their active group. Global Admin always has everything." />
     {error && <p className="error" role="alert">{error}</p>}
     {message && <p className="scope-note" role="status">{message}</p>}
     <div className="table-scroll"><table className="profile-grid" aria-label="App profiles">
@@ -490,7 +490,7 @@ export function AdminClassifications() {
   const [error, setError] = useState(""), [message, setMessage] = useState("");
   const load = useCallback(() => api.catalog.classifications().then((r) => setRows(r.levels.map((l) => ({ ...l })))).catch((e: Error) => setError(e.message)), []);
   useEffect(() => { void load(); }, [load]);
-  if (!rows) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  if (!rows) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading" role="status">Loading…</p>;
   const set = (i: number, patch: Partial<(typeof rows)[number]>) => setRows(rows.map((r, j) => j === i ? { ...r, ...patch } : r));
   const move = (i: number, by: number) => { const next = [...rows]; [next[i], next[i + by]] = [next[i + by], next[i]]; setRows(next); };
   const save = () => { setError(""); setMessage("");
@@ -526,7 +526,7 @@ export function AdminNotifications({ hub }: { hub: Hub }) {
   const [deliveries, setDeliveries] = useState<{ name: string; items: WebhookDelivery[] } | null>(null);
   const load = useCallback(() => api.webhooks.list().then(setData).catch((e: Error) => setError(e.message)), []);
   useEffect(() => { void load(); }, [load]);
-  if (!data) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  if (!data) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading" role="status">Loading…</p>;
   const label = (key: string) => data.events.find((e) => e.key === key)?.label ?? key;
   const done = (text: string) => { setMessage(text); setEditing(null); void load(); };
   const save = (e: React.FormEvent) => { e.preventDefault(); if (!editing) return; setError(""); setMessage("");

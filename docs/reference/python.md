@@ -42,7 +42,7 @@ connect(name: str, token: Optional[str]=None, schema: Optional[str]=None, viewer
 
 Returns a ready client: SQLAlchemy engine for SQL sources, boto3 client for S3.
 
-token: a service token, to connect as that service account (e.g. from outside Floren Data Platform).
+token: a service token, to connect as that service account (e.g. from outside Limoon).
 
 ## `run`
 

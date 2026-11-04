@@ -1,4 +1,4 @@
-# Installing Floren Data Platform on Kubernetes
+# Installing Limoon on Kubernetes
 
 One Helm install for the platform, then one OpenTofu apply for its configuration. This page is
 the short path; [the chart README](../deploy/helm/fdp/README.md) has every option, and

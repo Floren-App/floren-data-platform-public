@@ -1,8 +1,8 @@
-"""Local Trino endpoint for the SQL workspace: adds this workspace's Floren Data Platform identity to every request.
+"""Local Trino endpoint for the SQL workspace: adds this workspace's Limoon identity to every request.
 
 CloudBeaver's Trino JDBC connection points at http://127.0.0.1:8099 without credentials, so no token is
 stored in CloudBeaver's configuration, and Trino's JDBC driver never sends credentials over plain HTTP.
-This process forwards only the Trino client protocol (statements, result pages, info) to the Floren Data Platform
+This process forwards only the Trino client protocol (statements, result pages, info) to Limoon
 SQL gateway with the workspace token, and rewrites result-page links back to itself. Governance, auditing
 and row limits all stay in the gateway and the shared engine.
 """
@@ -48,7 +48,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             status, reply, payload = error.code, error.headers, error.read()
             self.log_error("gateway returned %s for %s %s", status, self.command, self.path.split("?")[0])
         except OSError as error:
-            self.send_error(502, f"Floren Data Platform SQL gateway unreachable: {error}")
+            self.send_error(502, f"Limoon SQL gateway unreachable: {error}")
             return
         # Continuation links point at the gateway; keep the client on this endpoint.
         payload = payload.replace(UPSTREAM.encode() + b"/v1/", LOCAL.encode() + b"/v1/")

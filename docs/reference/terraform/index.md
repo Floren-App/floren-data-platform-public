@@ -6,7 +6,7 @@ For installation, authentication, examples, imports and state protection, see th
 
 ## Provider configuration
 
-Configures Floren Data Platform through its API. Authenticate with a token, or with OAuth client credentials of an automation identity (for example the chart's fdp-automation client).
+Configures Limoon through its API. Authenticate with a token, or with OAuth client credentials of an automation identity (for example the chart's fdp-automation client).
 
 | Attribute | Type | Behavior | Description |
 |---|---|---|---|

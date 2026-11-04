@@ -92,7 +92,7 @@ export function AccessTab({ hub, groupId, section, bindingPrincipalId, onSelect,
         <button type="button" className="btn secondary" onClick={() => setCreating(false)}>Cancel</button>
       </div>
     </form>}
-    {loading ? <p className="muted">Loading groups…</p> : <div className="master-detail">
+    {loading ? <p className="muted loading">Loading groups…</p> : <div className="master-detail">
       <aside className="group-list" aria-label="Groups">
         <input type="search" aria-label="Search groups" placeholder="Search groups…" value={search} onChange={(e) => setSearch(e.target.value)} />
         <ul>{matching.map((g) => <li key={g.id}><button className={groupId === g.id ? "active" : ""} onClick={() => onSelect(g.id, g.name, section)}>
@@ -113,7 +113,7 @@ export function AccessTab({ hub, groupId, section, bindingPrincipalId, onSelect,
           </nav>}
           {section === "access" && group.can_inspect !== false && <>
             {group.system && <p className="scope-note">Owner on every object, including what is added later.</p>}
-            {!access ? <p className="muted" role="status">Loading…</p> : <>
+            {!access ? <p className="muted loading" role="status">Loading…</p> : <>
               <p className="hint">The roles this group holds, by kind of access. Open an object to see its roles, and a role to see its permissions.
                 {access.app_profile ? <> App profile: <strong>{access.app_profile}</strong>.</> : null}</p>
               {notice && <p className="success-message" role="status">{notice}</p>}

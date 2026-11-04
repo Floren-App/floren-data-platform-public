@@ -33,7 +33,7 @@ Definition Owners can use both failure bounds and tighter warning bounds.
 
 ## Automatic dbt checks
 
-Floren Data Platform imports test status and failing-row counts from native `run_results.json`
+Limoon imports test status and failing-row counts from native `run_results.json`
 alongside the manifest, execution time, revision and invocation metadata. Importing the
 same execution twice does not duplicate measurements. Removed tests are disabled rather
 than deleting their history. Generic and singular tests use the same result path.

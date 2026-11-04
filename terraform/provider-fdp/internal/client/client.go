@@ -1,4 +1,4 @@
-// Package client talks to the Floren Data Platform control-plane API with a bearer token: either a fixed token or one
+// Package client talks to Limoon control-plane API with a bearer token: either a fixed token or one
 // obtained (and renewed) with OAuth client credentials from the identity provider.
 package client
 
@@ -47,7 +47,7 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("Floren Data Platform API returned %d: %s", e.Status, e.Detail)
+	return fmt.Sprintf("Limoon API returned %d: %s", e.Status, e.Detail)
 }
 
 func IsNotFound(err error) bool {

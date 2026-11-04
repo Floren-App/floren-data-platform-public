@@ -152,7 +152,7 @@ trust mounts. See [certificate configuration](../deploy/helm/fdp/README.md).
 
 ## Automation authentication and explicit ownership
 
-Use a dedicated OIDC automation principal with the required Floren Data Platform app-group
+Use a dedicated OIDC automation principal with the required Limoon app-group
 bindings. Obtain its access token through the external IdP's supported flow. For
 SCIM deployments the automation principal must also be provisioned in the directory.
 Do not give workload/session credentials platform administration authority.

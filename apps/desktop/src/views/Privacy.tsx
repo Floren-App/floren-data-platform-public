@@ -22,7 +22,7 @@ export function PrivacyPolicies({ hub }: { hub: Hub }) {
   const load = useCallback(() => Promise.all([api.compliance.policies(), api.compliance.forms().catch(() => [] as AccessFormItem[])])
     .then(([g, f]) => { setGrid(g); setForms(f); }).catch((e: Error) => setError(e.message)), []);
   useEffect(() => { void load(); }, [load]);
-  if (!grid) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  if (!grid) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading" role="status">Loading…</p>;
   const policy = (layer: string, level: string) => grid.policies.find((p) => p.layer_id === layer && p.classification === level);
   const lowest = grid.classifications[0]?.name;
   return <>
@@ -108,7 +108,7 @@ export function PrivacyForms({ hub, openTab }: { hub: Hub; openTab: (t: TabRef) 
     <PageHeader icon={<ProductIcon kind="file" size={22} />} title="Compliance forms"
       subtitle="What people fill in to justify access. Forms have pages, and questions or pages can depend on earlier answers. Changes are drafted, then published as a new version." />
     {error && <p className="error" role="alert">{error}</p>}
-    {!forms ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Forms"><thead><tr><th>Form</th><th>Published</th><th>Draft</th><th>Used by</th></tr></thead><tbody>
+    {!forms ? <p className="muted loading" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Forms"><thead><tr><th>Form</th><th>Published</th><th>Draft</th><th>Used by</th></tr></thead><tbody>
       {forms.map((f) => <tr key={f.id}><td><button className="text-button" onClick={() => openTab({ kind: "privacy-form", ref: f.id, title: f.name })}>{f.name}</button>
         {f.description && <div className="muted small">{f.description}</div>}</td>
         <td>{f.published_version ? `Version ${f.published_version}` : <span className="muted">Not yet</span>}</td>
@@ -149,7 +149,7 @@ export function PrivacyForm({ id, hub, onRenamed, onDeleted }: { id: string; hub
     setDefinition(latest?.definition ?? { pages: [newPage([])] });
   };
   useEffect(() => { api.compliance.form(id).then(show).catch((e: Error) => setError(e.message)); }, [id]);
-  if (!form) return error ? <p className="error" role="alert">{error}</p> : <p className="muted" role="status">Loading…</p>;
+  if (!form) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading" role="status">Loading…</p>;
   const change = (d: FormDefinition) => { setDefinition(d); setDirty(true); };
   const save = () => { setError(""); setMessage("");
     return api.compliance.saveForm(form.name, { name: name.trim(), description, definition }).then((f) => { show(f); if (f.name !== form.name) onRenamed(f.name); setMessage("Draft saved."); return f; }); };
@@ -277,7 +277,7 @@ export function PrivacyRoles({ hub }: { hub: Hub }) {
       actions={admin && <button className="btn" onClick={() => { setMessage(""); setGiving(true); }}><IconPlus size={14} />Give a duty</button>} />
     {error && <p className="error" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
-    {!data ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Review duties"><thead><tr><th>Role</th><th>Group</th><th>Scope</th>{admin && <th />}</tr></thead><tbody>
+    {!data ? <p className="muted loading" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Review duties"><thead><tr><th>Role</th><th>Group</th><th>Scope</th>{admin && <th />}</tr></thead><tbody>
       {data.roles.map((r) => <tr key={r.id}><td>{r.label}</td><td>{r.group}</td><td>{scopeText(r.scope, layers, groups)}</td>
         {admin && <td><button className="icon-btn" aria-label={`Remove ${r.label} from ${r.group}`} onClick={() => { setError("");
           api.compliance.removeRole(r.id).then(() => void load()).catch((err: Error) => setError(err.message)); }}><IconTrash size={14} /></button></td>}</tr>)}
@@ -341,7 +341,7 @@ export function PrivacyReviews({ openTab }: { openTab: (t: TabRef) => void }) {
         {["in_review", "changes_requested", "approved", "declined", "withdrawn", "expired"].map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}</select></div>}
     {error && <p className="error" role="alert">{error}</p>}
     {box === "review" && late > 0 && <p className="notice" role="status">{late} overdue.</p>}
-    {!cases ? <p className="muted" role="status">Loading…</p> : <CaseTable cases={cases} openTab={openTab} label={box === "review" ? "Waiting for me" : "All cases"} />}
+    {!cases ? <p className="muted loading" role="status">Loading…</p> : <CaseTable cases={cases} openTab={openTab} label={box === "review" ? "Waiting for me" : "All cases"} />}
   </>;
 }
 
@@ -359,7 +359,7 @@ export function PrivacyMemberships({ hub }: { hub: Hub }) {
       subtitle="People who joined a group that has access given through a compliance form. They have the group's other access already; this access waits for your approval." />
     {error && <p className="error" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
-    {!items ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="New members to approve"><thead><tr><th>Person</th><th>Group</th><th /></tr></thead><tbody>
+    {!items ? <p className="muted loading" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="New members to approve"><thead><tr><th>Person</th><th>Group</th><th /></tr></thead><tbody>
       {items.map((m) => <tr key={m.app_group_id + m.principal_id}><td>{m.principal}</td><td>{m.group}</td>
         <td className="table-actions"><div className="row">
           <input aria-label={`Note for ${m.principal}`} placeholder="Note (optional)" value={notes[m.app_group_id + m.principal_id] ?? ""}
@@ -386,7 +386,7 @@ export function PrivacyRegister({ openTab }: { openTab: (t: TabRef) => void }) {
       actions={<button className="btn secondary" disabled={!rows?.some((row) => row.can_export)} onClick={() => void exportCsv()}>Export CSV</button>} />
     {error && <p className="error" role="alert">{error}</p>}
     <input aria-label="Filter the register" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter by group, data, person…" style={{ marginBottom: 8, minWidth: 280 }} />
-    {!rows ? <p className="muted" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Access register"><thead><tr>
+    {!rows ? <p className="muted loading" role="status">Loading…</p> : <div className="table-scroll"><table aria-label="Access register"><thead><tr>
       <th>Group</th><th>Access</th><th>Data</th><th>Form</th><th>Approved by</th><th>Approved</th><th>Until</th><th>People</th></tr></thead><tbody>
       {shown.map((r) => <tr key={r.case_id}><td>{r.group}</td>
         <td><button className="text-button" onClick={() => openTab({ kind: "privacy-case", ref: r.case_id, title: r.access })}>{r.access}</button></td>

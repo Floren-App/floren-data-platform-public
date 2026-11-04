@@ -226,7 +226,7 @@ def main():
                     'metadata': {'name': 'selfsigned', 'namespace': namespace}, 'spec': {'selfSigned': {}}},
                    {'apiVersion': 'cert-manager.io/v1', 'kind': 'Certificate',
                     'metadata': {'name': 'test-root', 'namespace': namespace},
-                    'spec': {'isCA': True, 'commonName': 'Disposable Floren Data Platform CA', 'secretName': 'test-root',
+                    'spec': {'isCA': True, 'commonName': 'Disposable Limoon CA', 'secretName': 'test-root',
                              'duration': '168h', 'issuerRef': {'name': 'selfsigned'}}}])
             kube('wait', '-n', namespace, '--for=condition=Ready', 'certificate/test-root', '--timeout=120s')
             root = base64.b64decode(resource('secret', 'test-root', namespace)['data']['tls.crt']).decode()

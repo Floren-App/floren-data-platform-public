@@ -1,4 +1,4 @@
-"""Floren Data Platform API helpers for the local setup scripts (seed_rbac.py, example-storage/register.py)."""
+"""Limoon API helpers for the local setup scripts (seed_rbac.py, example-storage/register.py)."""
 import json
 import os
 import ssl

@@ -1,6 +1,6 @@
 # Platform metadata database and SQL
 
-Floren Data Platform's operational database is configured with `FDP_DATABASE_URL`: your
+Limoon's operational database is configured with `FDP_DATABASE_URL`: your
 own PostgreSQL, or the optional bundled one. It is separate from your business data and
 from the secret store's values.
 
@@ -56,7 +56,7 @@ DELETE FROM fdp_metadata.public.identity_bindings
 WHERE app_group_id = 'group-id' AND principal_id = 'idp-group-or-user-id';
 ```
 
-`GRANT/REVOKE role ON RESOURCE 'id' TO/FROM GROUP|SERVICE|USER 'recipient'` is Floren Data Platform
+`GRANT/REVOKE role ON RESOURCE 'id' TO/FROM GROUP|SERVICE|USER 'recipient'` is Limoon
 gateway syntax. GROUP accepts an ID or exact group name; SERVICE and USER accept directory
 principal IDs. Built-in roles apply; this does not create native Trino roles.
 Assignment INSERT uses the same upsert behavior as the UI. Direct service grants retain
@@ -84,7 +84,7 @@ IMMEDIATE with literal parameters are supported.
 ## Database configuration
 
 To relocate metadata, provision PostgreSQL, migrate the existing database, change
-`FDP_DATABASE_URL`, and restart Floren Data Platform. Update the metadata JDBC URL to the same
+`FDP_DATABASE_URL`, and restart Limoon. Update the metadata JDBC URL to the same
 database and ensure Trino can reach it. Changing a URL does not migrate existing data.
 
 Local development (Compose) defaults:

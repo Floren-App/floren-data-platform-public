@@ -1,6 +1,6 @@
 """Daily finance pipeline: build the dbt models, then the sales report.
 
-Airflow only orchestrates. Each task runs on a Floren Data Platform warehouse, and its console appears in
+Airflow only orchestrates. Each task runs on a Limoon warehouse, and its console appears in
 the task log. Programs are referenced by their names in fdp.json (same repository).
 """
 

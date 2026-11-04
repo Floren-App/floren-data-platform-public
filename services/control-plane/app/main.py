@@ -156,7 +156,7 @@ async def lifespan(app: FastAPI):
 
 
 # Every route passes the app-profile gate: it refuses actions of features the caller's profile does not include.
-app = FastAPI(title="Floren Data Platform control plane", version="0.1.0", lifespan=lifespan, dependencies=[Depends(recovery_gate), Depends(feature_gate)])
+app = FastAPI(title="Limoon control plane", version="0.1.0", lifespan=lifespan, dependencies=[Depends(recovery_gate), Depends(feature_gate)])
 from .secrets import SecretBackendError
 
 

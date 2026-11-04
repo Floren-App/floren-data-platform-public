@@ -1,5 +1,5 @@
 #!/bin/sh
-# SQL workspace: CloudBeaver Community behind the Floren Data Platform gateway, querying through the governed
+# SQL workspace: CloudBeaver Community behind Limoon gateway, querying through the governed
 # SQL endpoint as this workspace's owner. Settings and saved scripts live on the workspace volume.
 set -eu
 if [ "$(id -u)" -eq 0 ]; then
@@ -26,7 +26,7 @@ python3 /opt/fdp/configure.py "$state"
 export CLOUDBEAVER_ROOT_URI="/ws/${FDP_WORKSPACE_ID}/"
 # Skip the first-run wizard. The admin account is unused: the owner is signed in from the gateway's
 # user header, and data access always uses the workspace token, never a CloudBeaver credential.
-export CB_SERVER_NAME="Floren Data Platform SQL"
+export CB_SERVER_NAME="Limoon SQL"
 export CB_SERVER_URL="${FDP_PUBLIC_URL:-http://localhost}/ws/${FDP_WORKSPACE_ID}/"
 export CB_ADMIN_NAME="${CB_ADMIN_NAME:-workspace-admin}"
 export CB_ADMIN_PASSWORD="${CB_ADMIN_PASSWORD:-$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')Aa1}"

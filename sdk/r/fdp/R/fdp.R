@@ -1,4 +1,4 @@
-# Floren Data Platform SDK for R.
+# Limoon SDK for R.
 #
 #   con <- fdp::connect("finance-dw")       # DBI connection
 #   DBI::dbGetQuery(con, "select * from sales")
@@ -8,7 +8,7 @@
   api <- Sys.getenv("FDP_API")
   token <- Sys.getenv("FDP_SESSION_TOKEN")
   if (api == "" || token == "") {
-    stop("fdp only works inside a Floren Data Platform workspace or run", call. = FALSE)
+    stop("fdp only works inside a Limoon workspace or run", call. = FALSE)
   }
   parts <- strsplit(token, ".", fixed = TRUE)[[1]]
   if (length(parts) == 3L) {
@@ -126,7 +126,7 @@ certificate <- function(var) {
 
 #' Call an operation of an external API registered in API management, as this program's identity.
 #'
-#' Floren Data Platform adds the API's headers, credentials and client certificate; the program never holds them.
+#' Limoon adds the API's headers, credentials and client certificate; the program never holds them.
 #' REST: api_call("crm", "GET", "/customers/7"). SOAP: api_call("bank", "POST", "GetBalance", body = "<GetBalance>...</GetBalance>").
 #' Returns the httr2 response (errors are not raised, so check httr2::resp_status()).
 #' @export

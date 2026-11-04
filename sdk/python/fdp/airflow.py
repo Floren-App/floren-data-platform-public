@@ -1,4 +1,4 @@
-"""Airflow operator: run Floren Data Platform programs and dbt projects on warehouses from DAGs.
+"""Airflow operator: run Limoon programs and dbt projects on warehouses from DAGs.
 
     from fdp.airflow import FDPRunOperator
 
@@ -47,11 +47,11 @@ class FDPRunOperator(BaseOperator):
             from .lineage import airflow_dag
             airflow_dag(self.dag)
         except Exception:
-            self.log.warning("Floren Data Platform DAG lineage upload failed; continuing the task")
+            self.log.warning("Limoon DAG lineage upload failed; continuing the task")
         run = fdp.orchestrate(program=self.program, workload=self.workload,
                                     args=self.args, warehouse=self.warehouse)
         self._run_id = run["id"]
-        self.log.info("Floren Data Platform run %s on warehouse %s (%s %s)", run["id"], run["pool_name"],
+        self.log.info("Limoon run %s on warehouse %s (%s %s)", run["id"], run["pool_name"],
                       run.get("runtime"), run.get("runtime_version"))
         printed = 0
         while True:
@@ -64,10 +64,10 @@ class FDPRunOperator(BaseOperator):
                 break
             time.sleep(self.poll_seconds)
         if status != "succeeded":
-            raise AirflowException(f"Floren Data Platform run {run['id']} {status}")
+            raise AirflowException(f"Limoon run {run['id']} {status}")
         return run["id"]
 
     def on_kill(self) -> None:
         if self._run_id:
-            self.log.info("stopping Floren Data Platform run %s", self._run_id)
+            self.log.info("stopping Limoon run %s", self._run_id)
             fdp.stop_run(self._run_id)

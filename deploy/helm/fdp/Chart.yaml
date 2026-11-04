@@ -1,6 +1,7 @@
 apiVersion: v2
 name: fdp
-description: Floren Data Platform control plane, gateway and runtime namespace
+description: Limoon control plane, gateway and runtime namespace
+icon: https://raw.githubusercontent.com/Floren-App/floren-data-platform-public/main/brand/logos/limoon-slice.svg
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

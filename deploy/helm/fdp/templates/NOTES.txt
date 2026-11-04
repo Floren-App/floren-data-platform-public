@@ -1,4 +1,4 @@
-Floren Data Platform platform resources have been submitted in {{ .Release.Namespace }}.
+Limoon platform resources have been submitted in {{ .Release.Namespace }}.
 
 Check deployment readiness:
   kubectl -n {{ .Release.Namespace }} get deployments,pods,jobs,pvc
@@ -43,7 +43,7 @@ No shared data volume: jobs and apps run only in controller-managed layers.
 {{- if .Values.layerController.enabled }}
 Layers become isolated once their infrastructure is enabled
 (PUT /v1/admin/layers/<id>/infrastructure); unmanaged layers keep the shared
-runtime namespace. Remaining limitations: docs/kubernetes-operations.md.
+runtime namespace. Remaining limitations: docs/kubernetes-helm-terraform-plan.md.
 {{- else }}
 The layer controller is disabled: all layers share one runtime namespace and
 one SQL engine. Enable layerController for per-layer isolation.

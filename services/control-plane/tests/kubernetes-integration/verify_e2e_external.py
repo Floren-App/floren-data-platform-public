@@ -218,7 +218,7 @@ class ExternalPlatform(Platform):
             self.scim(user)
         self.token = self.login()
         me = self.ok('GET', '/v1/me')
-        require(me.get('is_admin'), 'the SCIM-provisioned admin is not a Floren Data Platform administrator')
+        require(me.get('is_admin'), 'the SCIM-provisioned admin is not a Limoon administrator')
         return me
 
     def login(self):

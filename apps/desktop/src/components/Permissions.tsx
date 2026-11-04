@@ -303,7 +303,7 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
       onDone={(text) => { setJustify(null); setError(""); setMessage(text); }} />}
     {message && <p className="success-message" role="status">{message}</p>}
     {!canRead ? <p className="muted">You can browse this object's children. Permission bindings require explicit inspection permission.</p>
-      : loading ? <p className="muted" role="status">Loading permissions…</p> : <>
+      : loading ? <p className="muted loading" role="status">Loading permissions…</p> : <>
         <div className="table-scroll"><table className="grants-table">
           <thead><tr><th>App group or service</th><th>Role</th><th>Granted on</th><th /></tr></thead>
           {grouped.length ? grouped.map(([category, rows]) => <tbody key={category} className={`cat-${category}`} aria-label={CATEGORY_INFO[category].title}>

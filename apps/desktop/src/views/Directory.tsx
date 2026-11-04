@@ -10,7 +10,7 @@ import { PageHeader } from "../components/Page";
 
 export function OriginBadge({ principal }: { principal?: DirectoryPrincipal }) {
   const app = !principal || principal.origin === "app" || principal.kind === "service" || principal.provider === "local";
-  return <span className={`badge origin-badge ${app ? "app-origin" : "idp-origin"}`} title={app ? "Created and managed by Floren Data Platform" : principal?.provider}>
+  return <span className={`badge origin-badge ${app ? "app-origin" : "idp-origin"}`} title={app ? "Created and managed by Limoon" : principal?.provider}>
     {app ? "App-managed" : `IdP · ${principal?.provisioning === "scim" || principal?.managed ? "SCIM" : "OIDC"}`}
   </span>;
 }
@@ -43,7 +43,7 @@ export function UsersTab({ hub, selectedId, openTab }: { hub: Hub; selectedId?: 
       {directory.error && <p className="error" role="alert">{directory.error}</p>}
       <div className="object-toolbar"><input aria-label="Find user" type="search" placeholder="Search users…" value={search} onChange={(e) => setSearch(e.target.value)} />
         <button className="btn secondary" disabled={directory.status === "loading"} onClick={directory.refresh}><IconRefresh size={14} />Refresh users</button></div>
-      {directory.status === "loading" ? <p className="muted" role="status">Loading users…</p> : <table><thead><tr><th>User</th><th>Identity source</th><th>Status</th><th>Platform role</th></tr></thead><tbody>
+      {directory.status === "loading" ? <p className="muted loading" role="status">Loading users…</p> : <table><thead><tr><th>User</th><th>Identity source</th><th>Status</th><th>Platform role</th></tr></thead><tbody>
         {users.map((p) => <tr key={p.id} className={p.id === selectedId ? "selected" : ""}><td><button className="text-button object-name" onClick={() => openTab({ kind: "users", ref: p.id, title: p.name })} aria-label={`Open ${p.name}`}><ProductIcon kind="users" size={16} />{p.name}</button>
           {p.display_name && p.display_name !== p.name && <div className="muted">{p.display_name}</div>}</td>
           <td><OriginBadge principal={p} /></td><td><span className="status"><span className={`dot ${p.active ? "running" : ""}`} />{p.active ? "Active" : "Inactive"}</span></td><td>{p.platform_admin ? "Platform admin" : "User"}</td></tr>)}
@@ -79,7 +79,7 @@ function PersonAccess({ id, hub, openTab }: { id: string; hub: Hub; openTab: Ope
   useEffect(() => { api.access.groups().then((g) => setManageable(g.filter((x) => x.can_manage && !x.system))).catch(() => setManageable([])); }, [version]);
   const change = (p: Promise<unknown>, text: string) => { setError(""); p.then(() => { setNotice(text); setAdding(""); setVersion((v) => v + 1); }).catch((e: Error) => setError(e.message)); };
   if (error) return <p className="muted">{error.includes("administrators") ? "What someone can reach is visible to administrators and to the person." : error}</p>;
-  if (!data) return <p className="muted" role="status">Loading…</p>;
+  if (!data) return <p className="muted loading" role="status">Loading…</p>;
   return <>
     <h3>Groups</h3>
     {notice && <p className="success-message" role="status">{notice}</p>}

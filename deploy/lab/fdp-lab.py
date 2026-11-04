@@ -1,4 +1,4 @@
-"""A local Kubernetes lab for trying Floren Data Platform by hand: Helm install + OpenTofu configuration.
+"""A local Kubernetes lab for trying Limoon by hand: Helm install + OpenTofu configuration.
 
     make lab-up        create the k3d cluster "fdp-lab", install the chart, apply the OpenTofu config
     make lab-status    what is running, and how to sign in
@@ -205,7 +205,7 @@ def status():
     total = len(pods.splitlines())
     waiting = [line.split()[:2] for line in pods.splitlines() if 'Running' not in line and 'Completed' not in line]
     say(f'''
-Floren Data Platform lab is running ({total} pods{', not ready: ' + str(waiting) if waiting else ', all running'}).
+Limoon lab is running ({total} pods{', not ready: ' + str(waiting) if waiting else ', all running'}).
 
 One-time setup on this Mac (needs your password):
   1. Names:  echo "{HOSTS}" | sudo tee -a /etc/hosts
@@ -241,7 +241,7 @@ def down():
     run(['docker', 'rmi', IMAGE], check=False)
     shutil.rmtree(LAB, ignore_errors=True)
     say('Lab removed. If you trusted its CA: sudo security remove-trusted-cert -d <the old .lab/ca.pem> '
-        '(or delete "Floren Data Platform e2e root" in Keychain Access), and remove the fdp.test line from /etc/hosts.')
+        '(or delete "Limoon e2e root" in Keychain Access), and remove the fdp.test line from /etc/hosts.')
 
 
 if __name__ == '__main__':

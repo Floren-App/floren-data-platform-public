@@ -1,6 +1,6 @@
 # Where configuration lives: Helm or OpenTofu
 
-Floren Data Platform has two layers of configuration. Each setting lives in **one** of them.
+Limoon has two layers of configuration. Each setting lives in **one** of them.
 
 | | **Helm values** (`deploy/helm/fdp/values.yaml`) | **OpenTofu** (`registry.opentofu.org/floren-app/fdp`) or the app |
 |---|---|---|

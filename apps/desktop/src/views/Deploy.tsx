@@ -130,7 +130,7 @@ export function DeployWizard({ hub, openTab, initialFolder }: { hub: Hub; openTa
   return (
     <>
       <PageHeader icon={<IconBranch size={22} />} title="Deploy"
-        subtitle="Workspaces are private. To share a program or app, push it to git and deploy it from here. Floren Data Platform keeps it in sync with the branch: new commits are deployed automatically." />
+        subtitle="Workspaces are private. To share a program or app, push it to git and deploy it from here. Limoon keeps it in sync with the branch: new commits are deployed automatically." />
 
       <div className="card">
         <h3>1 · Source</h3>
@@ -287,7 +287,7 @@ function VersionsPanel({ pub }: { pub: Workload }) {
       <dt>Updates</dt><dd>{pub.auto_update ? <>New commits on <b className="mono">{pub.branch}</b> deploy automatically.</> : "Automatic updates are off: Check for updates deploys nothing until they are turned on."}</dd>
     </dl><p className="hint">Git is the source of truth. To change what runs, push to <span className="mono">{pub.branch}</span>; to roll back, revert the commit in Git.</p></section>
     <div className="section-heading"><h2>Commits on {pub.branch}</h2></div>
-    {error ? <p className="error" role="alert">{error}</p> : !versions ? <p className="muted" role="status">Reading the branch…</p>
+    {error ? <p className="error" role="alert">{error}</p> : !versions ? <p className="muted loading" role="status">Reading the branch…</p>
       : <div className="table-scroll"><table aria-label="Versions"><thead><tr><th>Version</th><th>Commit</th><th>Author</th><th>Committed</th><th>Here</th></tr></thead><tbody>
         {versions.commits.map((c) => <tr key={c.sha} className={c.state === "running" ? "current" : ""}>
           <td><span className="mono" title={c.sha}>{short(c.sha)}</span> <button className="icon-btn" aria-label={`Copy commit ${short(c.sha)}`} title="Copy the full commit hash" onClick={() => void navigator.clipboard?.writeText(c.sha)}>⧉</button></td>
@@ -323,7 +323,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
   }, [pub?.deployed_sha]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loadError && !pub) return <AccessError error={loadError} openTab={openTab} />;
-  if (!pub) return <p className="muted">Loading…</p>;
+  if (!pub) return <p className="muted loading">Loading…</p>;
 
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -572,7 +572,7 @@ export function AdminRepos({hub}:{hub:Hub}) {
   return (
     <>
       <PageHeader icon={<IconBranch size={22} />} title="Git repositories"
-        subtitle={<>Repositories people may deploy from. Floren Data Platform only ever reads from them: use a <b>read-only</b> token of a service account (GitHub: a fine-grained token with Contents read-only), so it cannot rewrite history. It is stored in the secret store and never shown again. People push from their workspaces with their own tokens (Account → Git credentials).</>}
+        subtitle={<>Repositories people may deploy from. Limoon only ever reads from them: use a <b>read-only</b> token of a service account (GitHub: a fine-grained token with Contents read-only), so it cannot rewrite history. It is stored in the secret store and never shown again. People push from their workspaces with their own tokens (Account → Git credentials).</>}
         actions={canCreate && <button className="btn" aria-expanded={open && !editing} onClick={() => open && !editing ? close() : (setForm(empty), setEditing(false), setOpen(true))}><IconPlus size={14} />Add repository</button>} />
       {error && <p className="error" role="alert">{error}</p>}
       {open && <form className="card" onSubmit={(e) => { e.preventDefault(); void save(); }}>
