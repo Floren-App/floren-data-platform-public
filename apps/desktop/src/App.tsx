@@ -56,10 +56,18 @@ export default function App() {
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
+    const started = performance.now();
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     currentUser()
-      .then(setUser)
-      .catch((e: Error) => setBootError(e.message))
-      .finally(() => setBooting(false));
+      .then((value) => { if (active) setUser(value); })
+      .catch((e: Error) => { if (active) setBootError(e.message); })
+      .finally(() => {
+        if (!active) return;
+        // Let the opening mark complete a full cycle, even with a cached session.
+        timer = setTimeout(() => setBooting(false), Math.max(0, 1200 - (performance.now() - started)));
+      });
+    return () => { active = false; clearTimeout(timer); };
   }, []);
 
   if (booting) return <Splash status="Connecting…" />;
@@ -234,7 +242,7 @@ function Shell({ user }: { user: User }) {
     <div className="shell">
       <nav className={`activity ${picked ? "picked" : ""}`} aria-label="Views" onMouseLeave={() => setPicked(false)} onKeyDown={() => setPicked(false)}
         onClick={(e) => { if ((e.target as HTMLElement).closest(".activity-group > button, .activity > button")) setPicked(true); }}>
-        <div className="brand-mark" title="limoon."><LimeSlice size={22} /></div>
+        <div className="brand-mark" role="img" aria-label="limoon." title="limoon."><LimeSlice size={22} /><Wordmark size={26} /></div>
         {groups.filter((g) => g.items.length).map((g, i) => <div key={g.label} className="activity-group" role="group" aria-label={g.label}>
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />
