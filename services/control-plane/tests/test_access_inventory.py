@@ -128,7 +128,7 @@ def test_access_administration_is_not_a_data_owner_review_exemption(client,repo)
 def test_explicit_families_separate_payload_and_configuration_in_registry():
     from app.access_inventory import category
     for key,definition in permissions.REGISTRY.items():
-        if 'PlatformContributor' in definition['roles']:
+        if 'Contributor' in definition['roles']:
             assert category(key)=='platform',key
         if 'AccessAdministrator' in definition['roles']:
             assert category(key)!='data',key
@@ -136,4 +136,4 @@ def test_explicit_families_separate_payload_and_configuration_in_registry():
             assert category(key)!='privileged',key
     for key in ('workspaces.files.write','delegation.query.write','delegation.files.write'):
         assert 'DataContributor' in permissions.REGISTRY[key]['roles']
-        assert 'PlatformContributor' not in permissions.REGISTRY[key]['roles']
+        assert 'Contributor' not in permissions.REGISTRY[key]['roles']
