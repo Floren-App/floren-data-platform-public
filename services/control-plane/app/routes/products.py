@@ -175,7 +175,7 @@ class _Viewer:
     def uses(self, asset, resource):
         if resource.kind == 'schema':
             source = self.db.get(DataSource, resource.object_id)
-            if rbac.data_scope(self.db, self.user, source):
+            if rbac.data_scope(self.db, self.user, source).get(resource.name):
                 return True
             from ..object_access import schema_rules, actions_for, file_actions
             rules = schema_rules(self.db, self.user, resource)
@@ -183,7 +183,11 @@ class _Viewer:
             return ('data.files.read' in file_actions(rules,path)) if source.kind == 's3' else ('data.sql.select' in actions_for(rules,path))
         if resource.kind == 'service':
             return self.can(resource.id,'open')
-        return self.can(resource.id,'read')
+        if resource.kind in rbac.API_KINDS:
+            return self.can(resource.id,'call')
+        if resource.kind in ('kafka', 'topic'):
+            return self.can(resource.id,'consume')
+        return False
 
 
 def members(db: Session, product: CatalogProduct) -> List[tuple]:
@@ -222,7 +226,8 @@ def card(db: Session, product: CatalogProduct, viewer: _Viewer) -> dict:
     lead_asset, lead_resource = parts[0] if parts else (db.get(CatalogAsset, product.asset_id), db.get(Resource, product.resource_id))
     governance = lead_asset.governance or {}
     pending = db.scalar(select(AccessRequest).where(AccessRequest.product_id == product.id, AccessRequest.status == "pending",
-                                                    AccessRequest.requester_principal_id == viewer.user.principal_id))
+                                                    AccessRequest.requester_principal_id == viewer.user.principal_id,
+                                                    AccessRequest.app_group_id.in_(viewer.groups)))
     readable = [viewer.uses(a, r) for a, r in parts]
     access = "granted" if parts and all(readable) else "requested" if pending else "partial" if any(readable) else "none"
     fresh = [_aware(_freshness(db, a, r)) for a, r in parts]
@@ -666,13 +671,16 @@ def request_out(db, r: AccessRequest) -> dict:
 
 
 def _group_has(db, resource, group_id) -> bool:
-    """Whether the group can already read the object (directly or through a parent folder or source)."""
+    """Payload access, rather than permission to discover an object's metadata."""
     if resource is None:
         return False
     ids = {a.id for a in rbac.ancestors(db, resource)} | {resource.id}
-    for a in db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id == group_id, RoleAssignment.resource_id.in_(ids))):
-        target = db.get(Resource, a.resource_id)
-        if "read" in rbac.roles_for(target).get(a.role, set()):
+    action = ('use' if resource.kind in rbac.PRODUCT_KINDS else
+              'open' if resource.kind == 'service' else
+              'call' if resource.kind in rbac.API_KINDS else
+              'consume' if resource.kind in ('kafka', 'topic') else 'select')
+    for a in rbac.group_grants(db, {group_id}):
+        if a.resource_id in ids and action in rbac.roles_for(resource).get(a.role, set()):
             return True
     return False
 
@@ -693,8 +701,10 @@ def request_access(product_id: str, body: RequestIn, db: Session = Depends(get_d
     from ..models import ProductAccess
     held = db.scalar(select(ProductAccess).where(ProductAccess.product_id == product.id, ProductAccess.app_group_id == body.app_group_id))
     waiting = held is not None and held.approved_assets is not None and any(a.id not in held.approved_assets for a, _ in parts)
+    from ..object_access import target_for_asset
+    targets = [target_for_asset(db, a, r, create=False) if r.kind == 'schema' else r for a, r in parts]
     if not waiting and (_group_has(db, db.get(Resource, product.access_resource_id), body.app_group_id) or (
-            parts and all(_group_has(db, r, body.app_group_id) for _, r in parts))):
+            targets and all(_group_has(db, r, body.app_group_id) for r in targets))):
         raise HTTPException(409, "that group already has access to everything in this product")
     if db.scalar(select(AccessRequest).where(AccessRequest.product_id == product.id, AccessRequest.app_group_id == body.app_group_id,
                                              AccessRequest.status == "pending")):

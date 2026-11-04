@@ -156,3 +156,48 @@ def test_catalog_search_leaves_files_and_folders_to_storage_and_workloads(client
         db.commit()
     kinds = {a["kind"] for a in client.get("/v1/catalog/search", headers=as_("ana")).json()["items"]}
     assert "file" not in kinds and "folder" not in kinds and "table" in kinds
+
+
+def test_catalog_viewer_with_metadata_and_other_schema_access_can_request_data(client, repo):
+    """Discovery, another schema, and inactive group access never mean this table is readable."""
+    ids = setup_products(client, repo)
+    published = client.post('/v1/catalog/products', headers=as_('ana'), json={
+        'asset_ids': [ids['sales']], 'title': 'Requestable sales'})
+    assert published.status_code == 201, published.text
+    product = published.json()
+    viewers = grant_group(client, ids['public'], 'Catalog viewers', 'Reader', users=['bob'])
+    with SessionLocal() as db:
+        staging = db.scalar(select(Resource).where(Resource.kind == 'schema', Resource.name == 'staging'))
+        staging_id = staging.id
+    client.put(f'/v1/rbac/resources/{staging_id}/assignments', headers=as_('admin'), json={
+        'app_group_id': viewers, 'role': 'DataReader'}).raise_for_status()
+    with SessionLocal() as db:
+        from app.models import CatalogProduct
+        access_id = db.get(CatalogProduct, product['id']).access_resource_id
+    client.put(f'/v1/rbac/resources/{access_id}/assignments', headers=as_('admin'), json={
+        'app_group_id': viewers, 'role': 'Viewer'}).raise_for_status()
+    grant_group(client, ids['public'], 'Inactive data readers', 'DataReader', users=['bob'])
+    client.put('/v1/me/active-group', headers=as_('bob'), json={'group_id': viewers}).raise_for_status()
+    listing = client.get('/v1/catalog/products', headers=as_('bob')).json()['items']
+    card = next(p for p in listing if p['id'] == product['id'])
+    assert card['access'] == 'none' and card['members'][0]['access'] == 'none'
+    assert card['members'][0]['open'] is None
+    from app.auth import User
+    from app.object_access import require_action
+    from fastapi import HTTPException
+    import pytest
+    with SessionLocal() as db, pytest.raises(HTTPException) as denied:
+        require_action(db, User('bob'), db.get(Resource, ids['public']), 'data.sql.preview', 'sales')
+    assert denied.value.status_code == 403
+    requested = client.post(f"/v1/catalog/products/{product['id']}/requests", headers=as_('bob'), json={
+        'app_group_id': viewers, 'reason': 'Weekly sales analysis'})
+    assert requested.status_code == 201, requested.text
+    assert client.get(f"/v1/catalog/products/{product['id']}", headers=as_('bob')).json()['access'] == 'requested'
+    other = grant_group(client, access_id, 'Other catalog viewers', 'Viewer', users=['bob'])
+    client.put('/v1/me/active-group', headers=as_('bob'), json={'group_id': other}).raise_for_status()
+    assert client.get(f"/v1/catalog/products/{product['id']}", headers=as_('bob')).json()['access'] == 'none'
+    grant_group(client, ids['public'], 'Catalog viewers', 'Reader', users=['admin'])
+    client.put('/v1/me/active-group', headers=as_('admin'), json={'group_id': viewers}).raise_for_status()
+    admin_card = client.get(f"/v1/catalog/products/{product['id']}", headers=as_('admin')).json()
+    assert admin_card['access'] == 'none' and not admin_card['can_manage']
+    assert admin_card['members'][0]['open'] is None

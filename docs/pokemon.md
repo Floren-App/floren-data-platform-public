@@ -96,6 +96,12 @@ that asks for *With illustrators* there fills in the compliance form; the data
 owners and then the scoped privacy reviewers decide. Production release managers and
 product owners are separate from development engineers in the demo configuration.
 
+`catalog_group_ids` gives additional groups discovery and request permissions without
+payload access. The demo places Viewers here so they can demonstrate requesting
+access. `consumer_group_ids` explicitly pre-approves additional consumers; these
+groups already have access and do not need to request it. Analysts remain
+pre-approved by default. A platform Reader/Viewer grant alone never grants data access.
+
 ## Apply and run
 
 Apply platform configuration first, then the independent Pokemon root. Inspect

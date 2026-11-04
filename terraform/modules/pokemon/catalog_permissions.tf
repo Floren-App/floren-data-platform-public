@@ -1,5 +1,5 @@
 locals {
-  catalog_audiences       = toset(concat([var.engineers_group_id, var.analysts_group_id, coalesce(var.product_owner_group_id, var.engineers_group_id)], var.consumer_group_ids))
+  catalog_audiences       = toset(concat([var.engineers_group_id, var.analysts_group_id, coalesce(var.product_owner_group_id, var.engineers_group_id)], var.consumer_group_ids, var.catalog_group_ids))
   catalog_page_grants     = { for pair in setproduct(local.catalog_audiences, ["products", "requests", "cases", "catalog"]) : "${pair[0]}:${pair[1]}" => { group = pair[0], page = pair[1] } }
   catalog_function_grants = { for pair in setproduct(local.catalog_audiences, ["products.collection", "products.object", "products.options", "products.requests.own"]) : "${pair[0]}:${pair[1]}" => { group = pair[0], namespace = pair[1] } }
   request_form_grants     = { for pair in setproduct(local.catalog_audiences, ["Contributor"]) : "${pair[0]}:${pair[1]}" => { group = pair[0], role = pair[1] } }
