@@ -18,41 +18,56 @@ function wedge(from: number, to: number) {
   return `M 32 32 L ${polar(FLESH, from)} A ${FLESH} ${FLESH} 0 0 1 ${polar(FLESH, to)} Z`;
 }
 
-/** Half a slice, cut along a line rising 45° to the right (from 225° to 45°); the flesh lies below the cut. */
-const HALF = { start: 45, spokes: [90, 135, 180], segments: 4 };
+/** Half a slice, cut along a line rising 45° to the right (from 225° to 45°); the flesh lies below the cut. Its outline
+ * is closed: the rind and pith also run along the cut (`inset` from it), so nothing reaches past the edge. */
+const HALF = { start: 45, spokes: [90, 135, 180], segments: 4, inset: { 30.5: 0, 27.5: 3, [FLESH]: 6.5 } as Record<number, number> };
+
+/** The part of a circle beyond a chord `d` from the centre, on the flesh side of the cut. */
+function halfDisc(r: number, d: number) {
+  const t = Math.acos(d / r) * 180 / Math.PI, n = HALF.start + 90;
+  return `M ${polar(r, n - t)} A ${r} ${r} 0 0 1 ${polar(r, n + t)} Z`;
+}
 
 /** The lime slice, in colour (the logo) or in one colour (`mono`, for icons that take the text colour). `half` draws
  * the half slice. With `loading`, its segments light up one after another. */
 export function LimeSlice({ size = 32, loading = false, title, half = false, mono = false }: {
   size?: number; loading?: boolean; title?: string; half?: boolean; mono?: boolean;
 }) {
-  const mask = useId();
+  const mask = useId(), clip = useId();
   const count = half ? HALF.segments : SEGMENTS, step = 360 / SEGMENTS;
   const start = half ? HALF.start : 0;
   const segments = Array.from({ length: count }, (_, i) => wedge(start + i * step, start + (i + 1) * step));
   const spokes = half ? HALF.spokes : Array.from({ length: SEGMENTS }, (_, i) => i * step);
   // The outline of the rind, pith and flesh: whole circles, or halves below the cut.
   const disc = (r: number) => half
-    ? `M ${polar(r, HALF.start)} A ${r} ${r} 0 0 1 ${polar(r, HALF.start + 180)} Z`
+    ? halfDisc(r, HALF.inset[r] ?? 0)
     : `M ${32 - r} 32 A ${r} ${r} 0 1 0 ${32 + r} 32 A ${r} ${r} 0 1 0 ${32 - r} 32 Z`;
+  // The half slice keeps its segments and lines inside the flesh; the whole slice needs no clip.
+  const inside = half ? `url(#${CSS.escape(clip)})` : undefined;
   const lines = spokes.map((a) => <line key={a} x1="32" y1="32" x2={polar(FLESH + 1, a).split(" ")[0]} y2={polar(FLESH + 1, a).split(" ")[1]} />);
   const label = { role: title ? "img" : undefined, "aria-label": title, "aria-hidden": title ? undefined : true } as const;
-  if (mono) return <svg className="lime-slice mono" width={size} height={size} viewBox="0 0 64 64" {...label}>
+  // The half slice lies on one side of the centre; this moves it back to the middle of its square.
+  const shift = half ? "translate(-4.6 -4.6)" : undefined;
+  if (mono) return <svg className="lime-slice mono" width={size} height={size} viewBox="0 0 64 64" {...label}><g transform={shift}>
     <mask id={mask}>
       <path d={disc(30.5)} fill="white" /><path d={disc(27.5)} fill="black" /><path d={disc(FLESH)} fill="white" />
-      <g stroke="black" strokeWidth={SPOKE} strokeLinecap="butt">{lines}</g><path d={disc(SPOKE)} fill="black" />
+      <g stroke="black" strokeWidth={SPOKE} strokeLinecap="butt" clipPath={inside}>{lines}</g>
+      {!half && <path d={disc(SPOKE)} fill="black" />}
     </mask>
+    {half && <clipPath id={clip}><path d={disc(FLESH)} /></clipPath>}
     <path d={disc(30.5)} fill="currentColor" mask={`url(#${CSS.escape(mask)})`} />
-  </svg>;
-  return <svg className={`lime-slice${loading ? " loading" : ""}`} width={size} height={size} viewBox="0 0 64 64" {...label}>
+  </g></svg>;
+  return <svg className={`lime-slice${loading ? " loading" : ""}`} width={size} height={size} viewBox="0 0 64 64" {...label}><g transform={shift}>
     <path d={disc(30.5)} className="lime-rind" />
     <path d={disc(27.5)} className="lime-pith" />
-    {segments.map((d, i) => <path key={i} d={d} className="lime-segment"
-      style={loading ? { animationDelay: `${(i - count) * 0.12}s` } : undefined} />)}
-    <g className="lime-spokes" strokeWidth={SPOKE} strokeLinecap="butt">{lines}</g>
-    {/* The centre, cut in half with the slice. */}
-    <path d={disc(SPOKE)} className="lime-pith" />
-  </svg>;
+    {half && <clipPath id={clip}><path d={disc(FLESH)} /></clipPath>}
+    <g clipPath={inside}>
+      {segments.map((d, i) => <path key={i} d={d} className="lime-segment"
+        style={loading ? { animationDelay: `${(i - count) * 0.12}s` } : undefined} />)}
+      <g className="lime-spokes" strokeWidth={SPOKE} strokeLinecap="butt">{lines}</g>
+    </g>
+    {!half && <path d={disc(SPOKE)} className="lime-pith" />}
+  </g></svg>;
 }
 
 /** The name, lowercase with its period. */

@@ -23,9 +23,17 @@ def wedge(start, end):
     return f'M 32 32 L {polar(FLESH, start)} A {FLESH} {FLESH} 0 0 1 {polar(FLESH, end)} Z'
 
 
+# The half slice has a closed outline: the rind and pith also run along the cut, set in by these distances.
+HALF_INSET = {30.5: 0, 27.5: 3, FLESH: 6.5}
+# Moves the half slice back towards the middle of its square (it lies on one side of the centre).
+HALF_SHIFT = 'translate(-4.6 -4.6)'
+
+
 def disc(r, half):
     if half:
-        return f'M {polar(r, HALF_START)} A {r} {r} 0 0 1 {polar(r, HALF_START + 180)} Z'
+        t = math.degrees(math.acos(HALF_INSET.get(r, 0) / r))
+        n = HALF_START + 90
+        return f'M {polar(r, n - t)} A {r} {r} 0 0 1 {polar(r, n + t)} Z'
     return f'M {32 - r} 32 A {r} {r} 0 1 0 {32 + r} 32 A {r} {r} 0 1 0 {32 - r} 32 Z'
 
 
@@ -38,7 +46,7 @@ def parts(half):
     return segments, spokes
 
 
-def colour(half=False, loading=False):
+def colour(half=False, loading=False, ident='f'):
     segments, spokes = parts(half)
     # Only the loading slice moves; the class is unique to it, so a page with several marks keeps the others still.
     style = ('<style>.limoon-tick{animation:limoon-tick .96s linear infinite}@keyframes limoon-tick{from{opacity:1}to{opacity:.3}}'
@@ -46,19 +54,27 @@ def colour(half=False, loading=False):
     flesh = ''.join(f'<path d="{d}" fill="{FLESH_COLOUR}"'
                     + (f' class="limoon-tick" style="animation-delay:{(i - len(segments)) * 0.12:.2f}s"' if loading else '') + '/>'
                     for i, d in enumerate(segments))
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">{style}'
-            f'<path d="{disc(30.5, half)}" fill="{RIND}"/><path d="{disc(27.5, half)}" fill="{PITH}"/>{flesh}'
-            f'<g stroke="{PITH}" stroke-width="{SPOKE}" stroke-linecap="butt">{spokes}</g>'
-            f'<path d="{disc(SPOKE, half)}" fill="{PITH}"/></svg>\n')
+    # The half slice keeps its segments and lines inside the flesh, so nothing reaches past its edge.
+    clip = f'<clipPath id="{ident}"><path d="{disc(FLESH, half)}"/></clipPath>' if half else ''
+    inside = f' clip-path="url(#{ident})"' if half else ''
+    centre = '' if half else f'<path d="{disc(SPOKE, half)}" fill="{PITH}"/>'
+    shift = f' transform="{HALF_SHIFT}"' if half else ''
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">{style}<g{shift}>{clip}'
+            f'<path d="{disc(30.5, half)}" fill="{RIND}"/><path d="{disc(27.5, half)}" fill="{PITH}"/>'
+            f'<g{inside}>{flesh}<g stroke="{PITH}" stroke-width="{SPOKE}" stroke-linecap="butt">{spokes}</g></g>'
+            f'{centre}</g></svg>\n')
 
 
-def mono(half=False, colour='currentColor'):
+def mono(half=False, colour='currentColor', ident='m'):
     _, spokes = parts(half)
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><mask id="m">'
+    clip = f'<clipPath id="{ident}c"><path d="{disc(FLESH, half)}"/></clipPath>' if half else ''
+    inside = f' clip-path="url(#{ident}c)"' if half else ''
+    centre = '' if half else f'<path d="{disc(SPOKE, half)}" fill="black"/>'
+    shift = f' transform="{HALF_SHIFT}"' if half else ''
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><g{shift}>{clip}<mask id="{ident}">'
             f'<path d="{disc(30.5, half)}" fill="white"/><path d="{disc(27.5, half)}" fill="black"/>'
-            f'<path d="{disc(FLESH, half)}" fill="white"/><g stroke="black" stroke-width="{SPOKE}" stroke-linecap="butt">{spokes}</g>'
-            f'<path d="{disc(SPOKE, half)}" fill="black"/></mask>'
-            f'<path d="{disc(30.5, half)}" fill="{colour}" mask="url(#m)"/></svg>\n')
+            f'<path d="{disc(FLESH, half)}" fill="white"/><g stroke="black" stroke-width="{SPOKE}" stroke-linecap="butt"{inside}>{spokes}</g>'
+            f'{centre}</mask><path d="{disc(30.5, half)}" fill="{colour}" mask="url(#{ident})"/></g></svg>\n')
 
 
 def main():
