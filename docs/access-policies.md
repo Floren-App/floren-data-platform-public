@@ -14,6 +14,15 @@ When data falls under a policy, every way of giving access needs an approved for
 Raising an existing role to one that reaches covered data counts as giving access. Lowering a
 role, or keeping one, does not.
 
+Forms are about **reading** the data, and they are for **people**:
+
+- Only access that reveals what the data holds needs a form (Data Reader and Data Contributor, and
+  named permissions such as SELECT, preview, file reads or consuming messages). Write-only access
+  (insert, update, delete, file writes, publishing messages) can be given directly.
+- Service identities (workloads and service accounts) never have forms. Whoever may give access to
+  the data (its Owner or Access Administrator) decides for them; the grant is in the audit log.
+  People given a role directly still need a form, so give access to a group instead.
+
 ## Which data is covered
 
 The **classification** that counts is the one the group would really see:

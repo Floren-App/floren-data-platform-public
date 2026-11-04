@@ -67,7 +67,9 @@ def authorize_grant(db, user, body):
         raise HTTPException(403, 'Global Admin must approve raw backup export delegation')
     if any(not action.startswith(body.namespace + ".") for action in actions):
         raise HTTPException(422, "every action must belong to the declared namespace")
-    if any(action.startswith(('data.sql.','data.files.','data.iceberg.')) for action in actions):
+    from ..compliance import needs_no_form, reveals_data
+    if any(reveals_data(action) for action in actions) and not needs_no_form(db, body.principal_id):
+        # Only reading data needs reviewed access; write-only grants can be given directly.
         resource = db.get(Resource, body.target_id)
         if resource:
             from ..compliance import role_requirement

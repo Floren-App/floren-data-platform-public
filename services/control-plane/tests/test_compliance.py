@@ -427,7 +427,7 @@ def test_the_datas_owners_need_no_form_below_what_they_own(client, repo):  # noq
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "justification_required"
 
 
-def test_existing_direct_identity_grants_reconcile_but_cannot_expand_protected_access(client, repo):
+def test_service_identities_need_no_form_but_people_and_groups_do(client, repo):
     from app.models import DirectoryPrincipal, ServiceRoleAssignment
     ids = setup_products(client, repo)
     rid = ids['public']
@@ -442,14 +442,32 @@ def test_existing_direct_identity_grants_reconcile_but_cannot_expand_protected_a
     classify(client, ids['sales'], {'ssn': {'classification': 'restricted'}})
     set_up_policy(client, rid)
     path = '/v1/rbac/resources/'+rid+'/assignments'
-    def assign(role, replaces=None):
-        return client.put(path, headers=as_('admin'), json={'principal_id': pid, 'role': role, 'replaces': replaces})
-    assert assign('DataReader').status_code == 200  # Terraform resends the current grant.
-    assert assign('Admin').status_code == 409   # New authority still needs approval.
-    assert assign('Reader', replaces='DataReader').status_code == 200  # Reduction remains possible.
-    assert assign('DataReader').status_code == 409  # A previous grant is not reusable approval.
-    client.delete(path+'/services/'+pid, headers=as_('admin')).raise_for_status()
-    assert assign('DataReader').status_code == 409  # Revocation cannot be undone by reconciliation.
+    def assign(role, replaces=None, **recipient):
+        return client.put(path, headers=as_('admin'), json={**(recipient or {'principal_id': pid}), 'role': role, 'replaces': replaces})
+    # Compliance forms are for people: whoever may give access decides for a service identity, and it is audited.
+    assert assign('DataReader').status_code == 200
+    assert assign('DataContributor', replaces='DataReader').status_code == 200
+    assert assign('Admin').status_code == 200
+    assert 'role.assign' in client.get('/v1/admin/audit?limit=20', headers=as_('admin')).text
+    # A person given access directly, or a group, still needs an approved form to read the data.
+    bob = client.get('/v1/me', headers=as_('bob')).json()['principal_id']
+    assert assign('DataReader', principal_id=bob).status_code == 409
+    group = grant_group(client, rid, 'Policy readers', 'Reader', users=['bob'])
+    assert assign('DataReader', app_group_id=group).status_code == 409
+
+
+def test_writing_protected_data_needs_no_form_reading_does(client, repo):
+    ids = setup_products(client, repo)
+    rid = ids['public']
+    classify(client, ids['sales'], {'ssn': {'classification': 'restricted'}})
+    set_up_policy(client, rid)
+    group = grant_group(client, rid, 'Writers only', 'Reader', users=['bob'])
+    def named(actions):
+        return client.post('/v1/permissions/assignments', headers=as_('admin'), json={
+            'target_id': rid, 'namespace': 'data', 'layer_id': layers.NON_PROD, 'app_group_id': group, 'actions': actions})
+    # Writing reveals nothing, so it can be given directly; reading still needs reviewed access.
+    assert named(['data.sql.insert', 'data.sql.update']).status_code == 201
+    assert named(['data.sql.select']).status_code == 409
 
 
 def test_metadata_group_cannot_turn_viewer_into_protected_payload_access(client, repo):

@@ -661,9 +661,12 @@ def user_principals(resource_id: str, db: Session = Depends(get_db), user: User 
 
 
 def require_justification(db, resource, body) -> None:
-    """Under an access policy a role is given only with an approved case for exactly this access."""
+    """Under an access policy a role is given to people only with an approved case for exactly this access;
+    service identities need no form."""
     from .. import compliance
     from ..models import AccessCase
+    if compliance.needs_no_form(db, body.principal_id):
+        return
     if body.principal_id:
         held = set(db.scalars(select(ServiceRoleAssignment.role).where(ServiceRoleAssignment.resource_id == resource.id,
                                                                        ServiceRoleAssignment.principal_id == body.principal_id)))
