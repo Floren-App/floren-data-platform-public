@@ -15,6 +15,7 @@
    - Sizes: controls 26px (--control), compact 22px (.btn.sm); icons 14px in buttons, 16px in
      lists and trees, 22px in page titles. */
 :root {
+  --brand-dot: #6cb52e;
   --bg: #1f1f1f;
   --bg-side: #181818;
   --bg-activity: #181818;
@@ -543,7 +544,7 @@ pre.terminal { background: #181818; color: #cccccc; border: 1px solid var(--bord
 .lime-slice.loading .lime-segment { animation: lime-tick .96s linear infinite; }
 @keyframes lime-tick { 0% { opacity: 1; } 100% { opacity: .3; } }
 .wordmark { font-family: var(--brand-font); font-weight: 600; letter-spacing: -.01em; line-height: 1; color: var(--fg-strong); }
-.wordmark-dot { color: var(--accent); }
+.wordmark-dot { color: var(--brand-dot); }
 .splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: var(--bg); }
 .splash .lime-slice { animation: lime-float 2.4s ease-in-out infinite; }
 @keyframes lime-float { 50% { transform: translateY(-4px) rotate(8deg); } }
