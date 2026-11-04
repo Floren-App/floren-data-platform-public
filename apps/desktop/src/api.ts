@@ -749,9 +749,10 @@ export function saveFile(data: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const send = async (force: boolean) => fetch(`${getServer()}/api${path}`, {
     method,
+    signal,
     headers: {
       Authorization: `Bearer ${await accessToken(force)}`,
       ...(body !== undefined && !(body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
@@ -966,10 +967,19 @@ export const api = {
     "GET", `/v1/data/schemas/${encodeURIComponent(schemaId)}/preview?${new URLSearchParams({ table })}`),
   metadataQuery: (sql: string) => request<{ columns: string[]; rows: unknown[][]; rowcount: number; truncated: boolean; query_id: string }>(
     "POST", "/v1/sql/query", { source: "fdp-metadata", sql, max_rows: 1000 }),
-  dataChildren: (schemaId: string, options: { table?: string; path?: string; after?: string; cached?: boolean } = {}) => {
+  dataChildren: async (schemaId: string, options: { table?: string; path?: string; after?: string; cached?: boolean } = {}) => {
     const { cached, ...rest } = options;
     const params = new URLSearchParams({ ...rest, ...(cached ? { cached: "true" } : {}) });
-    return request<DataChildren>("GET", `/v1/data/schemas/${encodeURIComponent(schemaId)}/children?${params}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45_000);
+    try {
+      return await request<DataChildren>("GET", `/v1/data/schemas/${encodeURIComponent(schemaId)}/children?${params}`, undefined, controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error("Metadata refresh timed out after 45 seconds. Try refreshing again.");
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   },
   access: {
     groupAssignments: (id: string) => request<{ resource: AccessResource; role: string }[]>("GET", `/v1/rbac/groups/${id}/assignments`),
