@@ -220,21 +220,18 @@ def migrate(db):
             resource = db.get(Resource, grant.resource_id)
             if admin_owned:
                 existing = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource.id,
-                                                                 RoleAssignment.app_group_id == GLOBAL_ADMIN))
+                                                                 RoleAssignment.app_group_id == GLOBAL_ADMIN, RoleAssignment.role == grant.role))
                 if not existing:
                     db.add(RoleAssignment(resource_id=resource.id, app_group_id=GLOBAL_ADMIN, role=grant.role))
-                elif set(rbac.roles_for(resource)[existing.role]) < set(rbac.roles_for(resource)[grant.role]):
-                    existing.role=grant.role
             else:
                 for principal in principals:
                     if not principal:
                         continue
                     direct = db.scalar(select(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id == resource.id,
-                                                                          ServiceRoleAssignment.principal_id == principal.id))
+                                                                          ServiceRoleAssignment.principal_id == principal.id,
+                                                                          ServiceRoleAssignment.role == grant.role))
                     if not direct:
                         db.add(ServiceRoleAssignment(resource_id=resource.id, principal_id=principal.id, role=grant.role))
-                    elif set(rbac.roles_for(resource)[direct.role]) < set(rbac.roles_for(resource)[grant.role]):
-                        direct.role = grant.role
             db.delete(grant)
         db.flush()
         for asset in db.scalars(select(CatalogAsset)):

@@ -463,7 +463,7 @@ function AccessPanel({ hub, openTab, activeKey }: Props) {
       can.newMembers && { kind: "privacy-memberships", title: "New members" },
       can.deadlines && !!badges.deadlines && { kind: "deadlines", title: "Needs a form" }]} />
     <NavList label="Who" activeKey={activeKey} openTab={openTab} items={[
-      can.page("people") && { kind: "users", title: "People" }, can.page("set-groups") && { kind: "access", title: "Groups" }, can.services && { kind: "services", title: "Service identities" }]} />
+      can.page("people") && { kind: "users", title: "People" }, can.page("set-groups") && { kind: "access", title: "Groups" }, can.who && { kind: "roles", title: "Roles" }, can.services && { kind: "services", title: "Service identities" }]} />
     <NavList label="Records" activeKey={activeKey} openTab={openTab} items={[
       can.register && { kind: "privacy-register", title: "Access register" }, can.audit && { kind: "admin-audit", title: "Audit log" },
       can.queries && { kind: "admin-query-log", title: "Query log" }]} />

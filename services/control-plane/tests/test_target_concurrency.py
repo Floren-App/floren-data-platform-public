@@ -70,7 +70,7 @@ def test_layer_service_may_receive_only_explicit_global_package_access(client):
         db.commit()
     def grant(target):
         return client.put('/v1/rbac/resources/'+target+'/assignments', headers=as_('admin'),
-                          json={'principal_id': pid, 'role': 'Executor'})
+                          json={'principal_id': pid, 'role': 'DataReader'})
     assert grant('packages').status_code == 200
     for target in ('test-data', 'test-package'):
         response = grant(target)

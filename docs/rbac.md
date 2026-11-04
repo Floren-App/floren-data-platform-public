@@ -35,16 +35,22 @@ profiles** (what parts of the app groups see; administrators) and **Secrets** (c
 sidebar only switches between them; each page carries its own list and detail.
 
 - **Groups** are app-managed security groups. Their members are people, IdP groups/roles and
-  service identities; they get fixed roles on objects. A group's page has **Members**, **Has
-  access to** (three searchable sections: **Data access**, **Platform access** and
-  **Privileged access**, including object roles, named feature/configuration grants,
-  product grants and review permissions across all layers) and **Settings** (name,
-  owners, app profile and compatibility review assignments). Changing members and changing roles on objects remain
-  separate powers.
+  service identities; they get roles on objects. A group's page has **Members**, **Has
+  access to** and **Settings** (name, owners and app profile). Has access to lists every role the
+  group holds, across all layers, under three collapsible sections: **Data access**, **Platform
+  access** and **Privileged access**. Within a section, roles are grouped by object; open an object
+  to see its roles and a role to see its permissions. One search covers objects, roles and
+  permissions. **Give access** opens a dialog for a role on an object, a data product, or a review
+  duty. Changing members and changing roles on objects remain separate powers.
+- **Roles** shows, for each kind of object, the roles it offers, their kind of access and every
+  permission in them, plus custom roles and review duties. Permissions belong to roles, roles are
+  given to groups, and people are members of groups. Every role badge on a Permissions tab or a
+  group's page links here. The page is a reference for everyone signed in.
 - **New group** is one page: name and owners, what its people see (app profile) and its first
   members. The group then opens on **Has access to**, where **Give access** offers the data products
   and objects you own: a product with one of its options, or an object with a role. When an access
   policy covers the data, its compliance form opens right there and the access follows the review.
+  Those who appoint review duties can give one here too.
 - **People** shows each person's groups (and the IdP group that put them there) and everything
   those give them, for administrators and the person themselves. **Add to group** and **Remove**
   work for the groups you manage; administrators also get links to what the person changed (audit
@@ -58,8 +64,9 @@ Workload folders under Workloads are separate from groups.
 ### Who may use the Access and Administration pages
 
 Every page in Access and Administration is an object you grant like any other.
-**Viewer** grants page visibility; named function permissions control individual operations.
-Legacy page roles are interpreted against the same per-action role matrix. Manager covers operational application/publication; Contributor covers draft edits, and destructive operations need Admin or Owner. Sections are their parents, so a role
+**Reader** sees a page and its configuration, **Contributor** changes what it configures (drafts,
+publishing, applying), **Data Reader** also reads the records it holds (log contents, query text,
+exports); destructive operations need Admin or Owner. Sections are their parents, so a role
 on a section covers all its pages, and a role on Administration covers everything. Platform
 administrators (Global Admin) have all of it. Grant them at the bottom of each page, under **Who can
 see or change this page** (administrators), or in Terraform:
@@ -68,7 +75,7 @@ see or change this page** (administrators), or in Terraform:
 resource "fdp_role_assignment" "privacy_forms" {
   resource_id  = "set-forms"   # Compliance forms
   app_group_id = fdp_app_group.privacy_office.id
-  role         = "Manager"
+  role         = "Contributor"
 }
 ```
 
@@ -84,7 +91,7 @@ checks the same roles. A platform administrator with another group than Global A
 what their groups were explicitly given; backend administrator privileges are reduced in that
 context too. The earlier **compliance administrator** role no longer grants page visibility or
 Privacy administration rights. Assign explicit page and capability grants. Group owners still
-manage their own groups. Review authority is an ordinary scoped platform permission;
+manage their own groups. Review authority is a scoped privileged permission (a review duty);
 legacy review assignments preserve their existing conditions.
 IdP identities and memberships carry **IdP · SCIM/OIDC** labels and are read-only here;
 application groups and managed service identities carry **App-managed** labels.
@@ -132,35 +139,48 @@ apps and every Airflow web/scheduler/worker component on the pool. Jobs and serv
 components are shown separately; the concurrent-job limit applies to job slots. Missing
 inventory is shown as unknown, not zero. Deployed scripts/notebooks are **Ready to run**:
 they reserve no persistent process and remain callable through the run API and
-`FDPRunOperator(workload="slug", args={...})` from Airflow. Executor permission on
-the workload/folder and the configured execution identity's data grants still apply.
+`FDPRunOperator(workload="slug", args={...})` from Airflow. Executor on the workload or folder
+and the configured execution identity's data grants still apply.
 
 
 ## Roles and inheritance
 
-| Data role | Permissions within a schema |
-|---|---|
-| PlatformContributor | Configure the object and permitted DDL; no payload or role administration |
-| DataReader | Read actual data; no configuration or role administration |
-| DataContributor | Read and write actual data; no configuration or role administration |
-| AccessAdministrator | Read object metadata and administer access; no payload/configuration |
-| Viewer | Metadata discovery; no row/file payload |
-| Executor | Read tables/views (legacy alias: Reader) |
-| Manager | Edit descriptive metadata; no row/file payload |
-| Contributor | Insert, update, delete; no payload read or native DDL |
-| Admin | Read/write and native DDL |
-| Owner | Admin plus Floren Data Platform role assignment |
+The same roles on every kind of object. Permissions belong to roles; roles are given to groups (or
+directly to a person or service identity) on an object; people and identities are members of groups.
+A group can hold several roles on one object, and they add up.
 
-Custom stored-function execution is not granted to Reader or Contributor.
+| Role | Kind | Means |
+|---|---|---|
+| Viewer | Platform | Data products only: find the product in the catalog and ask for access |
+| Reader | Platform | See the object or page and its configuration and metadata (tables, columns, operations). No data, no preview, no access from code |
+| Contributor | Platform | Change settings, configuration and metadata: deploy workloads, configure APIs and topics, create or alter tables. Includes Reader |
+| Executor | Platform | Trigger on-demand workloads (scripts, notebooks, dbt), start workspaces, run as a service identity, and see the runs |
+| DataReader | Data | Read what the object holds: SELECT and data preview, files, Kafka subscribe, API GET/HEAD/OPTIONS, open apps and documentation, read run outputs and logs, download packages |
+| DataContributor | Data | Change it: insert, update, delete, write files, Kafka publish, API POST/PUT/PATCH/DELETE, publish and import packages. Includes Data Reader |
+| AccessAdministrator | Privileged | Give and take away roles in its scope, without data or configuration |
+| Admin | Privileged | Everything except giving access, including deleting |
+| Owner | Privileged | Admin plus giving access and protected identity configuration |
 
-| Workload/folder role | Permissions |
-|---|---|
-| Viewer | Discover metadata without opening apps or running programs |
-| Executor | Discover/open/run |
-| Manager | Configure, deploy and create; execution and identity delegation remain separate |
-| Contributor | Edit permitted settings and drafts; no execution or deployment |
-| Admin | Execution, editing, deployment and create/remove programs/apps |
-| Owner | Admin plus role assignment and protected identity configuration |
+### Upgrading from the earlier roles
+
+`python -m app.schema_migrations upgrade` moves every grant to these roles once (revision
+`005_role_model`) and keeps exactly the access each gave: Viewer becomes Reader (Viewer stays on data
+products), Manager and PlatformContributor become Contributor, Reader and Executor on data become
+Data Reader, Executor on a workload becomes Executor plus Data Reader (running and opening apps),
+Consumer becomes Data Reader on products and Data Contributor on APIs (all methods), Publisher and
+Maintainer become Data Contributor (Maintainer also Contributor). Where the new roles carry less
+than the old one (write-only data Contributor, a Maintainer's new versions), the difference is kept
+as an explicit permission grant on the same object. Contributor gains what Manager and
+PlatformContributor carried. The audit event `migration.role_model` lists every change, with what
+was kept and what was gained.
+
+Terraform: change the role names in configuration (the provider adopts a renamed role on refresh,
+so the next plan shows the change); a changed role replaces the old one in place, and import IDs
+carry the role (`<resource_id>/group/<id>/<role>`).
+
+Not every object offers every role: Executor is for workloads, workspaces and service identities,
+Viewer for data products. A new version of an existing package needs its Owner or Admin (the group
+that published it), so a team that publishes its own packages cannot change another team's.
 
 Parent grants always apply. Children can add permissions, never block them. Named permissions support custom action bundles. Individual table, column, file and directory
 targets are available; see [data object permissions](data-object-permissions.md). There are no
@@ -222,9 +242,9 @@ identity picker. Permissions **on** the workload control management/invocation. 
 
 The deployer selects caller mode or fixed mode. Fixed mode uses the workload's own
 service principal or a service account the deployer is authorized to select. Human deployer
-identities are not fixed execution identities. Managers can deploy with the configured
+identities are not fixed execution identities. Contributors can deploy with the configured
 identity, but cannot change that identity, environment/secret bindings, or role assignments.
-Service-account Executor permits selection for execution, not token or secret management;
+Executor on a service account permits selection for execution, not token or secret management;
 those operations require Owner. Git branch permissions must reflect who can modify code
 that GitOps automatically deploys.
 
@@ -287,17 +307,23 @@ Delegated app requests are blocked as soon as policy changes are processed, but
 previously issued STS credentials remain valid until they expire. SCIM delivery latency
 precedes all of these timings.
 
-## Group permission inventory
+## Kinds of access
 
-Access → Groups → Has access to shows **Data access**, **Platform access** and
-**Privileged access** together across all layers. Rows include the concrete function,
-object/page scope, role, origin and conditions. Search by feature, permission key,
-object, role or layer. Review authority appears in Platform access, not a separate
-privilege category. Approval expiry, profile restrictions, self-review rules and
-layer boundaries still apply when an action runs.
+Each role falls in one of three kinds of access. A role's permissions can span kinds (an Owner also
+reads data); the role is listed under what it is for, and each permission keeps its own kind.
 
-Prefer `DataReader`, `DataContributor`, `PlatformContributor` and
-`AccessAdministrator` when separating duties. Existing roles retain their authority;
-legacy storage Contributor remains write-only. Named assignments and custom roles
-can select individual functions. The [matrix](permission-matrix.md) defines every
-registered bundle, including protected operations with additional admission rules.
+| Kind | Roles |
+|---|---|
+| **Data access**: read or change actual data, files and messages | `DataReader`, `DataContributor` |
+| **Platform access**: see pages and objects, configure them, trigger work | `Viewer`, `Reader`, `Contributor`, `Executor` |
+| **Privileged access**: administer, delete and give access | `Admin`, `Owner`, `AccessAdministrator`, and review duties |
+
+Permissions given without a built-in role (a custom role or selected permissions) take the
+strongest kind among them. On an object's **Permissions** tab, grants are grouped the same way and
+**Add role** opens a dialog where the roles are offered by kind, each with what it allows.
+
+Named assignments and custom roles can select individual functions, for example drafting forms
+without publishing them. The [matrix](permission-matrix.md) defines every role's permissions,
+including protected operations with additional admission rules.
+Approval expiry, profile restrictions, self-review rules and layer boundaries still apply when an
+action runs.

@@ -151,7 +151,7 @@ def attach(db, user, scope: dict) -> dict:
         if isinstance(g, rbac.ProductGrant):
             continue
         target = db.get(Resource, g.resource_id)
-        if target is not None and target.kind in ('source','schema') and g.role in ('Reader','Executor','Admin','Owner'):
+        if target is not None and target.kind in ('source','schema') and g.role in rbac.DATA_READ_ROLES:
             direct.add(g.resource_id)
     # Every path (product option) through which the caller reaches each table.
     paths: Dict[str, List[ProductOption]] = {}

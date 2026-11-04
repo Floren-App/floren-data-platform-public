@@ -446,7 +446,8 @@ function TryIt({ item, op }: { item: ApiDefinition; op: ApiOperation }) {
   const [result, setResult] = useState<{ status: number; headers: Record<string, string>; body: string; ms: number } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const canCall = op.actions.includes("call");
+  // Reading operations need Data Reader; the ones that change data need Data Contributor.
+  const canCall = op.actions.includes(["GET", "HEAD", "OPTIONS"].includes(op.method.toUpperCase()) ? "call" : "call_write");
   const send = async () => {
     setBusy(true); setError("");
     try { setResult(await tryExternal(item.slug, soap ? "POST" : op.method, path, body, body ? { "Content-Type": soap ? "text/xml" : "application/json" } : {})); }
@@ -459,7 +460,7 @@ function TryIt({ item, op }: { item: ApiDefinition; op: ApiOperation }) {
     <h2>Try it</h2>
     <p className="hint" style={{ marginTop: -4 }}>Calls the backend through Floren Data Platform as you, with the API's configured credentials. Programs use
       <code>{soap ? ` fdp.api("${item.slug}").soap("${op.name}", body)` : ` fdp.api("${item.slug}").${op.method.toLowerCase()}("${op.path}")`}</code>.</p>
-    {!canCall ? <p className="notice">Calling requires the Consumer role on this operation, its group or the API.</p> : <>
+    {!canCall ? <p className="notice">Calling requires {["GET", "HEAD", "OPTIONS"].includes(op.method.toUpperCase()) ? "Data Reader" : "Data Contributor"} on this operation, its group or the API.</p> : <>
       <div className="row" style={{ alignItems: "flex-end" }}>
         <span className={methodClass(soap ? "POST" : op.method)} style={{ marginBottom: 5 }}>{soap ? "SOAP" : op.method}</span>
         <div className="field" style={{ flex: 1, margin: 0 }}><label htmlFor="try-path">{soap ? "Operation" : "Path"}</label><input id="try-path" className="mono" value={path} disabled={soap} onChange={(e) => setPath(e.target.value)} /></div>

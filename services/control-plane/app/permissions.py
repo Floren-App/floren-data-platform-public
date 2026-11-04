@@ -14,7 +14,7 @@ from .authorization_cache import cached
 from .models import CustomPermissionRole, PermissionGrant, Resource
 
 REGISTRY = json.loads(Path(__file__).with_name("permission_registry.json").read_text())
-ROLES = ("Viewer", "Executor", "Contributor", "Manager", "Admin", "Owner", "PlatformContributor", "DataReader", "DataContributor", "AccessAdministrator")
+ROLES = ("Viewer", "Reader", "Contributor", "Executor", "DataReader", "DataContributor", "AccessAdministrator", "Admin", "Owner")
 
 
 def validate_actions(actions):
@@ -206,14 +206,8 @@ def domain_allowed(db, user, action, resource, legacy_action=None):
         return True
     if not legacy_action or action not in REGISTRY or not rbac.allowed(db,user,legacy_action,resource,named=False):
         return False
-    # Domain roles use the same action bundles as named roles. Generic legacy
-    # verbs (e.g. edit) must not make Contributor an Executor or Manager.
-    aliases={'Reader':{'Executor'},'Consumer':{'Executor'},'Publisher':{'Contributor','Executor','Manager'},
-        'Maintainer':{'Contributor','Executor','Manager'}}
-    held=set()
-    for grant in rbac.access(db,user,resource):
-        role=grant['role']
-        held.update(aliases.get(role,{role}))
+    # The role must also carry the named permission: the registry is the precise bundle of each role.
+    held={grant['role'] for grant in rbac.access(db,user,resource)}
     definition=REGISTRY[action]
     return bool(held & set(definition['roles'])) or bool(definition.get('requires_roles') and set(definition['requires_roles']).issubset(held))
 

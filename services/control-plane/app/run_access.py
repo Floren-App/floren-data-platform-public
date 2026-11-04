@@ -13,7 +13,7 @@ def allowed(db,user,action,run):
     # Explicit legacy workload execution remains compatible during migration.
     pub=db.get(Workload,run.workload_id) if run.workload_id else None
     if pub:
-        return permissions.domain_allowed(db,user,action,rbac.workload_resource(db,pub),'read' if action in ('runs.list','runs.read') else 'execute')
+        return permissions.domain_allowed(db,user,action,rbac.workload_resource(db,pub),'read' if action in ('runs.list','runs.read') else 'execute' if action.startswith('runs.') else 'open')
     return False
 
 

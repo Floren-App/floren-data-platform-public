@@ -11,92 +11,96 @@ from .config import get_settings
 from .models import (AppGroup, DirectoryMembership, DirectoryPrincipal, IdentityBinding,
                      Resource, RoleAssignment, ServiceRoleAssignment, ServiceAccount)
 
+# Roles are the same words on every kind of object. Reader and Contributor are platform roles: see an object and its
+# configuration, or change its settings, configuration and metadata. Data Reader and Data Contributor interact with
+# what the object holds: read it, or change it. Executor only triggers on-demand work. Viewer only discovers data
+# products in the catalog. Access Administrator, Admin and Owner are privileged. The verbs below serve the older
+# checks; named permissions (permission_registry.json) say precisely what each role may do.
 PROGRAM_ROLES = {
-    "Viewer": {"read"},
+    "Reader": {"read"},
+    "Contributor": {"read", "edit", "deploy", "create"},
     "Executor": {"read", "execute"},
-    "Contributor": {"read", "edit"},
-    "Manager": {"read", "edit", "deploy", "create"},
-    "Admin": {"read", "execute", "edit", "deploy", "create", "delete"},
-    "Owner": {"read", "execute", "edit", "deploy", "create", "delete", "assign", "identity"},
+    "DataReader": {"read", "open"},
+    "Admin": {"read", "execute", "open", "edit", "deploy", "create", "delete"},
+    "Owner": {"read", "execute", "open", "edit", "deploy", "create", "delete", "assign", "identity"},
 }
-# API management: Consumer may call (external APIs, as a program or person); management is separate.
+# APIs: Data Reader calls GET, HEAD and OPTIONS operations; Data Contributor also the ones that change data.
 API_ROLES = {
-    "Consumer": {"read", "call"},
-    "Viewer": {"read"},
-    "Executor": {"read", "call"},
-    "Contributor": {"read", "edit"},
-    "Manager": {"read", "edit", "create"},
-    "Admin": {"read", "call", "edit", "create", "delete"},
-    "Owner": {"read", "call", "edit", "create", "delete", "assign", "identity"},
+    "Reader": {"read"},
+    "Contributor": {"read", "edit", "create"},
+    "DataReader": {"read", "call"},
+    "DataContributor": {"read", "call", "call_write"},
+    "Admin": {"read", "call", "call_write", "edit", "create", "delete"},
+    "Owner": {"read", "call", "call_write", "edit", "create", "delete", "assign", "identity"},
 }
 API_KINDS = ("api-root", "api", "api-group", "api-operation")
-# Package metadata and downloads are independently granted. Publisher publishes new packages and imports
-# from PyPI/CRAN; a package's Owner (the publishing group) and Maintainers publish its new versions.
+# Packages: Data Reader downloads, Data Contributor publishes new packages and imports (the publishing group becomes
+# the new package's Owner, and only a package's Owner or Admin publishes its new versions); Contributor manages
+# availability.
 PACKAGE_ROLES = {
-    "Viewer": {"read"},
-    "Executor": {"read", "download"},
-    "Contributor": {"read", "create"},
-    "Manager": {"read", "publish", "yank", "import"},
+    "Reader": {"read"},
+    "Contributor": {"read", "yank"},
+    "DataReader": {"read", "download"},
+    "DataContributor": {"read", "download", "create", "import"},
     "Admin": {"read", "download", "create", "import", "publish", "yank", "delete"},
-    "Publisher": {"read", "download", "create", "import"},
-    "Maintainer": {"read", "download", "create", "import", "publish", "yank"},
     "Owner": {"read", "download", "create", "import", "publish", "yank", "delete", "assign"},
 }
 PACKAGE_KINDS = ("package-root", "package")
-# Data products: Consumer may read or use everything in the product (see product_grants); Owner also
-# manages the product and decides access requests.
+# Data products: Viewer finds a product in the catalog and asks for access; Data Reader uses everything in it (see
+# product_grants); Owner also manages the product and decides access requests.
 PRODUCT_ROLES = {
-    "Consumer": {"read", "use"},
     "Viewer": {"read"},
-    "Executor": {"read", "use"},
-    "Contributor": {"read", "edit"},
-    "Manager": {"read", "edit", "create"},
+    "Reader": {"read"},
+    "Contributor": {"read", "edit", "create"},
+    "DataReader": {"read", "use"},
     "Admin": {"read", "use", "edit", "create", "delete"},
     "Owner": {"read", "use", "assign"},
 }
 PRODUCT_KINDS = ("product-root", "product")
-# What a product's consumers get on each object in it: the role that lets someone read or use it.
-READER_ROLE = {"schema": "Reader", "source": "Reader", "topic": "Reader", "kafka": "Reader", "service": "Executor",
-               "api": "Consumer", "api-group": "Consumer", "api-operation": "Consumer"}
+# What a product's users get on each object in it.
+READER_ROLE = {"schema": "DataReader", "source": "DataReader", "topic": "DataReader", "kafka": "DataReader", "service": "DataReader",
+               "api": "DataReader", "api-group": "DataReader", "api-operation": "DataReader"}
 DATA_ROLES = {
     "Reader": {"read"},
-    "Viewer": {"read"},
-    "Executor": {"read"},
-    "Contributor": {"read", "write"},
-    "Manager": {"read", "edit"},
-    "Admin": {"read", "write", "ddl"},
-    "Owner": {"read", "write", "ddl", "assign"},
+    "Contributor": {"read", "edit", "configure", "ddl"},
+    "DataReader": {"read", "select"},
+    "DataContributor": {"read", "select", "write"},
+    "Admin": {"read", "select", "write", "edit", "configure", "ddl"},
+    "Owner": {"read", "select", "write", "edit", "configure", "ddl", "assign"},
 }
-
 KAFKA_ROLES = {
-    "Reader": {"read", "consume"},  # Existing assignment alias.
-    "Viewer": {"read"},
-    "Executor": {"read", "consume"},
-    "Contributor": {"read", "write"},
-    "Manager": {"read", "ddl"},
-    "Admin": {"read", "consume", "write", "ddl"},
-    "Owner": {"read", "consume", "write", "ddl", "assign"},
+    "Reader": {"read"},
+    "Contributor": {"read", "edit", "configure", "ddl"},
+    "DataReader": {"read", "consume"},
+    "DataContributor": {"read", "consume", "write"},
+    "Admin": {"read", "consume", "write", "edit", "configure", "ddl"},
+    "Owner": {"read", "consume", "write", "edit", "configure", "ddl", "assign"},
 }
-
-
 DATA_OBJECT_KINDS = ('table','column','file','directory')
 DATA_OBJECT_ROLES = {
-    'Viewer': {'read'},
-    'Executor': {'read','select','download'},
-    'Contributor': {'read','write','insert','update','delete_data'},
-    'Manager': {'read','configure','edit'},
+    'Reader': {'read'},
+    'Contributor': {'read','configure','edit','ddl'},
+    'DataReader': {'read','select','download'},
+    'DataContributor': {'read','select','download','write','insert','update','delete_data'},
     'Admin': {'read','select','download','write','insert','update','delete_data','configure','edit','ddl','create','delete'},
     'Owner': {'read','select','download','write','insert','update','delete_data','configure','edit','ddl','create','delete','assign'},
 }
-
-
-# Explicit role families coexist with legacy roles; no existing assignment gains new authority.
 for _roles in (PROGRAM_ROLES, API_ROLES, PACKAGE_ROLES, PRODUCT_ROLES, DATA_ROLES, KAFKA_ROLES, DATA_OBJECT_ROLES):
     _roles['AccessAdministrator'] = {'read', 'assign'}
-    _roles['PlatformContributor'] = {'read', 'edit', 'configure', 'ddl'}
-for _roles in (DATA_ROLES, KAFKA_ROLES, DATA_OBJECT_ROLES):
-    _roles['DataReader'] = set(_roles['Executor'])
-    _roles['DataContributor'] = set(_roles['Executor']) | set(_roles['Contributor'])
+# Roles that read what a data object holds (rows, files, messages), and that change it.
+DATA_READ_ROLES = frozenset({'DataReader', 'DataContributor', 'Admin', 'Owner'})
+DATA_WRITE_ROLES = frozenset({'DataContributor', 'Admin', 'Owner'})
+# How roles are written for people (messages, emails).
+LABELS = {'DataReader': 'Data Reader', 'DataContributor': 'Data Contributor', 'AccessAdministrator': 'Access Administrator'}
+
+
+def label(role: str) -> str:
+    return LABELS.get(role, role)
+
+
+# Native database access levels (read-only, read/write, DDL) that the data roles lease; not role names.
+LEVELS = ("Reader", "Contributor", "Admin", "Owner")
+DATA_LEVELS = {"DataReader": "Reader", "DataContributor": "Contributor", "Admin": "Admin", "Owner": "Owner"}
 
 
 def principal(db: Session, kind: str, external_id: str, name: str = "", provider: Optional[str] = None):
@@ -303,7 +307,7 @@ def role_grants(db: Session, user: User, resource_ids=None) -> list:
 
 
 class ProductGrant:
-    """A role a group holds on an object because it holds Consumer (or Owner) on a data product containing it.
+    """A role a group holds on an object because it holds Data Reader (or Owner) on a data product containing it.
     Never stored: revoking the product role, removing the object from the product or unpublishing ends it."""
 
     def __init__(self, resource_id, role, app_group_id, product_resource_id):
@@ -312,7 +316,7 @@ class ProductGrant:
 
 
 def product_grants(db: Session, assignments) -> list:
-    """Consumers and owners of a data product may read or use everything in it (under an access policy: what their
+    """Data Readers and owners of a data product may read or use everything in it (under an access policy: what their
     approval covered; objects added later wait for a new approval)."""
     from .models import CatalogAsset, CatalogProductMember, ProductAccess
     out = []
@@ -334,7 +338,7 @@ def product_grants(db: Session, assignments) -> list:
                 from .object_access import target_for_asset
                 target = target_for_asset(db, asset, target, create=True)
             if target is not None and target.kind in DATA_OBJECT_KINDS:
-                out.append(ProductGrant(target.id, 'Executor', a.app_group_id, product.id))
+                out.append(ProductGrant(target.id, 'DataReader', a.app_group_id, product.id))
             elif target is not None and target.kind in READER_ROLE:
                 out.append(ProductGrant(target.id, READER_ROLE[target.kind], a.app_group_id, product.id))
     return out
@@ -427,7 +431,7 @@ def allowed(db: Session, user: User, action: str, resource: Resource, named: boo
                                     "import", "publish", "yank"}:
         return True
     definitions = roles_for(resource)
-    if any(action in definitions.get('Executor' if resource.kind in DATA_OBJECT_KINDS and a['role'] == 'Reader' else a['role'], set()) for a in access(db, user, resource)):
+    if any(action in definitions.get(a['role'], set()) for a in access(db, user, resource)):
         return True
     if action == 'read' and named:
         from .permissions import allowed as capability_allowed
@@ -460,11 +464,8 @@ def owner_group(db: Session, user: User) -> AppGroup:
 def own(db: Session, user: User, resource: Resource):
     group = owner_group(db, user)
     resource.config = {**(resource.config or {}), "owner_group_id":group.id}
-    grant = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource.id,
-                                                  RoleAssignment.app_group_id == group.id))
-    if grant:
-        grant.role = "Owner"
-    else:
+    if db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource.id, RoleAssignment.app_group_id == group.id,
+                                              RoleAssignment.role == "Owner")) is None:
         db.add(RoleAssignment(resource_id=resource.id, app_group_id=group.id, role="Owner"))
     db.flush()
 
@@ -522,15 +523,9 @@ def data_scope(db: Session, user: User, source) -> dict:
     r = source_resource(db, source)
     for schema in db.scalars(select(Resource).where(Resource.kind == "schema", Resource.parent_id == r.id)):
         grants = access(db, user, schema)
-        levels = ("Reader", "Contributor", "Admin", "Owner")
-        ranks = [{"Executor":"Reader", "DataReader":"Reader", "DataContributor":"Contributor"}.get(a["role"],a["role"]) for a in grants
-                 if a["role"] in ("Reader", "Admin", "Owner", "Executor", "DataReader", "DataContributor")]
+        ranks = [DATA_LEVELS[a["role"]] for a in grants if a["role"] in DATA_LEVELS]
         if ranks:
-            level=max(ranks,key=levels.index)
-            # The native compatibility lease can combine separately granted read
-            # and write. Contributor alone never receives a read/write lease.
-            if level=='Reader' and any(a['role']=='Contributor' for a in grants):
-                level='Contributor'
+            level=max(ranks,key=LEVELS.index)
             result[schema.name]=level
     return result
 

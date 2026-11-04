@@ -121,7 +121,7 @@ export interface OperationInput {
   external?: { headers: ApiValue[]; timeout_seconds: number | null };
 }
 
-/** Calls an external API operation as yourself (needs Consumer), returning the raw response for the test console. */
+/** Calls an external API operation as yourself (needs Data Reader, or Data Contributor to change data), returning the raw response for the test console. */
 export async function tryExternal(slug: string, method: string, path: string, body: string, headers: Record<string, string>) {
   const started = performance.now();
   const res = await fetch(`${getServer()}/api/v1/egress/${slug}/${path.replace(/^\//, "")}`, {
@@ -559,7 +559,7 @@ export interface OptionFilter { asset_id: string; table: string; expression: str
 export interface ProductOptionOut { id: string; name: string; description: string; default: boolean; classification: string;
   masks?: OptionMask[]; filters?: OptionFilter[]; masked_columns?: number; filtered_tables?: number }
 export interface OptionInput { name: string; description: string; default: boolean; masks: { asset_id: string; column: string; method: string; expression: string }[]; filters: { asset_id: string; expression: string }[] }
-/** What Consumer on a product gives on each object: one role per distinct resource (tables share their schema's). */
+/** What Data Reader on a product gives on each object: one role per distinct resource (tables share their schema's). */
 export interface ProductGrant { resource_id: string; kind: string; name: string; role: string; object: string }
 /** A published data product: one or more objects; its card is visible to everyone in its layer, with or without access. */
 export interface Product {
@@ -832,11 +832,26 @@ export interface CatalogGraph { nodes: (CatalogAsset & { distance: number; linea
 export interface OrchestratorRun { dag_id: string; run_id: string; state: string; logical_date: string | null; start_date: string | null; end_date: string | null }
 export interface OrchestratorHistory { runs: OrchestratorRun[]; dags: string[] }
 
-export interface GroupPermissionRow {
-  permission: string; description: string; target_id: string; target_name: string;
-  role: string; origin: string; layer_id: string | null; layer_name?: string | null; conditions: string[]; grant_id: string | null;
+/** Data access reads or changes actual data; platform access is pages, features and configuration; privileged access
+ * administers, deletes and delegates. Each role has one category; its permissions keep their own. */
+export type AccessCategory = "data" | "platform" | "privileged";
+export interface PermissionRow { key: string; description: string; category: AccessCategory; constraint: string }
+/** A role a group holds, once, with the permissions it carries. */
+export interface GroupRoleAssignment {
+  id: string; role: string; category: AccessCategory; family: string | null;
+  target_id: string; target_name: string; target_kind: string | null;
+  origin: "object" | "product" | "named" | "custom" | "duty" | "system";
+  layer_id: string | null; layer_name: string | null; conditions: string[]; permissions: PermissionRow[];
+  product?: { id: string; title: string } | null; grant_id?: string; custom_role_id?: string | null; duty_id?: string; description?: string;
 }
-export type GroupAccessSections = Record<"data" | "platform" | "privileged", GroupPermissionRow[]>;
+export interface CatalogRole { name: string; category: AccessCategory; permissions: string[] }
+export interface RoleCatalogType { key: string; label: string; family: string; target_id?: string; pages?: string[]; roles: CatalogRole[] }
+export interface RoleCatalog {
+  types: RoleCatalogType[];
+  custom_roles: { id: string; name: string; category: AccessCategory; permissions: string[] }[];
+  review_duties: { key: string; name: string; description: string; category: AccessCategory; permissions: string[] }[];
+  permissions: Record<string, Omit<PermissionRow, "key">>;
+}
 
 export interface BackupDestination {
   id: string; name: string; bucket: string; prefix: string; endpoint_url: string; region: string;
@@ -956,10 +971,12 @@ export const api = {
   },
   access: {
     groupAssignments: (id: string) => request<{ resource: AccessResource; role: string }[]>("GET", `/v1/rbac/groups/${id}/assignments`),
-    groupAccess: (id: string) => request<{ access_sections?: GroupAccessSections; system: boolean; grants: AccessGrantRow[]; compliance_roles: ComplianceRoleHeld[]; app_profile: string | null }>("GET", `/v1/rbac/groups/${id}/access`),
+    groupAccess: (id: string) => request<{ access_roles?: GroupRoleAssignment[]; system: boolean; grants: AccessGrantRow[]; compliance_roles: ComplianceRoleHeld[]; app_profile: string | null }>("GET", `/v1/rbac/groups/${id}/access`),
     principalAccess: (id: string) => request<{ principal: { id: string; name: string; kind: string; active: boolean };
       groups: { id: string; name: string; system: boolean; via: string | null }[]; grants: AccessGrantRow[]; compliance_roles: ComplianceRoleHeld[] }>("GET", `/v1/rbac/principals/${id}/access`),
     roles: () => request<Record<string, Record<string, string[]>>>("GET", "/v1/rbac/roles"),
+    roleCatalog: () => request<RoleCatalog>("GET", "/v1/permissions/catalog"),
+    removePermission: (id: string) => request<void>("DELETE", `/v1/permissions/assignments/${id}`),
     directory: () => request<DirectoryPrincipal[]>("GET", "/v1/rbac/directory"),
     groups: () => request<AppGroup[]>("GET", "/v1/rbac/groups"),
     createGroup: (body: { name: string; description: string; owners: string[] }) => request<AppGroup>("POST", "/v1/rbac/groups", body),
@@ -979,8 +996,8 @@ export const api = {
     servicePrincipals: (id: string) => request<ServicePrincipal[]>("GET", `/v1/rbac/resources/${id}/service-principals`),
     assign: (id: string, app_group_id: string, role: string) => request<RoleAssignment[]>("PUT", `/v1/rbac/resources/${id}/assignments`, { app_group_id, role }),
     assignService: (id: string, principal_id: string, role: string) => request<RoleAssignment[]>("PUT", `/v1/rbac/resources/${id}/assignments`, { principal_id, role }),
-    revoke: (id: string, gid: string) => request<void>("DELETE", `/v1/rbac/resources/${id}/assignments/${gid}`),
-    revokeService: (id: string, pid: string) => request<void>("DELETE", `/v1/rbac/resources/${id}/assignments/services/${pid}`),
+    revoke: (id: string, gid: string, role?: string) => request<void>("DELETE", `/v1/rbac/resources/${id}/assignments/${gid}${role ? `?role=${encodeURIComponent(role)}` : ""}`),
+    revokeService: (id: string, pid: string, role?: string) => request<void>("DELETE", `/v1/rbac/resources/${id}/assignments/services/${pid}${role ? `?role=${encodeURIComponent(role)}` : ""}`),
   },
   dataPolicies: {
     list: (schemaId: string) => request<DataPolicy[]>("GET", `/v1/data-policies?schema_id=${encodeURIComponent(schemaId)}`),

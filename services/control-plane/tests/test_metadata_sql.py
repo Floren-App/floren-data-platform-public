@@ -81,22 +81,22 @@ def test_grants_bindings_and_prepared_mutations(metadata_mode):
         schema = db.scalar(select(Resource).where(Resource.kind == 'schema', Resource.name == 'reporting'))
         rid = schema.id
         ana = rbac.resolve_user(db, User('ana')).principal_id
-    grant = command(client, f"GRANT Reader ON RESOURCE '{rid}' TO GROUP 'SQL grants'")
+    grant = command(client, f"GRANT DataReader ON RESOURCE '{rid}' TO GROUP 'SQL grants'")
     assert grant.status_code == 200, grant.text
     with SessionLocal() as db:
         assignment = db.scalar(select(RoleAssignment).where(RoleAssignment.app_group_id == gid))
-        assert assignment.role == 'Reader'
+        assert assignment.role == 'DataReader'
         aid = assignment.id
     prepared = "UPDATE fdp_metadata.public.role_assignments SET role=? WHERE id=?"
-    result = command(client, f"EXECUTE change_role USING 'Contributor', '{aid}'", **{"X-Trino-Prepared-Statement": "change_role=" + quote_plus(prepared)})
+    result = command(client, f"EXECUTE change_role USING 'DataContributor', '{aid}'", **{"X-Trino-Prepared-Statement": "change_role=" + quote_plus(prepared)})
     assert result.status_code == 200, result.text
     result = command(client, f"INSERT INTO identity_bindings (app_group_id, principal_id) VALUES ('{gid}', '{ana}')")
     assert result.status_code == 200, result.text
     result = command(client, f"DELETE FROM identity_bindings WHERE app_group_id='{gid}' AND principal_id='{ana}'")
     assert result.status_code == 200, result.text
-    assert command(client, f"REVOKE Reader ON RESOURCE '{rid}' FROM GROUP 'SQL grants'").status_code == 422
-    assert command(client, f"REVOKE Contributor ON RESOURCE '{rid}' FROM GROUP 'SQL grants'").status_code == 200
-    assert command(client, f"GRANT Reader ON RESOURCE '{metadata.SCHEMA_ID}' TO GROUP 'SQL grants'").status_code == 403
+    assert command(client, f"REVOKE DataReader ON RESOURCE '{rid}' FROM GROUP 'SQL grants'").status_code == 422
+    assert command(client, f"REVOKE DataContributor ON RESOURCE '{rid}' FROM GROUP 'SQL grants'").status_code == 200
+    assert command(client, f"GRANT DataReader ON RESOURCE '{metadata.SCHEMA_ID}' TO GROUP 'SQL grants'").status_code == 403
 
 
 def test_management_sql_rejects_extra_statements_and_expressions(metadata_mode):

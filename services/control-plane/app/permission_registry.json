@@ -3,12 +3,13 @@
     "description": "Open Home",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global page; scoped cards",
     "target": "Home",
@@ -19,12 +20,13 @@
     "description": "Show navigation and open the named page",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One named page; optional layer restriction",
     "target": "Every page and alias",
@@ -34,8 +36,8 @@
   "pages.roles.assign": {
     "description": "Grant a role on this page",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "One named page; optional layer restriction",
     "target": "Every page and alias",
@@ -45,8 +47,8 @@
   "pages.roles.revoke": {
     "description": "Revoke a role on this page",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "One named page; optional layer restriction",
     "target": "Every page and alias",
@@ -57,12 +59,13 @@
     "description": "List eligible groups and layers",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Own session",
     "target": "Active group and layer selector",
@@ -73,12 +76,13 @@
     "description": "Select an eligible active group",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Own session",
     "target": "Active group and layer selector",
@@ -89,12 +93,13 @@
     "description": "Select an eligible active layer",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Own session",
     "target": "Active group and layer selector",
@@ -105,12 +110,13 @@
     "description": "Search authorized catalog objects",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + authorized objects",
     "target": "Catalog search and discovery",
@@ -121,12 +127,13 @@
     "description": "Autocomplete authorized objects",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + authorized objects",
     "target": "Catalog search and discovery",
@@ -137,12 +144,13 @@
     "description": "Open authorized catalog object metadata",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + authorized objects",
     "target": "Catalog search and discovery",
@@ -153,12 +161,13 @@
     "description": "View lineage and used-by graph",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + each node/edge",
     "target": "Lineage and dependencies",
@@ -170,8 +179,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + each node/edge",
     "target": "Lineage and dependencies",
@@ -183,8 +191,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + each node/edge",
     "target": "Lineage and dependencies",
@@ -195,12 +202,13 @@
     "description": "Read permitted descriptive metadata",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + asset",
     "target": "Governance metadata",
@@ -212,8 +220,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + asset",
     "target": "Governance metadata",
@@ -223,7 +230,7 @@
   "governance.status.set": {
     "description": "Change governance publication/status",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -246,12 +253,13 @@
     "description": "View permitted classification labels",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + asset/column",
     "target": "Asset and column classification",
@@ -263,8 +271,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + asset/column",
     "target": "Asset and column classification",
@@ -274,7 +281,7 @@
   "classification.binding.apply": {
     "description": "Apply classification without weakening protection",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -297,12 +304,13 @@
     "description": "List authorized product metadata",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + collection",
     "target": "Data products collection",
@@ -312,7 +320,7 @@
   "products.collection.create": {
     "description": "Create product in collection",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -325,12 +333,13 @@
     "description": "View product description, status and permitted members",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + product + member objects",
     "target": "Individual data product",
@@ -340,7 +349,8 @@
   "products.object.use": {
     "description": "Use approved product contents",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -354,8 +364,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + product + member objects",
     "target": "Individual data product",
@@ -365,7 +374,7 @@
   "products.object.publish": {
     "description": "Publish a product",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -377,7 +386,7 @@
   "products.object.live.update": {
     "description": "Apply changes to a published product",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -411,8 +420,8 @@
   "products.object.roles.assign": {
     "description": "Assign product roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + product + member objects",
     "target": "Individual data product",
@@ -422,8 +431,8 @@
   "products.object.roles.revoke": {
     "description": "Revoke product roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + product + member objects",
     "target": "Individual data product",
@@ -434,12 +443,13 @@
     "description": "Inspect permitted access options",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + product + affected asset",
     "target": "Product access options",
@@ -451,8 +461,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + product + affected asset",
     "target": "Product access options",
@@ -462,7 +471,7 @@
   "products.options.activate": {
     "description": "Activate option within approved protection",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -485,12 +494,13 @@
     "description": "View own requests",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Own request + layer + target group",
     "target": "My product access requests",
@@ -500,7 +510,12 @@
   "products.requests.own.create": {
     "description": "Request product access",
     "roles": [
+      "Viewer",
+      "Reader",
+      "Contributor",
       "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -514,8 +529,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Own request + layer + target group",
     "target": "My product access requests",
@@ -525,7 +539,12 @@
   "products.requests.own.submit": {
     "description": "Submit own request",
     "roles": [
+      "Viewer",
+      "Reader",
+      "Contributor",
       "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -537,7 +556,12 @@
   "products.requests.own.renew": {
     "description": "Request renewal of own access",
     "roles": [
+      "Viewer",
+      "Reader",
+      "Contributor",
       "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -549,7 +573,12 @@
   "products.requests.own.withdraw": {
     "description": "Withdraw own request",
     "roles": [
+      "Viewer",
+      "Reader",
+      "Contributor",
       "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -562,12 +591,13 @@
     "description": "View assigned request queue",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + product + assigned duty",
     "target": "Product requests to decide",
@@ -577,7 +607,7 @@
   "products.requests.review.approve": {
     "description": "Approve assigned request",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -589,7 +619,7 @@
   "products.requests.review.reject": {
     "description": "Reject assigned request",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -621,13 +651,13 @@
   "workspaces.collection.list": {
     "description": "List own or explicitly shared workspace metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + collection",
     "target": "Workspaces collection",
@@ -637,7 +667,7 @@
   "workspaces.collection.create": {
     "description": "Create workspace",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -649,13 +679,13 @@
   "workspaces.object.read": {
     "description": "Read workspace metadata and redacted configuration",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + personal workspace",
     "target": "Individual workspace",
@@ -697,14 +727,14 @@
     "area": "Workspaces",
     "constraint": "Another person's workspace needs explicit sharing/support delegation.",
     "requires_roles": [
-      "Contributor",
+      "DataContributor",
       "Executor"
     ]
   },
   "workspaces.object.settings.edit": {
     "description": "Change ordinary workspace settings",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -737,13 +767,13 @@
   "workspaces.files.list": {
     "description": "List permitted file metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -753,11 +783,10 @@
   "workspaces.files.read": {
     "description": "Read file contents",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -767,11 +796,10 @@
   "workspaces.files.download": {
     "description": "Download file",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -781,10 +809,9 @@
   "workspaces.files.write": {
     "description": "Create or change file contents",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -794,10 +821,9 @@
   "workspaces.files.delete": {
     "description": "Delete file",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -809,8 +835,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -822,8 +847,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + personal workspace/files",
     "target": "Workspace files and checkout",
@@ -833,13 +857,13 @@
   "git.credentials.read": {
     "description": "List own redacted credential metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Personal credential; layer-bound use",
     "target": "Git credentials",
@@ -851,8 +875,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Personal credential; layer-bound use",
     "target": "Git credentials",
@@ -864,8 +887,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Personal credential; layer-bound use",
     "target": "Git credentials",
@@ -886,7 +908,7 @@
   "git.credentials.use": {
     "description": "Use credential for an authorized repository",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -908,13 +930,13 @@
   "repositories.list": {
     "description": "List authorized repository definitions",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global definition; explicit layer binding",
     "target": "Repositories",
@@ -924,13 +946,13 @@
   "repositories.branches.read": {
     "description": "List authorized branches",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global definition; explicit layer binding",
     "target": "Repositories",
@@ -940,13 +962,13 @@
   "repositories.manifest.read": {
     "description": "Read approved program manifest metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global definition; explicit layer binding",
     "target": "Repositories",
@@ -956,7 +978,7 @@
   "repositories.refresh": {
     "description": "Refresh repository metadata",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -968,7 +990,7 @@
   "repositories.pull": {
     "description": "Pull repository using an authorized credential",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -982,8 +1004,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global definition; explicit layer binding",
     "target": "Repositories",
@@ -993,7 +1014,7 @@
   "repositories.register": {
     "description": "Register repository",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1005,7 +1026,7 @@
   "repositories.apply": {
     "description": "Apply ordinary repository configuration",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1048,13 +1069,13 @@
   "workloads.folders.list": {
     "description": "List authorized children and folder metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + source/destination folder",
     "target": "Workload folders",
@@ -1064,7 +1085,7 @@
   "workloads.folders.create": {
     "description": "Create child folder",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1076,7 +1097,7 @@
   "workloads.folders.rename": {
     "description": "Rename folder",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1088,7 +1109,7 @@
   "workloads.folders.move": {
     "description": "Move folder within permitted boundary",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1111,8 +1132,8 @@
   "workloads.folders.roles.assign": {
     "description": "Assign folder roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + source/destination folder",
     "target": "Workload folders",
@@ -1122,8 +1143,8 @@
   "workloads.folders.roles.revoke": {
     "description": "Revoke folder roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + source/destination folder",
     "target": "Workload folders",
@@ -1143,13 +1164,13 @@
   "workloads.deployments.candidates.read": {
     "description": "View authorized deploy candidates",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + destination collection",
     "target": "Deployment collection and wizard",
@@ -1159,7 +1180,7 @@
   "workloads.deployments.create": {
     "description": "Create workload in destination",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1171,7 +1192,7 @@
   "workloads.deployments.deploy": {
     "description": "Deploy a new workload",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1183,13 +1204,13 @@
   "workloads.code.versions.read": {
     "description": "View version and deployment status metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + workload",
     "target": "Workload source and versions",
@@ -1199,7 +1220,8 @@
   "workloads.code.source.read": {
     "description": "Read source artifact",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1213,8 +1235,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + workload",
     "target": "Workload source and versions",
@@ -1224,7 +1245,7 @@
   "workloads.code.deploy": {
     "description": "Deploy code changes",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1236,7 +1257,7 @@
   "workloads.code.sync": {
     "description": "Sync deployed workload with authorized Git source",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1248,7 +1269,7 @@
   "workloads.code.auto_update.set": {
     "description": "Enable or disable automatic deployment",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1260,13 +1281,13 @@
   "workloads.settings.read": {
     "description": "Read redacted workload settings",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + workload and selected identity",
     "target": "Workload configuration",
@@ -1276,7 +1297,7 @@
   "workloads.settings.edit": {
     "description": "Change ordinary settings and runtime sizing",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1328,8 +1349,8 @@
   "workloads.settings.roles.assign": {
     "description": "Assign workload roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + workload and selected identity",
     "target": "Workload configuration",
@@ -1339,8 +1360,8 @@
   "workloads.settings.roles.revoke": {
     "description": "Revoke workload roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + workload and selected identity",
     "target": "Workload configuration",
@@ -1361,13 +1382,13 @@
   "workloads.execution.read": {
     "description": "View workload execution status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + workload",
     "target": "Workload apps, programs and generated docs",
@@ -1389,7 +1410,8 @@
   "workloads.execution.app.open": {
     "description": "Open shared app",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1401,7 +1423,8 @@
   "workloads.execution.docs.open": {
     "description": "Open generated documentation",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1437,7 +1460,7 @@
   "workloads.execution.stop_others": {
     "description": "Stop another user's invocation",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1449,7 +1472,7 @@
   "workloads.execution.restart_service": {
     "description": "Restart persistent workload service",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1461,13 +1484,13 @@
   "runs.list": {
     "description": "List authorized runs and queue metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + run and parent workload/workspace",
     "target": "Run history, queue and orchestration",
@@ -1477,13 +1500,13 @@
   "runs.read": {
     "description": "Read authorized run metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + run and parent workload/workspace",
     "target": "Run history, queue and orchestration",
@@ -1529,7 +1552,7 @@
   "runs.cancel_others": {
     "description": "Cancel another user's run",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1541,7 +1564,7 @@
   "runs.queue.manage": {
     "description": "Manage authorized execution queue",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1553,13 +1576,13 @@
   "logs.metadata.read": {
     "description": "List authorized log stream metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + stream/run/workload",
     "target": "Logs",
@@ -1569,7 +1592,8 @@
   "logs.read": {
     "description": "Read log content",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1581,7 +1605,8 @@
   "logs.export": {
     "description": "Export log content",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1593,13 +1618,13 @@
   "artifacts.list": {
     "description": "List permitted artifact metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + run/artifact",
     "target": "Outputs and artifacts",
@@ -1609,7 +1634,8 @@
   "artifacts.read": {
     "description": "Read artifact contents",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1621,7 +1647,8 @@
   "artifacts.download": {
     "description": "Download artifact",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1633,7 +1660,8 @@
   "artifacts.open": {
     "description": "Open rendered artifact or generated documentation",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1656,13 +1684,13 @@
   "usage.read": {
     "description": "View authorized usage summaries",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + pool and referenced workload",
     "target": "Usage and occupancy",
@@ -1672,7 +1700,8 @@
   "usage.occupants.read": {
     "description": "View detailed authorized occupants and queue entries",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1684,7 +1713,8 @@
   "usage.export": {
     "description": "Export authorized usage",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -1696,16 +1726,14 @@
   "storage.sources.list": {
     "description": "List authorized source metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + source collection",
     "target": "Storage source collection",
@@ -1715,7 +1743,7 @@
   "storage.sources.register": {
     "description": "Register a storage integration",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1738,16 +1766,14 @@
   "storage.connection.read": {
     "description": "Read redacted connection settings",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + source",
     "target": "Source connection",
@@ -1757,7 +1783,7 @@
   "storage.connection.edit": {
     "description": "Edit ordinary connection configuration",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -1809,16 +1835,14 @@
   "storage.access.effective.read": {
     "description": "Read permitted effective-access summary",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + source/schema",
     "target": "Source and schema access",
@@ -1850,8 +1874,8 @@
   "storage.access.roles.assign": {
     "description": "Assign source/schema roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + source/schema",
     "target": "Source and schema access",
@@ -1861,8 +1885,8 @@
   "storage.access.roles.revoke": {
     "description": "Revoke source/schema roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + source/schema",
     "target": "Source and schema access",
@@ -1872,16 +1896,14 @@
   "storage.schemas.list": {
     "description": "List authorized schemas/namespaces",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + source/schema collection",
     "target": "Schema and namespace collection",
@@ -1891,10 +1913,9 @@
   "storage.schemas.register": {
     "description": "Register logical schema/namespace",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + source/schema collection",
     "target": "Schema and namespace collection",
@@ -1915,9 +1936,9 @@
   "storage.schemas.create_native": {
     "description": "Create native schema/namespace",
     "roles": [
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + source/schema collection",
     "target": "Schema and namespace collection",
@@ -1927,9 +1948,9 @@
   "storage.schemas.drop_native": {
     "description": "Drop native schema/namespace",
     "roles": [
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + source/schema collection",
     "target": "Schema and namespace collection",
@@ -1949,16 +1970,14 @@
   "storage.objects.list": {
     "description": "List authorized table/view/column metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1968,16 +1987,14 @@
   "storage.objects.describe": {
     "description": "Describe authorized object structure",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -1989,8 +2006,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -2000,9 +2016,9 @@
   "storage.objects.create": {
     "description": "Create native table/view",
     "roles": [
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -2012,9 +2028,9 @@
   "storage.objects.alter": {
     "description": "Alter native table/view",
     "roles": [
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -2024,9 +2040,9 @@
   "storage.objects.drop": {
     "description": "Drop native table/view",
     "roles": [
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -2036,8 +2052,8 @@
   "storage.objects.roles.assign": {
     "description": "Assign object roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -2047,8 +2063,8 @@
   "storage.objects.roles.revoke": {
     "description": "Revoke object roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + schema/table/view/column",
     "target": "Tables, views and columns",
@@ -2058,11 +2074,10 @@
   "data.sql.select": {
     "description": "Read table/view data with SELECT",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2072,11 +2087,10 @@
   "data.sql.preview": {
     "description": "Read data preview",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2086,10 +2100,9 @@
   "data.sql.insert": {
     "description": "Insert rows",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2099,10 +2112,9 @@
   "data.sql.update": {
     "description": "Update rows",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2112,10 +2124,9 @@
   "data.sql.delete": {
     "description": "Delete rows",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2125,9 +2136,9 @@
   "data.sql.ddl": {
     "description": "Execute authorized native DDL",
     "roles": [
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2137,9 +2148,9 @@
   "data.sql.truncate": {
     "description": "Truncate table",
     "roles": [
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2149,11 +2160,10 @@
   "data.sql.results.export": {
     "description": "Export query results",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + every referenced object",
     "target": "SQL, preview and query results",
@@ -2163,15 +2173,13 @@
   "data.queries.status.read": {
     "description": "Read permitted query status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + query and referenced source",
     "target": "SQL query lifecycle",
@@ -2181,11 +2189,10 @@
   "data.queries.text.read": {
     "description": "Read authorized SQL text",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + query and referenced source",
     "target": "SQL query lifecycle",
@@ -2195,11 +2202,10 @@
   "data.queries.results.read": {
     "description": "Read authorized query results",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + query and referenced source",
     "target": "SQL query lifecycle",
@@ -2209,11 +2215,10 @@
   "data.queries.cancel_own": {
     "description": "Cancel own query",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + query and referenced source",
     "target": "SQL query lifecycle",
@@ -2223,7 +2228,7 @@
   "data.queries.cancel_others": {
     "description": "Cancel another user's query",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -2235,13 +2240,13 @@
   "data.routines.read": {
     "description": "Discover permitted routine/sequence metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + executable object",
     "target": "Functions, procedures and sequences",
@@ -2251,7 +2256,8 @@
   "data.routines.execute": {
     "description": "Execute authorized function/procedure",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -2263,7 +2269,8 @@
   "data.routines.sequence.use": {
     "description": "Use authorized sequence",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -2308,14 +2315,13 @@
   "data.files.list": {
     "description": "List permitted file/prefix metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
+      "Executor",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2325,11 +2331,10 @@
   "data.files.read": {
     "description": "Read file content",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2339,11 +2344,10 @@
   "data.files.download": {
     "description": "Download file",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2353,10 +2357,9 @@
   "data.files.create": {
     "description": "Write new file",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2366,10 +2369,9 @@
   "data.files.overwrite": {
     "description": "Overwrite file",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2379,10 +2381,9 @@
   "data.files.delete": {
     "description": "Delete file",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2414,8 +2415,8 @@
   "data.files.roles.assign": {
     "description": "Assign prefix/file roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2425,8 +2426,8 @@
   "data.files.roles.revoke": {
     "description": "Revoke prefix/file roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + source/prefix/file",
     "target": "S3 files and prefixes",
@@ -2436,14 +2437,13 @@
   "data.iceberg.metadata.read": {
     "description": "View authorized snapshot/table metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
+      "Executor",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + namespace/table",
     "target": "Iceberg tables and snapshots",
@@ -2453,11 +2453,10 @@
   "data.iceberg.read": {
     "description": "Read table data",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + namespace/table",
     "target": "Iceberg tables and snapshots",
@@ -2467,10 +2466,9 @@
   "data.iceberg.commit": {
     "description": "Commit authorized data changes",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + namespace/table",
     "target": "Iceberg tables and snapshots",
@@ -2513,13 +2511,13 @@
   "data.policies.read": {
     "description": "Read authorized redacted policy",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + schema/table/column policy",
     "target": "Masks and row filters",
@@ -2531,8 +2529,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + schema/table/column policy",
     "target": "Masks and row filters",
@@ -2544,8 +2541,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + schema/table/column policy",
     "target": "Masks and row filters",
@@ -2555,7 +2551,7 @@
   "data.policies.apply_restrictive": {
     "description": "Apply demonstrably restrictive policy change",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -2587,8 +2583,8 @@
   "data.policies.roles.assign": {
     "description": "Delegate policy authority",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + schema/table/column policy",
     "target": "Masks and row filters",
@@ -2598,16 +2594,14 @@
   "kafka.clusters.list": {
     "description": "List authorized clusters/status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + cluster",
     "target": "Kafka cluster collection and cluster",
@@ -2617,16 +2611,14 @@
   "kafka.clusters.read": {
     "description": "Read authorized cluster metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + cluster",
     "target": "Kafka cluster collection and cluster",
@@ -2636,7 +2628,7 @@
   "kafka.clusters.register": {
     "description": "Register cluster",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -2648,7 +2640,7 @@
   "kafka.clusters.configure": {
     "description": "Configure cluster",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -2681,8 +2673,8 @@
   "kafka.clusters.roles.assign": {
     "description": "Assign cluster roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + cluster",
     "target": "Kafka cluster collection and cluster",
@@ -2692,8 +2684,8 @@
   "kafka.clusters.roles.revoke": {
     "description": "Revoke cluster roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + cluster",
     "target": "Kafka cluster collection and cluster",
@@ -2703,16 +2695,14 @@
   "kafka.topics.list": {
     "description": "List authorized topics",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2722,16 +2712,14 @@
   "kafka.topics.read": {
     "description": "Read topic configuration/status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2741,16 +2729,14 @@
   "kafka.topics.deletion.read": {
     "description": "Read deletion status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
-      "Admin",
-      "Owner",
-      "PlatformContributor",
+      "Executor",
       "DataReader",
       "DataContributor",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2760,7 +2746,7 @@
   "kafka.topics.create": {
     "description": "Create topic",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -2772,10 +2758,9 @@
   "kafka.topics.retention.change": {
     "description": "Change topic retention",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2785,10 +2770,9 @@
   "kafka.topics.partitions.change": {
     "description": "Change topic partitions",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2798,10 +2782,9 @@
   "kafka.topics.configure": {
     "description": "Change other topic settings",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2822,8 +2805,8 @@
   "kafka.topics.roles.assign": {
     "description": "Assign topic roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2833,8 +2816,8 @@
   "kafka.topics.roles.revoke": {
     "description": "Revoke topic roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + cluster/topic",
     "target": "Kafka topics",
@@ -2844,12 +2827,10 @@
   "kafka.data.session.create": {
     "description": "Create consume session within granted scope",
     "roles": [
-      "Executor",
-      "Contributor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + topic + consumer group",
     "target": "Kafka data and consumer groups",
@@ -2859,11 +2840,10 @@
   "kafka.data.consume": {
     "description": "Consume records",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + topic + consumer group",
     "target": "Kafka data and consumer groups",
@@ -2873,11 +2853,10 @@
   "kafka.data.offsets.commit_own": {
     "description": "Commit own authorized consumer offsets",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + topic + consumer group",
     "target": "Kafka data and consumer groups",
@@ -2887,10 +2866,9 @@
   "kafka.data.produce": {
     "description": "Produce records",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + topic + consumer group",
     "target": "Kafka data and consumer groups",
@@ -2900,7 +2878,7 @@
   "kafka.data.offsets.reset_others": {
     "description": "Reset another consumer group's offsets",
     "roles": [
-      "Manager",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -2912,13 +2890,13 @@
   "apis.collection.list": {
     "description": "List authorized APIs",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + collection",
     "target": "API collection",
@@ -2928,7 +2906,7 @@
   "apis.collection.register": {
     "description": "Register API",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -2940,13 +2918,13 @@
   "apis.object.read": {
     "description": "Read redacted API definition",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + API",
     "target": "API definition and trust",
@@ -2958,8 +2936,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + API",
     "target": "API definition and trust",
@@ -2969,7 +2946,7 @@
   "apis.object.apply": {
     "description": "Apply ordinary API definition",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3022,8 +2999,8 @@
   "apis.object.roles.assign": {
     "description": "Assign API roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + API",
     "target": "API definition and trust",
@@ -3033,8 +3010,8 @@
   "apis.object.roles.revoke": {
     "description": "Revoke API roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + API",
     "target": "API definition and trust",
@@ -3044,13 +3021,13 @@
   "apis.operations.read": {
     "description": "View authorized operation definition",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + API/group/operation",
     "target": "Endpoint groups and operations",
@@ -3062,8 +3039,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + API/group/operation",
     "target": "Endpoint groups and operations",
@@ -3073,7 +3049,7 @@
   "apis.operations.create": {
     "description": "Create operation/group",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3085,7 +3061,7 @@
   "apis.operations.apply": {
     "description": "Apply operation changes",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3097,7 +3073,7 @@
   "apis.operations.move": {
     "description": "Move operation to another group",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3120,8 +3096,8 @@
   "apis.operations.roles.assign": {
     "description": "Assign operation/group roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + API/group/operation",
     "target": "Endpoint groups and operations",
@@ -3131,18 +3107,31 @@
   "apis.operations.roles.revoke": {
     "description": "Revoke operation/group roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + API/group/operation",
     "target": "Endpoint groups and operations",
     "area": "APIs",
     "constraint": "REST and SOAP; group moves check both source and destination."
   },
-  "apis.calls.invoke": {
-    "description": "Call an authorized operation",
+  "apis.calls.read": {
+    "description": "Call an authorized operation with GET, HEAD or OPTIONS",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
+      "Admin",
+      "Owner"
+    ],
+    "scope": "Layer + operation + execution context",
+    "target": "API inbound and outbound gateway",
+    "area": "APIs",
+    "constraint": "Validate method/path and original caller on every request."
+  },
+  "apis.calls.write": {
+    "description": "Call an authorized operation with POST, PUT, PATCH or DELETE",
+    "roles": [
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -3154,13 +3143,13 @@
   "apis.calls.status.read": {
     "description": "Read permitted call status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + operation + execution context",
     "target": "API inbound and outbound gateway",
@@ -3170,7 +3159,8 @@
   "apis.calls.details.read": {
     "description": "Read authorized redacted call payload/error",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -3182,7 +3172,8 @@
   "apis.calls.export": {
     "description": "Export authorized call history",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -3194,7 +3185,7 @@
   "apis.calls.retention.set": {
     "description": "Set call-history retention",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3206,13 +3197,13 @@
   "directory.people.list": {
     "description": "List authorized people",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global directory or own person; filtered referenced resources",
     "target": "Directory and person detail",
@@ -3222,13 +3213,13 @@
   "directory.people.read": {
     "description": "View authorized person metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global directory or own person; filtered referenced resources",
     "target": "Directory and person detail",
@@ -3238,7 +3229,8 @@
   "directory.people.access.read": {
     "description": "Inspect authorized person's effective access",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -3250,7 +3242,8 @@
   "directory.people.access.export": {
     "description": "Export authorized person's effective access",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -3262,13 +3255,13 @@
   "groups.list": {
     "description": "List authorized groups",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3278,13 +3271,13 @@
   "groups.read": {
     "description": "View authorized group metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3294,7 +3287,7 @@
   "groups.create": {
     "description": "Create app group",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3306,7 +3299,7 @@
   "groups.metadata.edit": {
     "description": "Edit ordinary group metadata",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3329,8 +3322,8 @@
   "groups.owners.change": {
     "description": "Change designated group owners",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3340,8 +3333,8 @@
   "groups.members.add": {
     "description": "Add member to group",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3351,8 +3344,8 @@
   "groups.members.remove": {
     "description": "Remove member from group",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3362,8 +3355,8 @@
   "groups.idp.bind": {
     "description": "Bind IdP group/role/user",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3383,8 +3376,8 @@
   "groups.profile.assign": {
     "description": "Assign app profile to group",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global collection + individual group",
     "target": "App-group collection and group",
@@ -3394,13 +3387,13 @@
   "groups.access.read": {
     "description": "View authorized grant summaries",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Group + each referenced resource/layer",
     "target": "Group has-access and grants",
@@ -3410,7 +3403,8 @@
   "groups.access.details.read": {
     "description": "Inspect sensitive grant explanations",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -3422,7 +3416,8 @@
   "groups.access.export": {
     "description": "Export authorized group access",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -3434,13 +3429,13 @@
   "permissions.effective.read": {
     "description": "View safe effective-role summary",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + actual target",
     "target": "Permissions panels and identity pickers",
@@ -3470,8 +3465,8 @@
   "permissions.roles.assign": {
     "description": "Assign role on target",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + actual target",
     "target": "Permissions panels and identity pickers",
@@ -3481,8 +3476,8 @@
   "permissions.roles.revoke": {
     "description": "Revoke role on target",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + actual target",
     "target": "Permissions panels and identity pickers",
@@ -3512,13 +3507,13 @@
   "roles.custom.read": {
     "description": "Inspect authorized role definition",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global definition + delegated action/scope ceiling",
     "target": "Custom role definitions",
@@ -3528,7 +3523,6 @@
   "roles.custom.draft.edit": {
     "description": "Draft a custom role",
     "roles": [
-      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3570,13 +3564,13 @@
   "identities.list": {
     "description": "List authorized service identity metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + identity",
     "target": "Service identities and service accounts",
@@ -3586,13 +3580,13 @@
   "identities.read": {
     "description": "Read identity status and redacted configuration",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + identity",
     "target": "Service identities and service accounts",
@@ -3602,7 +3596,7 @@
   "identities.create": {
     "description": "Create service account",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3614,7 +3608,7 @@
   "identities.metadata.edit": {
     "description": "Edit ordinary identity metadata",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3658,8 +3652,8 @@
   "identities.roles.assign": {
     "description": "Assign roles on/to identity within delegation authority",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + identity",
     "target": "Service identities and service accounts",
@@ -3669,8 +3663,8 @@
   "identities.roles.revoke": {
     "description": "Revoke identity role assignments",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + identity",
     "target": "Service identities and service accounts",
@@ -3702,13 +3696,13 @@
   "identities.tokens.list": {
     "description": "View redacted token metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + identity/token",
     "target": "Service-account tokens",
@@ -3748,13 +3742,13 @@
   "secrets.list": {
     "description": "List authorized redacted secret metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3764,13 +3758,13 @@
   "secrets.read": {
     "description": "Read redacted secret metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3782,8 +3776,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3795,8 +3788,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3806,7 +3798,7 @@
   "secrets.rotate": {
     "description": "Rotate secret through configured workflow",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3851,8 +3843,8 @@
   "secrets.roles.assign": {
     "description": "Assign secret roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3862,8 +3854,8 @@
   "secrets.roles.revoke": {
     "description": "Revoke secret roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Personal/global object; explicit layer-bound use",
     "target": "Secrets",
@@ -3873,13 +3865,13 @@
   "profiles.read": {
     "description": "Inspect authorized app profile",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global definition + profile object",
     "target": "App profiles",
@@ -3891,8 +3883,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global definition + profile object",
     "target": "App profiles",
@@ -3902,7 +3893,7 @@
   "profiles.create": {
     "description": "Create profile",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3914,7 +3905,7 @@
   "profiles.apply": {
     "description": "Apply profile",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3926,7 +3917,7 @@
   "profiles.default.set": {
     "description": "Set default profile",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -3949,13 +3940,13 @@
   "classification.dictionary.read": {
     "description": "Read permitted dictionary labels",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global dictionary",
     "target": "Classification dictionary",
@@ -3967,8 +3958,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global dictionary",
     "target": "Classification dictionary",
@@ -3978,7 +3968,7 @@
   "classification.dictionary.publish": {
     "description": "Publish dictionary",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4002,12 +3992,13 @@
     "description": "List authorized forms",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -4018,12 +4009,13 @@
     "description": "Read authorized form and permitted versions",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -4035,8 +4027,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -4048,8 +4039,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -4059,7 +4049,7 @@
   "compliance.forms.publish": {
     "description": "Publish form version",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4082,8 +4072,8 @@
   "compliance.forms.roles.assign": {
     "description": "Assign form roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -4093,8 +4083,8 @@
   "compliance.forms.roles.revoke": {
     "description": "Revoke form roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global form object; optional layer-use binding",
     "target": "Compliance forms and versions",
@@ -4104,13 +4094,13 @@
   "compliance.policies.read": {
     "description": "Read authorized policy grid entries",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + classification/target policy",
     "target": "Access policies",
@@ -4122,8 +4112,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + classification/target policy",
     "target": "Access policies",
@@ -4133,7 +4122,7 @@
   "compliance.policies.apply": {
     "description": "Apply policy without weakening protection",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4165,8 +4154,8 @@
   "compliance.policies.roles.assign": {
     "description": "Delegate scoped policy authority",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Layer + classification/target policy",
     "target": "Access policies",
@@ -4176,13 +4165,13 @@
   "compliance.duties.read": {
     "description": "Inspect authorized review duties",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + target + classification/group",
     "target": "Review duties",
@@ -4213,12 +4202,13 @@
     "description": "List own or assigned cases",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4229,12 +4219,13 @@
     "description": "Read authorized case details",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4245,12 +4236,13 @@
     "description": "Read permitted attachment",
     "roles": [
       "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4262,8 +4254,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4275,8 +4266,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4288,8 +4278,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4301,8 +4290,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + case + requester/assigned duty",
     "target": "Compliance cases, reviews and attachments",
@@ -4312,7 +4300,12 @@
   "compliance.cases.submit": {
     "description": "Submit own case",
     "roles": [
+      "Viewer",
+      "Reader",
+      "Contributor",
       "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4324,7 +4317,12 @@
   "compliance.cases.withdraw": {
     "description": "Withdraw own case",
     "roles": [
+      "Viewer",
+      "Reader",
+      "Contributor",
       "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4336,7 +4334,12 @@
   "compliance.cases.renew": {
     "description": "Renew own case/access",
     "roles": [
+      "Viewer",
+      "Reader",
+      "Contributor",
       "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4348,7 +4351,7 @@
   "compliance.cases.approve": {
     "description": "Approve assigned case step",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4360,7 +4363,7 @@
   "compliance.cases.reject": {
     "description": "Reject assigned case step",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4372,7 +4375,7 @@
   "compliance.cases.changes.request": {
     "description": "Request changes on assigned case",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4384,13 +4387,13 @@
   "compliance.memberships.list": {
     "description": "View assigned membership queue",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Group + assigned approval duty; layer when bound",
     "target": "Membership approvals",
@@ -4400,7 +4403,7 @@
   "compliance.memberships.approve": {
     "description": "Approve assigned membership",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4412,7 +4415,7 @@
   "compliance.memberships.reject": {
     "description": "Reject assigned membership",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4424,13 +4427,13 @@
   "compliance.register.read": {
     "description": "Read authorized register entries",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + grants/cases",
     "target": "Access register",
@@ -4440,7 +4443,8 @@
   "compliance.register.export": {
     "description": "Export authorized register entries",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4452,13 +4456,13 @@
   "compliance.deadlines.read": {
     "description": "Read authorized deadlines",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + case/access",
     "target": "Deadlines",
@@ -4468,7 +4472,12 @@
   "compliance.deadlines.renew": {
     "description": "Submit renewal request",
     "roles": [
+      "Viewer",
+      "Reader",
+      "Contributor",
       "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4480,7 +4489,7 @@
   "compliance.deadlines.decide": {
     "description": "Decide assigned renewal",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4492,13 +4501,13 @@
   "audit.read": {
     "description": "Read permitted redacted audit events",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Explicit global events or layer + target",
     "target": "Audit log",
@@ -4508,7 +4517,8 @@
   "audit.details.read": {
     "description": "Read permitted sensitive audit details",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4520,7 +4530,8 @@
   "audit.export": {
     "description": "Export authorized audit events",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4532,7 +4543,7 @@
   "audit.retention.set": {
     "description": "Configure audit retention within mandatory minimum",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4544,7 +4555,7 @@
   "audit.export_policy.set": {
     "description": "Configure scoped audit export policy",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4556,13 +4567,13 @@
   "query_log.read": {
     "description": "Read authorized safe query metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + query/source; explicit global defaults",
     "target": "Query log",
@@ -4572,7 +4583,8 @@
   "query_log.text.read": {
     "description": "Read authorized SQL text",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4584,7 +4596,8 @@
   "query_log.details.read": {
     "description": "Read authorized query details",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4596,7 +4609,8 @@
   "query_log.export": {
     "description": "Export authorized query log",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -4608,7 +4622,7 @@
   "query_log.retention.set": {
     "description": "Set scoped query-log retention",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4620,7 +4634,7 @@
   "query_log.recording.set": {
     "description": "Configure scoped SQL recording",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4632,7 +4646,7 @@
   "query_log.reset": {
     "description": "Reset scoped query-log configuration",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4644,13 +4658,13 @@
   "siem.status.read": {
     "description": "Read redacted SIEM status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global integration; layer export filters",
     "target": "SIEM",
@@ -4660,7 +4674,7 @@
   "siem.export.configure": {
     "description": "Configure allowed export settings",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4692,13 +4706,13 @@
   "layers.collection.list": {
     "description": "List authorized layer metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global collection",
     "target": "Layers collection",
@@ -4708,7 +4722,7 @@
   "layers.collection.create": {
     "description": "Create layer",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4720,13 +4734,13 @@
   "layers.object.read": {
     "description": "Read layer metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer",
     "target": "Individual layer",
@@ -4736,7 +4750,7 @@
   "layers.object.settings.edit": {
     "description": "Change ordinary layer settings",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4748,7 +4762,7 @@
   "layers.object.quota.set": {
     "description": "Change delegated layer quota",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4760,7 +4774,7 @@
   "layers.object.workspaces.set": {
     "description": "Enable or disable workspaces in layer",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4803,8 +4817,8 @@
   "layers.object.roles.assign": {
     "description": "Assign layer roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "One layer",
     "target": "Individual layer",
@@ -4814,8 +4828,8 @@
   "layers.object.roles.revoke": {
     "description": "Revoke layer roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "One layer",
     "target": "Individual layer",
@@ -4825,13 +4839,13 @@
   "platform.defaults.read": {
     "description": "Inspect global defaults",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Dedicated global configuration",
     "target": "Global defaults",
@@ -4841,7 +4855,7 @@
   "platform.defaults.default_layer.set": {
     "description": "Set global default layer",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4853,7 +4867,7 @@
   "platform.defaults.default_layer.reset": {
     "description": "Reset global default layer",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4865,13 +4879,13 @@
   "layer_infrastructure.read": {
     "description": "Read infrastructure status/specification",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + infrastructure resource",
     "target": "Layer infrastructure",
@@ -4881,13 +4895,13 @@
   "layer_infrastructure.history.read": {
     "description": "Read infrastructure operation history",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + infrastructure resource",
     "target": "Layer infrastructure",
@@ -4899,8 +4913,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + infrastructure resource",
     "target": "Layer infrastructure",
@@ -4910,7 +4923,7 @@
   "layer_infrastructure.apply": {
     "description": "Apply authorized infrastructure configuration",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4922,7 +4935,7 @@
   "layer_infrastructure.retry": {
     "description": "Retry authorized infrastructure operation",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -4976,13 +4989,13 @@
   "network.policies.list": {
     "description": "List authorized policy metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -4992,13 +5005,13 @@
   "network.policies.read": {
     "description": "Read authorized effective network rules",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -5010,8 +5023,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -5023,8 +5035,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -5034,7 +5045,7 @@
   "network.policies.create": {
     "description": "Create policy within layer ceiling",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5046,7 +5057,7 @@
   "network.policies.apply": {
     "description": "Apply ordinary policy changes",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5058,7 +5069,7 @@
   "network.policies.remove": {
     "description": "Remove ordinary policy within mandatory baseline",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5080,8 +5091,8 @@
   "network.policies.roles.assign": {
     "description": "Assign network-policy roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -5091,8 +5102,8 @@
   "network.policies.roles.revoke": {
     "description": "Revoke network-policy roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "One layer + policy; explicit global baseline object",
     "target": "Network policies",
@@ -5102,13 +5113,13 @@
   "network.editor_allowlist.read": {
     "description": "Read authorized host rules",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + allowlist; separate global ceiling",
     "target": "Editor HTTPS allowlist",
@@ -5120,8 +5131,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + allowlist; separate global ceiling",
     "target": "Editor HTTPS allowlist",
@@ -5131,7 +5141,7 @@
   "network.editor_allowlist.apply": {
     "description": "Apply host rule",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5143,7 +5153,7 @@
   "network.editor_allowlist.delete": {
     "description": "Delete host rule",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5165,13 +5175,13 @@
   "network.api_destinations.read": {
     "description": "Read authorized destination rules",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + destination; separate global ceiling",
     "target": "External API destination/trust allowlist",
@@ -5183,8 +5193,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "One layer + destination; separate global ceiling",
     "target": "External API destination/trust allowlist",
@@ -5194,7 +5203,7 @@
   "network.api_destinations.apply": {
     "description": "Apply permitted destination rule",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5206,7 +5215,7 @@
   "network.api_destinations.delete": {
     "description": "Delete destination rule",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5228,13 +5237,13 @@
   "certificates.read": {
     "description": "Read public expiry/status metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global or layer + certificate/binding",
     "target": "Certificates and TLS trust",
@@ -5256,7 +5265,7 @@
   "certificates.chain.rotate": {
     "description": "Rotate public certificate chain",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5288,8 +5297,8 @@
   "certificates.roles.assign": {
     "description": "Assign certificate roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global or layer + certificate/binding",
     "target": "Certificates and TLS trust",
@@ -5299,8 +5308,8 @@
   "certificates.roles.revoke": {
     "description": "Revoke certificate roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global or layer + certificate/binding",
     "target": "Certificates and TLS trust",
@@ -5310,13 +5319,13 @@
   "compute.pools.list": {
     "description": "List permitted pool specifications",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global size definition; explicit layer/pool binding",
     "target": "Pools and warehouse sizes",
@@ -5338,7 +5347,7 @@
   "compute.pools.create": {
     "description": "Create pool definition/binding",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5350,7 +5359,7 @@
   "compute.pools.capacity.set": {
     "description": "Change authorized pool capacity",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5362,7 +5371,7 @@
   "compute.pools.engines.set": {
     "description": "Change authorized supported engines",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5385,8 +5394,8 @@
   "compute.pools.roles.assign": {
     "description": "Assign pool usage/management roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global size definition; explicit layer/pool binding",
     "target": "Pools and warehouse sizes",
@@ -5396,8 +5405,8 @@
   "compute.pools.roles.revoke": {
     "description": "Revoke pool roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global size definition; explicit layer/pool binding",
     "target": "Pools and warehouse sizes",
@@ -5407,13 +5416,13 @@
   "compute.defaults.read": {
     "description": "Read scoped limits and defaults",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + workload kind; separate global fallback",
     "target": "Workspace limits and default warehouses",
@@ -5435,7 +5444,7 @@
   "compute.defaults.limits.set": {
     "description": "Set scoped capacity limits",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5447,7 +5456,7 @@
   "compute.defaults.limits.reset": {
     "description": "Reset scoped capacity limits",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5459,7 +5468,7 @@
   "compute.defaults.warehouse.set": {
     "description": "Set scoped default warehouse",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5471,7 +5480,7 @@
   "compute.defaults.warehouse.reset": {
     "description": "Reset scoped default warehouse",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5483,13 +5492,13 @@
   "runtimes.list": {
     "description": "List permitted runtime metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global image definition; explicit layer approval",
     "target": "Runtimes",
@@ -5513,8 +5522,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global image definition; explicit layer approval",
     "target": "Runtimes",
@@ -5524,7 +5532,7 @@
   "runtimes.register": {
     "description": "Register runtime",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5536,7 +5544,7 @@
   "runtimes.enable": {
     "description": "Enable or disable runtime",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5548,7 +5556,7 @@
   "runtimes.default.set": {
     "description": "Set authorized runtime default",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5560,7 +5568,7 @@
   "runtimes.layer.approve": {
     "description": "Approve runtime for an authorized layer",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5583,13 +5591,13 @@
   "workspace_templates.list": {
     "description": "List authorized templates",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + template + target group",
     "target": "Workspace templates",
@@ -5599,13 +5607,13 @@
   "workspace_templates.read": {
     "description": "Read authorized template",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + template + target group",
     "target": "Workspace templates",
@@ -5617,8 +5625,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + template + target group",
     "target": "Workspace templates",
@@ -5628,7 +5635,7 @@
   "workspace_templates.create": {
     "description": "Create template",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5640,7 +5647,7 @@
   "workspace_templates.apply": {
     "description": "Apply/update template",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5693,13 +5700,13 @@
   "alerts.rules.read": {
     "description": "Read authorized rules/events/channels",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + rule + monitored targets + destination",
     "target": "Alert rules and channels",
@@ -5711,8 +5718,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + rule + monitored targets + destination",
     "target": "Alert rules and channels",
@@ -5722,7 +5728,7 @@
   "alerts.rules.create": {
     "description": "Create authorized rule",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5734,7 +5740,7 @@
   "alerts.rules.enable": {
     "description": "Enable or disable rule",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5746,7 +5752,7 @@
   "alerts.rules.update": {
     "description": "Update authorized rule",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5758,7 +5764,7 @@
   "alerts.rules.delete": {
     "description": "Delete authorized rule",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5770,7 +5776,7 @@
   "alerts.rules.acknowledge": {
     "description": "Acknowledge authorized incident",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5782,13 +5788,13 @@
   "webhooks.list": {
     "description": "List authorized redacted channel metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global channel or explicit layer binding",
     "target": "Webhooks and deliveries",
@@ -5798,13 +5804,13 @@
   "webhooks.status.read": {
     "description": "Read authorized delivery status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global channel or explicit layer binding",
     "target": "Webhooks and deliveries",
@@ -5814,7 +5820,7 @@
   "webhooks.test": {
     "description": "Send test to authorized endpoint",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5826,7 +5832,8 @@
   "webhooks.delivery.read": {
     "description": "Read authorized redacted delivery details",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -5838,7 +5845,7 @@
   "webhooks.create": {
     "description": "Create ordinary channel definition",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5850,7 +5857,7 @@
   "webhooks.update": {
     "description": "Update ordinary channel configuration",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5862,7 +5869,7 @@
   "webhooks.delete": {
     "description": "Delete channel",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5894,13 +5901,13 @@
   "metrics.read": {
     "description": "Read authorized metric metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + metric + all dependencies",
     "target": "Metrics, KPIs and quality definitions",
@@ -5910,13 +5917,13 @@
   "metrics.history.read": {
     "description": "Read authorized observations/history",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + metric + all dependencies",
     "target": "Metrics, KPIs and quality definitions",
@@ -5926,13 +5933,13 @@
   "metrics.versions.read": {
     "description": "Read authorized definition versions",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + metric + all dependencies",
     "target": "Metrics, KPIs and quality definitions",
@@ -5944,8 +5951,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + metric + all dependencies",
     "target": "Metrics, KPIs and quality definitions",
@@ -5955,7 +5961,7 @@
   "metrics.enable": {
     "description": "Enable or disable metric",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5967,7 +5973,7 @@
   "metrics.schedule.set": {
     "description": "Set measurement schedule",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5979,7 +5985,7 @@
   "metrics.measure": {
     "description": "Run authorized SQL measurement",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -5991,7 +5997,7 @@
   "metrics.report": {
     "description": "Report observation for authorized producer/metric",
     "roles": [
-      "Executor",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -6003,13 +6009,13 @@
   "slas.read": {
     "description": "Read authorized SLA/status/history",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + asset/incident",
     "target": "SLAs and incidents",
@@ -6021,8 +6027,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + asset/incident",
     "target": "SLAs and incidents",
@@ -6032,7 +6037,7 @@
   "slas.activate": {
     "description": "Activate SLA target",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6044,7 +6049,7 @@
   "slas.evaluate": {
     "description": "Evaluate authorized SLA",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6056,7 +6061,7 @@
   "slas.acknowledge": {
     "description": "Acknowledge authorized SLA incident",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6068,13 +6073,13 @@
   "packages.list": {
     "description": "List authorized package metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -6084,13 +6089,13 @@
   "packages.read": {
     "description": "Read package/version metadata",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -6100,7 +6105,8 @@
   "packages.download": {
     "description": "Download authorized package",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -6112,7 +6118,8 @@
   "packages.install": {
     "description": "Install authorized package in layer",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -6124,10 +6131,9 @@
   "packages.upload": {
     "description": "Upload draft package/version",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -6137,7 +6143,6 @@
   "packages.publish": {
     "description": "Publish package/version",
     "roles": [
-      "Manager",
       "Admin",
       "Owner"
     ],
@@ -6149,7 +6154,7 @@
   "packages.yank": {
     "description": "Yank version",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6161,7 +6166,7 @@
   "packages.unyank": {
     "description": "Unyank version",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6184,8 +6189,8 @@
   "packages.roles.assign": {
     "description": "Assign package roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -6195,8 +6200,8 @@
   "packages.roles.revoke": {
     "description": "Revoke package roles",
     "roles": [
-      "Owner",
-      "AccessAdministrator"
+      "AccessAdministrator",
+      "Owner"
     ],
     "scope": "Global package object; explicit layer consumption binding",
     "target": "Python/R packages",
@@ -6206,13 +6211,13 @@
   "packages.imports.list": {
     "description": "List authorized import jobs",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global source trust; layer + policy/job/package",
     "target": "Package imports and source policy",
@@ -6222,13 +6227,13 @@
   "packages.imports.read": {
     "description": "Read authorized import job/status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Global source trust; layer + policy/job/package",
     "target": "Package imports and source policy",
@@ -6238,7 +6243,7 @@
   "packages.imports.request": {
     "description": "Request approved import",
     "roles": [
-      "Manager",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -6250,7 +6255,7 @@
   "packages.imports.approve": {
     "description": "Approve scoped import",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6262,7 +6267,7 @@
   "packages.imports.execute": {
     "description": "Execute approved import",
     "roles": [
-      "Manager",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -6274,7 +6279,7 @@
   "packages.imports.allowlist.set": {
     "description": "Set scoped package allowlist",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6286,7 +6291,7 @@
   "packages.imports.allowlist.reset": {
     "description": "Reset scoped package allowlist",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6308,7 +6313,8 @@
   "connections.discover": {
     "description": "Discover authorized runtime connection metadata",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -6320,7 +6326,8 @@
   "connections.read_lease": {
     "description": "Acquire credential/lease limited to authorized read actions",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -6334,8 +6341,7 @@
     "roles": [
       "Contributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Layer + data resource + execution identity",
     "target": "Connection and scoped credentials",
@@ -6366,7 +6372,8 @@
   "delegation.query": {
     "description": "Execute viewer-authorized read query",
     "roles": [
-      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
       "Owner"
     ],
@@ -6378,11 +6385,10 @@
   "delegation.files.read": {
     "description": "Read viewer-authorized file",
     "roles": [
-      "Executor",
-      "Admin",
-      "Owner",
       "DataReader",
-      "DataContributor"
+      "DataContributor",
+      "Admin",
+      "Owner"
     ],
     "scope": "Layer + workload + original viewer + data object",
     "target": "Viewer-bound SQL/files",
@@ -6392,10 +6398,9 @@
   "delegation.query.write": {
     "description": "Execute viewer-authorized data write",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + workload + original viewer + data object",
     "target": "Viewer-bound SQL/files",
@@ -6405,10 +6410,9 @@
   "delegation.files.write": {
     "description": "Write viewer-authorized file",
     "roles": [
-      "Contributor",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "DataContributor"
+      "Owner"
     ],
     "scope": "Layer + workload + original viewer + data object",
     "target": "Viewer-bound SQL/files",
@@ -6418,13 +6422,13 @@
   "backups.configuration.read": {
     "description": "Read backup configuration",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Installation; target set-backups",
     "target": "Backup and recovery",
@@ -6444,13 +6448,13 @@
   "backups.history.read": {
     "description": "Read recovery archive inventory and status",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
       "Admin",
-      "Owner",
-      "PlatformContributor"
+      "Owner"
     ],
     "scope": "Installation; target set-backups",
     "target": "Backup and recovery",
@@ -6460,7 +6464,7 @@
   "backups.create": {
     "description": "Create an encrypted platform metadata backup",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6482,14 +6486,14 @@
   "backups.plans.read": {
     "description": "Plans read",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator",
       "Admin",
-      "Owner",
-      "PlatformContributor",
-      "AccessAdministrator"
+      "Owner"
     ],
     "scope": "Backup plan/destination or storage integration; source layer applies",
     "target": "Backup and recovery",
@@ -6500,7 +6504,6 @@
     "description": "Plans create",
     "roles": [
       "Contributor",
-      "PlatformContributor",
       "Admin",
       "Owner"
     ],
@@ -6513,7 +6516,6 @@
     "description": "Plans update",
     "roles": [
       "Contributor",
-      "PlatformContributor",
       "Admin",
       "Owner"
     ],
@@ -6525,7 +6527,7 @@
   "backups.plans.schedule.change": {
     "description": "Plans schedule change",
     "roles": [
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6579,7 +6581,7 @@
   "backups.plans.run": {
     "description": "Plans run",
     "roles": [
-      "Executor",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6591,14 +6593,14 @@
   "backups.destinations.read": {
     "description": "Destinations read",
     "roles": [
-      "Viewer",
-      "Executor",
+      "Reader",
       "Contributor",
-      "Manager",
+      "Executor",
+      "DataReader",
+      "DataContributor",
+      "AccessAdministrator",
       "Admin",
-      "Owner",
-      "PlatformContributor",
-      "AccessAdministrator"
+      "Owner"
     ],
     "scope": "Backup plan/destination or storage integration; source layer applies",
     "target": "Backup and recovery",
@@ -6638,8 +6640,7 @@
   "backups.destinations.use": {
     "description": "Destinations use",
     "roles": [
-      "Executor",
-      "Manager",
+      "Contributor",
       "Admin",
       "Owner"
     ],
@@ -6672,7 +6673,6 @@
   "reviews.forms.review": {
     "description": "Review compliance access requests in scope",
     "roles": [
-      "Executor",
       "Admin",
       "Owner"
     ],
@@ -6684,7 +6684,6 @@
   "reviews.memberships.approve": {
     "description": "Review requests to join groups with approved access",
     "roles": [
-      "Executor",
       "Admin",
       "Owner"
     ],
@@ -6696,7 +6695,6 @@
   "reviews.configuration.manage": {
     "description": "Manage compliance review configuration in scope",
     "roles": [
-      "Executor",
       "Admin",
       "Owner"
     ],

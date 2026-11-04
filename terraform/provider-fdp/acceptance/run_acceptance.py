@@ -316,13 +316,13 @@ resource "fdp_data_policy" "region" {{
 resource "fdp_role_assignment" "analysts_publish" {{
   resource_id  = "packages"
   app_group_id = fdp_app_group.analysts.id
-  role         = "{'Maintainer' if v2 else 'Publisher'}"
+  role         = "{'Contributor' if v2 else 'DataContributor'}"
 }}
 
 resource "fdp_role_assignment" "admin_contribute" {{
   resource_id  = fdp_schema.reporting.id
   principal_id = data.fdp_principal.admin.id
-  role         = "Contributor"
+  role         = "DataContributor"
 }}
 
 resource "fdp_repository" "analytics" {{

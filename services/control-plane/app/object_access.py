@@ -31,7 +31,7 @@ def snapshot(db, user):
     for grant in assignments:
         target = resources.get(grant.resource_id)
         if not target or not (target.kind in rbac.DATA_OBJECT_KINDS or
-            (target.kind in ('source', 'schema') and grant.role in ('Viewer','Manager','Contributor','PlatformContributor','DataReader','DataContributor','AccessAdministrator'))):
+            (target.kind in ('source', 'schema') and grant.role not in rbac.DATA_LEVELS)):
             continue
         if interactive(user) and getattr(grant, 'app_group_id', None) and grant.app_group_id != user.active_group_id:
             continue
@@ -53,8 +53,7 @@ def snapshot(db, user):
                 continue
             if not getattr(grant, 'legacy_reviewed', False) and any(a.startswith(('data.sql.','data.files.','data.iceberg.')) for a in actions):
                 from .compliance import role_requirement
-                role = 'Executor' if resource.kind in rbac.DATA_OBJECT_KINDS else 'Reader'
-                req = role_requirement(db, resource, role, getattr(grant, 'app_group_id', None))
+                req = role_requirement(db, resource, 'DataReader', getattr(grant, 'app_group_id', None))
                 if req['policy'] is not None:
                     # Mandatory reviews cannot be bypassed with a parallel named grant.
                     actions = {a for a in actions if not a.startswith(('data.sql.','data.files.','data.iceberg.'))}
@@ -137,7 +136,8 @@ def policy_allow(rules, operation, table='', columns=None):
         'SetTableProperties':'storage.objects.alter', 'SetTableComment':'storage.objects.metadata.edit',
         'SetColumnComment':'storage.objects.metadata.edit'}
     action = mapping.get(operation)
-    return bool(action and (action in actions or (operation != 'TruncateTable' and 'data.sql.ddl' in actions)))
+    # DDL changes structure; it never writes or removes rows.
+    return bool(action and (action in actions or (not action.startswith('data.sql.') and 'data.sql.ddl' in actions)))
 
 
 def file_actions(rules, path):
@@ -297,7 +297,7 @@ def require_action(db, user, schema, action, table=''):
     from fastapi import HTTPException
     source = source_record(db, schema.object_id)
     legacy = rbac.data_scope(db,user,source).get(schema.name) if source else None
-    roles = {'Reader':{'Executor'}, 'Contributor':{'Executor','Contributor'}, 'Admin':{'Admin'}, 'Owner':{'Owner'}}.get(legacy,set())
+    roles = {'Reader':{'DataReader'}, 'Contributor':{'DataContributor'}, 'Admin':{'Admin'}, 'Owner':{'Owner'}}.get(legacy,set())
     if roles.intersection(permissions.REGISTRY[action]['roles']):
         return
     rules = schema_rules(db,user,schema)

@@ -2,7 +2,7 @@ locals {
   catalog_audiences       = toset(concat([var.engineers_group_id, var.analysts_group_id, coalesce(var.product_owner_group_id, var.engineers_group_id)], var.consumer_group_ids))
   catalog_page_grants     = { for pair in setproduct(local.catalog_audiences, ["products", "requests", "cases", "catalog"]) : "${pair[0]}:${pair[1]}" => { group = pair[0], page = pair[1] } }
   catalog_function_grants = { for pair in setproduct(local.catalog_audiences, ["products.collection", "products.object", "products.options", "products.requests.own"]) : "${pair[0]}:${pair[1]}" => { group = pair[0], namespace = pair[1] } }
-  request_form_grants     = { for pair in setproduct(local.catalog_audiences, ["Contributor", "Executor"]) : "${pair[0]}:${pair[1]}" => { group = pair[0], role = pair[1] } }
+  request_form_grants     = { for pair in setproduct(local.catalog_audiences, ["Contributor"]) : "${pair[0]}:${pair[1]}" => { group = pair[0], role = pair[1] } }
 }
 
 # Discovery and requesting are independent of payload access and product ownership.
@@ -12,7 +12,7 @@ resource "fdp_permission_assignment" "catalog_pages" {
   namespace    = "pages"
   layer_id     = var.layer_id
   app_group_id = each.value.group
-  role         = "Viewer"
+  role         = "Reader"
 }
 
 resource "fdp_permission_assignment" "catalog_functions" {
@@ -21,7 +21,7 @@ resource "fdp_permission_assignment" "catalog_functions" {
   namespace    = each.value.namespace
   layer_id     = var.layer_id
   app_group_id = each.value.group
-  role         = each.value.namespace == "products.requests.own" ? "Executor" : "Viewer"
+  role         = "Viewer" # finding products and asking for access
 }
 
 resource "fdp_permission_assignment" "request_forms" {
@@ -38,5 +38,5 @@ resource "fdp_permission_assignment" "product_owner_review" {
   namespace    = "compliance.cases"
   layer_id     = var.layer_id
   app_group_id = coalesce(var.product_owner_group_id, var.engineers_group_id)
-  role         = "Manager"
+  role         = "Contributor"
 }

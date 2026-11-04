@@ -146,7 +146,7 @@ def observations_readable(db,user,metric):
             pending.extend(dependencies)
             continue
         if resource.kind!='schema':
-            if not domain_allowed(db,user,'metrics.read',resource,'execute'):
+            if not domain_allowed(db,user,'metrics.read',resource,'open'):
                 return False
             continue
         source=db.get(DataSource,resource.object_id)

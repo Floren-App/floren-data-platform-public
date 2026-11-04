@@ -119,7 +119,7 @@ class _Visibility:
         if workload_id not in self.workloads:
             pub = self.db.get(Workload, workload_id)
             self.workloads[workload_id] = bool(pub) and permissions.domain_allowed(
-                self.db, self.user, 'logs.read', rbac.workload_resource(self.db, pub), 'execute')
+                self.db, self.user, 'logs.read', rbac.workload_resource(self.db, pub), 'open')
         return self.workloads[workload_id]
 
     def run(self, run_id: str) -> bool:

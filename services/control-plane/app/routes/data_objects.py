@@ -133,7 +133,7 @@ def file_session(ident: str, body: SessionIn, db=Depends(get_db), user=Depends(g
     legacy = ((run.access_snapshot or {}).get(source.id,{}).get(schema.name)
         if user.execution_context.startswith('run:') else rbac.data_scope(db,user,source).get(schema.name))
     if legacy:
-        roles = {'Reader':{'Executor'}, 'Contributor':{'Executor','Contributor'}, 'Admin':{'Admin'}, 'Owner':{'Owner'}}.get(legacy,set())
+        roles = {'Reader':{'DataReader'}, 'Contributor':{'DataContributor'}, 'Admin':{'Admin'}, 'Owner':{'Owner'}}.get(legacy,set())
         held.update(key for key,value in permissions.REGISTRY.items() if key.startswith('data.files.') and roles.intersection(value['roles']))
     policy, path = object_access.file_session_policy(source,schema,row,held,body.mode)
     cred, _ = credentials(source,{schema.name:schema},{schema.name:'Reader'},get_secret_store(),db=db,policy_override=policy)

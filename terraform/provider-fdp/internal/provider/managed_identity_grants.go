@@ -9,7 +9,8 @@ import (
 	"github.com/Floren-App/terraform-provider-fdp/internal/client"
 )
 
-// Only assignments declared here are owned; unrelated grants are never replaced.
+// Only assignments declared here are owned: one role per resource. Unrelated grants, also other roles the identity
+// holds on the same resource, are never replaced.
 func (r *workloadResource) reconcileIdentityGrants(ctx context.Context, principal string, old, wanted map[string]string) error {
 	if len(old)+len(wanted) == 0 {
 		return nil
@@ -19,15 +20,20 @@ func (r *workloadResource) reconcileIdentityGrants(ctx context.Context, principa
 	}
 	// Install replacement access before withdrawing old access.
 	for resource, role := range wanted {
-		if err := r.api.Do(ctx, "PUT", "/v1/rbac/resources/"+url.PathEscape(resource)+"/assignments", map[string]any{"principal_id": principal, "role": role}, nil); err != nil {
+		body := map[string]any{"principal_id": principal, "role": role}
+		if previous, ok := old[resource]; ok && previous != role {
+			body["replaces"] = previous // a changed role takes the place of the one this workload owned
+		}
+		if err := r.api.Do(ctx, "PUT", "/v1/rbac/resources/"+url.PathEscape(resource)+"/assignments", body, nil); err != nil {
 			return err
 		}
 	}
-	for resource := range old {
+	for resource, role := range old {
 		if _, keep := wanted[resource]; keep {
 			continue
 		}
-		if err := r.api.Do(ctx, "DELETE", "/v1/rbac/resources/"+url.PathEscape(resource)+"/assignments/services/"+url.PathEscape(principal), nil, nil); err != nil && !client.IsNotFound(err) {
+		target := "/v1/rbac/resources/" + url.PathEscape(resource) + "/assignments/services/" + url.PathEscape(principal) + "?role=" + url.QueryEscape(role)
+		if err := r.api.Do(ctx, "DELETE", target, nil, nil); err != nil && !client.IsNotFound(err) {
 			return err
 		}
 	}
@@ -44,8 +50,9 @@ func (r *workloadResource) readIdentityGrants(ctx context.Context, principal str
 			}
 			return nil, err
 		}
+		// The declared role when the identity holds it; otherwise what it holds (drift shows in the plan).
 		for _, a := range assignments {
-			if !a.Inherited && a.PrincipalID != nil && *a.PrincipalID == principal {
+			if !a.Inherited && a.PrincipalID != nil && *a.PrincipalID == principal && actual[resource] != declared[resource] {
 				actual[resource] = a.Role
 			}
 		}

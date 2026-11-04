@@ -200,9 +200,9 @@ def test_external_api_calls_use_configured_secrets_and_consumer_permissions(clie
     api = api.json()
     op = client.post(f"/v1/apis/{api['id']}/operations", headers=as_("ana"), json={
         "name": "get-customer", "group": "Customers", "method": "GET", "path": "/customers/{id}"}).json()
-    # bob may not call it until an Owner grants Consumer on the operation (or its group or API).
+    # bob may not call it until an Owner grants Data Reader on the operation (or its group or API).
     assert client.get("/v1/egress/crm/customers/7", headers=as_("bob")).status_code == 404
-    grant_group(client, op["resource_id"], "CRM consumers", "Consumer", users=("bob",))
+    grant_group(client, op["resource_id"], "CRM consumers", "DataReader", users=("bob",))
     r = client.get("/v1/egress/crm/customers/7?expand=orders", headers={**as_("bob"), "X-Correlation-Id": "c-9", "Cookie": "x=1"})
     assert r.status_code == 200, r.text
     assert r.json() == {"id": 7, "name": "Acme"} and r.headers["x-request-id"] == "r-1" and "set-cookie" not in r.headers
@@ -266,7 +266,7 @@ def test_external_mtls_presents_the_client_certificate_and_trusts_the_configured
         api = client.post("/v1/apis", headers=as_("admin"), json={**body, "outbound": {**outbound, "client_certificate": "group:finance/bank-client"}})
         assert api.status_code == 201, api.text
         op = client.post(f"/v1/apis/{api.json()['id']}/operations", headers=as_("admin"), json={"name": "balance", "method": "GET", "path": "/balance"}).json()
-        grant_group(client, op["resource_id"], "Bank consumers", "Consumer", users=("ana",))
+        grant_group(client, op["resource_id"], "Bank consumers", "DataReader", users=("ana",))
         r = client.get("/v1/egress/bank/balance", headers=as_("ana"))
         assert r.status_code == 200, r.text
         assert Backend.seen[-1]["path"] == "/balance"
@@ -308,7 +308,7 @@ def test_operation_grants_allow_scoped_editing_without_sibling_metadata_or_calls
         assert r.status_code == 201, r.text
         return r.json()
     one, two = operation('permitted', 'Finance'), operation('hidden', 'Other department')
-    grant_group(client, one['resource_id'], 'Scoped API editors', 'Manager', users=['bob'])
+    grant_group(client, one['resource_id'], 'Scoped API editors', 'Contributor', users=['bob'])
     pid=client.get('/v1/me',headers=as_('bob')).json()['principal_id']
     from app.permissions import resource_layer
     with SessionLocal() as db:
@@ -349,7 +349,7 @@ def test_outbound_paths_and_configured_credentials_cannot_be_overridden(client, 
     for path in ['/customers/{id}/{id}', '/customers/..', '/' + 'x' * 257]:
         assert client.post(endpoint, headers=as_('admin'), json={'name': 'invalid', 'path': path}).status_code == 422
     op = client.post(endpoint, headers=as_('admin'), json={'name': 'customer', 'path': '/customers/{id}'}).json()
-    grant_group(client, op['resource_id'], 'Partner consumers', 'Consumer', users=['bob'])
+    grant_group(client, op['resource_id'], 'Partner consumers', 'DataReader', users=['bob'])
     r = client.get('/v1/egress/partner/customers/7?api_key=attacker&tenant=wrong', headers={**as_('bob'), 'x-tenant': 'wrong'})
     assert r.status_code == 200, r.text
     assert Backend.seen[-1]['path'] == '/api/customers/7?tenant=finance&api_key=configured-key'
@@ -379,7 +379,8 @@ def test_external_soap_action_and_decoded_http_responses(client, backend):
         'protocol': 'soap', 'outbound': {'base_url': backend}}).json()
     op = client.post(f"/v1/apis/{soap['id']}/operations", headers=as_('admin'), json={
         'name': 'Balance', 'method': 'POST', 'path': '/soap', 'soap_action': 'urn:Balance'}).json()
-    grant_group(client, op['resource_id'], 'SOAP consumers', 'Consumer', users=['bob'])
+    # SOAP operations are POSTed, so calling one is Data Contributor's.
+    grant_group(client, op['resource_id'], 'SOAP consumers', 'DataContributor', users=['bob'])
     response = client.post('/v1/egress/bank/Balance', headers=as_('bob'), content='<Balance><id>7</id></Balance>')
     assert response.status_code == 200 and response.text == '<BalanceResponse>7</BalanceResponse>'
     assert Backend.seen[-1]['path'] == '/soap'
@@ -389,7 +390,7 @@ def test_external_soap_action_and_decoded_http_responses(client, backend):
     rest = client.post('/v1/apis', headers=as_('admin'), json={'name': 'Compressed', 'slug': 'compressed', 'direction': 'external',
         'outbound': {'base_url': backend, 'pass_response_headers': ['content-type', 'content-encoding', 'content-length']}}).json()
     op = client.post(f"/v1/apis/{rest['id']}/operations", headers=as_('admin'), json={'name': 'compressed', 'path': '/compressed'}).json()
-    grant_group(client, op['resource_id'], 'Compressed consumers', 'Consumer', users=['bob'])
+    grant_group(client, op['resource_id'], 'Compressed consumers', 'DataReader', users=['bob'])
     response = client.get('/v1/egress/compressed/compressed', headers=as_('bob'))
     assert response.status_code == 200 and response.json()['name'] == 'Acme'
     assert 'content-encoding' not in response.headers

@@ -29,7 +29,7 @@ def offline(monkeypatch,client):
     for username in ('ana','bob'):
         pid=client.get('/v1/me',headers=as_(username)).json()['principal_id']
         with SessionLocal() as db:
-            db.add(ServiceRoleAssignment(resource_id='packages',principal_id=pid,role='Executor'))
+            db.add(ServiceRoleAssignment(resource_id='packages',principal_id=pid,role='DataReader'))
             db.commit()
 
 
@@ -68,7 +68,7 @@ def r_package(name="fdpr", version="1.0.0", imports="", depends="R (>= 4.1.0)", 
 
 def publishers(client, *users, name="Data engineers"):
     g = group(client, name, *users)
-    r = client.put("/v1/rbac/resources/packages/assignments", headers=ADMIN, json={"app_group_id": g["id"], "role": "Publisher"})
+    r = client.put("/v1/rbac/resources/packages/assignments", headers=ADMIN, json={"app_group_id": g["id"], "role": "DataContributor"})
     assert r.status_code == 200, r.text
     return g
 
@@ -88,7 +88,7 @@ def test_metadata_viewer_cannot_download_and_package_executor_cannot_read_siblin
     with SessionLocal() as db:
         db.execute(delete(ServiceRoleAssignment).where(ServiceRoleAssignment.principal_id==pid))
         package=db.scalar(select(Package).where(Package.key=='fdp-tools'))
-        db.add(ServiceRoleAssignment(resource_id=package.resource_id,principal_id=pid,role='Viewer'))
+        db.add(ServiceRoleAssignment(resource_id=package.resource_id,principal_id=pid,role='Reader'))
         db.commit()
     root='/v1/packages/python'
     assert client.get(root+'/fdp-tools',headers=as_('bob')).status_code==200
@@ -98,7 +98,7 @@ def test_metadata_viewer_cannot_download_and_package_executor_cannot_read_siblin
     assert 'fdp-tools' in index and 'private-sibling' not in index
     with SessionLocal() as db:
         grant=db.scalar(select(ServiceRoleAssignment).where(ServiceRoleAssignment.principal_id==pid))
-        grant.role='Executor';db.commit()
+        grant.role='DataReader';db.commit()
     assert client.get(root+'/files/fdp-tools/'+filename,headers=as_('bob')).content==data
     assert client.get(root+'/private-sibling',headers=as_('bob')).status_code==404
 
@@ -316,7 +316,7 @@ def test_executions_install_only_from_the_repository_and_publish_with_their_toke
     assert client.post("/v1/packages/python/legacy/", headers=tw_headers, data=twine, files={"content": (filename, data)}).status_code == 403
     # Grant the group captured by this workspace, rather than an inactive group.
     client.put("/v1/rbac/resources/packages/assignments",headers=ADMIN,
-        json={"app_group_id":ws["owner_group_id"],"role":"Publisher"}).raise_for_status()
+        json={"app_group_id":ws["owner_group_id"],"role":"DataContributor"}).raise_for_status()
     r = client.post("/v1/packages/python/legacy/", headers=tw_headers, data=twine, files={"content": (filename, data)})
     assert r.status_code == 200 and r.text == "OK"
     # A workspace token keeps working past its expiry while the workspace runs; not after it stops.

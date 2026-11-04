@@ -7,18 +7,15 @@ does not cancel an inherited grant.
 
 | Role | Physical object authority |
 |---|---|
-| PlatformContributor | Change object configuration and permitted DDL; no payload or role administration |
-| DataReader | Read actual data; no configuration or access delegation |
+| Reader | Discover metadata; no row or file contents |
+| Contributor | Change object configuration, descriptive metadata and DDL; no payload or access delegation |
+| DataReader | Read actual data |
 | DataContributor | Read and modify actual data; no configuration or access delegation |
 | AccessAdministrator | Administer access in scope; no payload or configuration |
-| Viewer | Discover metadata; no row or file contents |
-| Executor | Read rows or file contents |
-| Contributor | Write data; does not imply reading data |
-| Manager | Edit descriptive metadata; no payload authority |
 | Admin | Read, write and administer the object |
 | Owner | Admin plus delegation |
 
-Page Viewer remains separate. For example, discovering storage requires `pages` Viewer
+Page Reader remains separate. For example, discovering storage requires `pages` Reader
 on `storage`; reading a table requires its payload permission. Runtime identities use
 their admitted object grants and layer boundary, rather than desktop page permissions.
 Interactive group grants use only the selected group. Explicit principal grants remain
@@ -47,7 +44,7 @@ resource "fdp_data_object" "amount" {
 resource "fdp_role_assignment" "read_amount" {
   resource_id  = fdp_data_object.amount.id
   app_group_id = fdp_app_group.analysts.id
-  role         = "Executor"
+  role         = "DataReader"
 }
 ```
 
@@ -89,10 +86,9 @@ an identity is restricted to a single object.
 Named SQL reads require both `data.sql.select` and `data.queries.results.read` on
 every selected table or column. The engine checks both at the referenced object;
 a result grant on another source does not satisfy this check. Grant `data.queries`
-Viewer for query status and Executor for the listed result/cancellation functions,
-or use namespace `data` with an explicit action set. Legacy schema Reader/Executor
-is an explicit bundle containing data reading and result retrieval.
+Reader for query status and DataReader for the listed result/cancellation functions,
+or use namespace `data` with an explicit action set. Schema DataReader is a bundle containing data reading and result retrieval.
 
-Contributor alone supplies write actions through governed SQL. It does not supply
-SELECT. Native write-only credentials are refused because the supported native
-writer role also reads; grant both powers explicitly or use governed SQL.
+DataContributor supplies read and write through governed SQL; DDL comes with Contributor and never
+writes rows. A write-only grant is an explicit set of write permissions; native write-only
+credentials are refused because the supported native writer role also reads.

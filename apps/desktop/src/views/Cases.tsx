@@ -88,7 +88,7 @@ export function CaseView({ id, hub, openTab }: { id: string; hub: Hub; openTab: 
     {message && <p className="success-message" role="status">{message}</p>}
     <section className="card case-facts" aria-label="What it gives">
       <dl className="facts">
-        <div><dt>Gives</dt><dd>{c.kind === "product" ? <>Consumer of <button className="text-button" onClick={() => openTab({ kind: "product", ref: c.product_id!, title: c.product ?? "Product" })}>{c.product}</button>{c.option && ` with option ${c.option}`}</>
+        <div><dt>Gives</dt><dd>{c.kind === "product" ? <>Data Reader of <button className="text-button" onClick={() => openTab({ kind: "product", ref: c.product_id!, title: c.product ?? "Product" })}>{c.product}</button>{c.option && ` with option ${c.option}`}</>
           : c.kind === "role" ? `${c.role} on ${c.resource?.kind ?? ""} ${c.resource?.name ?? ""}` : `the group's justified access to ${c.principal}`}</dd></div>
         <div><dt>Data</dt><dd>{c.classification || "—"}{c.layer && ` in ${c.layer}`}</dd></div>
         <div><dt>Form</dt><dd>{c.form ? `${c.form}, version ${c.form_version}` : "—"}</dd></div>

@@ -1,4 +1,4 @@
-import { expect, test, Page } from "playwright/test";
+import { expect, test, Locator, Page } from "playwright/test";
 import { TAB_PAGES } from "../src/permissions";
 const ALL_FEATURES = ["products.browse", "products.request", "products.publish", "catalog.objects", "workspaces", "workloads.view", "workloads.manage", "storage", "packages", "kafka", "apis", "usage", "security"];
 const allPages = Object.fromEntries(Object.values(TAB_PAGES).map((p) => [p, true]));
@@ -8,9 +8,22 @@ type Grant = { id: string; resource_id: string; app_group_id: string | null; gro
   principal_id?: string; principal_name?: string; principal_kind?: string; role: string };
 const runCapabilities = ["logs.read", "artifacts.list", "artifacts.read", "artifacts.open", "runs.cancel_own", "runs.cancel_others", "runs.retry"];
 const workspaceCapabilities = ["object.read", "object.start", "object.stop", "object.editor.open", "object.settings.edit", "object.delete", "files.read"].map((a) => `workspaces.${a}`).concat("runs.create", "git.credentials.binding.change");
-const allActions = ["read", "write", "create", "delete", "alter", "execute", "assign", "identity"];
+const allActions = ["read", "write", "create", "delete", "alter", "execute", "open", "assign", "identity"];
 const resource = (id: string, kind: string, name: string, parent: string | null = null, config = {}, objectId: string | null = null): Resource =>
   ({ id, kind, name, parent_id: parent, object_id: objectId, config, actions: [...allActions] });
+
+// The control plane's role catalog, trimmed to names and categories (test_access_inventory.py checks the real one).
+const DATA_FAMILY = "DataReader:data DataContributor:data Reader:platform Contributor:platform AccessAdministrator:privileged Admin:privileged Owner:privileged";
+const PROGRAM_FAMILY = "Reader:platform Contributor:platform Executor:platform DataReader:data AccessAdministrator:privileged Admin:privileged Owner:privileged";
+const permissionInfo = { "data.sql.select": { description: "Read table rows", category: "data", constraint: "" },
+  "reviews.forms.review": { description: "Review compliance forms", category: "privileged", constraint: "" } };
+const roleCatalog = {
+  types: [["data-sql", DATA_FAMILY], ["data-iceberg", DATA_FAMILY], ["data-s3", DATA_FAMILY], ["kafka", DATA_FAMILY], ["topic", DATA_FAMILY], ["workloads", PROGRAM_FAMILY],
+    ["service-account", PROGRAM_FAMILY], ["settings:adm-privacy", PROGRAM_FAMILY], ["settings:adm-platform", PROGRAM_FAMILY]].map(([key, spec]) => ({ key, label: key, family: "",
+    roles: spec.split(" ").map((r) => { const [name, category] = r.split(":"); return { name, category, permissions: name === "DataReader" ? ["data.sql.select"] : [] }; }) })),
+  custom_roles: [], permissions: permissionInfo,
+  review_duties: [{ key: "compliance_reviewer", name: "Forms reviewer", description: "Review compliance forms in scope", category: "privileged", permissions: ["reviews.forms.review"] }],
+};
 
 async function setup(page: Page, access: "owner" | "reader" | "navigation" = "owner", dataAccess?: (r: Resource) => boolean, tokenSeconds = 3600) {
   const resources = [resource("workloads", "root", "Workloads"), resource("finance-folder", "folder", "Finance", "workloads"),
@@ -29,7 +42,7 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
   const groups = [{ id: "analysts", name: "Analysts", description: "Finance analysts", owners: ["admin"], bindings: ["idp-finance"], can_manage: true, can_inspect: true },
     { id: "operators", name: "Operators", description: "Platform operators", owners: ["admin"], bindings: [], can_manage: true, can_inspect: true }];
   const grants: Grant[] = [{ id: "parent-grant", resource_id: "source-pg", app_group_id: "operators", group: "Operators", role: "Owner" },
-    { id: "schema-grant", resource_id: "pg-reporting", app_group_id: "analysts", group: "Analysts", role: "Reader" }];
+    { id: "schema-grant", resource_id: "pg-reporting", app_group_id: "analysts", group: "Analysts", role: "DataReader" }];
   const workloads = [{ id: "sales", resource_id: "sales-service", folder_id: "report-folder", service_principal_id: "sales-identity", execution_mode: "caller",
     actions: access === "owner" ? allActions : ["read", "execute"], slug: "sales", title: "Sales app", kind: "app", runtime: "python", program: "sales", repo: "analytics", branch: "main", owner: "admin",
     allowed_groups: [], warehouse: "small", auto_update: false, status: "live", deployed_sha: "abc1234", deployed_commit: {}, deployed_at: null,
@@ -61,6 +74,7 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     const respond = (data: unknown, status = 200) => route.fulfill({ status, json: data, headers: { "Access-Control-Allow-Origin": "*" } });
     if (method !== "GET") mutations.push({ method, path, body }); else reads.push(path);
     if (path === "/v1/layers") return respond([{ id: "1a0000000001", name: "Prod", description: "", workspaces: false, production: true }, { id: "1a0000000002", name: "Non-Prod", description: "", workspaces: true, default: true }]);
+    if (path === "/v1/permissions/catalog") return respond(roleCatalog);
     if (path === "/v1/client-config") return respond({ oidc_issuer: "https://idp.test", oidc_client_id: "desktop", oidc_scopes: "openid", public_url: "https://iam.test" });
     if (path === "/v1/me") return respond({ username: "admin", is_admin: access === "owner", acting_admin: access === "owner", pages: allPages, app_features: ALL_FEATURES, active_group_id: activeGroup, active_layer_id: activeLayer, available_groups: groups.map((g) => ({ id: g.id, name: g.name })), groups: [], pools: [{ id: "small", name: "small", cpu: 2, memory_gb: 4, max_concurrent: 10, auto_suspend_seconds: 600, usage_available: true, active_runs: 1, active_services: 3, active_products: 2, active_executions: 4, in_use: 4, queued: 2 }], data_sources: [] });
     if (path === "/v1/compute/warehouses") return respond([{ name: "small", cpu: 2, memory_gb: 4, gpu: 0, max_concurrent: 10, in_use: 4, queued: 2,
@@ -191,6 +205,10 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
   return { mutations, reads, dataReads, errors, catalogItems, resources, workloads, activeGroup: () => activeGroup, rejectAssignment: () => { rejectAssignment = true; } };
 }
 
+/** Opens the Add role dialog of a Permissions tab; roles are radio buttons grouped by kind of access. */
+async function addRole(scope: Page | Locator) { await scope.getByRole("button", { name: "Add role", exact: true }).click(); }
+const roleOption = (scope: Page | Locator, role: string) => scope.getByRole("radio", { name: new RegExp(`^${role}`) });
+
 async function openSchema(page: Page, source = "finance-dw") {
   await page.getByRole("button", { name: "Storage", exact: true }).click();
   await page.locator(".sidebar").getByRole("button", { name: source, exact: true }).click();
@@ -232,8 +250,12 @@ test("Kafka opens topics lazily and keeps data roles on the topic permission pag
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Permissions", exact: true }).click();
   const panel = page.getByRole("region", { name: "Permissions for pokemon.cards" });
   await expect(panel).toBeVisible();
-  await expect(panel.getByLabel("Role", { exact: true })).toHaveValue("Reader");
-  await expect(panel.getByRole("option", { name: /^Executor/ })).toHaveCount(1);
+  await addRole(panel);
+  await expect(roleOption(panel, "Data Reader")).toBeChecked();
+  await expect(panel.getByRole("group", { name: "Data access" })).toContainText("Data Contributor");
+  await expect(panel.getByRole("group", { name: "Privileged access" })).toContainText("Owner");
+  await expect(panel.getByRole("group", { name: "Platform access" })).toContainText("Reader");
+  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(panel).toContainText("Consumer groups are isolated by identity");
 });
 
@@ -263,17 +285,19 @@ test("platform metadata has a SQL tab with results and validated mutation errors
 test("schema IAM stays scoped among 120 schemas and identical cross-source names", async ({ page }) => {
   const state = await setup(page);
   await openSchema(page);
-  await expect(page.getByRole("button", { name: "Remove Analysts's direct Reader role" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Analysts's direct DataReader role" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Remove Operators/ })).toHaveCount(0);
+  await addRole(page);
   await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
-  await page.getByLabel("Role", { exact: true }).selectOption("Contributor");
+  await roleOption(page, "Contributor").check();
   await page.getByRole("button", { name: "Assign role", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Assigned Contributor to Analysts.");
   expect(state.mutations).toContainEqual({ method: "PUT", path: "/v1/rbac/resources/pg-reporting/assignments", body: { app_group_id: "analysts", role: "Contributor" } });
   await openSchema(page, "lake");
+  await addRole(page);
   await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
   await page.getByRole("button", { name: "Assign role", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText("Assigned Reader to Analysts.");
+  await expect(page.getByRole("status")).toHaveText("Assigned Data Reader to Analysts.");
   expect(state.mutations.at(-1)?.path).toBe("/v1/rbac/resources/lake-reporting/assignments");
   expect(state.errors).toEqual([]);
 });
@@ -282,10 +306,11 @@ test("schema Owners grant and revoke Contributor directly to a service without c
   const state = await setup(page);
   await openSchema(page);
   const panel = page.getByRole('region', { name: 'Permissions for reporting', exact: true });
+  await addRole(panel);
   await panel.getByRole('combobox', { name: 'Grant to', exact: true }).selectOption('service');
   await panel.getByLabel('Find a service identity', { exact: true }).fill('finance');
   await panel.getByRole('combobox', { name: 'Service identity', exact: true }).selectOption('etl-identity');
-  await panel.getByLabel('Role', { exact: true }).selectOption('Contributor');
+  await roleOption(panel, "Contributor").check();
   await panel.getByRole('button', { name: 'Assign role', exact: true }).click();
   await expect(panel.getByRole('status')).toHaveText('Assigned Contributor to finance-etl.');
   const row = panel.getByRole('row').filter({ hasText: 'finance-etl' });
@@ -304,8 +329,8 @@ test("schema Owners grant and revoke Contributor directly to a service without c
 test("inherited grant opens the parent's permissions and direct revoke targets the child", async ({ page }) => {
   const state = await setup(page);
   await openSchema(page);
-  await page.getByRole("button", { name: "Remove Analysts's direct Reader role" }).click();
-  await expect(page.getByRole("status")).toHaveText("Removed the direct role for Analysts.");
+  await page.getByRole("button", { name: "Remove Analysts's direct DataReader role" }).click();
+  await expect(page.getByRole("status")).toHaveText("Removed Data Reader for Analysts.");
   expect(state.mutations.at(-1)?.path).toBe("/v1/rbac/resources/pg-reporting/assignments/analysts");
   await page.getByRole("cell", { name: "finance-dw", exact: true }).getByRole("button").click();
   await expect(page.getByRole("region", { name: "Permissions for finance-dw" })).toBeVisible();
@@ -316,7 +341,7 @@ test("explicit binding inspectors see grants without editing or service identity
   await setup(page, "reader");
   await openSchema(page);
   await expect(page.getByText("Inherited", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Assign role", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add role", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Remove/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Workloads", exact: true }).click();
   await page.getByRole("button", { name: /Finance$/, exact: false }).last().click();
@@ -332,7 +357,7 @@ test("metadata readers do not fetch grant bindings without inspection permission
   await openSchema(page);
   await expect(page.getByText(/Permission bindings require explicit inspection/)).toBeVisible();
   expect(state.reads).not.toContain("/v1/rbac/resources/pg-reporting/assignments");
-  await expect(page.getByRole("button", { name: "Assign role", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add role", exact: true })).toHaveCount(0);
 });
 
 test("navigation-only ancestors do not fetch protected permission details", async ({ page }) => {
@@ -351,8 +376,9 @@ test("nested folder creation and workload grants use the current object", async 
   await page.getByRole("button", { name: /Reports$/ }).last().click();
   await page.locator(".main").getByRole("button", { name: "Sales app", exact: true }).click();
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Permissions", exact: true }).click();
+  await addRole(page);
   await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
-  await expect(page.getByLabel("Role", { exact: true })).toHaveValue("Executor");
+  await expect(roleOption(page, "Executor")).toBeChecked();
   await page.getByRole("button", { name: "Assign role", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Assigned Executor to Analysts.");
   expect(state.mutations.at(-1)?.path).toBe("/v1/rbac/resources/sales-service/assignments");
@@ -424,8 +450,9 @@ test("folder IAM flows to apps and nested folders while keeping branches visible
   const sidebar = page.locator(".sidebar"), main = page.locator(".main");
   await page.getByRole("button", { name: "Workloads", exact: true }).click();
   await sidebar.getByRole("button", { name: "Permissions for folder Finance", exact: true }).click();
+  await addRole(page);
   await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
-  await page.getByLabel("Role", { exact: true }).selectOption("Executor");
+  await roleOption(page, "Executor").check();
   await page.getByRole("button", { name: "Assign role", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Assigned Executor to Analysts.");
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Contents", exact: true }).click();
@@ -447,7 +474,7 @@ test("deployed folder readers have no folder creation shortcuts", async ({ page 
   await expect(page.getByRole("button", { name: /^New folder/ })).toHaveCount(0);
   await page.locator(".sidebar").getByRole("button", { name: "Permissions for folder Finance", exact: true }).click();
   await expect(page.getByRole("region", { name: "Permissions for Finance" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Assign role", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add role", exact: true })).toHaveCount(0);
 });
 
 test("service permissions and identity bindings have their own contextual pages", async ({ page }) => {
@@ -456,8 +483,9 @@ test("service permissions and identity bindings have their own contextual pages"
   await page.locator(".sidebar").getByRole("button", { name: "Service identities", exact: true }).click();
   await page.getByRole("button", { name: "Service account: finance-etl", exact: true }).click();
   await page.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Permissions", exact: true }).click();
+  await addRole(page);
   await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
-  await page.getByLabel("Role", { exact: true }).selectOption("Owner");
+  await roleOption(page, "Owner").check();
   await page.getByRole("button", { name: "Assign role", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Assigned Owner to Analysts.");
   expect(state.mutations.at(-1)?.path).toBe("/v1/rbac/resources/etl-service/assignments");
@@ -511,6 +539,7 @@ test("data access failures name the identity and link to permissions and presele
   await expect(main.getByRole("region", { name: "Permissions for finance-dw", exact: true })).toBeVisible();
   await expect(main.getByRole("combobox", { name: "Grant to", exact: true })).toHaveValue("service");
   await expect(main.getByRole("combobox", { name: "Service identity", exact: true })).toHaveValue("etl-identity");
+  await page.keyboard.press("Escape");
   await page.getByRole("tab", { name: /Sales app/ }).click();
   await alert.getByRole("button", { name: "Manage identity bindings", exact: true }).click();
   await main.getByRole("button", { name: /^Analysts/ }).click();
@@ -562,6 +591,7 @@ test("permission failures keep the object in view and show the server denial", a
   const state = await setup(page);
   await openSchema(page);
   state.rejectAssignment();
+  await addRole(page);
   await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
   await page.getByRole("button", { name: "Assign role", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText("Owner permission required");
@@ -574,9 +604,15 @@ test("permissions and group bindings fit a compact desktop in dark mode", async 
   await page.emulateMedia({ colorScheme: "dark" });
   await setup(page);
   await openSchema(page);
-  await expect(page.getByRole("button", { name: "Assign role", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add role", exact: true })).toBeVisible();
   expect(await page.locator(".main").evaluate((main) => main.scrollWidth <= main.clientWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath("schema-permissions-compact-dark.png") });
+  await addRole(page);
+  const dialog = page.getByRole("dialog", { name: "Add a role on reporting" });
+  await expect(dialog.getByRole("group", { name: "Privileged access" })).toBeVisible();
+  expect(await dialog.evaluate((d) => d.scrollWidth <= d.clientWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("add-role-compact-dark.png") });
+  await page.keyboard.press("Escape");
   await page.getByRole("cell", { name: "Analysts", exact: true }).getByRole("button").click();
   await expect(page.getByRole("heading", { name: "Members", exact: true })).toBeVisible();
   expect(await page.locator(".main").evaluate((main) => main.scrollWidth <= main.clientWidth)).toBe(true);
@@ -1051,7 +1087,7 @@ test("the Access area lists who, what groups see and credentials; secrets live t
   await page.getByRole("button", { name: "Access", exact: true }).click();
   // Access opens on your to-do list; lists and detail belong to the pages, the sidebar only switches between them.
   await expect(main.getByRole("heading", { name: "Reviews", exact: true })).toBeVisible();
-  await expect(sidebar.getByRole("button")).toHaveText(["", "Access requests", "Reviews", "New members", "People", "Groups", "Service identities",
+  await expect(sidebar.getByRole("button")).toHaveText(["", "Access requests", "Reviews", "New members", "People", "Groups", "Roles", "Service identities",
     "Access register", "Audit log", "Query log", "Secrets"]);
   await expect(page.getByRole("button", { name: "Secrets", exact: true }).and(page.locator(".activity button"))).toHaveCount(0);
   await sidebar.getByRole("button", { name: "Groups", exact: true }).click();
@@ -1077,7 +1113,7 @@ test("IAM has separate group user and service pages with explicit identity origi
   await page.getByRole('button', { name: 'Access', exact: true }).click();
   // The sidebar is the only Access navigation; pages do not repeat it.
   const navigation = page.getByRole('list', { name: 'Who' });
-  await expect(navigation.getByRole('button')).toHaveCount(3);
+  await expect(navigation.getByRole('button')).toHaveCount(4);
   await navigation.getByRole('button', { name: 'People', exact: true }).click();
   await expect(main.getByRole('heading', { name: 'People', exact: true })).toBeVisible();
   await expect(main.getByText('IdP groups & roles', { exact: true })).toBeVisible();
@@ -1347,6 +1383,7 @@ test("catalog searches products and exposes governance SLA access and interactiv
   await expect(main.getByRole("table", { name: "SLA checks" })).toContainText("Unknown");
   await nav.getByRole("button", { name: "Permissions", exact: true }).click();
   await expect(main.getByRole("region", { name: "Permissions for Sales app" })).toBeVisible();
+  await addRole(page);
   await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
   await page.getByRole("button", { name: "Assign role", exact: true }).click();
   await expect(main.getByRole("status")).toHaveText("Assigned Executor to Analysts.");
@@ -1379,7 +1416,7 @@ test("catalog readers cannot edit governance SLAs or grants and table access sta
   await expect(main.getByRole("button", { name: "Save SLA", exact: true })).toHaveCount(0);
   await nav.getByRole("button", { name: "Permissions", exact: true }).click();
   await expect(main.getByRole("region", { name: "Permissions for reporting" })).toBeVisible();
-  await expect(main.getByRole("button", { name: "Assign role", exact: true })).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Add role", exact: true })).toHaveCount(0);
   expect(state.mutations).toEqual([]);
 });
 
@@ -2335,9 +2372,10 @@ test("schema Owners grant a person access directly and see User as the recipient
   await page.route("https://iam.test/api/v1/rbac/resources/*/user-principals", (route) => route.fulfill({ json: [{ id: "ana", name: "Ana" }] }));
   await openSchema(page);
   const main = page.locator(".main");
+  await addRole(main);
   await main.getByRole("combobox", { name: "Grant to", exact: true }).selectOption("user");
   await main.getByRole("combobox", { name: "User", exact: true }).selectOption("ana");
-  await main.getByRole("combobox", { name: "Role", exact: true }).selectOption("Contributor");
+  await roleOption(main, "Contributor").check();
   await main.getByRole("button", { name: "Assign role", exact: true }).click();
   await expect(main.getByRole("status")).toHaveText("Assigned Contributor to Ana.");
   await expect(main.getByText("User · direct", { exact: true })).toBeVisible();
@@ -2806,6 +2844,7 @@ test("granting covered data asks for the compliance form, page by page, and send
     : route.fallback());
   await page.route(/\/v1\/compliance\/cases$/, (route) => { cases.push(route.request().postDataJSON()); return route.fulfill({ status: 201, json: { id: "case1" } }); });
   await openSchema(page);
+  await addRole(page);
   await page.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
   await page.getByRole("button", { name: "Assign role", exact: true }).click();
   const panel = page.getByRole("region", { name: "Justify access" });
@@ -2824,7 +2863,7 @@ test("granting covered data asks for the compliance form, page by page, and send
   await panel.getByRole("checkbox", { name: "We use it only for this purpose" }).check();
   await panel.getByRole("button", { name: "Send for review", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Sent for review (case case1)" })).toBeVisible();
-  expect(cases[0]).toMatchObject({ kind: "role", resource_id: "pg-reporting", role: "Reader", app_group_id: "analysts", submit: true,
+  expect(cases[0]).toMatchObject({ kind: "role", resource_id: "pg-reporting", role: "DataReader", app_group_id: "analysts", submit: true,
     answers: { why: "Monthly revenue reporting", special: "No", ok: true } });
   await expect(panel).toBeHidden();
   expect(state.errors).toEqual([]);
@@ -3147,24 +3186,52 @@ test("administrators add a notification webhook, choose events and send a test",
 test("groups show members, what they reach and settings; connections and service accounts are set up where they live", async ({ page }) => {
   const state = await setup(page);
   const main = page.locator(".main"), sidebar = page.locator(".sidebar");
+  const removed: string[] = [];
+  await page.route(/\/v1\/compliance\/roles\/duty1$/, (route) => { removed.push(route.request().method()); return route.fulfill({ status: 204 }); });
+  const assignment = (id: string, role: string, category: string, target: [string, string, string], origin: string, permissions: [string, string, string][], extra = {}) => ({
+    id, role, category, family: null, target_id: target[0], target_name: target[1], target_kind: target[2], origin, layer_id: "1a0000000001", layer_name: "Prod", conditions: [],
+    permissions: permissions.map(([key, description, cat]) => ({ key, description, category: cat, constraint: "" })), ...extra });
   await page.route(/\/v1\/rbac\/groups\/analysts\/access$/, (route) => route.fulfill({ json: { system: false, app_profile: "Analyst",
-    compliance_roles: [{ role: "compliance_reviewer", label: "Review compliance forms in scope", scope: { classifications: ["restricted"] }, group: { id: "analysts", name: "Analysts" } }],
-    grants: [], access_sections:{
-      data:[{permission:"data.sql.select",description:"Read reporting rows",target_id:"pg-reporting",target_name:"reporting",role:"DataReader",origin:"Object role",layer_id:"production",conditions:["Approved until 2027-01-31"],grant_id:null}],
-      platform:[{permission:"reviews.forms.review",description:"Review compliance forms in scope",target_id:"cases",target_name:"Access requests",role:"Executor",origin:"Named assignment",layer_id:"production",conditions:[],grant_id:"review-grant"}],
-      privileged:[{permission:"storage.access.roles.assign",description:"Assign object access",target_id:"pg-reporting",target_name:"reporting",role:"AccessAdministrator",origin:"Named assignment",layer_id:"production",conditions:[],grant_id:"access-grant"}]
-    } } }));
+    compliance_roles: [], grants: [], access_roles: [
+      assignment("r1", "DataReader", "data", ["pg-reporting", "reporting", "schema"], "object", [["data.sql.select", "Read reporting rows", "data"], ["storage.objects.metadata.read", "See table names", "platform"]],
+        { conditions: ["Approved until 2027-01-31"] }),
+      assignment("r2", "Owner", "privileged", ["sales-service", "Sales app", "service"], "object", [["workloads.roles.assign", "Give roles on workloads", "privileged"], ["artifacts.read", "Read run outputs", "data"]]),
+      assignment("duty:duty1", "Forms reviewer", "privileged", ["cases", "Access requests", ""], "duty", [["reviews.forms.review", "Review compliance forms", "privileged"]],
+        { layer_id: null, layer_name: null, duty_id: "duty1", conditions: ["Classifications: restricted"], description: "Review compliance forms in scope" }),
+    ] } }));
   await page.getByRole("button", { name: "Access", exact: true }).click();
   await sidebar.getByRole("button", { name: "Groups", exact: true }).click();
   await main.getByRole("button", { name: /^Analysts/ }).click();
   const sections = main.getByRole("navigation", { name: "Group sections" });
   await expect(main.getByRole("table", { name: "Members" })).toBeVisible();
   await sections.getByRole("button", { name: "Has access to", exact: true }).click();
-  const reach = main.getByRole("table", { name: "Data access permissions" });
-  await expect(reach.getByRole("row", { name: /reporting/ })).toContainText("Approved until");
-  await expect(main.getByRole("table", {name:"Privileged access permissions"})).toContainText("Access Administrator");
-  await expect(main.getByRole("table", {name:"Platform access permissions"})).toContainText("Review compliance forms in scope");
-  await expect(main.getByText("Review compliance forms in scope")).toBeVisible();
+  // Roles, by kind of access and object; a role opens to its permissions.
+  const data = main.getByRole("region", { name: "Data access" }), privileged = main.getByRole("region", { name: "Privileged access" });
+  await expect(data).toContainText("finance-dw / reporting");
+  await expect(data).toContainText("Data Reader");
+  await expect(privileged).toContainText("Sales app");
+  await expect(privileged).toContainText("Access requests");
+  await expect(main.getByRole("region", { name: "Platform access" })).toContainText("No roles of this kind.");
+  await data.getByRole("button", { name: "Show roles on finance-dw / reporting" }).click();
+  await expect(data).toContainText("Approved until 2027-01-31");
+  await data.getByRole("button", { name: /Show the permissions of Data Reader/ }).click();
+  await expect(data.getByRole("table", { name: /Permissions of Data Reader/ })).toContainText("Read reporting rows");
+  await page.screenshot({ path: test.info().outputPath("group-has-access-to.png") });
+  // Sections fold away.
+  await data.getByRole("button", { name: /^Data access/ }).click();
+  await expect(data).not.toContainText("finance-dw / reporting");
+  // A search finds a permission and opens just the role that carries it.
+  await main.getByRole("searchbox", { name: "Search access" }).fill("roles.assign");
+  const owner = privileged.getByRole("table", { name: "Permissions of Owner on Sales app" });
+  await expect(owner).toContainText("Give roles on workloads");
+  await expect(owner).not.toContainText("Read run outputs");
+  await expect(privileged).not.toContainText("Access requests");
+  // A review duty is one of the group's privileged roles, removed from here.
+  await main.getByRole("searchbox", { name: "Search access" }).fill("");
+  await privileged.getByRole("button", { name: "Show roles on Access requests" }).click();
+  await expect(privileged).toContainText("Classifications: restricted");
+  await privileged.getByRole("button", { name: "Remove Forms reviewer on Access requests" }).click();
+  await expect.poll(() => removed).toEqual(["DELETE"]);
   await sections.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(main.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Analysts");
   // A storage connection's settings are on its Settings tab, not in Administration.
@@ -3249,13 +3316,18 @@ test("a new group is made in one page and given access from its own page; people
   await page.route(/\/v1\/rbac\/groups\/analysts\/access$/, (route) => route.fulfill({ json: { system: false, grants: [], compliance_roles: [], app_profile: null } }));
   await main.getByRole("button", { name: /^Analysts/ }).click();
   await main.getByRole("navigation", { name: "Group sections" }).getByRole("button", { name: "Has access to" }).click();
-  const give = main.getByRole("region", { name: "Give Analysts access" });
-  await give.getByRole("button", { name: "An object" }).click();
-  await give.getByLabel("Object").selectOption({ label: "finance-dw / reporting" });
-  await give.getByLabel("Role").selectOption("Reader");
+  await main.getByRole("button", { name: "Give access", exact: true }).click();
+  const give = page.getByRole("dialog", { name: "Give Analysts access" });
+  await expect(give.getByRole("button", { name: "A review duty" })).toBeVisible();
+  await give.getByRole("button", { name: "A role on an object" }).click();
+  await give.getByLabel("Find an object").fill("reporting");
+  await give.getByLabel("Object", { exact: true }).selectOption({ label: "finance-dw / reporting" });
+  await expect(roleOption(give, "Data Reader")).toBeChecked();
+  await page.screenshot({ path: test.info().outputPath("give-access.png") });
+  await roleOption(give, "Data Contributor").check();
   await give.getByRole("button", { name: "Give access" }).click();
-  await expect(main.getByRole("status")).toHaveText("Analysts is now Reader on reporting.");
-  expect(state.mutations.at(-1)).toMatchObject({ method: "PUT", path: "/v1/rbac/resources/pg-reporting/assignments", body: { app_group_id: "analysts", role: "Reader" } });
+  await expect(main.getByRole("status")).toHaveText("Analysts is now Data Contributor on reporting.");
+  expect(state.mutations.at(-1)).toMatchObject({ method: "PUT", path: "/v1/rbac/resources/pg-reporting/assignments", body: { app_group_id: "analysts", role: "DataContributor" } });
   // From a person: add them to a group you manage.
   await sidebar.getByRole("button", { name: "People", exact: true }).click();
   await main.getByRole("button", { name: "Open ana", exact: true }).click();
@@ -3278,10 +3350,11 @@ test("Administration shows the pages you hold a role on, and each page says who 
   await sidebar.getByRole("button", { name: "Compliance forms", exact: true }).click();
   await main.getByText("Who can see or change this page").click();
   const panel = main.getByRole("region", { name: "Permissions for Compliance forms" });
+  await addRole(panel);
   await panel.getByRole("combobox", { name: "App group", exact: true }).selectOption("analysts");
-  await panel.getByLabel("Role", { exact: true }).selectOption("Manager");
+  await roleOption(panel, "Contributor").check();
   await panel.getByRole("button", { name: "Assign role", exact: true }).click();
-  expect(state.mutations.at(-1)).toMatchObject({ method: "PUT", path: "/v1/rbac/resources/set-forms/assignments", body: { app_group_id: "analysts", role: "Manager" } });
+  expect(state.mutations.at(-1)).toMatchObject({ method: "PUT", path: "/v1/rbac/resources/set-forms/assignments", body: { app_group_id: "analysts", role: "Contributor" } });
   // Someone who manages only compliance forms sees only that page in Administration.
   await page.route("https://iam.test/api/v1/me", (route) => route.fulfill({ json: { username: "fay", is_admin: false, pages: { "set-forms": true }, active_group_id: "analysts", active_layer_id: null,
     available_groups: [{ id: "analysts", name: "Analysts" }], groups: [], pools: [], data_sources: [], app_features: ["products.browse"], compliance_roles: [],
@@ -3552,5 +3625,29 @@ test("Iceberg backup plans select namespaces and keep the existing schedule and 
   await expect(main.getByRole("status")).toHaveText("Backup plan saved.");
   expect(saved).toMatchObject({source_kind:"storage",source_id:"lake-source",schemas:["reporting","analytics.daily"],destination_id:"offsite",schedule:"15 3 * * *",enabled:false});
   await expect(main.getByRole("table",{name:"Backup plans"})).toContainText("Analytics lake");
+  expect(state.errors).toEqual([]);
+});
+
+test("Roles lists what each role on each kind of object carries, grouped by kind of access", async ({ page }) => {
+  const state = await setup(page);
+  const main = page.locator(".main");
+  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await page.locator(".sidebar").getByRole("button", { name: "Roles", exact: true }).click();
+  const detail = main.getByRole("region", { name: "Roles of data-sql" });
+  await expect(detail.getByRole("region", { name: "Privileged access" })).toContainText("Owner");
+  await expect(detail.getByRole("region", { name: "Platform access" })).toContainText("Reader");
+  await expect(detail.getByRole("region", { name: "Data access" })).toContainText("Data Reader");
+  // A search by permission opens the roles that carry it.
+  await main.getByRole("searchbox", { name: "Search roles and permissions" }).fill("table rows");
+  await expect(detail.getByRole("table", { name: "Permissions of Data Reader" })).toContainText("data.sql.select");
+  await page.screenshot({ path: test.info().outputPath("roles-search.png") });
+  await expect(detail).not.toContainText("Owner");
+  await main.getByRole("searchbox", { name: "Search roles and permissions" }).fill("");
+  await main.getByRole("complementary", { name: "Kinds of objects" }).getByRole("button", { name: /^Review duties/ }).click();
+  await expect(main.getByRole("region", { name: "Roles of Review duties" })).toContainText("Forms reviewer");
+  // On an object's Permissions tab, each role links to what it carries.
+  await openSchema(page);
+  await page.getByRole("region", { name: "Permissions for reporting" }).getByRole("button", { name: "Data Reader", exact: true }).click();
+  await expect(main.getByRole("region", { name: "Roles of data-sql" }).locator("li.highlight")).toContainText("Data Reader");
   expect(state.errors).toEqual([]);
 });

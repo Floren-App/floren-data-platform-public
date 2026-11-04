@@ -16,12 +16,12 @@ from .rbac_helpers import grant_group
 
 def test_broker_callback_cannot_borrow_another_groups_rights(client,topic):
     from .rbac_helpers import select_group
-    readers=grant_group(client,topic['id'],'Original readers','Reader',users=('ana',))
+    readers=grant_group(client,topic['id'],'Original readers','DataReader',users=('ana',))
     select_group(client,'ana',readers)
     admitted=issue(client,topic['id']).json()
     privileged=grant_group(client,topic['id'],'Inactive administrators','Admin',users=('ana',))
     client.put('/v1/rbac/resources/'+topic['id']+'/assignments',headers=as_('admin'),
-        json={'app_group_id':readers,'role':'Viewer'}).raise_for_status()
+        json={'app_group_id':readers,'role':'Reader','replaces':'DataReader'}).raise_for_status()
     assert issue(client,topic['id']).status_code==403
     select_group(client,'ana',privileged)
     assert decision(client,admitted,'READ').json()=={'result':False}
@@ -30,10 +30,10 @@ def test_broker_callback_cannot_borrow_another_groups_rights(client,topic):
 
 
 @pytest.mark.parametrize('role,consume,produce',[
-    ('Viewer',False,False),('Executor',True,False),('Contributor',False,True),
-    ('Manager',False,False),('Admin',True,True),('Owner',True,True),
+    ('Reader',False,False),('DataReader',True,False),('DataContributor',True,True),
+    ('Contributor',False,False),('Admin',True,True),('Owner',True,True),
 ])
-def test_six_kafka_roles_separate_metadata_and_payload(client,topic,role,consume,produce):
+def test_kafka_roles_separate_metadata_and_payload(client,topic,role,consume,produce):
     grant_group(client,topic['id'],'Kafka team',role,users=('ana',))
     assert client.get('/v1/kafka/topics/'+topic['id'],headers=as_('ana')).status_code==200
     assert issue(client,topic['id']).status_code==(200 if consume else 403)
@@ -80,7 +80,7 @@ def decision(client, session, operation, kind='TOPIC', name='orders', layer=laye
 
 
 def test_reader_cannot_produce_or_hijack_consumer_groups_and_revocation_is_live(client, topic):
-    grant_group(client, topic['id'], 'Readers', 'Reader', users=('ana',))
+    grant_group(client, topic['id'], 'Readers', 'DataReader', users=('ana',))
     out = issue(client, topic['id'])
     assert out.status_code == 200, out.text
     session = out.json()
@@ -96,13 +96,13 @@ def test_reader_cannot_produce_or_hijack_consumer_groups_and_revocation_is_live(
     assert issue(client, topic['id'], mode='produce').status_code == 403
     with SessionLocal() as db:
         from app.models import RoleAssignment
-        db.query(RoleAssignment).filter(RoleAssignment.resource_id == topic['id'], RoleAssignment.role == 'Reader').delete()
+        db.query(RoleAssignment).filter(RoleAssignment.resource_id == topic['id'], RoleAssignment.role == 'DataReader').delete()
         db.commit()
     assert decision(client, session, 'READ').json() == {'result':False}
 
 
-def test_contributor_can_produce_but_not_modify_topic_or_native_acl(client, topic):
-    grant_group(client, topic['id'], 'Writers', 'Contributor', users=('ana',))
+def test_data_contributor_can_produce_but_not_modify_topic_or_native_acl(client, topic):
+    grant_group(client, topic['id'], 'Writers', 'DataContributor', users=('ana',))
     session = issue(client, topic['id'], mode='produce').json()
     assert decision(client, session, 'WRITE').json() == {'result':True}
     assert decision(client, session, 'IDEMPOTENT_WRITE', 'CLUSTER', 'kafka-cluster').json() == {'result':True}
@@ -112,7 +112,7 @@ def test_contributor_can_produce_but_not_modify_topic_or_native_acl(client, topi
 
 
 def test_expired_or_deleted_topic_sessions_fail_closed(client, topic):
-    grant_group(client, topic['id'], 'Readers', 'Reader', users=('ana',))
+    grant_group(client, topic['id'], 'Readers', 'DataReader', users=('ana',))
     session = issue(client, topic['id']).json()
     with SessionLocal() as db:
         row = db.scalar(select(KafkaSession))
@@ -124,7 +124,7 @@ def test_expired_or_deleted_topic_sessions_fail_closed(client, topic):
 
 
 def test_topic_only_grant_is_navigable_without_enumerating_other_topics(client, topic):
-    grant_group(client, topic['id'], 'Readers', 'Reader', users=('ana',))
+    grant_group(client, topic['id'], 'Readers', 'DataReader', users=('ana',))
     result = client.get('/v1/rbac/resources',headers=as_('ana'))
     clusters = [r for r in result.json() if r['kind']=='kafka']
     assert len(clusters)==1 and not clusters[0]['actions']
@@ -148,7 +148,7 @@ def test_malformed_callbacks_fail_closed_and_key_rotation_accepts_previous_broke
 
 
 def test_recreating_topic_name_does_not_restore_old_grants_or_sessions(client, topic):
-    grant_group(client,topic['id'],'Readers','Reader',users=('ana',))
+    grant_group(client,topic['id'],'Readers','DataReader',users=('ana',))
     session=issue(client,topic['id']).json()
     assert client.delete('/v1/kafka/topics/'+topic['id'],headers=as_('admin')).status_code==204
     assert client.post('/v1/kafka/topics',headers=as_('admin'),json={'name':'orders','layer_id':layers.NON_PROD}).status_code==409
@@ -164,7 +164,7 @@ def test_recreating_topic_name_does_not_restore_old_grants_or_sessions(client, t
 def test_topic_lifecycle_validation_and_inherited_grants(client, topic):
     with SessionLocal() as db:
         cluster_id = db.get(Resource, topic['id']).parent_id
-    grant_group(client, cluster_id, 'Inherited readers', 'Reader', users=('ana',))
+    grant_group(client, cluster_id, 'Inherited readers', 'DataReader', users=('ana',))
     assert issue(client, topic['id']).status_code == 200
     assert client.post('/v1/kafka/topics', headers=as_('admin'),
                        json={'name':'orders', 'layer_id':layers.NON_PROD}).status_code == 409

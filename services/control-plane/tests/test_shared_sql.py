@@ -24,7 +24,7 @@ def sql_mode(client, monkeypatch):
         client.put('/v1/admin/datasources/' + name, headers=as_('admin'),
                    json=integration(name, kind)).raise_for_status()
         schema = client.post('/v1/rbac/sources/' + name + '/schemas', headers=as_('admin'), json={'name': 'reporting'}).json()
-        grant_group(client, schema['id'], 'finance-readers', 'Reader', users=('ana',))
+        grant_group(client, schema['id'], 'finance-readers', 'DataReader', users=('ana',))
         with SessionLocal() as db:
             resource = db.get(Resource, schema['id'])
             resource.config = {**resource.config, 'state': 'ready'}

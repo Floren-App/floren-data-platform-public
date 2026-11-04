@@ -648,7 +648,7 @@ def register_rows(db, user) -> List[dict]:
             continue
         out = case_out(db, case, user, full=False)
         access = (f"{out['product']} ({out['option']})" if out["option"] else out["product"]) if case.kind == "product" \
-            else f"{grant.role} on {out['resource']['name'] if out['resource'] else grant.resource_id}"
+            else f"{rbac.label(grant.role)} on {out['resource']['name'] if out['resource'] else grant.resource_id}"
         rows.append({"group": out["group"], "app_group_id": case.app_group_id, "access": access, "kind": case.kind,
                      "classification": case.classification, "layer": out["layer"] or "",
                      "form": f"{out['form']} v{out['form_version']}" if out["form"] else "", "requester": case.requester,

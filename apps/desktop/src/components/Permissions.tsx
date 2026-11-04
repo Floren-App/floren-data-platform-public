@@ -3,7 +3,8 @@ import { api, AccessResource, ApiError, AppGroup, CaseTarget, JustifyDeadline, R
 import { JustifyPanel } from "./ComplianceForm";
 import { ProductIcon } from "./ProductIcon";
 import type { TabRef } from "../views/Tabs";
-import { IconRefresh } from "./Icons";
+import { IconPlus, IconRefresh } from "./Icons";
+import { CATEGORIES, CATEGORY_INFO, CategoryBadge, catalogRoles, catalogTypeKey, Modal, RolePicker, useRoleCatalog } from "./Roles";
 
 export type ObjectSection = "overview" | "permissions" | "settings" | "preview" | "runs" | "sql" | "lineage" | "policies" | "versions" | "logs" | "alerts";
 export type OpenTab = (tab: TabRef) => void;
@@ -62,22 +63,23 @@ export function ObjectBreadcrumbs({ resource, resources, openTab, trailing = [] 
 }
 
 export function roleLabel(role: string): string {
-  return ({PlatformContributor:"Platform Contributor",DataReader:"Data Reader",DataContributor:"Data Contributor",AccessAdministrator:"Access Administrator"} as Record<string,string>)[role] || role;
+  return ({DataReader:"Data Reader",DataContributor:"Data Contributor",AccessAdministrator:"Access Administrator"} as Record<string,string>)[role] || role;
 }
 
-/** The roles an object offers (with what each allows), and the one to suggest first. */
+/** The roles an object offers (with what each allows), and the one to suggest first. Reader and Contributor see and
+ * configure the object; Data Reader and Data Contributor work with what it holds; Executor only triggers runs. */
 export function rolesFor(resource: Pick<AccessResource, "kind">) {
-  const isDataObject = ["table", "column", "file", "directory"].includes(resource.kind);
-  const isKafka = resource.kind === "kafka" || resource.kind === "topic";
-  const isData = resource.kind === "source" || resource.kind === "schema" || isKafka || isDataObject;
-  if (isDataObject) return { roles: { PlatformContributor:"Change object configuration; no data or access administration", DataReader:"Read actual data", DataContributor:"Read and modify actual data", AccessAdministrator:"Manage access without reading data or changing configuration", Viewer:"Read object metadata", Executor:"Read permitted content", Contributor:"Write content; reading is separate", Manager:"Manage object metadata", Admin:"Execute, edit and administer", Owner:"Administer and delegate" } as Record<string,string>, initial:"Viewer", isData, isProduct:false, isApi:false, isPackage:false, isKafka:false };
-  const isApi = API_KINDS.includes(resource.kind);
-  const isPackage = PACKAGE_KINDS.includes(resource.kind);
-  const isProduct = resource.kind === "product";
-  if (["setting", "settings-section", "settings-root"].includes(resource.kind))
-    return { roles: { Viewer: "Read permitted metadata", Contributor: "Edit drafts and content", Executor: "Use permitted functions and exports", Manager: "Apply operational configuration", Admin: "Execute, edit and administer", Owner: "Administer and delegate" } as Record<string, string>, initial: "Viewer", isData, isProduct, isApi, isPackage, isKafka };
-  const roles: Record<string, string> = isProduct ? PRODUCT_ROLES : isKafka ? { PlatformContributor: "Change configuration without messages or role administration", DataReader: "Consume messages", DataContributor: "Produce and consume messages", AccessAdministrator: "Manage access without message access", Viewer: "View topic metadata", Executor: "Consume and commit offsets for own groups", Contributor: "Produce messages; consuming is separate", Manager: "Configure topic lifecycle without reading messages", Admin: "Payload and topic administration", Owner: "All topic permissions and role assignments", Reader: "Legacy alias for Executor" } : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES : PROGRAM_ROLES;
-  const initial = isProduct ? "Consumer" : isData ? "Reader" : isApi ? "Consumer" : isPackage ? (resource.kind === "package" ? "Maintainer" : "Publisher") : "Executor";
+  const kind: string = resource.kind;
+  const isDataObject = ["table", "column", "file", "directory"].includes(kind);
+  const isKafka = kind === "kafka" || kind === "topic";
+  const isData = kind === "source" || kind === "schema" || isKafka || isDataObject;
+  const isApi = API_KINDS.includes(kind);
+  const isPackage = PACKAGE_KINDS.includes(kind);
+  const isProduct = kind === "product";
+  const roles: Record<string, string> = ["setting", "settings-section", "settings-root"].includes(kind) ? PAGE_ROLES
+    : isProduct ? PRODUCT_ROLES : isKafka ? KAFKA_ROLES : isData ? DATA_ROLES : isApi ? API_ROLES : isPackage ? PACKAGE_ROLES
+    : kind === "service" ? SERVICE_ROLES : PROGRAM_ROLES;
+  const initial = isData || isProduct || isApi || isPackage ? "DataReader" : roles.Executor ? "Executor" : "Reader";
   return { roles, initial, isData, isProduct, isApi, isPackage, isKafka };
 }
 
@@ -100,52 +102,65 @@ export function ObjectTabs({ active, onChange, settings = false, overview = "Ove
   </nav>;
 }
 
+const PRIVILEGED = {
+  AccessAdministrator: "Give and take away roles here, without reading data or changing configuration.",
+  Admin: "Everything except giving access: configure, use, delete.",
+  Owner: "Full control, including giving access to others.",
+};
 const DATA_ROLES = {
-  PlatformContributor: "Change configuration without data access", DataReader: "Read actual data", DataContributor: "Read and modify data", AccessAdministrator: "Manage access without data or configuration rights",
-  Viewer: "Discover schema metadata without row or file access.",
-  Executor: "Read data in this scope.",
-  Manager: "Edit descriptive metadata without data access.",
-  Reader: "Read data in this scope.",
-  Contributor: "Write data; reading requires Executor. Cannot create or alter tables.",
-  Admin: "Read, write, create, alter, and remove data objects. Cannot assign Floren Data Platform permissions.",
-  Owner: "Full control, including assigning permissions to app groups.",
+  Reader: "See the object, its tables and columns and its configuration. No data, no preview, no access from code.",
+  Contributor: "Change settings and descriptive metadata, and create or alter tables. No data.",
+  DataReader: "Read the data: SELECT, data preview and reading files from code.",
+  DataContributor: "Read and change the data: insert, update, delete and write files.",
+  ...PRIVILEGED,
+};
+const KAFKA_ROLES = {
+  Reader: "See the topic and its configuration. No messages.",
+  Contributor: "Configure the topic: partitions, retention. No messages.",
+  DataReader: "Subscribe: consume messages and commit offsets for your own consumer groups.",
+  DataContributor: "Publish and consume messages.",
+  ...PRIVILEGED,
 };
 const API_ROLES = {
-  Viewer: "Read API metadata without calling operations.",
-  Executor: "Call authorized API operations.",
-  Manager: "Configure endpoints without calling them.",
-  Consumer: "Call the API's operations from programs, or try them out. Internal APIs are called with their own JWT or mTLS.",
-  Contributor: "Edit draft configuration; calling and applying require separate permissions.",
-  Admin: "Create and remove operations and endpoint groups. Cannot assign permissions.",
-  Owner: "Full control, including permissions and the API's managed identity.",
+  Reader: "See the API and its operations.",
+  Contributor: "Configure the API: endpoints, groups and operations. No calls.",
+  DataReader: "Call its GET, HEAD and OPTIONS operations.",
+  DataContributor: "Call all its operations, also POST, PUT, PATCH and DELETE (SOAP operations are POST).",
+  ...PRIVILEGED,
 };
 const PACKAGE_ROLES = {
-  Viewer: "Read package metadata.",
-  Executor: "Download and install permitted packages.",
-  Contributor: "Upload new packages; publishing and imports require Manager.",
-  Manager: "Publish versions, manage availability and request imports.",
-  Admin: "Publish, import and administer packages.",
-  Publisher: "Publish new packages (their group becomes the package's Owner) and import packages from PyPI or CRAN.",
-  Maintainer: "Also publish new versions of packages and yank versions.",
-  Owner: "Full control, including deleting versions and assigning permissions.",
+  Reader: "See packages and versions.",
+  Contributor: "Manage availability: yank versions and the import allowlist.",
+  DataReader: "Download and install packages.",
+  DataContributor: "Also publish new packages (the group becomes their Owner) and import from PyPI or CRAN. New versions of a package are its Owner's.",
+  ...PRIVILEGED,
 };
 const PACKAGE_KINDS = ["package-root", "package"];
 const PRODUCT_ROLES = {
-  Viewer: "Read product metadata without accessing its data.",
-  Executor: "Use the objects covered by approved product access.",
-  Contributor: "Edit descriptive metadata without data access.",
-  Manager: "Manage product metadata without data access.",
-  Admin: "Administer and use the product without delegating permissions.",
-  Consumer: "Use everything in this data product: read its tables and topics, open its dashboards, call its APIs.",
-  Owner: "Also change the product, decide access requests and assign permissions.",
+  Viewer: "Find the product in the catalog and ask for access. Nothing else.",
+  Reader: "See the product and its configuration, without its data.",
+  Contributor: "Change the product's description and members, without its data.",
+  DataReader: "Use everything in the product: read its tables and topics, open its dashboards, call its APIs' read operations.",
+  ...PRIVILEGED,
 };
 const PROGRAM_ROLES = {
-  Viewer: "View workload metadata without running programs or opening apps.",
-  Executor: "Run programs and open apps.",
-  Contributor: "Edit permitted settings and drafts; running and deploying are separate.",
-  Manager: "Configure and deploy workloads and create folders; no execution or delegation.",
-  Admin: "Create and remove programs, apps, and folders. Cannot assign permissions.",
-  Owner: "Full control, including permissions and execution identity settings.",
+  Reader: "See workloads, their settings and status.",
+  Contributor: "Change settings, deploy and create folders. No running.",
+  Executor: "Trigger on-demand workloads (scripts, notebooks, dbt) and see their runs.",
+  DataReader: "Open apps and documentation, and read run outputs and logs.",
+  ...PRIVILEGED,
+};
+const SERVICE_ROLES = {
+  Reader: "See the service identity and its configuration.",
+  Contributor: "Change its settings.",
+  Executor: "Run things as this identity.",
+  ...PRIVILEGED,
+};
+const PAGE_ROLES = {
+  Reader: "See this page and its configuration.",
+  Contributor: "Change what this page configures.",
+  DataReader: "Also read the records it holds: log contents, query text, exports.",
+  ...PRIVILEGED,
 };
 
 /** Always scoped by the owning object; no global resource picker. */
@@ -195,10 +210,15 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
   }, [resource.id, canAssign, recipientType]);
 
   useEffect(() => {
-    if (initialServiceId) { setRecipientType("service"); setServiceId(initialServiceId); }
+    if (initialServiceId) { setRecipientType("service"); setServiceId(initialServiceId); setAdding(true); }
   }, [initialServiceId]);
 
   const [justify, setJustify] = useState<{ target: CaseTarget; requirement: Requirement } | null>(null);
+  const [adding, setAdding] = useState(!!initialServiceId);
+  const catalog = useRoleCatalog();
+  const typeKey = catalogTypeKey(resource, resources);
+  const typeRoles = catalogRoles(catalog, typeKey);
+  const categoryOf = (r: string) => typeRoles?.find((x) => x.name === r)?.category;
   // Access that needs a form and has none yet: it stays until its deadline.
   const [deadlines, setDeadlines] = useState<JustifyDeadline[]>([]);
   useEffect(() => { if (canAssign) api.compliance.deadlines(resource.id).then(setDeadlines).catch(() => setDeadlines([])); }, [resource.id, canAssign]);
@@ -211,7 +231,7 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
       await fn();
       // Refresh capabilities even when the change removes our own access.
       await onChanged();
-      setAssignments(await api.access.assignments(resource.id)); setMessage(success);
+      setAssignments(await api.access.assignments(resource.id)); setMessage(success); setAdding(false);
     } catch (e) {
       // Data under an access policy: the role is given once a compliance form is approved.
       if (e instanceof ApiError && e.requirement && recipientType === "group" && groupId)
@@ -227,14 +247,16 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
   const recipientName = recipientType !== "group" ? selectedService?.name : selectedGroup?.name;
   const visibleGroups = groups.filter((g) => !g.system && (g.id === groupId || g.name.toLowerCase().includes(search.toLowerCase())));
   const visibleServices = directPrincipals.filter((s) => s.id === serviceId || s.name.toLowerCase().includes(search.toLowerCase()));
-  const grantRows = (inherited: boolean) => assignments.filter((a) => a.inherited === inherited).map((a) => {
+  const grantRow = (a: RoleAssignment) => {
+    const inherited = a.inherited;
     const origin = resources.find((r) => r.id === a.resource_id);
     const name = a.principal_id ? a.principal_name ?? "Service identity" : a.group!;
     return <tr key={a.id}>
       <td>{a.principal_id ? <span className="row"><ProductIcon kind={a.principal_kind === "user" ? "user" : "identity"} size={16} />{name} <span className="badge">{a.principal_kind === "user" ? "User" : "Service"} · direct</span>
         {a.principal_active === false && <span className="badge">Inactive</span>}</span>
         : <button className="text-button" onClick={() => openTab({ kind: "access", ref: a.app_group_id!, title: name })}>{name}</button>}</td>
-      <td><span className="badge role-badge">{roleLabel(a.role)}</span>
+      <td><button className="text-button role-link" title="See this role's permissions" onClick={() => openTab({ kind: "roles", title: "Roles", ref: typeKey, roleName: a.role })}>
+        <span className="badge role-badge">{roleLabel(a.role)}</span></button>
         {!inherited && (() => { const d = deadlines.find((x) => x.app_group_id === a.app_group_id); return d && <div className="small">
           <span className="error-text">Needs a form by {new Date(d.due_at).toLocaleDateString()}</span>{" "}
           <button className="text-button" disabled={busy} onClick={() => justifyExisting(d)}>Justify</button></div>; })()}</td>
@@ -243,19 +265,26 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
         : resource.name}</td>
       <td className="table-actions">{!inherited && !a.system && canAssign && <button className="btn sm secondary" disabled={busy}
         aria-label={`Remove ${name}'s direct ${a.role} role`}
-        onClick={() => change(() => a.principal_id ? api.access.revokeService(resource.id, a.principal_id) : api.access.revoke(resource.id, a.app_group_id!), `Removed the direct role for ${name}.`)}>Remove</button>}
+        onClick={() => change(() => a.principal_id ? api.access.revokeService(resource.id, a.principal_id, a.role) : api.access.revoke(resource.id, a.app_group_id!, a.role), `Removed ${roleLabel(a.role)} for ${name}.`)}>Remove</button>}
         {a.system ? <span className="badge">System · protected</span> : inherited && <span className="badge">Inherited</span>}</td>
     </tr>;
-  });
+  };
+  // Direct grants first, then inherited ones; grouped by what kind of access the role gives.
+  const ordered = [...assignments].sort((a, b) => Number(a.inherited) - Number(b.inherited));
+  const grouped = typeRoles ? CATEGORIES.map((c) => [c, ordered.filter((a) => (categoryOf(a.role) ?? "platform") === c)] as const).filter(([, rows]) => rows.length) : [];
+  const roleNames = Object.keys(roles);
 
   return <section className="permissions-panel" aria-label={`Permissions for ${resource.name}`}>
     <div className="section-heading"><div><h2>Permissions <span className="badge">{resource.kind === "source" ? "Data source" : resource.kind === "schema" ? "Schema" : resource.kind === "root" ? "Workloads"
         : resource.kind === "api" ? "API" : resource.kind === "api-group" ? "Endpoint group" : resource.kind === "api-operation" ? "Operation" : resource.kind === "api-root" ? "All APIs" : resource.kind === "package-root" ? "Package repository" : resource.kind === "package" ? "Package" : resource.kind === "product" ? "Data product" : resource.kind}</span></h2>
-      <p className="muted">Who can access <strong>{resource.name}</strong>.</p></div>
-      {canRead && <button className="btn secondary" disabled={busy || loading} onClick={() => { setMessage(""); setReloadVersion((v) => v + 1); }}><IconRefresh size={14} />Refresh permissions</button>}
+      <p className="muted">Who can access <strong>{resource.name}</strong>, and with which role.</p></div>
+      <div className="row">
+        {canRead && <button className="btn secondary" disabled={busy || loading} onClick={() => { setMessage(""); setReloadVersion((v) => v + 1); }}><IconRefresh size={14} />Refresh permissions</button>}
+        {canRead && canAssign && <button className="btn" disabled={loading} onClick={() => { setMessage(""); setError(""); setJustify(null); setAdding(true); }}><IconPlus size={14} />Add role</button>}
+      </div>
     </div>
     {resource.owner_group_name && <p className="hint">Owner group · <strong>{resource.owner_group_name}</strong></p>}
-    <p className="scope-note">{resource.kind === "product" ? "Consumer gives the use of everything in this product, also what is added later. Removing a group, an object or the product ends that access; grants on the objects themselves are separate."
+    <p className="scope-note">{resource.kind === "product" ? "Data Reader gives the use of everything in this product, also what is added later. Removing a group, an object or the product ends that access; grants on the objects themselves are separate."
       : resource.kind === "source" ? "Grants apply to all registered schemas in this data source, including schemas registered later."
       : resource.kind === "schema" ? "Grants cover every current and future object in this schema."
       : resource.kind === "kafka" ? "Grants apply to every current and future topic in this Kafka cluster."
@@ -269,51 +298,60 @@ function PermissionEditor({ resource, resources, openTab, onChanged, initialServ
       : resource.kind === "package" ? "Who publishes new versions of this package and yanks versions. Everyone can install it."
       : "Grants control access to this service. Data access is granted separately on data sources and schemas."}
       {resource.parent_id && " Parent access always applies. Additional grants can be added here."}</p>
-    {error && !justify && <p className="error" role="alert">{error}</p>}
-    {justify && <JustifyPanel target={justify.target} requirement={justify.requirement} onCancel={() => setJustify(null)}
+    {error && !justify && !adding && <p className="error" role="alert">{error}</p>}
+    {justify && !adding && <JustifyPanel target={justify.target} requirement={justify.requirement} onCancel={() => setJustify(null)}
       onDone={(text) => { setJustify(null); setError(""); setMessage(text); }} />}
     {message && <p className="success-message" role="status">{message}</p>}
     {!canRead ? <p className="muted">You can browse this object's children. Permission bindings require explicit inspection permission.</p>
       : loading ? <p className="muted" role="status">Loading permissions…</p> : <>
-        <div className="table-scroll"><table>
+        <div className="table-scroll"><table className="grants-table">
           <thead><tr><th>App group or service</th><th>Role</th><th>Granted on</th><th /></tr></thead>
-          <tbody>{grantRows(false)}{grantRows(true)}
-            {!assignments.length && <tr><td colSpan={4} className="muted">No group or service grants. Platform administrators retain management access.</td></tr>}
-          </tbody>
+          {grouped.length ? grouped.map(([category, rows]) => <tbody key={category} className={`cat-${category}`} aria-label={CATEGORY_INFO[category].title}>
+            <tr className="category-row"><th colSpan={4}><span className="cat-name">{CATEGORY_INFO[category].title}</span>
+              <span className="muted small"> · {CATEGORY_INFO[category].description}</span></th></tr>
+            {rows.map(grantRow)}</tbody>)
+            : <tbody>{ordered.map(grantRow)}
+              {!assignments.length && <tr><td colSpan={4} className="muted">No group or service grants. Platform administrators retain management access.</td></tr>}</tbody>}
         </table></div>
-        {canAssign ? <form className="card grant-form" style={{ maxWidth: 760 }} onSubmit={(e) => {
-          e.preventDefault();
-          if (!recipientId || busy) return;
-          change(() => recipientType !== "group" ? api.access.assignService(resource.id, serviceId, role) : api.access.assign(resource.id, groupId, role), `Assigned ${role} to ${recipientName ?? "the recipient"}.`);
-        }}>
-          <h3>Assign a role</h3>
-          <div className="field"><label htmlFor={`grant-type-${resource.id}`}>Grant to</label>
-            <select id={`grant-type-${resource.id}`} value={recipientType} onChange={(e) => { setRecipientType(e.target.value); setServiceId(""); setSearch(""); }}>
-              <option value="group">App group</option><option value="service">Service identity</option><option value="user">User</option>
-            </select><span className="hint">Users and services can receive roles directly. App groups share access among their bound identities.</span>
-          </div>
-          <div className="arg-grid">
-            <div className="field"><label htmlFor={`grant-search-${resource.id}`}>{recipientType !== "group" ? recipientType === "user" ? "Find a user" : "Find a service identity" : "Find an app group"}</label>
-              <input id={`grant-search-${resource.id}`} type="search" placeholder={recipientType !== "group" ? recipientType === "user" ? "Search users…" : "Search services…" : "Search groups…"} value={search} onChange={(e) => setSearch(e.target.value)} />
-              {recipientType !== "group" ? <select aria-label={recipientType === "user" ? "User" : "Service identity"} value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-                <option value="">{recipientType === "user" ? "Choose user" : "Choose service identity"}</option>{visibleServices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select> : <select aria-label="App group" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-                <option value="">Choose app group</option>{visibleGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>}
+        {!canAssign && <p className="muted">An Owner or Access Administrator can change permissions on this object. Inherited grants are managed on the parent.</p>}
+        {adding && canAssign && <Modal title={<>Add a role on {resource.name}</>} wide onClose={() => { setAdding(false); setJustify(null); setError(""); }}>
+          {justify ? <JustifyPanel target={justify.target} requirement={justify.requirement} onCancel={() => setJustify(null)}
+            onDone={(text) => { setJustify(null); setError(""); setAdding(false); setMessage(text); }} />
+          : <form className="grant-form" aria-label="Add a role" onSubmit={(e) => {
+            e.preventDefault();
+            if (!recipientId || busy) return;
+            change(() => recipientType !== "group" ? api.access.assignService(resource.id, serviceId, role) : api.access.assign(resource.id, groupId, role), `Assigned ${roleLabel(role)} to ${recipientName ?? "the recipient"}.`);
+          }}>
+            <div className="arg-grid">
+              <div className="field"><label htmlFor={`grant-type-${resource.id}`}>Grant to</label>
+                <select id={`grant-type-${resource.id}`} value={recipientType} onChange={(e) => { setRecipientType(e.target.value); setServiceId(""); setSearch(""); }}>
+                  <option value="group">App group</option><option value="service">Service identity</option><option value="user">User</option>
+                </select><span className="hint">Groups share access among their members. Users and services can also get a role directly.</span>
+              </div>
+              <div className="field"><label htmlFor={`grant-search-${resource.id}`}>{recipientType !== "group" ? recipientType === "user" ? "Find a user" : "Find a service identity" : "Find an app group"}</label>
+                <input id={`grant-search-${resource.id}`} type="search" placeholder={recipientType !== "group" ? recipientType === "user" ? "Search users…" : "Search services…" : "Search groups…"} value={search} onChange={(e) => setSearch(e.target.value)} />
+                {recipientType !== "group" ? <select aria-label={recipientType === "user" ? "User" : "Service identity"} value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
+                  <option value="">{recipientType === "user" ? "Choose user" : "Choose service identity"}</option>{visibleServices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select> : <select aria-label="App group" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+                  <option value="">Choose app group</option>{visibleGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>}
+              </div>
             </div>
-            <div className="field"><label htmlFor={`grant-role-${resource.id}`}>Role</label>
-              <select id={`grant-role-${resource.id}`} value={role} onChange={(e) => setRole(e.target.value)}>
-                {Object.keys(roles).map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
-              </select><span className="hint">{roles[role]}</span>
-            </div>
-          </div>
-          {assignments.some((a) => !a.inherited && (recipientType !== "group" ? a.principal_id === serviceId : a.app_group_id === groupId)) && <p className="hint">This replaces the recipient's direct role. Inherited roles still apply.</p>}
-          <div className="form-actions"><button className="btn" disabled={busy || !recipientId}>{busy ? "Saving…" : "Assign role"}</button>
-            <button type="button" className="text-button" style={{ marginLeft: "auto" }} onClick={() => openTab({ kind: "access", title: "Groups" })}>Manage groups</button></div>
-        </form> : <p className="muted">An Owner or Access Administrator can change permissions on this object. Inherited grants are managed on the parent.</p>}
+            <RolePicker name={`grant-role-${resource.id}`} roles={roles} typeRoles={typeRoles} value={role} onChange={setRole} label={roleLabel} />
+            {assignments.some((a) => !a.inherited && (recipientType !== "group" ? a.principal_id === serviceId : a.app_group_id === groupId)) && <p className="hint">Roles add up: the recipient keeps the roles it has here.</p>}
+            {error && <p className="error" role="alert">{error}</p>}
+            <div className="form-actions"><button className="btn" disabled={busy || !recipientId || !role}>{busy ? "Saving…" : "Assign role"}</button>
+              <button type="button" className="btn secondary" onClick={() => setAdding(false)}>Cancel</button>
+              <button type="button" className="text-button" style={{ marginLeft: "auto" }} onClick={() => openTab({ kind: "roles", title: "Roles", ref: typeKey, roleName: role })}>What does this role allow?</button></div>
+          </form>}
+        </Modal>}
         <details className="role-reference"><summary>What each role allows</summary>
-          <dl className="kv">{Object.entries(roles).map(([name, description]) => <div className="role-description" key={name}>
-            <dt>{roleLabel(name)}</dt><dd>{description}</dd></div>)}</dl>
+          {(typeRoles ? CATEGORIES : [null]).map((category) => { const list = roleNames.filter((r) => !category || categoryOf(r) === category);
+            return !!list.length && <div key={category ?? "all"} className="role-reference-group">
+              {category && <h4><CategoryBadge category={category} /> {CATEGORY_INFO[category].title}</h4>}
+              <dl className="kv">{list.map((name) => <div className="role-description" key={name}>
+                <dt>{roleLabel(name)}</dt><dd>{roles[name]}</dd></div>)}</dl></div>; })}
+          <button className="text-button" onClick={() => openTab({ kind: "roles", title: "Roles", ref: typeKey })}>See every permission of these roles</button>
         </details>
       </>}
   </section>;

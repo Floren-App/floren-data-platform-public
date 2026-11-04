@@ -35,7 +35,7 @@ def test_real_postgres_roles_future_objects_and_revoked_running_job(client, repo
     try:
         ready = client.post(f"/v1/rbac/resources/{r['id']}/provision", headers=as_('admin'))
         assert ready.status_code == 200, ready.text
-        gid = grant_group(client, r['id'], 'Native readers', 'Reader', users=['ana'])
+        gid = grant_group(client, r['id'], 'Native readers', 'DataReader', users=['ana'])
         ws = start_workspace(client)
         _, wh = execution_token(ws)
         info = client.get('/v1/connect/native-test', headers=wh)

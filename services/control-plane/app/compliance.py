@@ -224,17 +224,16 @@ def owns(db, resource: Resource, group_id: Optional[str]) -> bool:
     if not group_id:
         return False
     for item in rbac.ancestors(db, resource):
-        assignment = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == item.id, RoleAssignment.app_group_id == group_id))
-        if assignment is not None and assignment.role != "AccessAdministrator" and "assign" in rbac.roles_for(item).get(assignment.role, set()):
-            return True
+        for assignment in db.scalars(select(RoleAssignment).where(RoleAssignment.resource_id == item.id, RoleAssignment.app_group_id == group_id)):
+            if assignment.role != "AccessAdministrator" and "assign" in rbac.roles_for(item).get(assignment.role, set()):
+                return True
     return False
 
 
 def role_requirement(db, resource: Resource, role: str, group_id: Optional[str]) -> dict:
-    if resource.kind in (*rbac.DATA_OBJECT_KINDS, 'source', 'schema', 'kafka', 'topic') and role in ('Viewer', 'Manager', 'PlatformContributor', 'AccessAdministrator'):
-        return {"layer_id": None, "classification": classification.UNCLASSIFIED, "policy": None}
-    # The data's owners do not justify their own use of it; becoming an owner does need a form.
-    if "read" not in rbac.roles_for(resource).get(role, set()) or owns(db, resource, group_id):
+    # Only roles that read the data need a form; the data's owners do not justify their own use of it (becoming an
+    # owner does need a form).
+    if role not in rbac.DATA_READ_ROLES or owns(db, resource, group_id):
         return {"layer_id": None, "classification": classification.UNCLASSIFIED, "policy": None}
     layer_id = layers.info(db, resource)["layer_id"]
     level = role_level(db, resource, group_id)
@@ -398,8 +397,9 @@ def approve(db, case: AccessCase, user) -> None:
         product = db.get(CatalogProduct, case.product_id)
         if product is None:
             raise HTTPException(409, "the product was unpublished")
-        resource_id, role, previous = product.access_resource_id, "Consumer", None
-        if db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == case.app_group_id)) is None:
+        resource_id, role, previous = product.access_resource_id, "DataReader", None
+        if db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == case.app_group_id,
+                                                  RoleAssignment.role == role)) is None:
             db.add(RoleAssignment(resource_id=resource_id, app_group_id=case.app_group_id, role=role))
         option = db.get(ProductOption, case.option_id) if case.option_id else product_options.default_option(db, product.id)
         product_options.set_option(db, product.id, case.app_group_id, option.id)
@@ -431,17 +431,11 @@ def approve(db, case: AccessCase, user) -> None:
 
 
 def apply_role(db, resource_id: str, group_id: str, role: str) -> Optional[str]:
-    """Give the role (never lowering one the group has); returns the lower role it replaced, if any."""
+    """Give the role, next to the other roles the group holds there; when it ends only this role goes."""
     from .models import RoleAssignment
-    resource = db.get(Resource, resource_id)
-    roles = rbac.roles_for(resource)
-    current = db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == group_id))
-    if current is None:
+    if db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == resource_id, RoleAssignment.app_group_id == group_id,
+                                              RoleAssignment.role == role)) is None:
         db.add(RoleAssignment(resource_id=resource_id, app_group_id=group_id, role=role))
-        return None
-    if current.role in roles and role in roles and not roles[role].issubset(roles[current.role]):
-        previous, current.role = current.role, role
-        return previous  # the lower role the group goes back to when this ends
     return None
 
 

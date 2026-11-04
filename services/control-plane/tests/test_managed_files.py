@@ -92,7 +92,7 @@ def test_browser_resolves_managed_storage_context_and_uses_namespace_reader_cred
     schema = client.post('/v1/rbac/sources/pokemon-files/schemas', headers=as_('admin'),
                          json={'name': 'landing', 'prefix': 'landing'}).json()
     client.post(f"/v1/rbac/resources/{schema['id']}/provision", headers=as_('admin')).raise_for_status()
-    grant_group(client, schema['id'], 'Landing readers', 'Reader', users=('ana',))
+    grant_group(client, schema['id'], 'Landing readers', 'DataReader', users=('ana',))
     namespace = namespace_for(layers.NON_PROD, get_settings().layer_namespace_prefix or 'fdp-layer')
     deps.get_orchestrator().layer_secrets[(namespace, 'fdp-rustfs-credentials')] = (
         'digest', {'access-key': 'ROOT', 'secret-key': 'ROOT-SECRET'})

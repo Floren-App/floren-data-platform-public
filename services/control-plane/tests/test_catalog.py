@@ -194,7 +194,7 @@ def test_lineage_never_bridges_a_hidden_producer_or_endpoint(client, repo):
     with SessionLocal() as db:
         schema = db.scalar(select(Resource).where(Resource.kind == 'schema'))
         schema_id = schema.id
-    grant_group(client, schema_id, 'Bob data readers', 'Reader', users=['bob'])
+    grant_group(client, schema_id, 'Bob data readers', 'DataReader', users=['bob'])
     tables = client.get('/v1/catalog/search?kind=table', headers=as_('bob')).json()['items']
     assert tables
     graph = client.get(f"/v1/catalog/assets/{tables[0]['id']}/lineage?depth=5", headers=as_('bob')).json()
@@ -378,7 +378,7 @@ def test_focused_upstream_is_end_to_end_data_flow_without_project_or_test_spokes
     app_id,app_resource=register(client,repo,kind='app',slug='dashboard')
     ingest_id,ingest_resource=register(client,repo,kind='script',slug='ingestion')
     external=client.post('/v1/apis',headers=as_('admin'),json={'name':'TCG API','slug':'tcg-api','direction':'external','outbound':{'base_url':'https://example.com'}}).json()
-    grant_group(client,external['resource_id'],'Finance data','Consumer',users=['ana'])
+    grant_group(client,external['resource_id'],'Finance data','DataReader',users=['ana'])
     with SessionLocal() as db:
         pub=db.get(Workload,app_id)
         pub.program_def={'lineage':{'inputs':[{'source':'finance-dw','schema':'public','name':'current'}]}} if declared else {}
@@ -495,7 +495,7 @@ def test_managed_api_calls_record_live_lineage_without_exposing_request_paramete
         pub=db.get(Workload,pid)
         principal_id=pub.service_principal_id
         token=mint_token('execution',pub.identity,60,pub=pub.id,pid=principal_id,sha=pub.deployed_sha)
-    assert client.put(f"/v1/rbac/resources/{external['resource_id']}/assignments",headers=as_('admin'),json={'principal_id':principal_id,'role':'Consumer'}).status_code==200
+    assert client.put(f"/v1/rbac/resources/{external['resource_id']}/assignments",headers=as_('admin'),json={'principal_id':principal_id,'role':'DataReader'}).status_code==200
     for _ in range(2):
         response=client.get('/v1/egress/upstream/cards/7?private=do-not-index',headers={'Authorization':'Bearer '+token})
         assert response.status_code==200,response.text

@@ -44,19 +44,23 @@ def test_real_broker_tls_oauth_sdk_and_revocation(client, topic, tmp_path, monke
     from kafka.errors import TopicAuthorizationFailedError, GroupAuthorizationFailedError, SaslAuthenticationFailedError, NoBrokersAvailable, KafkaTimeoutError
     from sqlalchemy import delete
     from app.db import SessionLocal
-    from app.models import RoleAssignment, Resource
+    from app.models import PermissionGrant, RoleAssignment, Resource
     from app import kafka_access
     import fdp
 
-    grant_group(client,topic['id'],'Writers','Contributor',users=('ana',))
-    # Producing and consuming are independent powers. This round-trip fixture
-    # explicitly grants both; removing Contributor later must still stop writes.
+    writers=grant_group(client,topic['id'],'Writers','Reader',users=('ana',))
+    # Producing and consuming are independent powers. This round-trip fixture grants
+    # write-only access to the group and reading directly; removing the write grant later
+    # must still stop writes.
+    client.post('/v1/permissions/assignments',headers=as_('admin'),json={
+        'target_id':topic['id'],'namespace':'kafka.data','layer_id':topic['config']['layer_id'],
+        'app_group_id':writers,'actions':['kafka.data.session.create','kafka.data.produce']}).raise_for_status()
     assert client.post(f"/v1/kafka/topics/{topic['id']}/session",headers=as_('ana'),
         json={'mode':'consume'}).status_code==403
     principal=client.get('/v1/me',headers=as_('ana')).json()['principal_id']
     client.post('/v1/permissions/assignments',headers=as_('admin'),json={
         'target_id':topic['id'],'namespace':'kafka.data','layer_id':topic['config']['layer_id'],
-        'principal_id':principal,'role':'Executor'}).raise_for_status()
+        'principal_id':principal,'role':'DataReader'}).raise_for_status()
     with SessionLocal() as db:
         layer=db.get(Resource,topic['config']['layer_id'])
         layer.config={**layer.config,'infrastructure':{**layer.config['infrastructure'],
@@ -203,7 +207,7 @@ def test_real_broker_tls_oauth_sdk_and_revocation(client, topic, tmp_path, monke
             with pytest.raises(TopicAuthorizationFailedError):
                 producer._raw.send('other',{'record_id':'forbidden'}).get(timeout=15)
             with SessionLocal() as db:
-                db.execute(delete(RoleAssignment).where(RoleAssignment.resource_id==topic['id'],RoleAssignment.role=='Contributor'))
+                db.execute(delete(PermissionGrant).where(PermissionGrant.target_id==topic['id'],PermissionGrant.app_group_id==writers))
                 db.commit()
             with pytest.raises(TopicAuthorizationFailedError):
                 producer.send({'record_id':'revoked'}).get(timeout=15)

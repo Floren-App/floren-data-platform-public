@@ -102,7 +102,7 @@ resource "fdp_app_group_member" "finance" {
 resource "fdp_role_assignment" "analysts_read" {
   resource_id  = fdp_schema.reporting.id
   app_group_id = fdp_app_group.analysts.id
-  role         = "Reader"
+  role         = "DataReader"
 }
 
 resource "fdp_repository" "analytics" {

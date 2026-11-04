@@ -11,7 +11,7 @@ from .test_deploying import repo  # noqa: F401
 def test_schema_can_be_read_back_and_deregistered_without_touching_data(client):
     client.put('/v1/admin/datasources/finance', headers=as_('admin'), json=integration('finance', 'postgres')).raise_for_status()
     schema = client.post('/v1/rbac/sources/finance/schemas', headers=as_('admin'), json={'name': 'reporting'}).json()
-    grant_group(client, schema['id'], 'Readers', 'Reader', users=('ana',))
+    grant_group(client, schema['id'], 'Readers', 'DataReader', users=('ana',))
     read = client.get(f"/v1/rbac/resources/{schema['id']}", headers=as_('admin'))
     assert read.status_code == 200 and read.json()['name'] == 'reporting' and read.json()['kind'] == 'schema'
     assert client.get(f"/v1/rbac/resources/{schema['id']}", headers=as_('bob')).status_code == 403

@@ -39,9 +39,10 @@ def test_folder_inheritance_is_additive_and_cycles_are_rejected(client):
     client.put(f"/v1/rbac/resources/{child['id']}/assignments", headers=as_('ana'),
                json={'app_group_id': gid, 'role': 'Executor'})
     access = client.get(f"/v1/rbac/resources/{child['id']}/access", headers=as_('bob')).json()
-    assert {'read','edit','execute'} <= set(access['resource']['actions'])
-    assert 'deploy' not in access['resource']['actions']  # Neither Contributor nor Executor deploys
-    assert client.post('/v1/rbac/folders', headers=as_('bob'), json={'name': 'No', 'parent_id': child['id']}).status_code == 403
+    # Roles add up: Contributor configures, deploys and creates (inherited), Executor runs; neither deletes or gives access.
+    assert {'read','edit','deploy','create','execute'} <= set(access['resource']['actions'])
+    assert not {'delete','assign','open'} & set(access['resource']['actions'])
+    assert client.post('/v1/rbac/folders', headers=as_('bob'), json={'name': 'Monthly', 'parent_id': child['id']}).status_code == 201
     assert client.patch(f"/v1/rbac/resources/{parent['id']}", headers=as_('ana'),
                         json={'name': 'Finance', 'parent_id': child['id']}).status_code == 422
     assert client.delete(f"/v1/rbac/folders/{parent['id']}", headers=as_('ana')).status_code == 409
@@ -50,14 +51,14 @@ def test_folder_inheritance_is_additive_and_cycles_are_rejected(client):
                       json={'app_group_id': gid, 'role': 'Custom'}).status_code == 422
 
 
-def test_contributor_cannot_execute_deploy_or_change_managed_settings(client, repo):
+def test_reader_sees_and_contributor_configures_but_neither_runs_or_changes_identity(client, repo):
     pub = deploy(client, repo, program='sales-report', slug='report').json()
-    editors = grant_group(client, pub['resource_id'], 'Editors', 'Contributor', users=['bob'])
+    editors = grant_group(client, pub['resource_id'], 'Editors', 'Reader', users=['bob'])
     select_group(client, 'bob', editors)
     assert client.patch(f"/v1/workloads/{pub['id']}", headers=as_('bob'), json={'title':'Edited','auto_update':True}).status_code==403
     assert client.post(f"/v1/workloads/{pub['id']}/sync",headers=as_('bob')).status_code==403
     assert client.post(f"/v1/workloads/{pub['id']}/runs",headers=as_('bob'),json={}).status_code==403
-    client.put(f"/v1/rbac/resources/{pub['resource_id']}/assignments",headers=as_('admin'),json={'app_group_id':editors,'role':'Manager'}).raise_for_status()
+    client.put(f"/v1/rbac/resources/{pub['resource_id']}/assignments",headers=as_('admin'),json={'app_group_id':editors,'role':'Contributor','replaces':'Reader'}).raise_for_status()
     assert client.patch(f"/v1/workloads/{pub['id']}",headers=as_('bob'),json={'title':'Edited','auto_update':True}).status_code==200
     assert client.post(f"/v1/workloads/{pub['id']}/sync",headers=as_('bob')).status_code==200
     assert client.post(f"/v1/workloads/{pub['id']}/runs",headers=as_('bob'),json={}).status_code==403
@@ -89,7 +90,7 @@ def test_environment_folders_deploy_same_app_from_independent_branches(client, r
         assert apps[env]['folder_id'] == folders[env]['id'] and apps[env]['branch'] == env
     assert len({p['service_principal_id'] for p in apps.values()}) == 3
 
-    testers = grant_group(client, folders['tst']['id'], 'Sales testers', 'Executor', users=['bob'])
+    testers = grant_group(client, folders['tst']['id'], 'Sales testers', 'DataReader', users=['bob'])
     acceptance = grant_group(client, folders['acp']['id'], 'Acceptance admins', 'Admin', users=['bob'])
     assert client.put('/v1/me/active-group',headers=as_('bob'),json={'group_id':acceptance}).status_code==200
     visible = client.get('/v1/workloads', headers=as_('bob')).json()
@@ -306,12 +307,12 @@ def test_global_admin_data_access_and_ordinary_schema_scope(client):
     admin = rows('admin')
     assert admin[('source', 'access-dw')]['data_access'] is True and 'assign' in admin[('source', 'access-dw')]['actions']
     assert admin[('schema', 'granted')]['data_access'] is True
-    grant_group(client, admin[('schema', 'granted')]['id'], 'Access readers', 'Reader', users=['bob'])
+    grant_group(client, admin[('schema', 'granted')]['id'], 'Access readers', 'DataReader', users=['bob'])
     bob = rows('bob')
     assert bob[('schema', 'granted')]['data_access'] is True
     # The source is listed only to navigate to the granted schema; the other schema is not listed.
     assert bob[('source', 'access-dw')]['data_access'] is False and ('schema', 'hidden') not in bob
-    selected=grant_group(client, source_id, 'Access source readers', 'Reader', users=['bob'])
+    selected=grant_group(client, source_id, 'Access source readers', 'DataReader', users=['bob'])
     assert client.put('/v1/me/active-group',headers=as_('bob'),json={'group_id':selected}).status_code==200
     bob = rows('bob')
     assert bob[('source', 'access-dw')]['data_access'] is True and bob[('schema', 'hidden')]['data_access'] is True

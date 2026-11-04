@@ -143,7 +143,7 @@ function readWatches(key: string): Watches | null {
 function OrchestratorWatch({ hub, openTab }: { hub: Hub; openTab: OpenTab }) {
   const storageKey = `fdp.orchestrators:${getServer()}:${hub.me!.username}`;
   const [saved, setSaved] = useState<Watches | null>(() => readWatches(storageKey)), [editing, setEditing] = useState(false), [refresh, setRefresh] = useState(0);
-  const available = hub.workloads.filter((p) => p.kind === "airflow" && p.actions.includes("execute"));
+  const available = hub.workloads.filter((p) => p.kind === "airflow" && p.actions.includes("open"));
   const watches = saved ?? Object.fromEntries(available.slice(0, 3).map((p) => [p.id, ""]));
   const selected = available.filter((p) => Object.prototype.hasOwnProperty.call(watches, p.id));
   const save = (next: Watches) => { setSaved(next); try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* Session changes still work when storage is disabled. */ } };

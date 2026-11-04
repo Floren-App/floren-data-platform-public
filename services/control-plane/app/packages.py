@@ -5,8 +5,8 @@ CRAN-style repository (src/contrib/PACKAGES with the newest version of each pack
 src/contrib/Archive/<package>/, the layout renv uses for "pkg@version"). Workspaces, runs and deployed programs
 install only from here: they have no route to PyPI or CRAN.
 
-Metadata and downloads require explicit package or repository grants. Publishing is RBAC: Publishers publish new packages (their
-group becomes the package's Owner) and import packages from PyPI/CRAN; a package's Owner and Maintainers
+Metadata and downloads require explicit package or repository grants. Publishing is RBAC: Data Contributors publish new packages (their
+group becomes the package's Owner) and import packages from PyPI/CRAN; a package's Owner and Data Contributors
 publish its new versions. Published files are never overwritten; a version can be yanked. A package name
 is either internal or imported, never both, so a published package cannot shadow an upstream one.
 """
@@ -271,8 +271,8 @@ def add_file(db: Session, package: Package, parsed: Parsed, filename: str, recei
 
 
 def publish(db: Session, user: User, kind: str, filename: str, received: Received) -> Tuple[PackageFile, bool]:
-    """A person's or program's own package. New names need Publisher on the repository; new versions of an
-    existing package need publish on that package (its Owner group or a Maintainer)."""
+    """A person's or program's own package. New names need Data Contributor on the repository; new versions of an
+    existing package need publish on that package (its Owner group or a Data Contributor)."""
     try:
         parsed = parse(kind, filename, received)
         package = find(db, kind, parsed.key)

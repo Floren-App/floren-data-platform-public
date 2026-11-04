@@ -2,7 +2,7 @@
 
 While enabled, an import (app, API or OpenTofu's fdp_package) may only request a package on the list; names end
 in "*" for a family (e.g. "scikit-*"). Dependencies an allowed package needs come along with it, or it would not
-install. Packages published here are not affected. Disabled (the default), Publishers import any package.
+install. Packages published here are not affected. Disabled (the default), Data Contributors import any package.
 """
 from __future__ import annotations
 

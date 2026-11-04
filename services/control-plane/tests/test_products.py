@@ -13,7 +13,7 @@ from .test_deploying import repo  # noqa: F401
 def setup_products(client, repo):  # noqa: F811
     for username in ('ana','bob'):
         pid=client.get('/v1/me',headers=as_(username)).json()['principal_id']
-        for namespace,role in (('products.collection','Viewer'),('products.object','Viewer'),('products.requests.own','Executor')):
+        for namespace,role in (('products.collection','Viewer'),('products.object','Viewer'),('products.requests.own','Viewer')):
             client.post('/v1/permissions/assignments',headers=as_('admin'),json={
                 'target_id':'products','namespace':namespace,'principal_id':pid,'layer_id':'*','role':role}).raise_for_status()
     staging = client.post("/v1/rbac/sources/finance-dw/schemas", headers=as_("admin"), json={"name": "staging"})
@@ -58,7 +58,7 @@ def test_bundle_publish_browse_lineage_request_and_approve(client, repo):  # noq
         assert target_for_asset(db, asset, db.get(Resource, asset.resource_id), create=False) is not None
     assert product["title"] == "Sales" and product["kind"] == "app" and product["domain"] == "Finance" and product["can_manage"]
     assert [(m["name"], m["kind"]) for m in product["members"]] == [("dash", "app"), ("sales", "table")]
-    assert {(g["kind"], g["name"], g["role"]) for g in product["grants"]} == {("service", "dash", "Executor"), ("table", "sales", "Executor")}
+    assert {(g["kind"], g["name"], g["role"]) for g in product["grants"]} == {("service", "dash", "DataReader"), ("table", "sales", "DataReader")}
     # The lead leads one product; an object may still be in others.
     assert client.post("/v1/catalog/products", headers=as_("ana"), json={"asset_ids": [ids["dash"]], "title": "again"}).status_code == 409
     in_products = client.get(f"/v1/catalog/assets/{ids['sales']}/product", headers=as_("ana")).json()["products"]
@@ -107,11 +107,11 @@ def test_bundle_publish_browse_lineage_request_and_approve(client, repo):  # noq
     with SessionLocal() as db:
         from app.models import CatalogProduct
         access_resource = db.get(CatalogProduct, product["id"]).access_resource_id
-    assert (access_resource, "Consumer") in roles and ("workloads", "Executor") in roles  # existing roles are kept
+    assert (access_resource, "DataReader") in roles and ("workloads", "Executor") in roles  # existing roles are kept
     assert (ids["public"], "Reader") not in roles
     assert {"catalog.publish", "catalog.access_request", "catalog.access_approved"} <= actions
     assert client.post(url, headers=as_("bob"), json={"app_group_id": executors, "reason": "x y z"}).status_code == 409  # has it all
-    # Owners see who has access on the product page, and revoking Consumer ends it everywhere.
+    # Owners see who has access on the product page, and revoking Data Reader ends it everywhere.
     detail = client.get(f"/v1/catalog/products/{product['id']}", headers=as_("ana")).json()
     assert detail["access_resource"]["kind"] == "product" and detail["access_resource"]["id"] == access_resource
     assert "access_resource" not in client.get(f"/v1/catalog/products/{product['id']}", headers=as_("bob")).json()

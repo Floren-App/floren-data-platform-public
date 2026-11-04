@@ -67,7 +67,7 @@ def masked_sales(client,repo):
 
 def test_metadata_role_cannot_remove_product_option_masks(client,repo):
     ids,_,group=masked_sales(client,repo)
-    for role in ('Viewer','Manager'):
+    for role in ('Reader','Contributor'):
         client.put('/v1/rbac/resources/'+ids['public']+'/assignments',headers=as_('admin'),
             json={'app_group_id':group,'role':role}).raise_for_status()
         assert scope_for('bob')['finance_dw']['policies']['public.sales']['masks']['email']['method']=='hash'
@@ -107,7 +107,7 @@ def test_cached_metrics_cannot_bypass_product_masks_or_metadata_only_access(clie
     client.post(base+'/'+metric['id']+'/observations',headers=as_('admin'),
         json={'value':987654.321,'idempotency_key':'sensitive-total'}).raise_for_status()
     client.put('/v1/rbac/resources/'+ids['public']+'/assignments',headers=as_('admin'),
-        json={'app_group_id':group,'role':'Viewer'}).raise_for_status()
+        json={'app_group_id':group,'role':'Reader'}).raise_for_status()
     response=client.get(base,headers=as_('bob'))
     assert response.status_code==200,response.text
     assert response.json()[0]['latest'] is None
@@ -116,7 +116,7 @@ def test_cached_metrics_cannot_bypass_product_masks_or_metadata_only_access(clie
     assert client.get(base+'/'+metric['id']+'/history',headers=as_('bob')).status_code==403
     # An explicit, unfiltered schema read grants these values as well as SQL rows.
     client.put('/v1/rbac/resources/'+ids['public']+'/assignments',headers=as_('admin'),
-        json={'app_group_id':group,'role':'Executor'}).raise_for_status()
+        json={'app_group_id':group,'role':'DataReader'}).raise_for_status()
     response=client.get(base,headers=as_('bob'))
     assert response.json()[0]['latest']['value']==987654.321
 
@@ -167,7 +167,7 @@ def test_options_mask_what_consumers_see_and_set_the_level(client, repo):  # noq
     # Direct access to the schema is not limited by a product option.
     client.put(f"/v1/catalog/products/{p['id']}/consumers/{executors}", headers=as_("ana"), json={"option_id": masked}).raise_for_status()
     assert "policies" in scope_for("bob")["finance_dw"]
-    client.put(f"/v1/rbac/resources/{public}/assignments", headers=as_("admin"), json={"app_group_id": executors, "role": "Reader"}).raise_for_status()
+    client.put(f"/v1/rbac/resources/{public}/assignments", headers=as_("admin"), json={"app_group_id": executors, "role": "DataReader"}).raise_for_status()
     assert "policies" not in scope_for("bob")["finance_dw"]
     # Removing an option moves its consumers to the default.
     client.patch(f"/v1/catalog/products/{p['id']}", headers=as_("ana"), json={"options": [

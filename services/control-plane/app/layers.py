@@ -197,11 +197,9 @@ def migrate(db):
             for grant in db.scalars(select(RoleAssignment).where(RoleAssignment.app_group_id == group.id)):
                 for principal in principals:
                     direct = db.scalar(select(ServiceRoleAssignment).where(ServiceRoleAssignment.resource_id == grant.resource_id,
-                        ServiceRoleAssignment.principal_id == principal.id))
+                        ServiceRoleAssignment.principal_id == principal.id, ServiceRoleAssignment.role == grant.role))
                     if not direct:
                         db.add(ServiceRoleAssignment(resource_id=grant.resource_id, principal_id=principal.id, role=grant.role))
-                    elif set(roles_for(db.get(Resource, grant.resource_id))[direct.role]) < set(roles_for(db.get(Resource, grant.resource_id))[grant.role]):
-                        direct.role = grant.role
             db.execute(delete(RoleAssignment).where(RoleAssignment.app_group_id == group.id))
             db.execute(delete(IdentityBinding).where(IdentityBinding.app_group_id == group.id))
             db.delete(group)

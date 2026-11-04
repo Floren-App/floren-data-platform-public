@@ -262,6 +262,19 @@
             ],
             "title": "Principal Id"
           },
+          "replaces": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A role the recipient holds here that this one takes the place of (changing a role); otherwise the role is added",
+            "title": "Replaces"
+          },
           "role": {
             "title": "Role",
             "type": "string"
@@ -3641,7 +3654,7 @@
         "properties": {
           "enabled": {
             "default": true,
-            "description": "Off: Publishers may import any public package",
+            "description": "Off: Data Contributors may import any public package",
             "title": "Enabled",
             "type": "boolean"
           },
@@ -22394,7 +22407,7 @@
     },
     "/v1/egress/{slug}/{path}": {
       "delete": {
-        "description": "Programs (and people testing) call an external API as themselves; needs Consumer on the operation.",
+        "description": "Programs (and people testing) call an external API as themselves; needs Data Reader on the operation (Data Contributor for POST, PUT, PATCH and DELETE).",
         "operationId": "delete_v1_egress_slug_path",
         "parameters": [
           {
@@ -22474,7 +22487,7 @@
         ]
       },
       "get": {
-        "description": "Programs (and people testing) call an external API as themselves; needs Consumer on the operation.",
+        "description": "Programs (and people testing) call an external API as themselves; needs Data Reader on the operation (Data Contributor for POST, PUT, PATCH and DELETE).",
         "operationId": "get_v1_egress_slug_path",
         "parameters": [
           {
@@ -22554,7 +22567,7 @@
         ]
       },
       "patch": {
-        "description": "Programs (and people testing) call an external API as themselves; needs Consumer on the operation.",
+        "description": "Programs (and people testing) call an external API as themselves; needs Data Reader on the operation (Data Contributor for POST, PUT, PATCH and DELETE).",
         "operationId": "patch_v1_egress_slug_path",
         "parameters": [
           {
@@ -22634,7 +22647,7 @@
         ]
       },
       "post": {
-        "description": "Programs (and people testing) call an external API as themselves; needs Consumer on the operation.",
+        "description": "Programs (and people testing) call an external API as themselves; needs Data Reader on the operation (Data Contributor for POST, PUT, PATCH and DELETE).",
         "operationId": "post_v1_egress_slug_path",
         "parameters": [
           {
@@ -22714,7 +22727,7 @@
         ]
       },
       "put": {
-        "description": "Programs (and people testing) call an external API as themselves; needs Consumer on the operation.",
+        "description": "Programs (and people testing) call an external API as themselves; needs Data Reader on the operation (Data Contributor for POST, PUT, PATCH and DELETE).",
         "operationId": "put_v1_egress_slug_path",
         "parameters": [
           {
@@ -24922,7 +24935,7 @@
     },
     "/v1/packages/allowlist": {
       "delete": {
-        "description": "Off and empty: Publishers may import any public package.",
+        "description": "Off and empty: Data Contributors may import any public package.",
         "operationId": "delete_v1_packages_allowlist",
         "parameters": [
           {
@@ -26135,6 +26148,70 @@
           }
         },
         "summary": "Capabilities",
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/v1/permissions/catalog": {
+      "get": {
+        "description": "Every role each kind of object offers, its category and the permissions it carries; custom roles and review\nduties too. The Roles page and the role pickers read this.",
+        "operationId": "get_v1_permissions_catalog",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Catalog",
         "tags": [
           "permissions"
         ]
@@ -28122,6 +28199,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -28177,6 +28270,7 @@
     },
     "/v1/rbac/resources/{resource_id}/assignments/{app_group_id}": {
       "delete": {
+        "description": "Remove one role of the group here, or with no role all of its direct roles here.",
         "operationId": "delete_v1_rbac_resources_resource_id_assignments_app_group_id",
         "parameters": [
           {
@@ -28195,6 +28289,22 @@
             "schema": {
               "title": "App Group Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
             }
           },
           {

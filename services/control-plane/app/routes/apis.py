@@ -542,7 +542,7 @@ async def inbound(slug: str, request: Request, path: str = ""):
 
 @router.api_route("/v1/egress/{slug}/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def egress(slug: str, path: str, request: Request, user: User = Depends(get_actor)):
-    """Programs (and people testing) call an external API as themselves; needs Consumer on the operation."""
+    """Programs (and people testing) call an external API as themselves; needs Data Reader on the operation (Data Contributor for POST, PUT, PATCH and DELETE)."""
     body = await request.body()
     if len(body) > core.MAX_BODY:
         raise HTTPException(413, "request body exceeds 10 MB")
@@ -568,10 +568,12 @@ def _egress(slug: str, path: str, method: str, headers: Dict[str, str], query, b
         if op is None:
             raise HTTPException(404, f"{api.name} has no operation for {method} /{path}")
         resource = core.operation_resource(db, api, op)
-        if not permissions.domain_allowed(db,user,'apis.calls.invoke',resource,'call'):
+        needed = core.call_permission(op.method)
+        if not permissions.domain_allowed(db,user,needed,resource,'call'):
             audit(db, user.username, "api.egress.denied", api.id, operation=op.name)
             db.commit()
-            raise HTTPException(403, f"{user.username} may not call {api.name} {op.name}; ask for the Consumer role")
+            raise HTTPException(403, f"{user.username} may not call {api.name} {op.name}; ask for the "
+                                     f"{'Data Reader' if needed == 'apis.calls.read' else 'Data Contributor'} role")
         db.commit()
         status, reply, content = core.call_external(api, op, upstream, query, headers, body, get_secret_store())
         audit(db, user.username, "api.egress", api.id, operation=op.name, status=status, ms=int((time.monotonic() - started) * 1000))

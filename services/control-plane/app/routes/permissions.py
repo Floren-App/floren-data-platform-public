@@ -71,8 +71,7 @@ def authorize_grant(db, user, body):
         resource = db.get(Resource, body.target_id)
         if resource:
             from ..compliance import role_requirement
-            role = 'Executor' if resource.kind in rbac.DATA_OBJECT_KINDS else 'Reader'
-            if role_requirement(db, resource, role, body.app_group_id)['policy'] is not None:
+            if role_requirement(db, resource, 'DataReader', body.app_group_id)['policy'] is not None:
                 raise HTTPException(409, 'this data requires reviewed access; use an approved object-role case or a governed product')
     if not policy.can_delegate(db, user, body.namespace, body.target_id, body.layer_id, actions):
         raise HTTPException(403, "Owner of this capability scope required; cannot delegate permissions you do not hold")
@@ -82,6 +81,14 @@ def authorize_grant(db, user, body):
 @router.get("/registry")
 def registry(user=Depends(get_actor)):
     return {"roles": list(policy.ROLES), "permissions": policy.REGISTRY}
+
+
+@router.get("/catalog")
+def catalog(db=Depends(get_db), user=Depends(get_actor)):
+    """Every role each kind of object offers, its category and the permissions it carries; custom roles and review
+    duties too. The Roles page and the role pickers read this."""
+    from ..access_inventory import role_catalog
+    return role_catalog(db, user)
 
 
 @router.get("/capabilities")

@@ -154,7 +154,7 @@ def test_live_storage_browser_is_bounded_to_the_granted_namespace(client):
                        "role_arn": "arn:aws:iam::123456789012:role/fdp"}, "provisioner_secret": cred}).raise_for_status()
         schema = client.post("/v1/rbac/sources/files/schemas", headers=as_("admin"), json={"name": "input", "prefix": "data"}).json()
         client.post(f"/v1/rbac/resources/{schema['id']}/provision", headers=as_("admin")).raise_for_status()
-        group = grant_group(client, schema["id"], "File readers", "Reader", users=("ana",))
+        group = grant_group(client, schema["id"], "File readers", "DataReader", users=("ana",))
         url = f"/v1/data/schemas/{schema['id']}/children"
         response = client.get(url, headers=as_("ana"))
         assert response.status_code == 200, response.text

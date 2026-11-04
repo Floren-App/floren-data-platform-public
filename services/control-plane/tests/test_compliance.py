@@ -80,14 +80,14 @@ def test_role_grants_need_an_approved_case_reviewed_by_someone_else(client, repo
                                                                              "scope": {"layers": [layer], "classifications": ["restricted"]}})
     assert role.status_code == 201, role.text
     # The schema holds restricted data in this layer: a Reader grant needs a justification.
-    refused = client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": marketing, "role": "Reader"})
+    refused = client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": marketing, "role": "DataReader"})
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "justification_required"
     assert refused.json()["detail"]["requirement"]["form"]["name"] == "Privacy impact"
-    need = client.post("/v1/compliance/requirement", headers=as_("ana"), json={"kind": "role", "resource_id": ids["public"], "role": "Reader",
+    need = client.post("/v1/compliance/requirement", headers=as_("ana"), json={"kind": "role", "resource_id": ids["public"], "role": "DataReader",
                                                                                "app_group_id": marketing}).json()
     assert need["required"] and need["classification"] == "restricted" and need["steps"] == [{"role": "compliance_reviewer", "approvals": 1}]
     # Required answers of visible pages; a page shown by a condition counts only when shown.
-    target = {"kind": "role", "resource_id": ids["public"], "role": "Reader", "app_group_id": marketing}
+    target = {"kind": "role", "resource_id": ids["public"], "role": "DataReader", "app_group_id": marketing}
     assert client.post("/v1/compliance/cases", headers=as_("ana"), json={**target, "answers": {"purpose": "x", "data": ["email"]}}).status_code == 422
     assert client.post("/v1/compliance/cases", headers=as_("ana"), json={**target, "answers": {**ANSWERS, "data": ["health"]}}).status_code == 422
     case = client.post("/v1/compliance/cases", headers=as_("ana"), json={**target, "answers": ANSWERS})
@@ -107,11 +107,11 @@ def test_role_grants_need_an_approved_case_reviewed_by_someone_else(client, repo
     approved = client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "approve"}).json()
     assert approved["status"] == "approved" and approved["approved_until"]
     with SessionLocal() as db:
-        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == marketing)).role == "Reader"
+        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == marketing)).role == "DataReader"
         assert db.scalar(select(JustifiedGrant).where(JustifiedGrant.app_group_id == marketing)).case_id == case["id"]
     # Terraform and the API name the approved case.
     named = client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"),
-                       json={"app_group_id": marketing, "role": "Reader", "justification_id": case["id"]})
+                       json={"app_group_id": marketing, "role": "DataReader", "justification_id": case["id"]})
     assert named.status_code == 200
     # Someone who joins later gets the justified access only after their membership is approved.
     grant_group(client, "workloads", "Marketing readers", "Executor", users=["bob"])
@@ -180,7 +180,7 @@ def test_legacy_compliance_admin_needs_explicit_page_grants(client):
     assert me["compliance_roles"] == ["compliance_admin"]
     assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 403
     assert client.put("/v1/compliance/forms/Privacy impact", headers=as_("bob"), json={"name": "Privacy impact", "definition": FORM}).status_code == 403
-    grant_group(client, "set-classes", "Privacy admins", "Manager", users=["bob"])
+    grant_group(client, "set-classes", "Privacy admins", "Contributor", users=["bob"])
     grant_group(client, "set-forms", "Privacy admins", "Admin", users=["bob"])
     assert client.put("/v1/catalog/classifications", headers=as_("bob"), json={"levels": levels}).status_code == 200
     assert client.put("/v1/compliance/forms/Privacy impact", headers=as_("bob"), json={"name": "Privacy impact", "definition": FORM}).status_code == 200
@@ -234,11 +234,11 @@ def test_reviews_notify_by_email_and_land_in_the_register(client, repo, monkeypa
                                                                     "scope": {"layers": [layer]}}).raise_for_status()
     set_email("ana", "ana@example.test")
     set_email("bob", "bob@example.test")
-    target = {"kind": "role", "resource_id": ids["public"], "role": "Reader", "app_group_id": marketing}
+    target = {"kind": "role", "resource_id": ids["public"], "role": "DataReader", "app_group_id": marketing}
     case = client.post("/v1/compliance/cases", headers=as_("ana"), json={**target, "answers": ANSWERS}).json()
     notify.tick(SessionLocal)
     # Reviewers are told what waits and where; the answers never go out by email.
-    assert [(m["to"], m["subject"]) for m in Hook.sent] == [("bob@example.test", "Review needed: Reader on public for =Marketing")]
+    assert [(m["to"], m["subject"]) for m in Hook.sent] == [("bob@example.test", "Review needed: Data Reader on public for =Marketing")]
     assert f"/#case={case['id']}" in Hook.sent[0]["body"] and "Monthly report" not in Hook.sent[0]["body"]
     client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "changes", "note": "Which report?"})
     client.post(f"/v1/compliance/cases/{case['id']}/submit", headers=as_("ana")).raise_for_status()
@@ -262,11 +262,11 @@ def test_reviews_notify_by_email_and_land_in_the_register(client, repo, monkeypa
     # The register: what was given through a form, by whom and until when; CSV for the auditors.
     assert client.get("/v1/compliance/register", headers=as_("ana")).status_code == 403
     rows = client.get("/v1/compliance/register", headers=as_("bob")).json()
-    assert [(r["group"], r["access"], r["approved_by"], r["case_id"]) for r in rows] == [("=Marketing", "Reader on public", "bob", case["id"])]
+    assert [(r["group"], r["access"], r["approved_by"], r["case_id"]) for r in rows] == [("=Marketing", "Data Reader on public", "bob", case["id"])]
     csv = client.get("/v1/compliance/register", headers=as_("admin"), params={"format": "csv"})
     assert csv.headers["content-type"].startswith("text/csv")
     lines = csv.text.splitlines()
-    assert lines[0].startswith("group,access,kind") and lines[1].startswith("'=Marketing,Reader on public,role,restricted")
+    assert lines[0].startswith("group,access,kind") and lines[1].startswith("'=Marketing,Data Reader on public,role,restricted")
 
 
 def test_webhooks_are_admin_configured_signed_filtered_and_retried(client, monkeypatch):
@@ -326,7 +326,7 @@ def test_access_ends_renews_and_existing_access_gets_a_deadline(client, repo, mo
     classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
     # Access that existed before the policy: kept, with a deadline.
     legacy = grant_group(client, "workloads", "Legacy readers", "Executor")
-    client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": legacy, "role": "Reader"}).raise_for_status()
+    client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": legacy, "role": "DataReader"}).raise_for_status()
     layer, _ = set_up_policy(client, ids["public"])
     marketing = grant_group(client, "workloads", "Marketing readers", "Executor")
     privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
@@ -338,9 +338,9 @@ def test_access_ends_renews_and_existing_access_gets_a_deadline(client, repo, mo
     now = utcnow()
     expiry.tick(SessionLocal, now)
     deadlines = client.get("/v1/compliance/deadlines", headers=as_("ana"), params={"resource_id": ids["public"]}).json()
-    assert [(d["group"], d["role"], d["classification"]) for d in deadlines] == [("Legacy readers", "Reader", "restricted")]
+    assert [(d["group"], d["role"], d["classification"]) for d in deadlines] == [("Legacy readers", "DataReader", "restricted")]
     # The group's access is approved for 25 days; a renewal opens 30 days before the end, prefilled.
-    target = {"kind": "role", "resource_id": ids["public"], "role": "Reader", "app_group_id": marketing}
+    target = {"kind": "role", "resource_id": ids["public"], "role": "DataReader", "app_group_id": marketing}
     case = client.post("/v1/compliance/cases", headers=as_("ana"), json={**target, "answers": ANSWERS,
                                                                          "until": (now + timedelta(days=25)).isoformat()}).json()
     approved = client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "approve"}).json()
@@ -354,7 +354,7 @@ def test_access_ends_renews_and_existing_access_gets_a_deadline(client, repo, mo
     expiry.tick(SessionLocal, now + timedelta(days=12))   # once
     notify.tick(SessionLocal)
     subjects = [(m["to"], m["subject"]) for m in Hook.sent]
-    assert ("ana@example.test", "Renew access: Reader on public for Marketing readers") in subjects
+    assert ("ana@example.test", "Renew access: Data Reader on public for Marketing readers") in subjects
     assert sum(s.startswith("Access ends in 13 days") for _, s in subjects) == 1, subjects
     assert any(s.startswith("Justify access by") for _, s in subjects)
     # Without a renewal the access ends; the role goes away and the case is expired.
@@ -380,7 +380,7 @@ def test_justifying_existing_access_clears_its_deadline_and_overdue_reviews_esca
     ids = setup_products(client, repo)
     classify(client, ids["sales"], {"email": {"classification": "restricted", "tags": ["pii"]}})
     legacy = grant_group(client, "workloads", "Legacy readers", "Executor")
-    client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": legacy, "role": "Reader"}).raise_for_status()
+    client.put(f"/v1/rbac/resources/{ids['public']}/assignments", headers=as_("ana"), json={"app_group_id": legacy, "role": "DataReader"}).raise_for_status()
     set_up_policy(client, ids["public"])
     privacy = grant_group(client, "workloads", "Privacy team", "Executor", users=["bob"])
     select_group(client, "bob", privacy)
@@ -389,11 +389,11 @@ def test_justifying_existing_access_clears_its_deadline_and_overdue_reviews_esca
     now = utcnow()
     expiry.tick(SessionLocal, now)
     # The owners justify the access the group already has.
-    case = client.post("/v1/compliance/cases", headers=as_("ana"), json={"kind": "role", "resource_id": ids["public"], "role": "Reader",
+    case = client.post("/v1/compliance/cases", headers=as_("ana"), json={"kind": "role", "resource_id": ids["public"], "role": "DataReader",
                                                                          "app_group_id": legacy, "answers": ANSWERS}).json()
     expiry.tick(SessionLocal, now + timedelta(days=11))   # review due after 10 days: overdue
     notify.tick(SessionLocal)
-    assert ("bob@example.test", "Review overdue: Reader on public for Legacy readers") in [(m["to"], m["subject"]) for m in Hook.sent]
+    assert ("bob@example.test", "Review overdue: Data Reader on public for Legacy readers") in [(m["to"], m["subject"]) for m in Hook.sent]
     client.post("/v1/compliance/roles", headers=as_("admin"), json={"role": "compliance_reviewer", "app_group_id": privacy}).raise_for_status()
     client.post(f"/v1/compliance/cases/{case['id']}/decision", headers=as_("bob"), json={"decision": "approve"}).raise_for_status()
     with SessionLocal() as db:
@@ -402,7 +402,7 @@ def test_justifying_existing_access_clears_its_deadline_and_overdue_reviews_esca
     expiry.tick(SessionLocal, now + timedelta(days=20))   # justified now: no new deadline, the access stays
     with SessionLocal() as db:
         assert db.scalar(select(JustificationDeadline)) is None
-        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == legacy)).role == "Reader"
+        assert db.scalar(select(RoleAssignment).where(RoleAssignment.resource_id == ids["public"], RoleAssignment.app_group_id == legacy)).role == "DataReader"
 
 
 def test_the_datas_owners_need_no_form_below_what_they_own(client, repo):  # noqa: F811
@@ -437,19 +437,19 @@ def test_existing_direct_identity_grants_reconcile_but_cannot_expand_protected_a
         db.add(principal); db.flush()
         pid = principal.id
         db.add(Resource(kind='service', name='Stable runtime', object_id='stable-runtime', config={'layer_id': layers.NON_PROD}))
-        db.add(ServiceRoleAssignment(resource_id=rid, principal_id=pid, role='Reader'))
+        db.add(ServiceRoleAssignment(resource_id=rid, principal_id=pid, role='DataReader'))
         db.commit()
     classify(client, ids['sales'], {'ssn': {'classification': 'restricted'}})
     set_up_policy(client, rid)
     path = '/v1/rbac/resources/'+rid+'/assignments'
-    def assign(role):
-        return client.put(path, headers=as_('admin'), json={'principal_id': pid, 'role': role})
-    assert assign('Reader').status_code == 200  # Terraform resends the current grant.
+    def assign(role, replaces=None):
+        return client.put(path, headers=as_('admin'), json={'principal_id': pid, 'role': role, 'replaces': replaces})
+    assert assign('DataReader').status_code == 200  # Terraform resends the current grant.
     assert assign('Admin').status_code == 409   # New authority still needs approval.
-    assert assign('Viewer').status_code == 200  # Reduction remains possible.
-    assert assign('Reader').status_code == 409  # A previous grant is not reusable approval.
+    assert assign('Reader', replaces='DataReader').status_code == 200  # Reduction remains possible.
+    assert assign('DataReader').status_code == 409  # A previous grant is not reusable approval.
     client.delete(path+'/services/'+pid, headers=as_('admin')).raise_for_status()
-    assert assign('Reader').status_code == 409  # Revocation cannot be undone by reconciliation.
+    assert assign('DataReader').status_code == 409  # Revocation cannot be undone by reconciliation.
 
 
 def test_metadata_group_cannot_turn_viewer_into_protected_payload_access(client, repo):
@@ -457,7 +457,7 @@ def test_metadata_group_cannot_turn_viewer_into_protected_payload_access(client,
     rid = ids['public']
     classify(client, ids['sales'], {'ssn': {'classification': 'restricted'}})
     set_up_policy(client, rid)
-    group = grant_group(client, rid, 'Metadata only', 'Viewer', users=['bob'])
+    group = grant_group(client, rid, 'Metadata only', 'Reader', users=['bob'])
     response = client.put('/v1/rbac/resources/'+rid+'/assignments', headers=as_('admin'),
-                          json={'app_group_id': group, 'role': 'Reader'})
+                          json={'app_group_id': group, 'role': 'DataReader'})
     assert response.status_code == 409 and response.json()['detail']['code'] == 'justification_required'

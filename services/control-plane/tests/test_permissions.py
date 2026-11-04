@@ -10,7 +10,7 @@ from .test_deploying import repo  # noqa: F401
 def grant(client, **changes):
     pid = client.get('/v1/me', headers=as_('bob')).json()['principal_id']
     body = dict(target_id='set-network', namespace='network.editor_allowlist', principal_id=pid,
-                layer_id='1a0000000002', role='Manager')
+                layer_id='1a0000000002', role='Contributor')
     body.update(changes)
     result = client.post('/v1/permissions/assignments', headers=as_('admin'), json=body)
     assert result.status_code == 201, result.text
@@ -24,7 +24,7 @@ def allowed(action, target='set-network', layer='1a0000000002'):
 
 def test_exact_actions_scope_and_revoke(client):
     assert not allowed('network.editor_allowlist.apply')
-    row = grant(client)
+    row = grant(client, role=None, actions=['network.editor_allowlist.apply'])
     assert allowed('network.editor_allowlist.apply')
     assert not allowed('network.editor_allowlist.draft.edit')
     assert not allowed('network.editor_allowlist.apply', layer='1a0000000001')
@@ -143,7 +143,7 @@ def test_disabled_recipient_can_be_revoked(client):
 
 
 def page(client, target):
-    return grant(client, target_id=target, namespace='pages', layer_id=None, role='Viewer')
+    return grant(client, target_id=target, namespace='pages', layer_id=None, role='Reader')
 
 
 def test_network_operator_is_confined_to_its_layer(client):
@@ -167,7 +167,9 @@ def test_page_view_and_form_edit_publish_are_independent(client):
     assert client.get('/v1/compliance/forms', headers=as_('bob')).status_code == 403
     assert client.get('/v1/compliance/policies', headers=as_('bob')).status_code == 403
     assert client.get('/v1/compliance/roles', headers=as_('bob')).status_code == 403
-    grant(client, target_id='set-forms', namespace='compliance.forms', layer_id=None, role='Contributor')
+    # Drafting alone: Contributor would also publish, so the drafting permissions are given explicitly.
+    grant(client, target_id='set-forms', namespace='compliance.forms', layer_id=None, role=None,
+          actions=['compliance.forms.create', 'compliance.forms.draft.edit'])
     assert client.put('/v1/compliance/forms/Purpose', headers=as_('bob'), json=body).status_code == 403
     page(client, 'set-forms')
     response = client.put('/v1/compliance/forms/Purpose', headers=as_('bob'), json=body)
@@ -183,7 +185,7 @@ def test_scoped_layer_creation_is_delegable(client):
     gid = grant_group(client, 'workloads', 'Layer builders', 'Executor', users=['bob'])
     client.put('/v1/me/active-group', headers=as_('bob'), json={'group_id': gid}).raise_for_status()
     page(client, 'set-layers')
-    grant(client, target_id='set-layers', namespace='layers.collection', layer_id=None, role='Manager')
+    grant(client, target_id='set-layers', namespace='layers.collection', layer_id=None, role='Contributor')
     response = client.post('/v1/admin/layers', headers=as_('bob'), json={'name': 'Sandbox'})
     assert response.status_code == 201, response.text
     assert client.post('/v1/admin/layers', headers=as_('bob'), json={'name': 'Protected', 'production': True}).status_code == 403
@@ -219,7 +221,7 @@ def test_workload_auto_update_permission_cannot_change_identity_or_run(client, r
     from .test_deploying import deploy
     from .rbac_helpers import grant_group, select_group
     pub = deploy(client, repo, program='sales-report', slug='fine-workload').json()
-    group = grant_group(client, pub['resource_id'], 'Workload viewers', 'Viewer', users=['bob'])
+    group = grant_group(client, pub['resource_id'], 'Workload viewers', 'Reader', users=['bob'])
     select_group(client, 'bob', group)
     with SessionLocal() as db:
         from app.permissions import resource_layer
@@ -245,7 +247,7 @@ def test_token_inventory_and_creation_do_not_grant_revocation_or_secret_writes(c
     setup_finance_db(client);make_sa(client)
     resources=client.get('/v1/rbac/resources',headers=as_('admin')).json()
     target=next(r for r in resources if r['config'].get('service_account'))
-    group=grant_group(client,target['id'],'Credential auditors','Viewer',users=['bob'])
+    group=grant_group(client,target['id'],'Credential auditors','Reader',users=['bob'])
     select_group(client,'bob',group)
     grant(client,target_id=target['id'],namespace='identities.tokens',layer_id=target['layer_id'],
         role=None,actions=['identities.tokens.list'])
@@ -269,7 +271,7 @@ def test_workload_viewer_needs_a_separate_permission_for_log_contents(client,rep
     from app.models import Workload
     from app.workload_logs import entry
     pub=deploy(client,repo,program='sales-report',slug='log-boundary').json()
-    group=grant_group(client,pub['resource_id'],'Metadata observers','Viewer',users=['bob'])
+    group=grant_group(client,pub['resource_id'],'Metadata observers','Reader',users=['bob'])
     select_group(client,'bob',group)
     with SessionLocal() as db:
         entry(db,workload=db.get(Workload,pub['id']),level='info',message='Private application payload')
@@ -293,7 +295,7 @@ def test_api_metadata_edit_does_not_rebind_credentials_or_change_trust(client):
     created=client.post('/v1/apis',headers=as_('admin'),json=body)
     assert created.status_code==201,created.text
     api=created.json()
-    group=grant_group(client,api['resource_id'],'API metadata editors','Viewer',users=['bob'])
+    group=grant_group(client,api['resource_id'],'API metadata editors','Reader',users=['bob'])
     select_group(client,'bob',group)
     with SessionLocal() as db:
         layer=permissions.resource_layer(db,api['resource_id'])

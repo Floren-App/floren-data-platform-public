@@ -26,7 +26,7 @@ def test_personal_secret_viewer_does_not_write_delete_or_inject_values(client):
         with pytest.raises(SecretAccessError):
             authorize_secrets(db,deps.get_secret_store(),rbac.resolve_user(db,User('bob')),{'KEY':'me/private'})
     client.delete('/v1/permissions/assignments/'+writer['id'],headers=as_('admin')).raise_for_status()
-    grant(client,'secrets','secret:user:bob',role='Viewer')
+    grant(client,'secrets','secret:user:bob',role='Reader')
     rows=client.get('/v1/secrets',headers=as_('bob')).json()
     assert len(rows)==1 and rows[0]['capabilities']==[] and 'private-value' not in str(rows)
     assert client.put('/v1/secrets/user/me/private',headers=as_('bob'),json={'value':'overwrite'}).status_code==403
