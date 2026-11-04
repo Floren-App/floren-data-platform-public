@@ -6,7 +6,8 @@ a lime slice. The platform's green was already a lime.
 ## Name
 
 - In running text: **Limoon**.
-- As a logo, window title and on the opening screen: **limoon.**, lowercase, with the period in lime.
+- As a logo, window title and on the opening screen: **limoon.**, lowercase. Styled wordmarks use
+  `#6cb52e` for the period in both light and dark themes, including app navigation and the docs header.
 - Technical names keep their `fdp` prefix (images `fdp-*`, the `fdp` SDK, `FDP_*` settings, the Terraform provider
   `floren-app/fdp`). The domain stays floren.app.
 

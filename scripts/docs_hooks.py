@@ -53,3 +53,13 @@ def on_page_markdown(markdown, page, config, **kwargs):
         relative = resolved.relative_to(repo).as_posix()
         return '](' + source + relative + ('#' + fragment if fragment else '') + ')'
     return re.sub(r'\]\(([^\s)]+)\)', rewrite, markdown)
+
+
+def on_post_page(output, page, config):
+    """Colour the visible wordmark's period, keeping titles and attributes plain text."""
+    if config['site_name'] != 'limoon.':
+        return output
+    head, boundary, body = output.partition('</head>')
+    body = re.sub(r'(?<=>)(\s*)limoon\.(?=\s*<)',
+                  r'\1limoon<span class="wordmark-dot">.</span>', body)
+    return head + boundary + body
