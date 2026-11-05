@@ -28,6 +28,10 @@ All logos are SVG, in [`logos/`](logos/).
 Only the loading slice moves. Use the `-on-dark` versions on dark backgrounds. Leave clear space around a logo of at
 least a quarter of the slice's height, and don't recolour, stretch, rotate or outline the marks.
 
+The sidebar uses the half-slice lockup SVG at its original aspect ratio, with the matching light/dark asset.
+Collapsed navigation clips the wordmark, keeping the same half slice in place. The build script copies these
+assets into the app from `logos/`.
+
 ## Colours
 
 See [`colors.css`](colors.css) and [`colors.json`](colors.json).

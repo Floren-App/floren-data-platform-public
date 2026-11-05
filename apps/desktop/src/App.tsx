@@ -242,7 +242,7 @@ function Shell({ user }: { user: User }) {
     <div className="shell">
       <nav className={`activity ${picked ? "picked" : ""}`} aria-label="Views" onMouseLeave={() => setPicked(false)} onKeyDown={() => setPicked(false)}
         onClick={(e) => { if ((e.target as HTMLElement).closest(".activity-group > button, .activity > button")) setPicked(true); }}>
-        <div className="brand-mark" role="img" aria-label="limoon." title="limoon."><LimeSlice size={22} /><Wordmark size={26} /></div>
+        <div className="brand-mark" role="img" aria-label="limoon." title="limoon."><span className="brand-lockup" aria-hidden="true" /></div>
         {groups.filter((g) => g.items.length).map((g, i) => <div key={g.label} className="activity-group" role="group" aria-label={g.label}>
           {i > 0 && <hr />}{g.items.map(activityButton)}</div>)}
         <div className="spacer" />

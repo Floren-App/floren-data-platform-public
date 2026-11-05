@@ -16,6 +16,7 @@
      lists and trees, 22px in page titles. */
 :root {
   --brand-dot: #6cb52e;
+  --brand-lockup: url("./assets/limoon-lockup-half-on-dark.svg");
   --bg: #1f1f1f;
   --bg-side: #181818;
   --bg-activity: #181818;
@@ -70,6 +71,7 @@
    app; a choice of light or dark (data-theme on the root) always wins over the system. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
+    --brand-lockup: url("./assets/limoon-lockup-half.svg");
     --bg: #ffffff;
     --bg-side: #f8f8f8;
     --bg-activity: #f8f8f8;
@@ -102,6 +104,7 @@
   }
 }
 :root[data-theme="light"] {
+  --brand-lockup: url("./assets/limoon-lockup-half.svg");
   --bg: #ffffff;
   --bg-side: #f8f8f8;
   --bg-activity: #f8f8f8;
@@ -549,11 +552,11 @@ pre.terminal { background: #181818; color: #cccccc; border: 1px solid var(--bord
 .splash .lime-slice { animation: lime-float 2.4s ease-in-out infinite; }
 @keyframes lime-float { 50% { transform: translateY(-4px) rotate(8deg); } }
 .splash p { margin: 0; }
-.brand-mark { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 13px; margin-bottom: 2px; flex-shrink: 0; overflow: hidden; white-space: nowrap; }
-.brand-mark .lime-slice, .brand-mark .wordmark { flex-shrink: 0; }
-.brand-mark .wordmark { opacity: 0; transition: opacity .08s ease-out; }
-@media (hover: hover) { .activity:hover:not(.picked) .brand-mark .wordmark { opacity: 1; transition-delay: .1s; } }
-.activity:focus-within:has(:focus-visible):not(.picked) .brand-mark .wordmark { opacity: 1; }
+.brand-mark { display: flex; align-items: center; height: 40px; padding: 0 11px; margin-bottom: 2px; flex-shrink: 0; overflow: hidden; }
+.brand-lockup { width: 120px; aspect-ratio: 4412 / 976; flex-shrink: 0; background: var(--brand-lockup) center / contain no-repeat;
+  clip-path: inset(0 calc(100% - 26px) 0 0); transition: clip-path .08s ease-out; }
+@media (hover: hover) { .activity:hover:not(.picked) .brand-lockup { clip-path: inset(0); transition-delay: .1s; } }
+.activity:focus-within:has(:focus-visible):not(.picked) .brand-lockup { clip-path: inset(0); }
 .login-brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 8px; }
 .login-brand h1 { margin: 0; }
 /* Loading: the slice whose segments light up in turn, like the opening screen. In a page or panel it stands above

@@ -187,6 +187,9 @@ def main():
     for name in lockups:
         if (BRAND / 'logos' / name).exists():
             copies['docs/assets/' + name] = (BRAND / 'logos' / name).read_text()
+    for name in ['limoon-lockup-half.svg', 'limoon-lockup-half-on-dark.svg']:
+        if (BRAND / 'logos' / name).exists():
+            copies['apps/desktop/src/assets/' + name] = (BRAND / 'logos' / name).read_text()
     for path, svg in copies.items():
         (ROOT / path).write_text(svg)
     print(f'wrote {len(logos)} logos, colours and {len(copies)} copies')

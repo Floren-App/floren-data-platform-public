@@ -2444,22 +2444,22 @@ test("activity bar shows its labels on hover without taking room", async ({ page
   const state = await setup(page);
   const bar = page.getByRole("navigation", { name: "Views" }), sidebar = page.locator(".sidebar");
   const sidebarLeft = (await sidebar.boundingBox())!.x;
-  const wordmark = bar.locator(".brand-mark .wordmark");
+  const wordmark = bar.locator(".brand-lockup");
   await expect(bar.getByRole("img", { name: "limoon.", exact: true })).toBeVisible();
-  await expect(wordmark).toHaveText("limoon.");
-  await expect(wordmark).toHaveCSS("opacity", "0");
+  await expect(wordmark).toHaveCSS("background-image", /limoon-lockup-half/);
+  await expect(wordmark).not.toHaveCSS("clip-path", "inset(0px)");
   expect((await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
   await bar.getByRole("button", { name: "Workspaces", exact: true }).hover();
   await expect.poll(async () => (await bar.boundingBox())!.width).toBeGreaterThan(150);
   expect((await sidebar.boundingBox())!.x).toBe(sidebarLeft); // Overlays the sidebar; nothing shifts.
-  await expect(wordmark).toHaveCSS("opacity", "1");
+  await expect(wordmark).toHaveCSS("clip-path", "inset(0px)");
   const logoBox = (await wordmark.boundingBox())!, barBox = (await bar.boundingBox())!;
   expect(logoBox.x + logoBox.width).toBeLessThan(barBox.x + barBox.width);
   await page.screenshot({ path: test.info().outputPath("expanded-limoon-logo.png") });
   await expect(bar.getByRole("button", { name: "Workspaces", exact: true })).toContainText("Workspaces");
   await page.mouse.move(700, 300);
   await expect.poll(async () => (await bar.boundingBox())!.width).toBeLessThanOrEqual(48);
-  await expect(wordmark).toHaveCSS("opacity", "0");
+  await expect(wordmark).not.toHaveCSS("clip-path", "inset(0px)");
   // Choosing a section closes the labels at once, so the sidebar is usable; they open again on the next hover.
   await bar.getByRole("button", { name: "Workspaces", exact: true }).click();
   await page.waitForTimeout(300);
