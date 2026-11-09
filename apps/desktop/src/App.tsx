@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { User } from "oidc-client-ts";
 import { currentUser, getServer, onSessionExpired, resetManager, setServer, signIn, signOut, WEB_MODE } from "./auth";
 import { useHub } from "./hub";
@@ -13,6 +13,8 @@ import { GitChoiceHost } from "./views/GitCredentials";
 import { openInWindow, type AppFeature } from "./api";
 import { documentationUrl } from "./documentation";
 import { pageVisible, TAB_PAGES } from "./permissions";
+import { fromHash, savedPins, savePins, toHash } from "./routes";
+import { useUnsavedGuard } from "./unsaved";
 import { LimeSlice, Splash, Wordmark } from "./components/Brand";
 import { applyTheme, savedTheme, type Theme } from "./theme";
 
@@ -119,9 +121,14 @@ function Shell({ user }: { user: User }) {
   const [tabs, setTabs] = useState<EditorTab[]>([{ ...HOME, pinned: false }]);
   const [active, setActive] = useState(key(HOME));
   const [switchingGroup, setSwitchingGroup] = useState(false);
+  // Only the open page is mounted: leaving it (another page, closing it, another group) asks first when it has unsaved work.
+  const unsaved = useUnsavedGuard();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { if (copied) { const t = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(t); } }, [copied]);
   // After choosing a section the labels close, so the sidebar is free at once; they reopen on the next hover.
   const [picked, setPicked] = useState(false);
   const switchGroup = async (id: string) => {
+    if (!(await unsaved.confirmLeave())) return;
     setSwitchingGroup(true);
     try { await hub.selectActiveGroup(id); }
     finally { setSwitchingGroup(false); }
@@ -133,8 +140,13 @@ function Shell({ user }: { user: User }) {
     setView("catalog"); openTab({ kind: "catalog", title: "Catalog" });
     requestAnimationFrame(() => document.getElementById("catalog-search")?.focus());
   };
-  const openTab = (t: TabRef) => {
-    if (!pageVisible(hub.me, TAB_PAGES[t.kind])) return;
+  /** Opens a page; resolves false when it is not shown (not visible to this person, or they chose to stay). */
+  const openTab = (t: TabRef): Promise<boolean> => {
+    if (!pageVisible(hub.me, TAB_PAGES[t.kind])) return Promise.resolve(false);
+    if (key(t) === active) { show(t); return Promise.resolve(true); }
+    return unsaved.confirmLeave().then((leave) => { if (leave) show(t); return leave; });
+  };
+  const show = (t: TabRef) => {
     setView(viewForTab(t));
     setTabs((ts) => {
       if (ts.some((x) => key(x) === key(t))) return ts.map((x) => key(x) === key(t) ? { ...t, pinned: x.pinned } : x);
@@ -150,7 +162,12 @@ function Shell({ user }: { user: User }) {
       .map((x) => key(x) === key(tab) ? { ...x, pinned: !x.pinned } : x));
     if (tab.pinned) { setActive(key(tab)); setView(viewForTab(tab)); }
   };
-  const closeTab = (k: string) => {
+  const select = (t: TabRef) => {
+    if (key(t) === active) return;
+    void unsaved.confirmLeave().then((leave) => { if (leave) { setActive(key(t)); setView(viewForTab(t)); } });
+  };
+  const closeTab = async (k: string) => {
+    if (k === active && !(await unsaved.confirmLeave())) return;
     setTabs((ts) => {
       const next = ts.filter((x) => key(x) !== k);
       if (k === active) { setActive(next.length ? key(next[next.length - 1]) : ""); if (next.length) setView(viewForTab(next[next.length - 1])); }
@@ -163,9 +180,45 @@ function Shell({ user }: { user: User }) {
     if (!signedIn) return;
     let link: string | null = null;
     try { link = sessionStorage.getItem("fdp.link"); sessionStorage.removeItem("fdp.link"); } catch { /* no storage */ }
+    // Pinned pages from the last visit come back, if this person may still see them.
+    const username = hub.me?.username ?? "";
+    const pins = savedPins(username).filter((t) => pageVisible(hub.me, TAB_PAGES[t.kind]));
+    if (pins.length) setTabs((ts) => [...ts.filter((x) => !pins.some((p) => key(p) === key(x))), ...pins.map((t) => ({ ...t, pinned: true }))]);
+    pinsLoaded.current = true;
     if (link?.startsWith("case=")) openTab({ kind: hub.me?.compliance_roles?.length ? "privacy-case" : "case", ref: link.slice(5), title: "Compliance form" });
     else if (link === "memberships") openTab({ kind: "privacy-memberships", title: "Memberships" });
+    else if (link?.startsWith("/")) { const t = fromHash("#" + link); if (t) openTab(t); }
   }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The address follows the open page, so it can be reloaded, bookmarked and shared; Back and Forward move between
+  // pages. Going back reopens the page through the same checks as navigating there.
+  const pinsLoaded = useRef(false), fromHistory = useRef(false);
+  const shown = tabs.find((t) => key(t) === active);
+  useEffect(() => {
+    if (!signedIn || !shown) return;
+    const hash = toHash(shown);
+    if (window.location.hash === hash) return;
+    const url = window.location.pathname + window.location.search + hash;
+    if (fromHistory.current || !window.location.hash) history.replaceState(null, "", url);
+    else history.pushState(null, "", url);
+    fromHistory.current = false;
+  }, [signedIn, shown]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const back = () => {
+      const t = fromHash(window.location.hash);
+      if (!t) return;
+      fromHistory.current = true;
+      void openTab(t).then((shownNow) => {
+        // Stayed on the page (or it is not visible): the address goes back to the page that is open.
+        if (!shownNow) { fromHistory.current = false; const open = tabs.find((x) => key(x) === active); if (open) history.pushState(null, "", toHash(open)); }
+      });
+    };
+    window.addEventListener("popstate", back);
+    return () => window.removeEventListener("popstate", back);
+  });
+  useEffect(() => {
+    if (pinsLoaded.current && hub.me?.username) savePins(hub.me.username, tabs.filter((t) => t.pinned));
+  }, [tabs, hub.me?.username]);
   useEffect(() => {
     const search = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); }
@@ -272,7 +325,7 @@ function Shell({ user }: { user: User }) {
         <div className="context-picker" role="group" aria-label="Working context">
           <label htmlFor="active-group">Group</label>
           <select id="active-group" aria-label="Active group" value={hub.me?.active_group_id ?? ""} disabled={switchingGroup || !hub.me?.available_groups?.length}
-            title="Shows this group's objects and owns new objects. Secondary groups still authorize existing-object actions."
+            title="You act as this group: everything you see and do uses only its access, and it owns the objects you create."
             onChange={(e) => void switchGroup(e.target.value)}>
             <option value="" disabled>{hub.me?.available_groups?.length ? "Choose active group" : "No groups available"}</option>
             {hub.me?.available_groups?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -294,28 +347,44 @@ function Shell({ user }: { user: User }) {
       </aside>
 
       <main className="main">
+        {(() => {
+          // Always in view: whose access applies and where new work lands. A username such as admin is not a role.
+          const group = hub.me?.available_groups?.find((g) => g.id === hub.me?.active_group_id);
+          const layer = hub.layers.find((l) => l.id === hub.layerId);
+          const layerless = LAYERLESS_VIEWS.includes(view);
+          return <div className="acting-context" aria-label="Acting context"
+            title="Everything you see and do here uses this group's access. A workspace's editor and its runs act as the group the workspace was created for.">
+            Acting as <strong>{group?.name ?? "no group"}</strong>
+            {!!hub.layers.length && <> · {layerless ? <span>All layers</span> : layer ? <strong>{layer.name}</strong> : <span>no layer chosen</span>}
+              {!layerless && layer?.production && <span className="production">production</span>}</>}
+            <span className="grow" />
+            <button className="text-button" title="Copy a link to this page. Whoever opens it still needs access to it."
+              onClick={() => void navigator.clipboard?.writeText(window.location.href).then(() => setCopied(true), () => setCopied(false))}>
+              {copied ? "Link copied" : "Copy link"}</button>
+          </div>;
+        })()}
         <div className="tabs" role="tablist" aria-label="Open editors">
           {tabs.filter((t) => pageVisible(hub.me, TAB_PAGES[t.kind])).map((t) => (
             <div key={key(t)} role="tab" aria-label={t.title} aria-selected={key(t) === active} tabIndex={key(t) === active ? 0 : -1} title={t.title}
-                 className={`tab ${t.pinned ? "pinned" : "preview"} ${key(t) === active ? "active" : ""}`} onClick={() => { setActive(key(t)); setView(viewForTab(t)); }}
-                 onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(key(t)); } }}
+                 className={`tab ${t.pinned ? "pinned" : "preview"} ${key(t) === active ? "active" : ""}`} onClick={() => select(t)}
+                 onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); void closeTab(key(t)); } }}
                  onKeyDown={(e) => {
                    const i = tabs.indexOf(t);
                    const move = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
                    if (move && tabs.length > 1) {
                      e.preventDefault();
                      const next = tabs[(i + move + tabs.length) % tabs.length];
-                     setActive(key(next)); setView(viewForTab(next));
+                     select(next);
                      (e.currentTarget.parentElement?.children[tabs.indexOf(next)] as HTMLElement | undefined)?.focus();
                    }
-                   if (e.key === "Delete") closeTab(key(t));
+                   if (e.key === "Delete") void closeTab(key(t));
                  }}>
               <span className="tab-label">{t.title}</span>
               <button className="icon-btn tab-pin" aria-label={`${t.pinned ? "Unpin" : "Pin"} ${t.title}`} aria-pressed={t.pinned}
                 title={t.pinned ? "Unpin page · allow it to be replaced" : "Pin page · keep it open"}
                 onClick={(e) => { e.stopPropagation(); togglePin(t); }}><IconPin /></button>
               <button className="icon-btn close" aria-label={`Close ${t.title}`} title="Close"
-                      onClick={(e) => { e.stopPropagation(); closeTab(key(t)); }}>
+                      onClick={(e) => { e.stopPropagation(); void closeTab(key(t)); }}>
                 <IconClose />
               </button>
             </div>
@@ -323,9 +392,10 @@ function Shell({ user }: { user: User }) {
         </div>
         <div className="content">
           {current
-            ? <div className={`page ${current.kind === "docs" ? "wide" : ""}`}><TabContent key={`${key(current)}:${hub.me?.active_group_id ?? ""}`} tab={current} hub={hub} openTab={openTab} /></div>
+            ? <div className={`page ${current.kind === "docs" ? "wide" : ""}`}><unsaved.Provider value={unsaved.registry}><TabContent key={`${key(current)}:${hub.me?.active_group_id ?? ""}`} tab={current} hub={hub} openTab={(t) => void openTab(t)} /></unsaved.Provider></div>
             : <div className="empty-editor"><div><p>No editor open.</p><p>Choose an item in the sidebar, or press <span className="kbd">⌘K</span> to search the catalog.</p></div></div>}
         </div>
+        {unsaved.dialog}
       </main>
 
       <GitChoiceHost />

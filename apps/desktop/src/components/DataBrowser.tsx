@@ -101,7 +101,10 @@ export function DataListing({ schema, location = { schemaId: schema.id }, openTa
           <td>{columns ? <span className="mono">{child.name}</span> : <button className="text-button object-name" onClick={() => openTab(dataTab(schema, child))}><ProductIcon kind={child.kind === "folder" ? "directory" : child.kind === "file" ? "data" : "table"} size={16} />{child.name}</button>}</td>
           <td className={columns ? "mono muted" : ""}>{columns ? child.data_type : kindLabel(child)}</td>
           {columns && <td>{child.nullable ? "Yes" : "No"}</td>}
-        </tr>)}{!items.length && <tr><td colSpan={columns ? 3 : 2} className="muted">{search ? "No matching objects on this page." : "No objects found in this scope."}</td></tr>}
+        </tr>)}{!items.length && <tr><td colSpan={columns ? 3 : 2} className="muted">{search ? "No matching objects on this page."
+          : state.data?.schema_state === "missing" ? <>The schema <strong>{schema.name}</strong> is registered, but the engine does not have it yet. It appears once something creates it, such as a first dbt run or a <code>CREATE SCHEMA</code>.</>
+          : state.data?.schema_state === "present" ? "This schema exists and has no tables or views yet."
+          : "No objects found in this scope."}</td></tr>}
       </tbody></table></div>}
     {(previous.length > 0 || state.data?.next_cursor) && <div className="row pagination">
       <span className="muted">Page {previous.length + 1}</span>

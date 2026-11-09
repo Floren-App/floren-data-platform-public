@@ -9,7 +9,7 @@ export function documentationUrl(view: View): string {
     workspaces: "workspaces/",
     workloads: "deploying/",
     data: "storage-integrations/",
-    kafka: "",                      // no public Kafka guide yet: the site start page
+    kafka: "kafka-operations/",
     apis: "api-management/",
     packages: "packages/",
     catalog: "catalog/",
@@ -17,5 +17,10 @@ export function documentationUrl(view: View): string {
     compute: "compute/",
     admin: "configuration/",
   };
-  return new URL(routes[view], BASE.endsWith("/") ? BASE : `${BASE}/`).href;
+  return guideUrl(routes[view]);
+}
+
+/** A public guide page by its route, such as "platform-recovery/". */
+export function guideUrl(route: string): string {
+  return new URL(route, BASE.endsWith("/") ? BASE : `${BASE}/`).href;
 }

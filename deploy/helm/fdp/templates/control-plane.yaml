@@ -89,6 +89,9 @@ spec:
           envFrom:
             - secretRef: { name: {{ .Values.existingSecret }} }
           env:
+            # For the installation readiness report: which bundled services are single-instance.
+            - name: FDP_BUNDLED_SERVICES
+              value: {{ list (ternary "keycloak" "" .Values.keycloak.enabled) (ternary "openbao" "" .Values.openbao.enabled) (ternary "metadata-postgresql" "" .Values.metadataDatabase.enabled) | compact | join "," | quote }}
             {{- if .Values.metadataDatabase.enabled }}
             - { name: FDP_DATABASE_HOST, value: {{ include "fdp.databaseHost" . | quote }} }
             - { name: FDP_DATABASE_NAME, value: fdp }

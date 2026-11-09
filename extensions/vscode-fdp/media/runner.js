@@ -3,7 +3,9 @@
   const vscode = acquireVsCodeApi();
   const app = document.getElementById("app");
   const ACTIVE = new Set(["pending", "running"]);
-  let state = { config: null, pools: [], sources: [], runs: [] };
+  let state = { config: null, pools: [], sources: [], runs: [], readiness: null };
+  // Per-section load failures; a section that failed keeps showing what it last loaded.
+  let sectionErrors = {};
   let selected = (vscode.getState() || {}).selected || null;
   const values = (vscode.getState() || {}).values || {};
   let error = null;
@@ -30,7 +32,7 @@
 
   window.addEventListener("message", (e) => {
     const m = e.data;
-    if (m.type === "state") { state = m; error = null; }
+    if (m.type === "state") { state = { ...state, ...m.loaded }; sectionErrors = m.errors || {}; error = null; }
     else if (m.type === "runs") state.runs = m.runs;
     else if (m.type === "error") { error = m.message; fieldErrors = m.fieldErrors || {}; busy = false; }
     else if (m.type === "started") { busy = false; fieldErrors = {}; error = null; }
@@ -91,7 +93,19 @@
       h("button", { class: "link", title: "Reload", onclick: () => vscode.postMessage({ type: "refresh" }) }, "reload")));
 
     const body = [];
-    if (!cfg) body.push(h("p", { class: "muted" }, "Loading…"));
+    const ready = state.readiness;
+    if (ready) {
+      const c = ready.context;
+      body.push(h("p", { class: "context" }, "Acting as ", h("strong", {}, c.group_name || "no group"),
+        c.layer_name ? [" in ", h("strong", {}, c.layer_name)] : "", " (this workspace's editor)"));
+      const open = ready.checks.filter((x) => x.state !== "ready" && x.key !== "workspace");
+      if (open.length) body.push(h("ul", { class: "readiness" }, open.map((x) => h("li", {},
+        h("span", { class: `state ${x.state}` }, { missing: "Missing", unavailable: "Not available", unknown: "Unknown" }[x.state]),
+        " ", h("strong", {}, x.label), x.detail ? ` · ${x.detail}` : ""))));
+    }
+    for (const [section, message] of Object.entries(sectionErrors))
+      body.push(h("div", { class: "error", role: "alert" }, `${{ config: "Programs", pools: "Warehouses", sources: "Data sources", runs: "Runs", readiness: "Readiness" }[section] || section}: ${message}`));
+    if (!cfg) body.push(h("p", { class: "muted" }, sectionErrors.config ? "Programs could not be loaded." : "Loading…"));
     else if (!cfg.exists) {
       body.push(h("p", { class: "muted" }, "This workspace has no fdp.json yet. It lists the programs you can run on a warehouse, with their arguments and requirements."),
         h("button", { onclick: () => vscode.postMessage({ type: "createConfig" }) }, "Create fdp.json"));

@@ -1,6 +1,77 @@
 {
   "components": {
     "schemas": {
+      "ActingContext": {
+        "description": "Who a request acts as: the person, or the editor, job or workload credential they used.",
+        "properties": {
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The group whose access applies",
+            "title": "Group Id"
+          },
+          "group_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Name"
+          },
+          "kind": {
+            "enum": [
+              "person",
+              "editor",
+              "job",
+              "workload",
+              "service"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "layer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layer Id"
+          },
+          "layer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layer Name"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "username"
+        ],
+        "title": "ActingContext",
+        "type": "object"
+      },
       "ActiveGroupIn": {
         "additionalProperties": false,
         "properties": {
@@ -4463,6 +4534,53 @@
         "title": "QueryLogSettingsIn",
         "type": "object"
       },
+      "ReadinessCheck": {
+        "properties": {
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The permission key involved, if any",
+            "title": "Permission"
+          },
+          "state": {
+            "description": "missing: a permission or setting is absent; unavailable: a dependency is not usable now; unknown: it could not be checked",
+            "enum": [
+              "ready",
+              "missing",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "state"
+        ],
+        "title": "ReadinessCheck",
+        "type": "object"
+      },
       "RepoIn": {
         "properties": {
           "allowed_groups": {
@@ -7299,6 +7417,56 @@
         "title": "WorkspaceOut",
         "type": "object"
       },
+      "WorkspaceReadiness": {
+        "description": "A point-in-time explanation. Every action still checks permissions, policy and capacity itself.",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ActingContext"
+          },
+          "workspace_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Group Id"
+          },
+          "workspace_group_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The group the workspace was created for",
+            "title": "Workspace Group Name"
+          }
+        },
+        "required": [
+          "context",
+          "checks",
+          "checked_at"
+        ],
+        "title": "WorkspaceReadiness",
+        "type": "object"
+      },
       "WorkspaceSettingsIn": {
         "description": "Workspaces have their own limits; they never count toward a warehouse's maximum.",
         "properties": {
@@ -9505,6 +9673,70 @@
           }
         },
         "summary": "Revoke",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/installation-readiness": {
+      "get": {
+        "description": "What is configured, protected, operated by someone else, or unknown. Read-only evidence for Global Admin; it\nchanges no setting and claims no protection it cannot see.",
+        "operationId": "get_v1_admin_installation-readiness",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Installation Readiness",
         "tags": [
           "admin"
         ]
@@ -14743,6 +14975,80 @@
         ]
       }
     },
+    "/v1/backups/plans/check": {
+      "post": {
+        "description": "Whether a plan's source, destination and vault key reference are usable; changes nothing.",
+        "operationId": "post_v1_backups_plans_check",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Plan",
+        "tags": [
+          "platform recovery"
+        ]
+      }
+    },
     "/v1/backups/plans/{ident}": {
       "delete": {
         "operationId": "delete_v1_backups_plans_ident",
@@ -15309,6 +15615,89 @@
           }
         },
         "summary": "Resume",
+        "tags": [
+          "platform recovery"
+        ]
+      }
+    },
+    "/v1/backups/schedule-preview": {
+      "get": {
+        "description": "The next five runs of a schedule in its timezone, as the scheduler computes them.",
+        "operationId": "get_v1_backups_schedule-preview",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schedule",
+            "required": true,
+            "schema": {
+              "title": "Schedule",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
+              "default": "UTC",
+              "title": "Timezone",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Schedule Preview",
         "tags": [
           "platform recovery"
         ]
@@ -27670,6 +28059,145 @@
         ]
       }
     },
+    "/v1/rbac/provenance": {
+      "get": {
+        "description": "Who manages an object's configuration: Terraform (with its configuration reference and revision), the app, or\nunknown; and any app change since Terraform last applied it. For objects you may read; others answer 404.",
+        "operationId": "get_v1_rbac_provenance",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "target",
+            "required": true,
+            "schema": {
+              "title": "Target",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Provenance",
+        "tags": [
+          "RBAC",
+          "RBAC"
+        ]
+      }
+    },
+    "/v1/rbac/provenance/changes": {
+      "get": {
+        "description": "Terraform-managed objects changed in the app since Terraform last applied them: what the next plan will likely\nshow as drift. A review list for Global Admin; it changes nothing and adopts nothing into Terraform state.",
+        "operationId": "get_v1_rbac_provenance_changes",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Provenance Changes",
+        "tags": [
+          "RBAC",
+          "RBAC"
+        ]
+      }
+    },
     "/v1/rbac/resources": {
       "get": {
         "operationId": "get_v1_rbac_resources",
@@ -32085,6 +32613,81 @@
           }
         },
         "summary": "Open Workspace",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/v1/workspaces/{ws_id}/readiness": {
+      "get": {
+        "description": "Who you act as here, and whether running, logs, outputs and the warehouse will work. It explains; each\naction still checks for itself.",
+        "operationId": "get_v1_workspaces_ws_id_readiness",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ws_id",
+            "required": true,
+            "schema": {
+              "title": "Ws Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-fdp-active-group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fdp-Active-Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceReadiness"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Workspace Readiness",
         "tags": [
           "workspaces"
         ]

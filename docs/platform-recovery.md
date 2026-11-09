@@ -142,9 +142,11 @@ are the preferred model for new configuration.
 
 ## Scheduling, retention and notifications
 
-Choose a daily time in the app, or a five-field cron expression with an IANA timezone.
-`30 3 * * 0` means Sunday at 03:30 in the selected timezone. The app shows the next
-scheduled run in that timezone. Timezone-aware scheduling accounts for daylight
+Choose daily or weekly at a time in the app, or under **Advanced** any five-field cron expression, with an IANA
+timezone. `30 3 * * 0` means Sunday at 03:30 in the selected timezone. An advanced schedule that is not daily or
+weekly stays advanced; the app never rewrites it. The form previews the next runs, computed by the server exactly as
+the scheduler will, and shows the full path the archives go to. **Largest archive** and **Most objects** stop a backup
+that would be bigger than expected (10 GiB and 100,000 objects unless you change them). Timezone-aware scheduling accounts for daylight
 saving changes; use a time outside the DST transition window for predictable daily
 operation. Missed occurrences are coalesced after downtime, not replayed as a backlog.
 A plan never overlaps itself; other plans keep their independent queue/history.
@@ -162,6 +164,20 @@ and history. A destination cannot be removed while a plan references it.
 Configure existing notification channels for `backup.failed`, `backup.succeeded`
 and `backup.retention.failed`. Notifications contain status and plan IDs, not
 credentials, database contents, object data or encryption keys.
+
+## Status and readiness
+
+With no plan, the page says **Not configured**: nothing is backed up by a plan, and nothing is turned on for you.
+Each plan shows what it is doing (paused, scheduled, running, or last backup failed with the reason) and when it
+last completed. **What is protected** lists each source with its enabled plans and its latest completed backup.
+
+**Check prerequisites** in the plan form checks, with the same adapters a backup uses, that you may export the
+source and it has a backup adapter, that the referenced vault secret holds a usable recovery public key, and that you
+may use the destination, its location is valid and outside the source, and retention fits its Object Lock. It
+changes nothing: no bucket policy, retention, encryption, credentials or schedule.
+
+A completed backup is an archive whose checksum was verified after upload. That is not evidence that a restore
+works: rehearse restores in an isolated environment with the procedures below, and record the results.
 
 ## Access control
 
@@ -242,6 +258,54 @@ Customer-native PostgreSQL backup/PITR is also supported. Run the offline
 `python -m app.recovery quarantine --confirm-restored-target` procedure against the
 restored metadata target before starting FDP. Native database recovery does not
 recover vault contents or replace native backups of other dependencies.
+
+## Who protects what
+
+| Component | Protected by | Notes |
+|---|---|---|
+| Control plane metadata | A Limoon backup plan (control plane) | Contains vault references, not secret values |
+| PostgreSQL, S3 files and Iceberg integrations | Limoon backup plans for those integrations | Within the boundaries above |
+| Metadata database service | You, or the bundled single-instance PostgreSQL | The bundled one is not highly available |
+| Secret store (vault) | You, through the vault's own backup | Limoon never exports the vault |
+| Identity provider | You, or the bundled single-instance Keycloak | |
+| Workspace volumes, packages, artifacts | You, with storage snapshots | Not in Limoon's backups |
+| Kafka messages | You, with Kafka's replication or mirroring | |
+| Git repositories and Terraform state | You, where they are hosted | |
+
+**Installation readiness** under Administration (for an active Global Admin) shows the same split for your
+installation: what is configured, what needs attention, what is not configured, what is single-instance, what you
+operate, and what is unknown. It is read-only and claims no protection it cannot see; a restore drill, for example,
+stays unknown until you record one.
+
+## Restore drills
+
+A completed backup proves an archive was written and its checksum verified, not that a restore works. Rehearse one
+regularly, never over the live installation:
+
+1. Create an isolated environment: its own namespace or cluster, its own database, no route from users, and no
+   network path to the live layers.
+2. Restore the chosen archive there with the procedure above, using a private key read from the vault for this
+   drill only. Do not export or copy the vault.
+3. Keep the restored system quarantined: start it without schedulers, workloads or notifications, as for a real
+   recovery, and check it before any reconciliation.
+4. Check what matters: sign-in, groups and roles, the catalog, a sample of workloads and data access, and that the
+   restored release and metadata schema match.
+5. Record the evidence, then remove the environment.
+
+Keep a record per drill with no secret values or data in it:
+
+| Field | Example |
+|---|---|
+| Date and who ran it | 2026-11-07, platform team |
+| Release and metadata schema of the archive | abc1234, 0009_management_provenance |
+| Plan and archive | Nightly control plane, the archive's object key and SHA-256 |
+| Environment | Isolated namespace `drill-2026-11`, no user route |
+| Observed RPO | Archive age when the drill began, e.g. 9 hours |
+| Observed RTO | From start to a usable restored system, e.g. 47 minutes |
+| Result and checks | Passed: sign-in, roles, catalog, three workloads, one data query |
+| Follow-ups | What to fix before the next drill |
+
+Report the RPO and RTO you observed, not targets you have not measured.
 
 ## Iceberg snapshot backups and recovery
 

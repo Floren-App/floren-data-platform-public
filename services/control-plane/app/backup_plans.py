@@ -86,6 +86,66 @@ def next_due(plan, after):
                     max_years_between_matches=5).get_next(datetime).astimezone(timezone.utc)
 
 
+def upcoming(schedule, tz, count=5):
+    """The next runs of a schedule, computed exactly as the scheduler does (daylight-saving changes included)."""
+    from croniter import croniter
+    if len(schedule.split()) != 5 or not croniter.is_valid(schedule):
+        raise ValueError('use a five-field cron schedule')
+    plan = type('Schedule', (), {'schedule': schedule, 'timezone': tz})()
+    ZoneInfo(tz)
+    runs, after = [], utcnow()
+    for _ in range(count):
+        after = next_due(plan, after)
+        runs.append(after)
+    return runs
+
+
+def status(db, ident, enabled):
+    """What a plan is doing: paused, running, failed or scheduled, and when it last completed. A completed backup is a
+    verified archive (checksum), not evidence that a restore works."""
+    history = list(db.scalars(select(PlatformBackup).where(PlatformBackup.destination['_plan_id'].as_string() == ident)
+                              .order_by(PlatformBackup.created_at.desc()).limit(50)))
+    latest = history[0] if history else None
+    success = next((r for r in history if r.status == 'succeeded'), None)
+    state = ('running' if latest and latest.status in ('queued', 'running') else 'paused' if not enabled
+             else 'failed' if latest and latest.status == 'failed' else 'scheduled')
+    return {'state': state, 'last_status': latest.status if latest else None,
+            'last_run_at': (latest.finished_at or latest.created_at).isoformat() if latest else None,
+            'last_success_at': success.finished_at.isoformat() if success and success.finished_at else None,
+            'last_error': latest.error if latest and latest.status == 'failed' else ''}
+
+
+def prerequisites(db, user, plan):
+    """Checks a plan's source, destination and vault key reference with the existing adapters, changing nothing:
+    no bucket policy, retention, encryption, credentials or schedule. Each result says what was checked."""
+    checks = []
+    def check(key, label, work, ok):
+        try:
+            work()
+            checks.append({'key': key, 'label': label, 'state': 'ready', 'detail': ok})
+        except HTTPException as exc:
+            checks.append({'key': key, 'label': label, 'state': 'missing', 'detail': str(exc.detail)})
+        except Exception as exc:  # an adapter or vault answer we could not use
+            checks.append({'key': key, 'label': label, 'state': 'unavailable', 'detail': str(exc) or exc.__class__.__name__})
+    def source_supported():
+        value = authorize_source(db, user, plan)
+        if value['kind'] not in ('control_plane', 'postgres', 's3', 'iceberg'):
+            raise HTTPException(422, f"{value['kind']} integrations have no backup adapter yet")
+    check('source', 'Source', source_supported, 'You may export it and it has a backup adapter.')
+    def key():
+        row = get(db, DESTINATION, plan.destination_id)
+        from .deps import get_secret_store
+        from .recovery_archive import public_key
+        pem = get_secret_store().read(row.value['recovery_key_ref']).get('public_key', '')
+        if not pem:
+            raise HTTPException(422, 'the vault secret has no public_key field')
+        public_key(pem)
+    check('recovery_key', 'Recovery key in the vault', key, 'The referenced secret holds an RSA public key of at least 3072 bits.')
+    check('destination', 'Destination', lambda: resolve_destination(db, user, plan),
+          'You may use it, its location is valid and outside the source, and its retention fits its Object Lock.')
+    return checks
+
+
 def get(db, kind, ident, lock=False):
     stmt = select(PlatformSetting).where(PlatformSetting.key == kind+ident)
     if lock:

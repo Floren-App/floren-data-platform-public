@@ -19,11 +19,11 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/apis/{api_id}/operations` | Create Operation |
 | `PUT` | `/v1/apis/{api_id}/operations/{op_id}` | Update Operation |
 | `DELETE` | `/v1/apis/{api_id}/operations/{op_id}` | Delete Operation |
-| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
-| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
-| `GET` | `/v1/egress/{slug}/{path}` | Egress |
 | `POST` | `/v1/egress/{slug}/{path}` | Egress |
+| `DELETE` | `/v1/egress/{slug}/{path}` | Egress |
 | `PATCH` | `/v1/egress/{slug}/{path}` | Egress |
+| `GET` | `/v1/egress/{slug}/{path}` | Egress |
+| `PUT` | `/v1/egress/{slug}/{path}` | Egress |
 
 ## RBAC
 
@@ -41,6 +41,8 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `POST` | `/v1/rbac/groups/{group_id}/bindings` | Bind |
 | `DELETE` | `/v1/rbac/groups/{group_id}/bindings/{principal_id}` | Unbind |
 | `GET` | `/v1/rbac/principals/{principal_id}/access` | Principal Access |
+| `GET` | `/v1/rbac/provenance` | Provenance |
+| `GET` | `/v1/rbac/provenance/changes` | Provenance Changes |
 | `GET` | `/v1/rbac/resources` | Resources |
 | `PATCH` | `/v1/rbac/resources/{resource_id}` | Move Resource |
 | `GET` | `/v1/rbac/resources/{resource_id}` | Read Resource |
@@ -83,6 +85,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `DELETE` | `/v1/admin/datasources/{name}` | Delete Source |
 | `POST` | `/v1/admin/datasources/{name}/grants` | Grant |
 | `DELETE` | `/v1/admin/datasources/{name}/grants/{group}` | Revoke |
+| `GET` | `/v1/admin/installation-readiness` | Installation Readiness |
 | `GET` | `/v1/admin/pools` | List Pools |
 | `PUT` | `/v1/admin/pools/{name}` | Upsert Pool |
 | `DELETE` | `/v1/admin/pools/{name}` | Delete Pool |
@@ -394,6 +397,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `DELETE` | `/v1/backups/destinations/{ident}` | Delete Destination |
 | `GET` | `/v1/backups/plans` | List Plans |
 | `POST` | `/v1/backups/plans` | Create Plan |
+| `POST` | `/v1/backups/plans/check` | Check Plan |
 | `GET` | `/v1/backups/plans/{ident}` | Plan Detail |
 | `PUT` | `/v1/backups/plans/{ident}` | Update Plan |
 | `DELETE` | `/v1/backups/plans/{ident}` | Delete Plan |
@@ -402,6 +406,7 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `DELETE` | `/v1/backups/plans/{ident}/runs/{run_id}` | Delete Archive |
 | `GET` | `/v1/backups/recovery` | Recovery |
 | `POST` | `/v1/backups/recovery/resume` | Resume |
+| `GET` | `/v1/backups/schedule-preview` | Schedule Preview |
 | `GET` | `/v1/backups/sources` | Sources |
 
 ## runs
@@ -460,5 +465,6 @@ The installed server also exposes interactive OpenAPI at `/api/docs` when routed
 | `GET` | `/v1/workspaces/{ws_id}/config` | Workspace Config |
 | `PUT` | `/v1/workspaces/{ws_id}/git` | Choose Workspace Git |
 | `POST` | `/v1/workspaces/{ws_id}/open` | Open Workspace |
+| `GET` | `/v1/workspaces/{ws_id}/readiness` | Workspace Readiness |
 | `POST` | `/v1/workspaces/{ws_id}/start` | Start Workspace |
 | `POST` | `/v1/workspaces/{ws_id}/stop` | Stop Workspace |

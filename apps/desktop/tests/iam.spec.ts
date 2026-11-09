@@ -188,7 +188,10 @@ async function setup(page: Page, access: "owner" | "reader" | "navigation" = "ow
     if (path === "/v1/catalog/products") return respond({ items: [], domains: [], kinds: [] });
     if (path === "/v1/catalog/requests") return respond([]);
     if (path === "/v1/compliance/requirement") return respond({ required: false, layer_id: null, classification: "internal" });
+    if (/^\/v1\/workspaces\/[^/]+\/readiness$/.test(path)) return respond({ context: { kind: "person", username: "admin", group_id: "analysts",
+      group_name: "Analysts", layer_id: null, layer_name: null }, workspace_group_id: null, workspace_group_name: null, checks: [], checked_at: "2026-11-06T09:00:00Z" });
     if (path === "/v1/compliance/deadlines") return respond([]);
+    if (path === "/v1/rbac/provenance") return respond({ source: "unknown" });
     if (/^\/v1\/rbac\/groups\/[^/]+\/access$/.test(path)) return respond({ system: false, grants: [], compliance_roles: [], app_profile: null });
     const principalAccess = path.match(/^\/v1\/rbac\/principals\/([^/]+)\/access$/);
     if (principalAccess) return respond({ principal: { id: principalAccess[1], name: principalAccess[1], kind: "user", active: true },
@@ -1365,6 +1368,7 @@ test("storage and workloads open the same canonical lineage and controls as cata
   const reads = state.dataReads.length;
   await main.getByRole("navigation", { name: "Object sections" }).getByRole("button", { name: "Lineage", exact: true }).click();
   await expect(main.getByRole("region", { name: "Interactive lineage graph" })).toBeVisible();
+  await expect(main.getByLabel("Direct lineage", { exact: true })).toContainText("a path that never ran or is not instrumented does not appear");
   await expect(main.getByRole("button", { name: "Upstream lineage", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(main.getByLabel("Show operational dependencies", { exact: true })).not.toBeChecked();
   expect(state.dataReads.length).toBe(reads);
@@ -2949,6 +2953,44 @@ test("a product request under a policy carries the form's answers", async ({ pag
   expect(state.errors).toEqual([]);
 });
 
+test("a request is for the acting group and waits for the compliance check, which can be retried", async ({ page }) => {
+  const state = await setup(page);
+  const sent: Record<string, unknown>[] = [];
+  const product = { id: "p1", asset_id: "a-sales", title: "Customers", summary: "People.", kind: "table", runtime: null, name: "customers", layer_id: "1a0000000001",
+    layer_name: "Prod", domain: "Sales", classification: "internal", status: "draft", steward: "", owner_group_name: "Sales", updated_at: null, sla_status: "",
+    published_at: "2026-10-31T09:00:00Z", published_by: "ana", access: "none", can_manage: false,
+    members: [{ asset_id: "a-sales", name: "customers", kind: "table", runtime: null, access: "none", updated_at: null, open: null }],
+    grants: [{ resource_id: "s", kind: "schema", name: "public", role: "Reader", object: "customers" }], open: null,
+    options: [{ id: "o-std", name: "Standard", description: "", default: true, classification: "internal", masked_columns: 0, filtered_tables: 0 }],
+    lineage: [], lineage_edges: [], used_by: [], used_by_others: 0 };
+  await page.route(/\/v1\/catalog\/products/, (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() !== "GET") { sent.push(route.request().postDataJSON()); return route.fulfill({ status: 201, json: { id: "r1" } }); }
+    return route.fulfill({ json: url.pathname.endsWith("/products") ? { items: [product], domains: [], kinds: ["table"] } : product });
+  });
+  let failing = true;
+  await page.route(/\/v1\/compliance\/requirement$/, (route) => failing
+    ? route.fulfill({ status: 503, json: { detail: "the policy service is unavailable" } })
+    : route.fulfill({ json: { required: false, layer_id: null, classification: "internal" } }));
+  const main = page.locator(".main");
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await main.getByRole("article", { name: "Customers" }).getByRole("button", { name: "Request access", exact: true }).click();
+  const form = main.getByRole("form", { name: "Request access to Customers" });
+  await expect(form.getByRole("combobox")).toHaveCount(0);  // no choice of groups the server would refuse
+  await expect(form).toContainText("the group you are acting as");
+  await form.getByRole("textbox", { name: "Why you need it" }).fill("Churn analysis");
+  // A failed check is not "no form needed": sending waits until it succeeds.
+  await expect(form.getByRole("alert")).toContainText("Could not check whether this option needs a compliance form");
+  await expect(form.getByRole("button", { name: "Send request", exact: true })).toBeDisabled();
+  failing = false;
+  await form.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(form.getByRole("button", { name: "Send request", exact: true })).toBeEnabled();
+  await form.getByRole("button", { name: "Send request", exact: true }).click();
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent[0]).toMatchObject({ option_id: "o-std", reason: "Churn analysis" });
+  expect(state.errors.filter((e) => !e.includes("503"))).toEqual([]);
+});
+
 test("the privacy area sets policies per layer and classification and builds multi-page forms", async ({ page }) => {
   const state = await setup(page);
   const sent: { method: string; url: string; body: any }[] = [];
@@ -3128,7 +3170,7 @@ test("requesters change answers when asked, and email links open the case", asyn
   await page.goto("/index.html#case=case1");   // an email link opens the app fresh
   const main = page.locator(".main");
   await expect(main.getByRole("heading", { name: "Reader on reporting" })).toBeVisible();
-  expect(new URL(page.url()).hash).toBe("");
+  expect(new URL(page.url()).hash).toMatch(/^#\/case\/case1(\?|$)/);  // the address now names the open page
   await expect(main.locator(".case-history")).toContainText("Which report?");
   await main.getByRole("button", { name: "Change answers" }).click();
   await main.getByRole("textbox", { name: /Why does the group need it/ }).fill("The monthly finance revenue report");
@@ -3254,7 +3296,8 @@ test("groups show members, what they reach and settings; connections and service
   const sections = main.getByRole("navigation", { name: "Group sections" });
   await expect(main.getByRole("table", { name: "Members" })).toBeVisible();
   await sections.getByRole("button", { name: "Has access to", exact: true }).click();
-  // Roles, by kind of access and object; a role opens to its permissions.
+  // First the whole picture in a sentence, then roles by kind of access and object; a role opens to its permissions.
+  await expect(main.getByLabel("Summary of this group's access", { exact: true })).toContainText(/Analysts holds \d+ roles on \d+ objects/);
   const data = main.getByRole("region", { name: "Data access" }), privileged = main.getByRole("region", { name: "Privileged access" });
   await expect(data).toContainText("finance-dw / reporting");
   await expect(data).toContainText("Data Reader");
@@ -3583,8 +3626,8 @@ test("backup plans save a vault reference, bucket path and local schedule", asyn
   await main.getByLabel("Plan name",{exact:true}).fill("Nightly platform");
   await main.getByLabel("Destination",{exact:true}).selectOption("offsite");
   await main.getByLabel("Path below destination",{exact:true}).fill("platform/nightly");
-  await main.getByLabel("Daily backup time",{exact:true}).fill("02:30");
-  await main.getByLabel("Timezone",{exact:true}).fill("Europe/Amsterdam");
+  await main.getByLabel("Time",{exact:true}).fill("02:30");
+  await main.getByLabel("Timezone",{exact:true}).selectOption("Europe/Amsterdam");
   await main.getByRole("button",{name:"Save plan",exact:true}).click();
   await expect(main.getByRole("status")).toHaveText("Backup plan saved.");
   expect(saved[0]).toMatchObject({bucket:"company-recovery",recovery_key_ref:"backups/production/key"});
@@ -3677,7 +3720,7 @@ test("Iceberg backup plans select namespaces and keep the existing schedule and 
   await main.getByLabel("Destination",{exact:true}).selectOption("offsite");
   await main.getByLabel("Schemas / Iceberg namespaces (comma separated; empty means all)").fill("reporting, analytics.daily");
   await expect(main.getByLabel("Source prefix (relative to integration)")).toHaveCount(0);
-  await main.getByLabel("Daily backup time",{exact:true}).fill("03:15");
+  await main.getByLabel("Time",{exact:true}).fill("03:15");
   await main.getByRole("button",{name:"Save plan",exact:true}).click();
   await expect(main.getByRole("status")).toHaveText("Backup plan saved.");
   expect(saved).toMatchObject({source_kind:"storage",source_id:"lake-source",schemas:["reporting","analytics.daily"],destination_id:"offsite",schedule:"15 3 * * *",enabled:false});
@@ -3758,5 +3801,230 @@ test("the account menu switches between light, dark and the system theme, and re
   // The menu stays open while trying themes.
   await page.getByRole("menuitemradio", { name: "Same as the system" }).click();
   await expect(root).not.toHaveAttribute("data-theme", /.+/);
+  expect(state.errors).toEqual([]);
+});
+
+test('the acting context stays in view and a workspace explains what will work before acting',async({page})=>{
+  const state=await setup(page);
+  const ws={id:'ready-ws',owner:'admin',name:'Analysis',editor:'vscode',status:'running',
+    capabilities:['workspaces.object.read','workspaces.files.read','runs.create'],
+    last_activity_at:'2026-10-20T10:00:00Z',created_at:'2026-10-20T10:00:00Z'};
+  await page.route('https://iam.test/api/v1/workspaces',route=>route.fulfill({json:[ws]}));
+  await page.route('https://iam.test/api/v1/workspaces/ready-ws/readiness',route=>route.fulfill({json:{
+    context:{kind:'person',username:'admin',group_id:'analysts',group_name:'Analysts',layer_id:'1a0000000002',layer_name:'Non-Prod'},
+    workspace_group_id:'engineers',workspace_group_name:'Engineers',checked_at:'2026-11-06T09:00:00Z',checks:[
+      {key:'runs',label:'Start runs',state:'ready',detail:'',permission:'runs.create'},
+      {key:'logs',label:'Read run logs',state:'missing',detail:'Your group does not have logs.read; runs still start, but their logs are hidden.',permission:'logs.read'},
+      {key:'config',label:'Read fdp.json',state:'unknown',detail:'Start the workspace to read its fdp.json.',permission:'workspaces.files.read'}]}}));
+  await page.reload();
+  const context=page.getByLabel('Acting context',{exact:true});
+  await expect(context).toContainText('Acting as Analysts');
+  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Workspaces',exact:true}).click();
+  await page.locator('.sidebar').getByRole('button',{name:/^Analysis/}).click();
+  const panel=page.locator('.main').getByRole('region',{name:'Readiness'});
+  await expect(panel).toContainText('2 to look at');
+  await expect(panel).toContainText('The editor and its runs act as Engineers');
+  await expect(panel.getByRole('listitem').filter({hasText:'Read run logs'})).toContainText('Missing');
+  await expect(panel.getByRole('listitem').filter({hasText:'Read run logs'})).toContainText('logs.read');
+  await expect(panel.getByRole('listitem').filter({hasText:'Read fdp.json'})).toContainText('Unknown');
+  expect(state.errors).toEqual([]);
+});
+
+test('a refused action names the missing permission and the way forward instead of an outage',async({page})=>{
+  const state=await setup(page);
+  const ws={id:'denied-ws',owner:'admin',name:'Denied',editor:'vscode',status:'running',
+    capabilities:['workspaces.object.read','workspaces.files.read','runs.create'],
+    last_activity_at:'2026-10-20T10:00:00Z',created_at:'2026-10-20T10:00:00Z'};
+  await page.route('https://iam.test/api/v1/workspaces',route=>route.fulfill({json:[ws]}));
+  await page.route('https://iam.test/api/v1/workspaces/denied-ws/config',route=>route.fulfill({status:403,json:{detail:'workspaces.files.read permission required'}}));
+  await page.reload();
+  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Workspaces',exact:true}).click();
+  await page.locator('.sidebar').getByRole('button',{name:/^Denied/}).click();
+  const alert=page.locator('.main').getByRole('alert').filter({hasText:'workspaces.files.read'});
+  await expect(alert).toContainText("Your group doesn't have access");
+  await expect(alert).toContainText('ask an administrator');
+  await expect(page.getByText(/Cannot reach Limoon/)).toHaveCount(0);
+  expect(state.errors.filter(e=>!e.includes('403'))).toEqual([]);
+});
+
+test('a decision on a waiting request shows up without reopening the catalog, and polling stops after it',async({page})=>{
+  await page.clock.install();
+  const state=await setup(page);
+  let access='requested',lists=0;
+  const product={id:'p1',asset_id:'a1',title:'Customers',summary:'People.',kind:'table',runtime:null,name:'customers',layer_id:'1a0000000002',
+    layer_name:'Non-Prod',domain:'Sales',classification:'internal',status:'draft',steward:'',owner_group_name:'Sales',updated_at:null,sla_status:'',
+    published_at:'2026-10-31T09:00:00Z',published_by:'ana',can_manage:false,members:[],grants:[],open:null,options:[],lineage:[],lineage_edges:[],used_by:[],used_by_others:0};
+  await page.route(/\/v1\/catalog\/products(\?|$)/,route=>{lists++;return route.fulfill({json:{items:[{...product,access}],domains:[],kinds:['table']}});});
+  const main=page.locator('.main');
+  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Catalog',exact:true}).click();
+  const card=main.getByRole('article',{name:'Customers'});
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Requested');                                             // waiting for a decision
+  await expect(main.getByText(/^Updated /)).toBeVisible();
+  access='granted';                                                                          // the owners approve elsewhere
+  await page.clock.fastForward(10_500);
+  await expect.poll(()=>lists).toBeGreaterThan(1);
+  await expect(card).toContainText('You have access');
+  const after=lists;
+  await page.clock.fastForward(60_000);                                                      // nothing waits any more: no polling
+  expect(lists).toBe(after);
+  expect(state.errors).toEqual([]);
+});
+
+test('pages have addresses: reload and Back reopen them, pins come back, and a link grants nothing',async({page})=>{
+  const state=await setup(page);
+  const views=page.getByRole('navigation',{name:'Views'});
+  await views.getByRole('button',{name:'Catalog',exact:true}).click();
+  await expect.poll(()=>new URL(page.url()).hash).toMatch(/^#\/products/);
+  const catalog=new URL(page.url()).hash;
+  await views.getByRole('button',{name:'Access',exact:true}).click();
+  await expect.poll(()=>new URL(page.url()).hash).not.toBe(catalog);
+  await page.goBack();                                          // Back reopens the previous page
+  await expect.poll(()=>new URL(page.url()).hash).toBe(catalog);
+  await expect(page.locator('.main').getByRole('heading',{name:'Data products',exact:true})).toBeVisible();
+  // Pin it; after a reload it is still open, and the address still names it.
+  await page.getByRole('button',{name:'Pin Data products',exact:true}).click();
+  await page.reload();
+  await expect(page.getByRole('tab',{name:'Data products'})).toBeVisible();
+  await expect.poll(()=>new URL(page.url()).hash).toBe(catalog);
+  expect(state.errors).toEqual([]);
+});
+
+test('a link to a page you may not see opens nothing',async({page})=>{
+  const state=await setup(page);
+  await page.route('https://iam.test/api/v1/me',route=>route.fulfill({json:{username:'vera',is_admin:false,active_group_id:'analysts',active_layer_id:null,
+    available_groups:[{id:'analysts',name:'Analysts'}],groups:[],pools:[],data_sources:[],app_features:['products.browse'],compliance_roles:[],
+    permission_grants:[],pages:{products:true},settings:{}}}));
+  await page.goto('/#/workspace/ws1?title=Private+workspace');
+  await page.reload();                                          // signed in afresh as this person
+  await expect(page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Catalog',exact:true})).toBeVisible();
+  await expect(page.getByRole('tab',{name:'Private workspace'})).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+test('leaving a page with unsaved changes asks first: stay keeps them, discard leaves',async({page})=>{
+  const state=await setup(page);
+  const product={id:'p1',asset_id:'a1',title:'Customers',summary:'People.',kind:'table',runtime:null,name:'customers',layer_id:'1a0000000002',
+    layer_name:'Non-Prod',domain:'Sales',classification:'internal',status:'draft',steward:'',owner_group_name:'Sales',updated_at:null,sla_status:'',
+    published_at:'2026-10-31T09:00:00Z',published_by:'ana',access:'none',can_manage:false,members:[],grants:[],open:null,
+    options:[{id:'o1',name:'Standard',description:'',default:true,classification:'internal',masked_columns:0,filtered_tables:0}],lineage:[],lineage_edges:[],used_by:[],used_by_others:0};
+  await page.route(/\/v1\/catalog\/products/,route=>{
+    const url=new URL(route.request().url());
+    return route.fulfill({json:url.pathname.endsWith('/products')?{items:[product],domains:[],kinds:['table']}:product});
+  });
+  const main=page.locator('.main'),views=page.getByRole('navigation',{name:'Views'});
+  await views.getByRole('button',{name:'Catalog',exact:true}).click();
+  await main.getByRole('article',{name:'Customers'}).getByRole('button',{name:'Request access',exact:true}).click();
+  await main.getByRole('textbox',{name:'Why you need it'}).fill('Churn analysis');
+  await views.getByRole('button',{name:'Home',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Unsaved changes'});
+  await expect(dialog).toContainText('The request for Customers has changes that are not saved yet');
+  await expect(dialog.getByRole('button',{name:'Save and continue'})).toHaveCount(0);  // a request is sent, not saved
+  await dialog.getByRole('button',{name:'Stay',exact:true}).click();
+  await expect(main.getByRole('textbox',{name:'Why you need it'})).toHaveValue('Churn analysis');
+  // Switching group would act as another group: it asks as well.
+  await page.getByLabel('Active group',{exact:true}).selectOption({index:2});
+  await page.getByRole('dialog',{name:'Unsaved changes'}).getByRole('button',{name:'Discard changes',exact:true}).click();
+  await expect(main.getByRole('textbox',{name:'Why you need it'})).not.toHaveValue('Churn analysis');  // reopened empty, as the other group
+  expect(state.errors).toEqual([]);
+});
+
+test('backups say when nothing is configured, keep advanced schedules and limits, preview runs and check prerequisites',async({page})=>{
+  const state=await setup(page);
+  const plans:any[]=[],saved:any[]=[];
+  await page.route('https://iam.test/api/v1/backups**',route=>{
+    const req=route.request(),url=new URL(req.url()),path=url.pathname;
+    if(path.endsWith('/sources'))return route.fulfill({json:[{id:'',name:'Control plane',kind:'control_plane',supported:true,detail:'Metadata'}]});
+    if(path.endsWith('/destinations'))return route.fulfill({json:[{id:'offsite',name:'Offsite',bucket:'recovery',prefix:'backups',recovery_key_ref:'backups/public'}]});
+    if(path.endsWith('/schedule-preview'))return route.fulfill({json:{runs:['2026-11-14T00:30:00Z','2026-11-21T00:30:00Z','2026-11-28T00:30:00Z']}});
+    if(path.endsWith('/plans/check'))return route.fulfill({json:{checks:[{key:'source',label:'Source',state:'ready',detail:'You may export it.'},
+      {key:'recovery_key',label:'Recovery key in the vault',state:'missing',detail:'the vault secret has no public_key field'}]}});
+    if(path.endsWith('/plans')){
+      if(req.method()==='POST'){saved.push(req.postDataJSON());plans.push({id:'p1',next_run_at:'2026-11-14T00:30:00Z',capabilities:['backups.plans.update','backups.history.read'],
+        status:{state:'failed',last_status:'failed',last_run_at:'2026-11-07T00:30:00Z',last_success_at:'2026-11-01T00:30:00Z',last_error:'archive larger than the limit'},...req.postDataJSON()});
+        return route.fulfill({status:201,json:plans[0]});}
+      return route.fulfill({json:plans});
+    }
+    if(/\/plans\/p1$/.test(path)&&req.method()==='PUT'){saved.push(req.postDataJSON());return route.fulfill({json:{...plans[0],...req.postDataJSON()}});}
+    return route.fulfill({json:path.endsWith('/configuration')?{enabled:false}:[]});
+  });
+  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Administration',exact:true}).click();
+  await page.getByRole('button',{name:'Backup and recovery',exact:true}).click();
+  const main=page.locator('.main');
+  await expect(main.getByRole('region',{name:'Not configured'})).toContainText('nothing is backed up');
+  await main.getByRole('button',{name:'New backup plan',exact:true}).click();
+  await main.getByLabel('Plan name',{exact:true}).fill('Weekly');
+  await main.getByLabel('Destination',{exact:true}).selectOption('offsite');
+  await main.getByRole('radio',{name:'Advanced'}).check();
+  await main.getByLabel('Cron schedule (five fields)').fill('30 1 1-7 * 6');               // first Saturday: not daily or weekly
+  await expect(main.getByRole('radio',{name:'Daily'})).toBeDisabled();                  // never simplified away by a click
+  await expect(main.getByText(/Next runs:/)).toBeVisible();
+  await main.getByLabel('Largest archive (GiB)').fill('25');
+  await main.getByLabel('Most objects').fill('5000');
+  await expect(main.getByText('s3://recovery/backups/daily/')).toBeVisible();          // where archives will go
+  await main.getByRole('button',{name:'Check prerequisites',exact:true}).click();
+  const checks=main.getByRole('list',{name:'Prerequisites'});
+  await expect(checks.getByRole('listitem').filter({hasText:'Recovery key in the vault'})).toContainText('Missing');
+  await main.getByRole('button',{name:'Save plan',exact:true}).click();
+  await expect.poll(()=>saved.length).toBe(1);
+  expect(saved[0]).toMatchObject({schedule:'30 1 1-7 * 6',max_bytes:25*2**30,max_objects:5000,enabled:false});
+  // The plan reports what its last backup did, not only that it is scheduled.
+  const row=main.getByRole('table',{name:'Backup plans'}).getByRole('row',{name:/Weekly/});
+  await expect(row).toContainText('Last backup failed');
+  await expect(row).toContainText('archive larger than the limit');
+  await expect(main.getByRole('table',{name:'Protection by source'})).toContainText('Control plane');
+  // Opening it again keeps the advanced schedule and the limits.
+  await row.getByRole('button',{name:'Edit',exact:true}).click();
+  await expect(main.getByLabel('Cron schedule (five fields)')).toHaveValue('30 1 1-7 * 6');
+  await expect(main.getByLabel('Most objects')).toHaveValue('5000');
+  expect(state.errors).toEqual([]);
+});
+
+test('a Terraform-managed object says so before an edit, and shows an app change as likely drift',async({page})=>{
+  const state=await setup(page);
+  await page.route(/\/v1\/rbac\/provenance\?/,route=>{
+    const target=new URL(route.request().url()).searchParams.get('target');
+    return route.fulfill({json:target==='finance-folder'?{source:'terraform',reference:'platform-config//terraform',revision:'abc1234',managed_by:'service:fdp-automation',
+      managed_at:'2026-11-06T09:00:00Z',app_change:{at:'2026-11-06T10:00:00Z',by:'ana',action:'role.assign'}}:{source:'unknown'}});
+  });
+  const sidebar=page.locator('.sidebar'),main=page.locator('.main');
+  await page.getByRole('button',{name:'Workloads',exact:true}).click();
+  await sidebar.getByRole('button',{name:'Finance',exact:true}).click();
+  await main.getByRole('navigation',{name:'Object sections'}).getByRole('button',{name:'Permissions',exact:true}).click();
+  const note=main.getByRole('note',{name:'Managed by Terraform'});
+  await expect(note).toContainText('platform-config//terraform');
+  await expect(note).toContainText('Changed here by ana');
+  await expect(note).toContainText('drift');
+  expect(state.errors).toEqual([]);
+});
+
+test('installation readiness shows evidence by area, including what is off, operated elsewhere or unknown',async({page})=>{
+  const state=await setup(page);
+  await page.route('https://iam.test/api/v1/admin/installation-readiness',route=>route.fulfill({json:{generated_at:'2026-11-07T09:00:00Z',release:'abc1234',
+    summary:{configured:1,not_configured:1,single_instance:1,unknown:1},items:[
+      {area:'Release',item:'Metadata schema',state:'configured',detail:'At 0009_management_provenance'},
+      {area:'Dependencies',item:'Metadata database',state:'single_instance',detail:'Bundled PostgreSQL: one instance, not highly available'},
+      {area:'Recovery',item:'Backup plans',state:'not_configured',detail:'No plan: nothing is backed up by Limoon'},
+      {area:'Recovery',item:'Restore drill',state:'unknown',detail:'No drill evidence is recorded here'}]}}));
+  await page.getByRole('navigation',{name:'Views'}).getByRole('button',{name:'Administration',exact:true}).click();
+  await page.locator('.sidebar').getByRole('button',{name:'Installation readiness',exact:true}).click();
+  const main=page.locator('.main');
+  await expect(main.getByRole('region',{name:'Recovery'})).toContainText('Not configured');
+  await expect(main.getByRole('region',{name:'Recovery'}).getByRole('listitem').filter({hasText:'Restore drill'})).toContainText('Unknown');
+  await expect(main.getByRole('region',{name:'Dependencies'})).toContainText('Single instance');
+  expect(state.errors).toEqual([]);
+});
+
+test('a registered schema the engine does not have yet says so instead of looking empty',async({page})=>{
+  const state=await setup(page);
+  await page.route(/\/v1\/data\/schemas\/[^/]+\/children/,route=>{
+    const cached=new URL(route.request().url()).searchParams.get('cached')==='true';
+    return route.fulfill({json:cached?{children:[],next_cursor:null,cached:true}:{children:[],next_cursor:null,schema_state:'missing'}});
+  });
+  const main=page.locator('.main'),sidebar=page.locator('.sidebar');
+  await page.getByRole('button',{name:'Storage',exact:true}).click();
+  await sidebar.getByRole('button',{name:'finance-dw',exact:true}).click();
+  await main.getByRole('button',{name:'reporting',exact:true}).click();
+  await expect(main.getByRole('region',{name:'Objects in reporting'})).toContainText('the engine does not have it yet');
   expect(state.errors).toEqual([]);
 });

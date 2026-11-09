@@ -228,7 +228,14 @@ async def children(resource_id: str, request: Request, response: Response,
         cursor = str(rows[-1][3]) if rows and len(result["rows"]) > limit else None
     from ..catalog import index_children
     await run_in_threadpool(transaction_call, db, index_children, schema, items, table, path)
-    return {"children": items, "next_cursor": cursor}
+    out = {"children": items, "next_cursor": cursor}
+    if table is None and not items and not after:
+        # Empty, or not there at all? A registered schema can exist only in the catalog until something creates it.
+        exists = await query_request(QueryIn(source=source.name, sql=f"SELECT schema_name FROM {catalog}.information_schema.schemata "
+                                             "WHERE schema_name = ?", parameters=[schema.name], max_rows=1),
+                                     request, db=db, authorization=authorization, x_fdp_viewer="")
+        out["schema_state"] = "present" if exists["rows"] else "missing"
+    return out
 
 
 

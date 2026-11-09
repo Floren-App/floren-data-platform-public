@@ -12,6 +12,8 @@ from ..schemas import DataSourceOut, PoolOut, RunOut
 
 def audit(db: Session, actor: str, action: str, target: str, **detail) -> None:
     db.add(AuditEvent(actor=actor, action=action, target=target, detail=detail))
+    from ..provenance import record
+    record(db, actor, action, target)
 
 
 def ds_out(ds: DataSource, db: Optional[Session] = None, user=None) -> DataSourceOut:

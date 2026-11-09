@@ -67,9 +67,9 @@ export function ArgField({ arg, value, onChange, error, sources }: {
 
 export function useWorkspaceConfig(workspaceId: string, running: boolean) {
   const [cfg, setCfg] = useState<WorkspaceConfig | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const load = useCallback(() => {
-    api.workspaceConfig(workspaceId).then((c) => { setCfg(c); setError(null); }).catch((e: Error) => setError(e.message));
+    api.workspaceConfig(workspaceId).then((c) => { setCfg(c); setError(null); }).catch((e: Error) => setError(e));
   }, [workspaceId]);
   useEffect(() => { load(); }, [load, running]);
   return { cfg, error, reload: load };
@@ -128,7 +128,7 @@ export function ProgramRunner({ workspaceId, running, hub, onStarted, openTab }:
     </div>
   );
 
-  if (error) return <div className="card">{header}<p className="error" role="alert">{error}</p></div>;
+  if (error) return <div className="card">{header}<AccessError error={error} openTab={openTab} /></div>;
   if (!cfg) return <div className="card">{header}<p className="muted loading">Loading…</p></div>;
   if (!cfg.exists) {
     return (

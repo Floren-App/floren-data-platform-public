@@ -555,6 +555,24 @@ class WorkloadLog(Base):
     actor: Mapped[str] = mapped_column(String(256), default="")
 
 
+class ManagementProvenance(Base):
+    """Who manages an object's configuration: Terraform (declared by the provider) or the app. An operational fact,
+    never an authorization grant. Objects with no row have unknown provenance; none is invented for them."""
+
+    __tablename__ = "management_provenance"
+
+    target: Mapped[str] = mapped_column(String(128), primary_key=True)
+    source: Mapped[str] = mapped_column(String(16))                # terraform | app
+    reference: Mapped[str] = mapped_column(String(512), default="")  # e.g. the configuration repository and root
+    revision: Mapped[str] = mapped_column(String(128), default="")
+    managed_by: Mapped[str] = mapped_column(String(128))
+    managed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # An app change after Terraform last applied: the next plan will likely show drift.
+    app_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    app_changed_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    app_change: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
 class AuditEvent(Base):
     """Who touched which data source, from which execution. Append-only."""
 

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { freshnessText, useFreshness } from "../freshness";
+import { useUnsaved } from "../unsaved";
 import { AccessCaseItem, AccessRequestItem, ago, api, ApiError, openInWindow, AppGroup, CaseTarget, JustifyDeadline, Requirement, AssetProduct, OptionInput, Product, ProductCandidate, ProductDetail, ProductGrant, ProductMember, ProductOpen } from "../api";
 import type { Hub } from "../hub";
 import { PageHeader } from "../components/Page";
@@ -88,14 +90,24 @@ export function ProductsView({ hub, openTab, tab }: { hub: Hub; openTab: OpenTab
   const [q, setQ] = useState(""), [domain, setDomain] = useState(""), [kind, setKind] = useState(""), [accessible, setAccessible] = useState(false);
   const [data, setData] = useState<{ items: Product[]; domains: string[]; kinds: string[] } | null>(null), [error, setError] = useState("");
   const [publishing, setPublishing] = useState(tab.intent === "publish");
-  const [version, setVersion] = useState(0);
+  const [version, setVersion] = useState(0), [updated, setUpdated] = useState<Date | null>(null), [refreshing, setRefreshing] = useState(false);
   useEffect(() => { if (tab.intent === "publish") setPublishing(true); }, [tab.intent, tab.assetId]);
+  // A decision on your request can come at any time: check again while one is waiting, and when you come back.
+  const tick = useFreshness(!!data?.items.some((p) => p.access === "requested"));
+  const group = hub.me?.active_group_id;
+  // Another group or layer: never show the previous context's access while the new one loads.
+  useEffect(() => { setData(null); setUpdated(null); }, [group, hub.layerId]);
   useEffect(() => {
     let alive = true;
-    const t = setTimeout(() => api.products.list({ layer_id: hub.layerId, q, domain, kind, accessible, mine })
-      .then((d) => { if (alive) { setData(d); setError(""); } }).catch((e: Error) => alive && setError(e.message)), 200);
+    const t = setTimeout(() => {
+      setRefreshing(true);
+      api.products.list({ layer_id: hub.layerId, q, domain, kind, accessible, mine })
+        .then((d) => { if (alive) { setData(d); setError(""); setUpdated(new Date()); } })
+        .catch((e: Error) => alive && setError(e.message))
+        .finally(() => alive && setRefreshing(false));
+    }, 200);
     return () => { alive = false; clearTimeout(t); };
-  }, [hub.layerId, q, domain, kind, accessible, mine, version]);
+  }, [hub.layerId, group, q, domain, kind, accessible, mine, version, tick]);
   const layer = hub.layers.find((l) => l.id === hub.layerId)?.name;
   return <>
     <PageHeader icon={<IconCatalog size={22} />} title={mine ? "My products" : "Data products"}
@@ -110,7 +122,8 @@ export function ProductsView({ hub, openTab, tab }: { hub: Hub; openTab: OpenTab
       <select aria-label="Contains" value={kind} onChange={(e) => setKind(e.target.value)}><option value="">Any contents</option>{data?.kinds.map((k) => <option key={k} value={k}>With {KIND[k]?.[1] ?? kindLabel(k)}</option>)}</select>
       {!mine && <label className="row muted"><input type="checkbox" checked={accessible} onChange={(e) => setAccessible(e.target.checked)} />Only what I can use</label>}
     </div>
-    {error && <p className="error" role="alert">{error}</p>}
+    {data && <p className="muted small freshness">{freshnessText({ at: updated, refreshing, error })}</p>}
+    {error && !data && <p className="error" role="alert">{error}</p>}
     {!data ? <p className="muted loading" role="status">Loading data products…</p>
       : !data.items.length ? <div className="empty-state"><p>{q || domain || kind || accessible ? "No products match." : mine ? "You do not own a product in this layer yet."
           : "Nothing is published in this layer yet."}</p><p className="muted">A product bundles what you share: for example a dashboard with the tables it uses. Publish from an object's page, or with Publish a product.</p></div>
@@ -197,25 +210,37 @@ function ObjectLineage({ detail, hub, openTab }: { detail: ProductDetail; hub: H
   </>;
 }
 
+/** Whether the chosen option needs a compliance form. A failed lookup is never treated as "no form needed". */
+type RequirementState = { state: "loading" } | { state: "none" } | { state: "required"; requirement: Requirement } | { state: "failed"; message: string };
+
 function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDone: () => void; onCancel: () => void }) {
-  const groups = hub.me?.available_groups ?? [];
-  const [group, setGroup] = useState(hub.me?.active_group_id && groups.some((g) => g.id === hub.me?.active_group_id) ? hub.me.active_group_id : groups[0]?.id ?? "");
+  // A request is made for the group you are acting as: the server accepts no other.
+  const acting = (hub.me?.available_groups ?? []).find((g) => g.id === hub.me?.active_group_id);
+  const group = acting?.id ?? "";
   const [reason, setReason] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [option, setOption] = useState(((p.options ?? []).find((o) => o.default) ?? (p.options ?? [])[0])?.id ?? "");
   // Data under an access policy: the request carries the policy's compliance form.
-  const [requirement, setRequirement] = useState<Requirement | null>(null);
+  const [lookup, setLookup] = useState<RequirementState>({ state: "loading" }), [attempt, setAttempt] = useState(0);
   const [answers, setAnswers] = useState<Answers>({}), [files, setFiles] = useState<Record<string, File>>({});
   const [until, setUntil] = useState(""), [complete, setComplete] = useState(true);
   useEffect(() => {
     if (!group) return;
-    let live = true;
+    let live = true;  // a slower answer for an earlier option or group must not replace the current one
+    setLookup({ state: "loading" });
     api.compliance.requirement({ kind: "product", app_group_id: group, product_id: p.id, option_id: option || undefined })
-      .then((r) => { if (live) setRequirement(r.required ? r : null); }).catch(() => { if (live) setRequirement(null); });
+      .then((r) => { if (live) setLookup(r.required ? { state: "required", requirement: r } : { state: "none" }); })
+      .catch((err) => { if (live) setLookup({ state: "failed", message: (err as Error).message }); });
     return () => { live = false; };
-  }, [p.id, group, option]);
+  }, [p.id, group, option, attempt]);
+  // A request is sent, not saved: leaving can only discard it or stay.
+  useUnsaved(!!reason.trim() || Object.keys(answers).length > 0, `The request for ${p.title}`);
+  const requirement = lookup.state === "required" ? lookup.requirement : null;
   const definition = requirement?.form?.definition;
+  const ready = lookup.state === "none" || (lookup.state === "required" && !!definition && complete);
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); setBusy(true); setError("");
+    e.preventDefault();
+    if (busy || !ready) return;
+    setBusy(true); setError("");
     try {
       if (!requirement) { await api.products.requestAccess(p.id, group, reason.trim(), option || undefined); onDone(); return; }
       const hasFiles = Object.keys(files).length > 0;
@@ -226,10 +251,11 @@ function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDon
   };
   return <form className="card" aria-label={`Request access to ${p.title}`} onSubmit={(e) => void submit(e)}>
     <h2>Request access</h2>
-    <p className="muted">{p.owner_group_name ?? "The owners"} decide. Approval gives the group you choose Data Reader on this product: {grantsText(p.grants)}.</p>
+    <p className="muted">{p.owner_group_name ?? "The owners"} decide. Approval gives your group Data Reader on this product: {grantsText(p.grants)}.</p>
+    {acting
+      ? <p className="request-target">For <strong>{acting.name}</strong>, the group you are acting as. <span className="muted">To ask for another group, switch group in the sidebar first.</span></p>
+      : <p className="error" role="alert">Choose the group to request for in the sidebar first.</p>}
     <div className="arg-grid">
-      <div className="field"><label htmlFor="request-group">For your group</label>
-        <select id="request-group" value={group} onChange={(e) => setGroup(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>
       {(p.options ?? []).length > 1 && <fieldset className="field request-options" style={{ gridColumn: "1 / -1" }}><legend>Access option</legend>
         {(p.options ?? []).map((o) => <label key={o.id} className="row"><input type="radio" name="request-option" checked={option === o.id} onChange={() => setOption(o.id)} />
           <span><strong>{o.name}</strong>{o.default && <span className="muted"> · default</span>} <span className="product-chip">{words(o.classification)}</span>
@@ -247,8 +273,11 @@ function RequestForm({ p, hub, onDone, onCancel }: { p: Product; hub: Hub; onDon
         : <p className="error" role="alert">The policy's form has no published version yet. Ask the privacy team.</p>}
       <div className="field"><label htmlFor="request-until">Access needed until (optional)</label><input id="request-until" type="date" value={until} onChange={(e) => setUntil(e.target.value)} /></div>
     </div>}
+    {group && lookup.state === "loading" && <p className="muted" role="status">Checking whether this option needs a compliance form…</p>}
+    {lookup.state === "failed" && <p className="error" role="alert">Could not check whether this option needs a compliance form, so the request can't be sent yet. {lookup.message}{" "}
+      <button type="button" className="text-button" onClick={() => setAttempt((n) => n + 1)}>Retry</button></p>}
     {error && <p className="error" role="alert">{error}</p>}
-    <div className="form-actions"><button className="btn" disabled={busy || !group || reason.trim().length < 3 || (!!requirement && (!definition || !complete))}>{busy ? "Sending…" : "Send request"}</button>
+    <div className="form-actions"><button className="btn" disabled={busy || !group || reason.trim().length < 3 || !ready}>{busy ? "Sending…" : "Send request"}</button>
       <button type="button" className="btn secondary" onClick={onCancel}>Cancel</button></div>
   </form>;
 }
@@ -259,8 +288,10 @@ function EditForm({ detail, hub, onSaved, onCancel, openTab }: { detail: Product
   const [options, setOptions] = useState<OptionInput[]>((detail.options ?? []).map((o) => ({ name: o.name, description: o.description, default: o.default,
     masks: (o.masks ?? []).map((m) => ({ asset_id: m.asset_id, column: m.column, method: m.method, expression: m.expression })),
     filters: (o.filters ?? []).map((f) => ({ asset_id: f.asset_id, expression: f.expression })) })));
-  const save = (e: React.FormEvent) => { e.preventDefault();
-    void api.products.update(detail.id, { title: title.trim(), summary, asset_ids: chosen, options }).then(onSaved).catch((err: Error) => setError(err.message)); };
+  const store = () => api.products.update(detail.id, { title: title.trim(), summary, asset_ids: chosen, options });
+  const save = (e: React.FormEvent) => { e.preventDefault(); void store().then(onSaved).catch((err: Error) => setError(err.message)); };
+  const [initial] = useState(() => JSON.stringify({ title: detail.title, summary: detail.summary, chosen: detail.members.map((m) => m.asset_id), options }));
+  useUnsaved(JSON.stringify({ title, summary, chosen, options }) !== initial, `The product ${detail.title}`, () => store().then(onSaved));
   return <form className="card" aria-label="Edit product" onSubmit={save}>
     <div className="arg-grid"><div className="field"><label htmlFor="product-title">Name in the catalog</label><input id="product-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} /></div>
       <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="product-summary">Summary</label><textarea id="product-summary" rows={2} maxLength={600} value={summary} onChange={(e) => setSummary(e.target.value)} /></div></div>
@@ -466,11 +497,13 @@ export function AccessRequestsView({ hub, openTab, tab }: { hub: Hub; openTab: O
   const box = tab.ref === "mine" ? "mine" : "approve";
   const [rows, setRows] = useState<AccessRequestItem[] | null>(null), [error, setError] = useState(""), [notes, setNotes] = useState<Record<string, string>>({});
   const load = useCallback(() => api.products.requests(box).then((r) => { setRows(r); setError(""); }).catch((e: Error) => setError(e.message)), [box]);
-  useEffect(() => { void load(); }, [load]);
+  // Your own requests are decided elsewhere: check again while one waits. New requests to approve appear when you come back.
+  const tick = useFreshness(box === "mine" && !!rows?.some((r) => r.status === "pending"));
+  useEffect(() => { void load(); }, [load, tick, hub.me?.active_group_id]);
   // Compliance forms: role grants waiting for another owner, or everything you sent.
   const [cases, setCases] = useState<AccessCaseItem[]>([]);
   useEffect(() => { api.compliance.cases(box === "mine" ? "mine" : "review").then((list) => setCases(box === "mine" ? list : list.filter((c) => c.kind === "role")))
-    .catch(() => setCases([])); }, [box]);
+    .catch(() => setCases([])); }, [box, tick, hub.me?.active_group_id]);
   const decide = (r: AccessRequestItem, approve: boolean) => api.products.decide(r.id, approve, notes[r.id] ?? "").then(() => { void load(); void hub.refresh(); }).catch((e: Error) => setError(e.message));
   return <>
     <PageHeader icon={<IconCatalog size={22} />} title="Access requests" subtitle={box === "approve" ? "Requests for the data products your groups own. Approving makes the requested group a Consumer of the product." : "Your requests and their decisions."} />

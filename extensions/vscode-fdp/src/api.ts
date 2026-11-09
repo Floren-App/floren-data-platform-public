@@ -50,6 +50,14 @@ export interface Run {
 
 export interface OutputFile { path: string; size: number }
 
+export interface ReadinessCheck { key: string; label: string; state: "ready" | "missing" | "unavailable" | "unknown"; detail: string; permission: string | null }
+/** Who this editor acts as and what will work; each action still checks for itself. */
+export interface Readiness {
+  context: { kind: string; username: string; group_name: string | null; layer_name: string | null };
+  workspace_group_name: string | null;
+  checks: ReadinessCheck[];
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public fieldErrors?: Record<string, string>) {
     super(message);
@@ -57,6 +65,16 @@ export class ApiError extends Error {
 }
 
 export const ACTIVE = new Set(["pending", "running"]);
+
+/** Says what went wrong in words that match the cause: a refusal is not an outage. */
+export function describe(e: unknown): string {
+  const message = (e as Error)?.message ?? String(e);
+  if (!(e instanceof ApiError)) return `Cannot reach Limoon: ${message}`;
+  if (e.status === 401) return `This editor's session has ended; reopen the editor from Limoon. (${message})`;
+  if (e.status === 403) return `This editor's group doesn't have access: ${message}`;
+  if (e.status >= 500) return `Limoon could not answer just now (${e.status}): ${message}`;
+  return message;
+}
 
 export class Api {
   readonly base = process.env.FDP_API ?? "";
@@ -92,6 +110,7 @@ export class Api {
   }
 
   config = () => this.req<ConfigOut>("GET", `/v1/workspaces/${this.workspaceId}/config`);
+  readiness = () => this.req<Readiness>("GET", `/v1/workspaces/${this.workspaceId}/readiness`);
   pools = () => this.req<Pool[]>("GET", "/v1/pools");
   sources = () => this.req<Source[]>("GET", "/v1/connect");
   runs = () => this.req<Run[]>("GET", `/v1/runs?workspace_id=${this.workspaceId}`);

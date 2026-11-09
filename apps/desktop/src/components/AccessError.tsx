@@ -1,5 +1,6 @@
 import { ApiError, DataAccessIssue } from "../api";
 import { OpenTab } from "./Permissions";
+import { classify } from "../errors";
 
 /** Permission failures explain both the missing grant and the identity receiving it. */
 export function AccessError({ error, issue, openTab }: {
@@ -9,7 +10,17 @@ export function AccessError({ error, issue, openTab }: {
     <h3>Upstream SLA requires attention</h3><p className="error">{error.slaIssue.message}</p><div className="form-actions">{error.slaIssue.assets.map(a=><button key={a.asset_id} className="btn secondary" onClick={()=>openTab({kind:'catalog-object',ref:a.asset_id,title:a.name||'Required input',catalogSection:'sla'})}>{a.name||'Required input'} · {a.status.replaceAll('_',' ')}</button>)}</div>
   </section>;
   const detail = issue ?? (error instanceof ApiError ? error.accessIssue : undefined);
-  if (!detail) return <p className="error" role="alert">{typeof error === "string" ? error : error.message}</p>;
+  if (!detail) {
+    const failure = classify(error);
+    // A missing platform permission: name it and the way forward, not just the raw key.
+    if (failure.permission) return <section className="card access-error" role="alert">
+      <h3>{failure.title}</h3>
+      <p>The group you are acting as doesn't have <code>{failure.permission}</code> here.</p>
+      <p className="hint">Switch to a group that has it, or ask an administrator or the object's owner to grant it to your group.</p>
+    </section>;
+    return <p className="error" role="alert">{failure.kind === "network" || failure.kind === "unavailable" || failure.kind === "session"
+      ? `${failure.title}: ${failure.message}` : failure.message}</p>;
+  }
   const serviceId = detail.identity.kind === "service" ? detail.identity.principal_id ?? undefined : undefined;
   return <section className="card access-error" role="alert">
     <h3>Data access required</h3>

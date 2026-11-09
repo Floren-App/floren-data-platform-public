@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ManagedBy } from "./ManagedBy";
 import { api, AccessResource, ApiError, AppGroup, CaseTarget, JustifyDeadline, Requirement, RoleAssignment, ServicePrincipal } from "../api";
 import { JustifyPanel } from "./ComplianceForm";
 import { ProductIcon } from "./ProductIcon";
@@ -168,7 +169,7 @@ export function PermissionsPanel(props: {
   resource: AccessResource; resources: AccessResource[]; openTab: OpenTab; onChanged: () => Promise<void>;
   initialServiceId?: string;
 }) {
-  return <PermissionEditor key={props.resource.id} {...props} />;
+  return <><ManagedBy target={props.resource.id} /><PermissionEditor key={props.resource.id} {...props} /></>;
 }
 
 function PermissionEditor({ resource, resources, openTab, onChanged, initialServiceId }: Parameters<typeof PermissionsPanel>[0]) {

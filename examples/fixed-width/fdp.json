@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "warehouse": "xsmall",
+  "programs": {
+    "fixed-width-ingest": {
+      "kind": "script",
+      "entrypoint": "ingest.py",
+      "description": "Append sample file as unchanged physical lines plus metadata",
+      "data_sources": [
+        "lake"
+      ],
+      "args": [
+        {
+          "name": "definition_name",
+          "label": "File definition",
+          "type": "string",
+          "required": true,
+          "help": "The layout in file_definition these lines follow, e.g. customers_v1."
+        }
+      ]
+    },
+    "fixed-width-parse": {
+      "kind": "dbt",
+      "entrypoint": "parser",
+      "description": "Seed the layout, check record lengths, then generate all-VARCHAR fields",
+      "dbt": {
+        "data_source": "lake",
+        "schema": "fixed_width",
+        "dev_schema": "fixed_width",
+        "threads": 1
+      },
+      "data_sources": [
+        "lake"
+      ]
+    }
+  }
+}

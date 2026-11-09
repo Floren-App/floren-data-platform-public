@@ -7,8 +7,9 @@ import { applyTheme, savedTheme } from "./theme";
 // Before the first paint, so a chosen theme never flashes the other one.
 applyTheme(savedTheme());
 
-// Links in review emails open a case (#case=<id>) or the memberships. Kept across the sign-in redirect.
-const link = window.location.hash.match(/^#(case=[A-Za-z0-9]{1,32}|memberships)$/);
+// Links in review emails open a case (#case=<id>) or the memberships; a page link is #/<kind>/<ref>. Kept across the
+// sign-in redirect, and opened once signed in, with the same checks as navigating there.
+const link = window.location.hash.match(/^#(case=[A-Za-z0-9]{1,32}|memberships|\/[a-z-]+(?:\/[^?]*)?(?:\?.*)?)$/);
 if (link) {
   try { sessionStorage.setItem("fdp.link", link[1]); } catch { /* storage unavailable: open the app as usual */ }
   history.replaceState(null, "", window.location.pathname + window.location.search);

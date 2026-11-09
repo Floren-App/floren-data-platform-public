@@ -282,6 +282,17 @@ export function GroupAccessInventory({ roles, group, hub, openTab, onChanged }: 
       </div>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
+    {(() => {
+      // The whole picture in a sentence before the details: what kind of access, how much through products.
+      const objects = new Set(roles.map((r) => r.target_id)).size;
+      const by = (c: AccessCategory) => roles.filter((r) => r.category === c).length;
+      const viaProducts = roles.filter((r) => r.origin === "product").length;
+      return roles.length ? <p className="access-summary" aria-label="Summary of this group's access">
+        <strong>{group.name}</strong> holds {roles.length} role{roles.length === 1 ? "" : "s"} on {objects} object{objects === 1 ? "" : "s"}:
+        {" "}{by("data")} for data{viaProducts ? ` (${viaProducts} through data products)` : ""}, {by("platform")} for the platform and {by("privileged")} privileged.
+        <span className="muted"> A role on a folder, connection, schema or layer also applies to everything inside it.</span></p>
+        : <p className="muted access-summary">{group.name} has no access yet.</p>;
+    })()}
     {CATEGORIES.map((category) => {
       const objects = objectsOf(category), count = objects.reduce((n, o) => n + o.roles.length, 0), open = !closed.has(category);
       // Counted as shown: feature grants of one role on one object are one row.

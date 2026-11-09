@@ -33,6 +33,28 @@ watches the root config; use the runner's reload action after editing a reposito
 config if it does not refresh automatically. [Program configuration](fdp-json.md)
 describes validation and arguments.
 
+## Readiness and who acts
+
+A workspace's **Readiness** panel says who acts there and which group's access applies, then checks each step of the
+workflow:
+
+| Check | Ready when |
+|---|---|
+| Workspace running | The editor is running |
+| Read fdp.json | The group may read files, and the workspace's `fdp.json` is present and valid |
+| Start runs | The group has `runs.create` |
+| Warehouse | The layer has a default warehouse that the group may use |
+| Read run logs, Read run outputs | The group has `logs.read`, `artifacts.read` |
+
+Logs and outputs are separate from running: a group with Executor access can start runs without seeing what they
+print or produce. A check that could not run says **Unknown**, never Ready. Readiness explains what to expect; each
+action still checks access when you take it.
+
+The editor and its runs act as the group the workspace was created for. The app acts as the group selected in the
+sidebar, which can differ; the panel says so when it does. The VS Code runner shows the same context and lists any
+check that is not ready. Each of its sections loads separately, so a failure in one (for example the data sources)
+leaves the programs usable.
+
 ## Lifecycle
 
 Creating a pod is not the same as a ready editor. **Starting** includes storage

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { ManagedBy } from "../components/ManagedBy";
 import { api, ApiError, AppFeature, Webhook, WebhookDelivery, AppGroup, AppProfile, rEnabled, AuditEvent, defaultLayerId, DataSource, EDITOR_NAME, Editor, EgressAllowlist, EgressHost, Layer, Pool, Repo, StorageField, StorageType, WorkspaceSettings, WorkspaceTemplate, WorkspaceTemplateInput, WORKLOAD_KINDS, WorkloadKind, usablePools } from "../api";
 import type { Hub } from "../hub";
 import { can } from "../permissions";
@@ -168,6 +169,7 @@ export function StorageConnectionSettings({ hub, name, openTab }: { hub: Hub; na
   const ds = sources.find((s) => s.name === name);
   if (!ds) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading" role="status">Loading…</p>;
   return <>
+    <ManagedBy target={ds.name} />
     {message && <p className="success-message" role="status">{message}</p>}
     {ds.groups.length > 0 && <p className="scope-note">Legacy grants to review: {ds.groups.join(", ")}</p>}
     {ds.config.system_metadata ? <p className="scope-note">Managed by the deployment; change it in the Helm values.</p>

@@ -28,6 +28,9 @@ type Config struct {
 	CAFile       string
 	// Explicit owner group for created objects; automation never depends on a person's sidebar selection.
 	ActiveGroupID string
+	// Where this configuration lives and which revision is applied, recorded as the objects' management provenance.
+	ConfigurationReference string
+	ConfigurationRevision  string
 }
 
 type Client struct {
@@ -140,6 +143,14 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any) error
 		}
 		if c.activeGroup != "" {
 			req.Header.Set("X-FDP-Active-Group", c.activeGroup)
+		}
+		// Declares that Terraform manages what this request changes, so the app can warn before an edit drifts.
+		req.Header.Set("X-FDP-Managed-By", "terraform")
+		if c.cfg.ConfigurationReference != "" {
+			req.Header.Set("X-FDP-Configuration", c.cfg.ConfigurationReference)
+		}
+		if c.cfg.ConfigurationRevision != "" {
+			req.Header.Set("X-FDP-Configuration-Revision", c.cfg.ConfigurationRevision)
 		}
 		resp, err := c.http.Do(req)
 		if err != nil {

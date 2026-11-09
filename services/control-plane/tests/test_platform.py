@@ -342,6 +342,13 @@ def test_airflow_workload_orchestrates_programs(client, platform_repo):
                        json={'workload': 'callable-report', 'args': {'region': 'North'}})
     assert task.status_code == 201 and task.json()['workload_id'] == report['id'], task.text
     assert client.post("/v1/orchestrate/runs", headers=wl_headers(spec), json={"program": "nope"}).status_code == 404
+    # The DAG follows the tasks it started, in other workloads too, but not runs it did not start.
+    for started in (t['id'], task.json()['id']):
+        assert client.get(f"/v1/runs/{started}", headers=wl_headers(spec)).status_code == 200
+    unrelated = client.post(f"/v1/workloads/{report['id']}/runs", headers=as_("ana"), json={'args': {'region': 'South'}})
+    assert unrelated.status_code == 201, unrelated.text
+    assert client.get(f"/v1/runs/{unrelated.json()['id']}", headers=wl_headers(spec)).status_code == 404
+    assert unrelated.json()['id'] not in {r['id'] for r in client.get('/v1/runs', headers=wl_headers(spec)).json()}
 
     # GitOps for Airflow: recreate (old scheduler stopped before the new one starts).
     old = spec.name

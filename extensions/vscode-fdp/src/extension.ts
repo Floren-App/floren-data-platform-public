@@ -1,6 +1,6 @@
 import * as crypto from "crypto";
 import * as vscode from "vscode";
-import { Api, ApiError, Program, Run, Source } from "./api";
+import { Api, ApiError, describe, Program, Run, Source } from "./api";
 import { RunConsoles } from "./console";
 import { AppPreview } from "./preview";
 import { insertSnippet } from "./snippets";
@@ -107,14 +107,17 @@ class RunnerView implements vscode.WebviewViewProvider {
       this.post({ type: "unavailable" });
       return;
     }
-    try {
-      const [config, pools, sources, runs] = await Promise.all([
-        this.api.config(), this.api.pools(), this.api.sources(), this.api.runs(),
-      ]);
-      this.post({ type: "state", config, pools, sources, runs });
-    } catch (e) {
-      this.post({ type: "error", message: (e as Error).message });
-    }
+    // Each section loads on its own: a failed source list must not hide the programs that did load.
+    const sections = { config: this.api.config(), pools: this.api.pools(), sources: this.api.sources(),
+                       runs: this.api.runs(), readiness: this.api.readiness() };
+    const results = await Promise.allSettled(Object.values(sections));
+    const loaded: Record<string, unknown> = {}, errors: Record<string, string> = {};
+    Object.keys(sections).forEach((key, i) => {
+      const result = results[i];
+      if (result.status === "fulfilled") loaded[key] = result.value;
+      else errors[key] = describe(result.reason);
+    });
+    this.post({ type: "state", loaded, errors });
     this.schedule();
   }
 
@@ -184,8 +187,9 @@ class RunnerView implements vscode.WebviewViewProvider {
           return this.previewLocal(m.program as string, m.prog as Program);
       }
     } catch (e) {
+      // Field errors explain themselves next to the field; anything else says whether it was a refusal or an outage.
       const err = e as ApiError;
-      this.post({ type: "error", message: err.message, fieldErrors: err.fieldErrors });
+      this.post({ type: "error", message: err.fieldErrors ? err.message : describe(e), fieldErrors: err.fieldErrors });
     }
   }
 

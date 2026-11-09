@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ReadinessPanel } from "../components/Readiness";
 import { pageVisible, TAB_PAGES } from "../permissions";
 import { runCan, workspaceCan, api, DataLocation, EDITOR_LABEL, inLayer, inLine, isActive, poolDot, poolInLayer, shortSha, openInWindow, OutputContent, OutputFile, Run, RunScope, runtimeLabel, WarehouseOccupant, WarehouseOverview } from "../api";
 import { DataObjectView } from "../components/DataBrowser";
@@ -24,6 +25,7 @@ import { WorkspaceSections } from "./WorkspaceSections";
 import { LogView } from "../components/LogView";
 import { PackageImportsView, PackagesView, PackageView } from "./Packages";
 import { BackupsView } from "./Backups";
+import { InstallationReadinessView } from "./InstallationReadiness";
 import { QueryLogView } from "./QueryLog";
 import { rEnabled, type PackageKind } from "../api";
 
@@ -37,7 +39,7 @@ export type TabKind = "data-permissions" | "roles" | "kafka" | "kafka-clusters" 
   | "products" | "product" | "access-requests" | "app-profiles" | "repos" | "deadlines"
   | "privacy-reviews" | "privacy-case" | "case" | "privacy-memberships" | "privacy-register"
   | "privacy-policies" | "privacy-forms" | "privacy-form" | "privacy-roles" | "privacy-classifications"
-  | "admin-app-profiles" | "admin-notifications" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit" | "admin-backups";
+  | "admin-app-profiles" | "admin-notifications" | "admin-classifications" | "admin-layers" | "admin-sources" | "admin-repos" | "admin-runtimes" | "admin-service-accounts" | "admin-pools" | "admin-workspace-templates" | "admin-network" | "admin-query-log" | "admin-audit" | "admin-backups" | "admin-readiness";
 
 export interface TabRef {
   kind: TabKind;
@@ -128,6 +130,7 @@ export function TabContent({ tab, hub, openTab }: Props) {
     case "admin-pools": return <><AdminPools hub={hub} /><SettingsPermissions page="set-pools" hub={hub} openTab={openTab} /></>;
     case "admin-workspace-templates": return <><AdminWorkspaceTemplates hub={hub} /><SettingsPermissions page="set-template" hub={hub} openTab={openTab} /></>;
     case "admin-network": return <><AdminNetwork hub={hub} /><SettingsPermissions page="set-network" hub={hub} openTab={openTab} /></>;
+    case "admin-readiness": return <InstallationReadinessView />;
     case "admin-backups": return <BackupsView key={`${hub.me?.principal_id}/${hub.me?.active_group_id}/${hub.layerId}`} hub={hub} />;
     case "admin-query-log": return <><QueryLogView key={tab.search ?? ""} hub={hub} initialActor={tab.search} /><SettingsPermissions page="set-querylog" hub={hub} openTab={openTab} /></>;
     case "git-credentials": return <GitCredentialsTab hub={hub} sections={<WorkspaceSections active="git" openTab={openTab} />} />;
@@ -208,7 +211,7 @@ function PoolView({ name, hub, openTab }: { name?: string; hub: Hub; openTab: (t
           <tbody>{view.occupants.map((o) => <tr key={`${o.category}:${o.run_id ?? o.workload_id ?? o.workspace_id ?? o.layer_id}:${o.state}`} className={o.category === "trino" ? "" : "clickable"} onClick={() => open(o)}>
             <td>{o.category === "trino" ? o.name : <button className="text-button" onClick={(e) => { e.stopPropagation(); open(o); }}>{o.name}</button>}</td>
             <td>{CATEGORY[o.category]}{o.kind !== o.category && o.category !== "trino" ? ` · ${o.kind}` : ""}</td><td>{o.layer_name ?? "—"}</td><td>{o.owner}</td>
-            <td><span className="status"><span className={`dot ${o.state}`} />{o.state === "queued" ? `queued · ${inLine(o.queue_position)}` : "running"}</span></td>
+            <td><span className="status"><span className={`dot ${o.state}`} />{o.state === "queued" ? `queued · ${inLine(o.queue_position)}` : o.state === "requested" ? "requested" : "running"}</span></td>
             <td>{o.slots || "—"}</td>
           </tr>)}</tbody></table></div> : <p className="muted">None of your work is using this warehouse.</p>}
         {(view.others_in_use > 0 || view.others_queued > 0) && <p className="muted">Work of others you cannot see: {view.others_in_use} slot{view.others_in_use === 1 ? "" : "s"} in use{view.others_queued ? `, ${view.others_queued} waiting` : ""}.</p>}
@@ -324,6 +327,7 @@ function WorkspaceTab({ id, hub, openTab }: { id: string; hub: Hub; openTab: (t:
         </dl>
         {workspaceCan(ws, "object.settings.edit") && workspaceCan(ws,"git.credentials.binding.change") && <WorkspaceGit ws={ws} onChanged={hub.refresh} />}
       </div>
+      <ReadinessPanel workspaceId={ws.id} status={ws.status} />
       {ws.editor === "sql" ? <section className="card"><h2>SQL</h2>
         <p className="muted">Browse every catalog and schema you have a data role on, write queries with completion, and keep them as
           <code>.sql</code> scripts. Queries run on the shared engine as you, with the same governance and audit as programs.

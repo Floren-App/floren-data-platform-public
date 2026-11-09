@@ -46,3 +46,4 @@ app = ["permission_registry.json", "alembic/*.json", "alembic/*.py", "alembic/ve
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["persona: a persona journey; part of the release gate (make persona-acceptance)"]

@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     oidc_username_claim: str = "preferred_username"
     admin_role: str = "fdp-admin"
     directory_mode: Literal["oidc", "scim"] = "oidc"
+    # Set by the Helm chart: the bundled single-instance services that are enabled, for the readiness report.
+    bundled_services: str = ""
     scim_token: str = ""  # separate provisioning bearer credential; empty disables SCIM
     # Bearer for /internal/metrics and /internal/metrics/certificates (Prometheus); empty disables them.
     metrics_token: str = ""

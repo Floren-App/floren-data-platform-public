@@ -119,8 +119,8 @@ topic DDL remain denied to client tokens. Grants on a cluster inherit to topics;
 additional topic grants never block inherited access. Direct managed-identity
 assignments work without an intermediary group.
 
-The active group owns newly created registrations/topics. Creation requires that
-primary group's permission; secondary groups may authorize other operations.
+The active group owns newly created registrations/topics. Creation and every other
+operation use that group's permissions; other memberships add nothing until selected.
 Topic-only grants reveal the cluster name needed for navigation, but no unrelated
 topic names or grants. Children load when the cluster is opened.
 

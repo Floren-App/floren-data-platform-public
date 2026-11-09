@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useUnsaved } from "../unsaved";
 import { AccessCaseItem, AccessFormItem, AccessPolicyItem, api, JustifyDeadline, RegisterRow, saveFile, AppGroup, ClassificationLevel, ComplianceRoleItem, FieldType, FormCondition, FormDefinition, FormField, FormPage } from "../api";
 import type { Hub } from "../hub";
 import { can } from "../permissions";
@@ -149,10 +150,13 @@ export function PrivacyForm({ id, hub, onRenamed, onDeleted }: { id: string; hub
     setDefinition(latest?.definition ?? { pages: [newPage([])] });
   };
   useEffect(() => { api.compliance.form(id).then(show).catch((e: Error) => setError(e.message)); }, [id]);
+  const saveDraft = useRef<() => Promise<unknown>>();
+  useUnsaved(dirty, `The form ${name || "draft"}`, admin ? () => saveDraft.current!() : undefined);
   if (!form) return error ? <p className="error" role="alert">{error}</p> : <p className="muted loading" role="status">Loading…</p>;
   const change = (d: FormDefinition) => { setDefinition(d); setDirty(true); };
   const save = () => { setError(""); setMessage("");
     return api.compliance.saveForm(form.name, { name: name.trim(), description, definition }).then((f) => { show(f); if (f.name !== form.name) onRenamed(f.name); setMessage("Draft saved."); return f; }); };
+  saveDraft.current = save;
   const publish = () => { setError(""); setMessage("");
     (dirty || !form.has_draft ? save() : Promise.resolve(form)).then((f) => api.compliance.publishForm(f.id))
       .then(() => api.compliance.form(id)).then((f) => { show(f); setMessage(`Published version ${f.published_version}. New cases use it; open cases keep theirs.`); })

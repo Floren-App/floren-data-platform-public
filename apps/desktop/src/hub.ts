@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, AccessResource, AppFeature, Layer, Me, modeLayerId, Workload, Run, Workspace } from "./api";
 import { useObjectCache } from "./cache";
 import { SessionExpiredError } from "./auth";
+import { classify } from "./errors";
 import { pageVisible } from "./permissions";
 
 export interface Hub {
@@ -35,6 +36,15 @@ export const RUN_PAGE = 20;
 const MAX_RUNS = 500;
 const IDENTITY_POLL_MS = 30_000;
 const stable = <T,>(before: T, after: T): T => JSON.stringify(before) === JSON.stringify(after) ? before : after;
+
+/** A failed background refresh: an answer from Limoon (a refusal or invalid request) is not an outage. */
+function backgroundError(reason: unknown): string {
+  const failure = classify(reason);
+  if (failure.kind === "network") return `Cannot reach Limoon: ${failure.message}`;
+  if (failure.kind === "unavailable") return `${failure.title}; it will try again: ${failure.message}`;
+  if (failure.kind === "denied" || failure.kind === "session") return `Some of this page could not be loaded. ${failure.title}: ${failure.message}`;
+  return `Some of this page could not be loaded: ${failure.message}`;
+}
 
 export function useHub(enabled: boolean): Hub {
   const cache = useObjectCache();
@@ -117,7 +127,7 @@ export function useHub(enabled: boolean): Hub {
       const failure = results.find((r): r is PromiseRejectedResult => r.status === "rejected" && !(r.reason instanceof SessionExpiredError));
       if (failure) {
         pollFailed.current = true;
-        setError(`Cannot reach Limoon: ${(failure.reason as Error).message}`);
+        setError(backgroundError(failure.reason));
       } else if (pollFailed.current && results.every((r) => r.status === "fulfilled")) {
         pollFailed.current = false;
         setError(null);

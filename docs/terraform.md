@@ -115,6 +115,27 @@ The [getting-started source example](../terraform/examples/getting-started/main.
 shows the resource relationships; adapt its addresses, storage, groups and provider
 version to your installation. Its placeholder IdP group must exist before lookup.
 
+## Terraform and changes in the app
+
+The provider declares on every request that Terraform manages what it changes. Limoon records that with each change's
+audit event, so the app can say an object is **Managed by Terraform**, with the configuration it comes from when you
+set one:
+
+```hcl
+provider "fdp" {
+  configuration_reference = "git.example.com/platform-config//terraform"  # or FDP_CONFIGURATION_REFERENCE
+  configuration_revision  = var.commit                                     # or FDP_CONFIGURATION_REVISION
+}
+```
+
+The note appears on an object's Permissions and Settings. A change made in the app to a Terraform-managed object is
+still possible, for an emergency for example, but the note then says who changed it and when: the next plan will
+likely show it as drift, and the next apply undoes it unless the configuration changes too. Administrators find all
+such objects at `GET /v1/rbac/provenance/changes`. The list changes nothing and adopts nothing into Terraform state.
+
+Provenance is only what was declared. Objects never changed through Terraform show nothing; their provenance is
+unknown, and Limoon does not guess it from user agents or from where an identity came from.
+
 ## Workload identities and import
 
 Prefer each workload's built-in managed identity: `execution_mode = "fixed"`, no

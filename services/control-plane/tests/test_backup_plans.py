@@ -197,3 +197,30 @@ def test_legacy_admission_does_not_block_independent_plan(client,recovery_keys):
     with SessionLocal() as db:
         assert backups.queue(db,'admin').id
         db.commit()
+
+
+def test_plan_status_preview_and_prerequisites_change_nothing(client,recovery_keys):
+    """A plan says whether it is paused, scheduled, running or failed; the schedule preview and the prerequisite
+    check explain without enabling, writing or scheduling anything."""
+    dest=destination(client,recovery_keys)
+    assert client.get('/v1/backups/plans',headers=ADMIN).json()==[]   # not configured: nothing invented
+    body={'name':'Nightly','destination_id':dest['id'],'schedule':'30 1 * * 0','timezone':'Europe/Amsterdam','prefix':'weekly'}
+    checks={c['key']:c for c in client.post('/v1/backups/plans/check',headers=ADMIN,json=body).json()['checks']}
+    assert {k:c['state'] for k,c in checks.items()}=={'source':'ready','recovery_key':'ready','destination':'ready'}
+    assert client.get('/v1/backups/plans',headers=ADMIN).json()==[]   # the check created no plan
+    runs=client.get('/v1/backups/schedule-preview',headers=ADMIN,params={'schedule':'30 1 * * 0','timezone':'Europe/Amsterdam'}).json()['runs']
+    assert len(runs)==5 and all(datetime.fromisoformat(r).weekday() in (5,6) for r in runs)   # Sunday 01:30 local is Saturday/Sunday UTC
+    assert client.get('/v1/backups/schedule-preview',headers=ADMIN,params={'schedule':'61 * * * *'}).status_code==422
+    plan=client.post('/v1/backups/plans',headers=ADMIN,json=body).json()
+    assert plan['enabled'] is False and plan['status']['state']=='paused' and plan['status']['last_success_at'] is None
+    assert plan['max_bytes']==10737418240 and plan['max_objects']==100000   # the limits are part of the plan
+    client.post('/v1/backups/plans/'+plan['id']+'/runs',headers=ADMIN).raise_for_status()
+    assert client.get('/v1/backups/plans/'+plan['id'],headers=ADMIN).json()['status']['state']=='running'
+    # A vault reference without a usable key is reported, not repaired.
+    deps.get_secret_store().put('backups/keys/broken',{'public_key':''})
+    with SessionLocal() as db:
+        row=db.scalar(select(PlatformSetting).where(PlatformSetting.key==plans.DESTINATION+dest['id']))
+        row.value={**row.value,'recovery_key_ref':'backups/keys/broken'};db.commit()
+    checks={c['key']:c for c in client.post('/v1/backups/plans/check',headers=ADMIN,json=body).json()['checks']}
+    assert checks['recovery_key']['state']=='missing' and 'public_key' in checks['recovery_key']['detail']
+    assert client.post('/v1/backups/plans/check',headers=as_('ana'),json=body).status_code==403

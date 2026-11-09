@@ -293,6 +293,19 @@ export function LineageExplorer({ asset, openTab, version }: { asset: CatalogAss
       {orchestration && graph.nodes.some((a) => ["airflow", "airflow_dag"].includes(a.kind)) && <button className="btn sm secondary" onClick={() => jumpTo(graph.nodes.filter(a => ["airflow", "airflow_dag"].includes(a.kind)).map(a => a.id))}>Airflow orchestration</button>}
       <button className="text-button" onClick={() => instance.current?.fitView({ padding: .15, maxZoom: 1, duration: 300 })}>Fit entire chain</button>
     </nav>}
+    {!busy && (() => {
+      // The immediate neighbours in words, and how recent the evidence is; the graph has the rest.
+      const name = (id: string) => graph.nodes.find((a) => a.id === id)?.name ?? "";
+      const names = (ids: string[]) => [...new Set(ids.map(name).filter(Boolean))];
+      const inputs = names(graph.edges.filter((e) => e.target === focus).map((e) => e.source));
+      const consumers = names(graph.edges.filter((e) => e.source === focus).map((e) => e.target));
+      const latest = graph.edges.map((e) => e.observed_at).filter(Boolean).sort().pop();
+      const list = (items: string[]) => items.length > 4 ? `${items.slice(0, 4).join(", ")} and ${items.length - 4} more` : items.join(", ");
+      return <p className="small lineage-neighbours" aria-label="Direct lineage">
+        {inputs.length ? <>Reads from {list(inputs)}</> : "No inputs observed"} · {consumers.length ? <>used by {list(consumers)}</> : "no consumers observed"}
+        {latest && <> · newest evidence {new Date(latest).toLocaleDateString()}</>}
+        <span className="muted"> · Lineage shows what was observed or declared; a path that never ran or is not instrumented does not appear.</span></p>;
+    })()}
     <div className="lineage-summary"><span>{busy ? <span className="loading" role="status">Loading lineage…</span> : <>Centered on <strong>{current?.name || asset.name}</strong> · {graph.nodes.length} objects · {graph.edges.length} connections</>}</span><span className="row" style={{ gap: 12 }}>{selected && <button className="text-button" onClick={() => setSelected(null)}>Clear path highlight</button>}{focus !== asset.id && <button className="text-button" onClick={() => setFocus(asset.id)}>Return to {asset.name}</button>}</span></div>
     {mode === "explore" ? <div className="lineage-explorer" role="region" aria-label="Interactive lineage graph">
       <ReactFlow<FlowNode> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onInit={(value) => { instance.current = value; }}

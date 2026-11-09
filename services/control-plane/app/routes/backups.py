@@ -39,7 +39,11 @@ def plan_output(row,db,user):
     actions=('backups.plans.read','backups.plans.update','backups.plans.schedule.change','backups.plans.source.change',
         'backups.plans.destination.change','backups.plans.retention.change','backups.plans.delete','backups.plans.run',
         'backups.history.read','backups.archives.delete')
-    return {**plans.output(row),'capabilities':[a for a in actions if permissions.allowed(db,user,a,ident)]}
+    capabilities=[a for a in actions if permissions.allowed(db,user,a,ident)]
+    out={**plans.output(row),'capabilities':capabilities}
+    if 'backups.history.read' in capabilities:
+        out['status']=plans.status(db,ident,row.value.get('enabled',False))
+    return out
 
 
 @router.get('/configuration')
@@ -203,6 +207,23 @@ def delete_destination(ident: str,db=Depends(get_db),user=Depends(get_actor)):
         raise HTTPException(409,'remove or move plans referencing this destination first')
     row.value={**row.value,'_deleted':True}
     audit(db,user.username,'backup.destination.delete',ident);db.commit()
+
+
+@router.get('/schedule-preview')
+def schedule_preview(schedule: str, timezone: str = 'UTC', db=Depends(get_db), user=Depends(get_actor)):
+    """The next five runs of a schedule in its timezone, as the scheduler computes them."""
+    view_page(db,user)
+    try:
+        return {'runs':[r.isoformat() for r in plans.upcoming(schedule,timezone)]}
+    except (ValueError,KeyError) as exc:
+        raise HTTPException(422,'invalid timezone or schedule, or no run in the next five years') from exc
+
+
+@router.post('/plans/check')
+def check_plan(body: plans.PlanIn, db=Depends(get_db), user=Depends(get_actor)):
+    """Whether a plan's source, destination and vault key reference are usable; changes nothing."""
+    user=view_page(db,user)
+    return {'checks':plans.prerequisites(db,user,body)}
 
 
 @router.get('/plans')

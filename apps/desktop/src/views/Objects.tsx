@@ -1,4 +1,5 @@
 import { can } from "../permissions";
+import { ManagedBy } from "../components/ManagedBy";
 import { ObjectLineage } from "../components/ObjectLineage";
 import { LogView } from "../components/LogView";
 import { useEffect, useState } from "react";
@@ -267,7 +268,7 @@ export function OrganizationSettings({ resource, hub, openTab }: { resource: Acc
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   };
-  return <section className="card"><h2>Name &amp; location</h2>
+  return <><ManagedBy target={resource.id} /><section className="card"><h2>Name &amp; location</h2>
     {error && <p className="error" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
     {parent?.actions.includes("delete") && <form onSubmit={move}>
@@ -284,7 +285,7 @@ export function OrganizationSettings({ resource, hub, openTab }: { resource: Acc
       <div><h3>Delete folder</h3><p className="muted">{hub.resources.some((r) => r.parent_id === resource.id) ? "This folder has contents. Move or remove them first; only empty folders can be deleted." : "Only empty folders can be deleted."}</p></div>
       <button className="btn danger" disabled={busy || hub.resources.some((r) => r.parent_id === resource.id)} onClick={remove}>Delete empty folder</button>
     </div>}
-  </section>;
+  </section></>;
 }
 
 /** Access → Service identities: every workload's built-in identity and the service accounts, in one list. */

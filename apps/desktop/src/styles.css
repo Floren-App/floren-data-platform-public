@@ -229,6 +229,7 @@ button:focus-visible, summary:focus-visible, [role="tab"]:focus-visible { outlin
 .warehouse-usage { display: flex; align-items: center; gap: 10px; }
 .warehouse-usage .meter { flex: 1; max-width: 220px; }
 .dot.queued { background: transparent; box-shadow: inset 0 0 0 2px var(--warn); }
+.dot.requested { background: transparent; box-shadow: inset 0 0 0 2px var(--info); }
 .dot.starting { background: var(--warn); }
 .workspace-starting { border-color: var(--warn); }
 .dot.failed { background: var(--err); }
@@ -853,3 +854,25 @@ tr.overdue td:first-child { box-shadow: inset 3px 0 0 var(--err); }
 .product-access-add { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 .product-access-add .field { flex: 1; min-width: 160px; }
 .product-access-add .btn { margin-bottom: 12px; }
+
+/* Readiness: what will work in a workspace and as whom. The state words carry the meaning; colour only supports it. */
+.readiness-context { margin: 0 0 8px; }
+.readiness-checks { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.readiness-checks li { display: flex; gap: 10px; align-items: baseline; }
+.readiness-state { flex: none; min-width: 88px; font-size: 12px; font-weight: 600; }
+.readiness-state.ready { color: var(--ok); }
+.readiness-state.missing { color: var(--err); }
+.readiness-state.unavailable { color: var(--warn); }
+.readiness-state.unknown { color: var(--fg-muted); }
+
+/* The acting context, always in view: which group's access applies and in which layer. */
+.acting-context { display: flex; gap: 6px; align-items: center; padding: 3px 12px; font-size: 12px; background: var(--bg-side);
+  border-bottom: 1px solid var(--border); color: var(--fg-muted); flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acting-context strong { color: var(--fg); font-weight: 600; }
+.acting-context .production { color: var(--err); font-weight: 600; }
+.acting-context .grow { flex: 1; }
+.acting-context .text-button { font-size: 12px; }
+
+/* Configuration managed elsewhere (Terraform): a quiet note above the settings it concerns. */
+.managed-by { margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--info); background: var(--bg-side); font-size: 13px; }
+.access-summary { margin: 4px 0 12px; }

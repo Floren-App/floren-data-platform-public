@@ -12,7 +12,7 @@ from ..db import get_db
 from ..deps import get_actor, get_orchestrator, granted_sources
 from ..models import ComputePool, Resource, Workspace, utcnow
 from ..orchestrator import Orchestrator
-from ..schemas import ActiveGroupIn, ActiveLayerIn, ConfigOut, Me, OpenOut, PoolOut, WorkspaceIn, WorkspaceOut
+from ..schemas import ActiveGroupIn, ActiveLayerIn, ConfigOut, Me, OpenOut, PoolOut, WorkspaceIn, WorkspaceOut, WorkspaceReadiness
 from ..executions import workspace_spec
 from ..workspace_files import load_config
 from .. import git_credentials
@@ -329,6 +329,17 @@ def list_pools(layer_id: Optional[str] = None, kind: Optional[Literal["script", 
     elif kind and user.environment_id:
         layer_id = user.environment_id
     return pools_for(db,rbac.effective_allowlist_groups(db,user),layer_id,kind,user=user)
+
+
+@router.get("/workspaces/{ws_id}/readiness", response_model=WorkspaceReadiness)
+def workspace_readiness(ws_id: str, db: Session = Depends(get_db), orch: Orchestrator = Depends(get_orchestrator),
+                        user: User = Depends(get_actor)):
+    """Who you act as here, and whether running, logs, outputs and the warehouse will work. It explains; each
+    action still checks for itself."""
+    ws = owned(db, ws_id, user)
+    workspace_access.require(db, user, 'workspaces.object.read', ws)
+    from ..readiness import workspace_readiness as explain
+    return explain(db, orch, user, ws)
 
 
 @router.get("/workspaces/{ws_id}/config", response_model=ConfigOut)

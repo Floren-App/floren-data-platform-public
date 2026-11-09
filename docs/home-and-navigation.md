@@ -6,13 +6,16 @@ FDP runs in the browser or as a desktop app. Both use the same API and the same 
 
 The bottom of the sidebar shows your working context:
 
-- **Group**: which app group creates and owns new objects, and which objects the lists show
-  (workspaces, workloads, storage and catalog). Your other memberships still authorize
-  actions on existing objects. See [active groups](active-groups.md).
+- **Group**: the app group you act as. Its access applies to everything you see and do, it owns
+  the objects you create, and the lists show its objects (workspaces, workloads, storage and
+  catalog). Your other memberships add nothing until you switch to them. See
+  [active groups](active-groups.md).
 - **Layer**: the layer you work in. Home, Workspaces, Workloads (folders included), Storage,
   Kafka, APIs and Usage show that layer (items without a layer show in every layer), and what
   you create lands in it. A note in each list counts what is in other layers. Production
   layers are marked "production" in the picker. Your choice is remembered for your account.
+
+The line above the tabs repeats it, **Acting as** *group* · *layer*, so it stays in view on every page.
 
 Search the catalog from anywhere with **Ctrl/Cmd+K**.
 
@@ -51,7 +54,20 @@ Status dots mean the same on every page: green is running or succeeded, blue is 
 demand), yellow is starting or waiting, red is failed, and gray is stopped or idle.
 
 Opening an object opens it in a tab. New pages replace the single unpinned preview tab;
-pin a tab to keep it open.
+pin a tab to keep it open. Pinned tabs come back the next time you open the app on the same device, if you still
+have access to them.
+
+Every page has its own address, so reloading keeps you on it and **Back** and **Forward** move between pages.
+**Copy link** above the tabs copies the address to share. A link grants nothing: whoever opens it sees the page
+only if they may, and a page they may not see does not open.
+
+Leaving a page with changes you have not saved (going to another page, closing its tab or switching group) asks
+first: save and continue, discard the changes, or stay. Closing or reloading the window asks too.
+
+Lists that wait on someone else follow up by themselves while the page is open: data products and access requests
+while a request is waiting for a decision, and backups while one runs. They also refresh when you come back to the
+window. A small **Updated** time shows when a list was last loaded; if an update fails, the last list stays with the
+reason, and is not shown as current.
 
 ## Home
 
