@@ -10,18 +10,18 @@ Confirm the source revision, configuration and integration checks for your deplo
 | Workspaces | VS Code, RStudio and SQL editors; private subdirectory storage; root/direct-repository config discovery |
 | Layer isolation | Managed layers: own namespace, default-deny network policies and layer-local services; requires a CNI that enforces policy. Unmanaged layers are an authorization boundary only |
 | Data IAM | Additive schema/source grants plus explicit table, column, file and directory targets. Fine SQL grants use governed Trino; raw native credentials are refused. Column masks and row filters remain enforced |
-| Metadata recovery | Encrypted scheduled archives to configurable external S3; offline restore, quarantine and reconciliation. Customer data, external dependencies and workspace volumes require customer backups; see [recovery](platform-recovery.md) |
+| Backup and recovery | Optional backup plans for the control plane and PostgreSQL, S3 files and Iceberg integrations, each with its own destination, schedule and retention; encrypted archives with references into the selected vault; offline restore, quarantine and reconciliation. Nothing runs until a plan is enabled. Workspace volumes, packages, Kafka messages, the IdP, the vault, Git and Terraform state need their own arrangements; see [recovery](platform-recovery.md) |
 | Metadata upgrades | Explicit serialized Alembic migrations; API startup refuses a pending schema; see [upgrades](metadata-upgrades.md) |
 | Native DDL | Admin may receive native privileges that also permit native grants on some engines; FDP IAM assignment remains protected |
 | Workload IAM | Nested folders, additive inheritance, built-in managed identities and fixed/caller data modes |
 | Catalog | Governed resources, search, lineage, quality and freshness/run SLA evidence; uncertified objects remain available |
-| Multi-asset product bundles | Not yet a separately managed package resource; keep related asset descriptions/domain/tags consistent |
+| Data products | Managed bundles of tables, files, dashboards and other objects, with access options (masks and row filters), requests, approvals and compliance forms; managed through the app, the API and the `fdp_data_product` resource |
 | Lineage | Program observations and native dbt/Airflow evidence; completeness depends on executed/instrumented paths and captured artifacts |
 | SLA enforcement | Configurable evidence and input gates; external notification delivery is not a complete incident-management system |
 | Bundled services | Keycloak, PostgreSQL and RustFS are optional and single-instance, not highly available; bring your own for HA |
 | Provider distribution | Signed GitHub releases of Floren-App/terraform-provider-fdp, installed into a filesystem mirror (`scripts/install-provider.sh`); not listed in a public registry |
 | Documentation versions | This site follows main; historical Markdown is available at source commits |
-| Kafka | Phase 1 (managed Kafka per layer, governed topics, stream workloads) is not yet accepted on a live cluster; connectors, schemas and external access are planned |
+| Kafka | Phase 1 (managed Kafka per layer, governed topics, stream workloads) is implemented and verified against a real broker; its live Kubernetes acceptance (operator reconciliation, network policy enforcement, volume lifecycle) is still open. Connectors, schemas and external access are planned; see [Kafka](kafka-operations.md) |
 | AI agent | Not available yet; planned (see the roadmap) |
 
 The [installation guide](kubernetes-install.md#what-is-not-supported-yet) and

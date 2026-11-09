@@ -37,3 +37,12 @@ button.small { padding: 2px 8px; font-size: 11px; }
 .dot.succeeded { background: var(--vscode-testing-iconPassed, #2ea043); }
 .dot.failed { background: var(--vscode-testing-iconFailed, #f85149); }
 @keyframes pulse { 50% { opacity: .35; } }
+
+/* Who this editor acts as, and anything that will not work yet. */
+.context { margin: 4px 0 6px; }
+.readiness { margin: 0 0 8px; padding-left: 0; list-style: none; }
+.readiness li { margin: 2px 0; }
+.readiness .state { font-weight: 600; }
+.readiness .state.missing { color: var(--vscode-errorForeground); }
+.readiness .state.unavailable { color: var(--vscode-editorWarning-foreground); }
+.readiness .state.unknown { color: var(--vscode-descriptionForeground); }

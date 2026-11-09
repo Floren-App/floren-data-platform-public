@@ -170,3 +170,24 @@ def test_live_storage_browser_is_bounded_to_the_granted_namespace(client):
     finally:
         raw.delete_objects(Bucket=bucket, Delete={"Objects": [{"Key": key} for key in keys]})
         raw.delete_bucket(Bucket=bucket)
+
+
+def test_an_empty_listing_says_whether_the_schema_exists_at_all(sql_mode, monkeypatch):
+    """A registered schema that the engine does not have yet is not the same as an empty one."""
+    client, _ = sql_mode
+    exists = {"value": False}
+    sent = []
+
+    async def engine(method, path, **kwargs):
+        sent.append(kwargs["content"].decode())
+        rows = [["reporting"]] if "information_schema.schemata" in sent[-1] and exists["value"] else []
+        return httpx.Response(200, json={"id": "metadata_test", "columns": [{"name": "name"}], "data": rows})
+
+    monkeypatch.setattr(sql_access, "engine_request", engine)
+    url = f"/v1/data/schemas/{schema_id()}/children"
+    missing = client.get(url, headers=as_("ana"))
+    assert missing.status_code == 200, missing.text
+    assert missing.json() == {"children": [], "next_cursor": None, "schema_state": "missing"}
+    exists["value"] = True
+    assert client.get(url, headers=as_("ana")).json()["schema_state"] == "present"
+    assert any("information_schema.schemata" in s for s in sent)

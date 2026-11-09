@@ -63,6 +63,7 @@ export const TAB_PAGES: Record<TabKind, string | null> = {
   "package-imports": "imports",
   "admin-audit": "set-auditlog",
   "admin-backups": "set-backups",
+  "admin-readiness": "set-layers",  // installation-wide evidence; the API itself requires active Global Admin
   "deadlines": "deadlines",
 };
 

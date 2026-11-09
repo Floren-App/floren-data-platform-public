@@ -1,0 +1,3 @@
+000001Ada Lovelace        NL0000012500
+000002Grace Hopper        BE0000000750
+000003No Balance          NL          

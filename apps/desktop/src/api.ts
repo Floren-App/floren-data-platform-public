@@ -152,7 +152,9 @@ export interface DataChild {
   data_type?: string; nullable?: boolean; ordinal_position?: number; path?: string; size?: number; modified_at?: string;
 }
 /** cached: the last listing the platform saw, returned without querying the engine. */
-export interface DataChildren { children: DataChild[]; next_cursor: string | null; cached?: boolean }
+export interface DataChildren { children: DataChild[]; next_cursor: string | null; cached?: boolean;
+  /** With an empty first page: whether the engine has the schema at all ("missing": registered here only). */
+  schema_state?: "present" | "missing" }
 export interface DataLocation { schemaId: string; table?: string; path?: string; item?: DataChild }
 
 export type WorkloadKind = "script" | "notebook" | "app" | "dbt" | "airflow" | "stream" | "kafka";
@@ -196,7 +198,8 @@ export interface WorkspaceSettings {
 export interface WarehouseOccupant {
   category: "job" | "app" | "airflow" | "trino" | "kafka" | "workspace";
   kind: string;
-  state: "running" | "queued";
+  /** requested: platform infrastructure holding its slots; whether it is ready is not confirmed here. */
+  state: "running" | "queued" | "requested";
   slots: number;
   name: string;
   owner: string;
@@ -280,6 +283,14 @@ export type Editor = "vscode" | "rstudio" | "sql";
 export const EDITOR_NAME: Record<Editor, string> = { vscode: "VS Code", rstudio: "RStudio", sql: "SQL" };
 export const EDITOR_LABEL: Record<Editor, string> = {
   vscode: "VS Code · Python, Jupyter, Streamlit", rstudio: "RStudio · R, Shiny", sql: "SQL · CloudBeaver, query any data you can access" };
+
+/** Who a request acts as: the person, or the editor, job or workload credential they used. */
+export interface ActingContext { kind: "person" | "editor" | "job" | "workload" | "service"; username: string;
+  group_id: string | null; group_name: string | null; layer_id: string | null; layer_name: string | null }
+export interface ReadinessCheck { key: string; label: string; state: "ready" | "missing" | "unavailable" | "unknown"; detail: string; permission: string | null }
+/** A point-in-time explanation; every action still checks for itself. */
+export interface WorkspaceReadiness { context: ActingContext; workspace_group_id: string | null; workspace_group_name: string | null;
+  checks: ReadinessCheck[]; checked_at: string }
 
 export interface Workspace {
   capabilities?: string[];
@@ -865,8 +876,19 @@ export interface BackupPlan {
   id: string; name: string; capabilities?: string[]; layer_id?: string | null; enabled: boolean; source_kind: "control_plane" | "storage"; source_id: string;
   destination_id: string; prefix: string; schedule: string; timezone: string; schemas: string[];
   source_prefix: string; retention_days: number; max_bytes: number; max_objects: number; next_run_at: string;
+  /** What the plan is doing; only with permission to read its history. */
+  status?: { state: "paused" | "scheduled" | "running" | "failed"; last_status: string | null; last_run_at: string | null;
+    last_success_at: string | null; last_error: string };
 }
-export type BackupPlanInput = Omit<BackupPlan, "id" | "next_run_at" | "layer_id" | "capabilities">;
+/** Evidence of the installation's state; read-only. */
+export interface InstallationReadiness { generated_at: string; release: string;
+  items: { area: string; item: string; state: "configured" | "attention" | "not_configured" | "single_instance" | "customer_operated" | "unknown"; detail: string }[];
+  summary: Record<string, number> }
+/** Who manages an object's configuration; "unknown" when nothing declared it. */
+export interface Provenance { source: "terraform" | "app" | "unknown"; reference?: string; revision?: string; managed_by?: string; managed_at?: string;
+  app_change?: { at: string; by: string; action: string } | null }
+export interface BackupCheck { key: string; label: string; state: "ready" | "missing" | "unavailable"; detail: string }
+export type BackupPlanInput = Omit<BackupPlan, "id" | "next_run_at" | "layer_id" | "capabilities" | "status">;
 export interface BackupSource { id: string; name: string; kind: string; supported: boolean; detail: string }
 
 export interface BackupConfiguration {
@@ -880,6 +902,7 @@ export interface BackupRecord {
 }
 
 export const api = {
+  provenance: (target: string) => request<Provenance>("GET", `/v1/rbac/provenance?${new URLSearchParams({ target })}`),
   backups: {
     plans: () => request<BackupPlan[]>("GET", "/v1/backups/plans"),
     sources: () => request<BackupSource[]>("GET", "/v1/backups/sources"),
@@ -888,6 +911,8 @@ export const api = {
     deletePlan: (id: string) => request<void>("DELETE", `/v1/backups/plans/${id}`),
     runPlan: (id: string) => request<BackupRecord>("POST", `/v1/backups/plans/${id}/runs`),
     planHistory: (id: string) => request<BackupRecord[]>("GET", `/v1/backups/plans/${id}/runs`),
+    schedulePreview: (schedule: string, timezone: string) => request<{ runs: string[] }>("GET", `/v1/backups/schedule-preview?${new URLSearchParams({ schedule, timezone })}`),
+    checkPlan: (body: BackupPlanInput) => request<{ checks: BackupCheck[] }>("POST", "/v1/backups/plans/check", body),
     saveDestination: (body: BackupDestinationInput, id?: string) => request<BackupDestination>(id ? "PUT" : "POST", id ? `/v1/backups/destinations/${id}` : "/v1/backups/destinations", body),
     deleteDestination: (id: string) => request<void>("DELETE", `/v1/backups/destinations/${id}`),
     disableConfiguration: () => request<void>("DELETE", "/v1/backups/configuration"),
@@ -1028,6 +1053,7 @@ export const api = {
   openWorkspace: (id: string) => request<{ url: string }>("POST", `/v1/workspaces/${id}/open`),
 
   workspaceConfig: (id: string) => request<WorkspaceConfig>("GET", `/v1/workspaces/${id}/config`),
+  workspaceReadiness: (id: string) => request<WorkspaceReadiness>("GET", `/v1/workspaces/${id}/readiness`),
 
   runs: (limit = 100, sort: "created" | "updated" = "created") => request<Run[]>("GET", `/v1/runs?limit=${limit}${sort === "updated" ? "&sort=updated" : ""}`),
   createRun: (workspace_id: string, pool: string, kind: RunKind, entrypoint: string) =>
@@ -1163,6 +1189,7 @@ export const api = {
   },
 
   admin: {
+    installationReadiness: () => request<InstallationReadiness>("GET", "/v1/admin/installation-readiness"),
     runtimes: () => request<Runtime[]>("GET", "/v1/admin/runtimes"),
     upsertRuntime: (kind: string, version: string, body: { image: string; description: string; is_default: boolean; enabled: boolean }) =>
       request<Runtime>("PUT", `/v1/admin/runtimes/${kind}/${encodeURIComponent(version)}`, body),

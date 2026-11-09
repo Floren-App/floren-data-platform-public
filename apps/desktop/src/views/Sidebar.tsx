@@ -481,7 +481,8 @@ function AdminPanel({ hub, openTab, activeKey }: Props) {
       can.page("set-layers") && { kind: "admin-layers", title: "Layers" }, can.page("set-pools") && { kind: "admin-pools", title: "Compute pools" },
       can.page("set-runtimes") && { kind: "admin-runtimes", title: "Runtimes (versions)" }, can.page("set-template") && { kind: "admin-workspace-templates", title: "Workspace templates" },
       can.page("set-alerts") && { kind: "admin-notifications", title: "Alerts" },
-      can.page("set-backups") && { kind: "admin-backups", title: "Backup and recovery" }]} />
+      can.page("set-backups") && { kind: "admin-backups", title: "Backup and recovery" },
+      !!hub.me?.acting_admin && { kind: "admin-readiness", title: "Installation readiness" }]} />
     <NavList label="Security" activeKey={activeKey} openTab={openTab} items={[
       can.page("set-profiles") && { kind: "app-profiles", title: "App profiles" }, can.page("set-network") && { kind: "admin-network", title: "Network allowlist" }]} />
     <NavList label="Privacy" activeKey={activeKey} openTab={openTab} items={[

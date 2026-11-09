@@ -1,4 +1,5 @@
 import { can } from "../permissions";
+import { ManagedBy } from "../components/ManagedBy";
 import { ObjectLineage } from "../components/ObjectLineage";
 import { AlertRules } from "./Alerts";
 import { objectKindLabel } from "../objectKinds";
@@ -394,6 +395,7 @@ export function WorkloadView({ id, tab, hub, openTab, runTab }: {
       {section === "versions" && <VersionsPanel pub={pub} />}
       {section === "logs" && <LogView scope={{ workload_id: pub.id }} openTab={openTab} showWorkload={false} label={`Log of ${pub.title}`} />}
       {section === "settings" && <>
+        <ManagedBy target={pub.slug} />
         {(can("workloads.settings.identity.change", pub.actions.includes("identity")) || can("workloads.settings.execution_mode.change", pub.actions.includes("identity")) || can("workloads.settings.secret.bind", pub.actions.includes("identity"))) && <ProductionSettings pub={pub} onSave={(patch) => act(() => api.updateWorkload(pub.id, patch))} />}
         {resource && parent?.actions.includes("delete") && <OrganizationSettings resource={resource} hub={hub} openTab={openTab} />}
       </>}

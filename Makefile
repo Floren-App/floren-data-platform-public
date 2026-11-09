@@ -92,6 +92,15 @@ test:
 	cd apps/desktop && npm install --no-fund --no-audit && npm run build
 	cd extensions/vscode-fdp && npm install --no-fund --no-audit && npm run compile
 
+# The release gate for workflow and permission-model changes: every persona's journey and refusals, plus the
+# execution boundaries and orchestration they rely on. Writes .local/persona-report.json (no secrets).
+PERSONA_TESTS := tests/test_persona_journeys.py tests/test_execution_boundaries.py tests/test_workspace_readiness.py \
+	tests/test_platform.py::test_airflow_workload_orchestrates_programs
+.PHONY: persona-acceptance
+persona-acceptance:
+	cd $(CP) && .venv/bin/pytest -q -p no:cacheprovider $(PERSONA_TESTS) --junitxml=../../.local/persona-junit.xml; \
+	  status=$$?; cd ../.. && $(CP_PYTHON) scripts/persona_report.py .local/persona-junit.xml .local/persona-report.json && exit $$status
+
 test-sql:
 	bash services/control-plane/tests/sql-integration/run.sh
 

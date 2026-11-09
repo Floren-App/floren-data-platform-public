@@ -534,3 +534,14 @@ def audit_log(limit: int = 200, actor: str = "", action: str = "", target: str =
     events = db.scalars(query.limit(max(1, min(limit, 1000))))
     return [{"at": e.at, "actor": e.actor, "action": e.action, "target": e.target, "detail": e.detail}
             for e in events]
+
+
+@router.get("/installation-readiness")
+def installation_readiness(db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """What is configured, protected, operated by someone else, or unknown. Read-only evidence for Global Admin; it
+    changes no setting and claims no protection it cannot see."""
+    from ..app_profiles import acting_as_admin
+    if not acting_as_admin(rbac.resolve_user(db, user)):
+        raise HTTPException(403, "active Global Admin required")
+    from ..installation_readiness import report
+    return report(db)

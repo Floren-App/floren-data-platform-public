@@ -111,14 +111,14 @@ models in the platform, then the agent, which benefits from all of them.
       21 s query finished although its only worker was deleted 4 s in.
     - Open: a requested worker the cluster cannot place yet (no node with room; the lab node is full) counts
       as running and takes a warehouse slot. Show requested vs. ready workers, and say when the cluster lacks room.
-[] Dedicated warehouses for teams, e.g. data engineers' business-critical Airflow.
+[x] Dedicated warehouses for teams, e.g. data engineers' business-critical Airflow.
     - Decided (2026-10-23): called "dedicated". Created only by administrators and tied to groups; not one of
       the shared on-demand warehouses, so no slot limit, never queues and counts toward nothing else. No
       reservation inside Kubernetes: administrators make sure there are nodes for the warehouses they create.
     - Built: `dedicated` on warehouses (API, desktop admin page, `fdp_compute_pool`), groups required, not usable
       for Trino workers or workspaces; deploying on any group-limited warehouse now requires one of its groups
       (before, only runs checked this).
-[] Layers only from configuration: no built-in Prod and Non-Prod.
+[x] Layers only from configuration: no built-in Prod and Non-Prod.
     - Decided (2026-10-23): like warehouses, layers come only from OpenTofu or an administrator; a fresh install
       has exactly the layers its configuration defines. Next after the full lab test.
     - Needed: a configurable default layer for work without one (today: Non-Prod), and a clear "no layers
@@ -131,7 +131,7 @@ models in the platform, then the agent, which benefits from all of them.
       only layer); `production` on layers (personal and group secrets stay out); the default layer cannot be
       deleted; OpenTofu destroy retires a layer with infrastructure and keeps it with its storage; installs with
       the built-in layers keep them (Prod production, Non-Prod default). Lab, e2e and example create their layers.
-[] Define warehouses with their max amount of usage. So limit small warehouses to 6. 
+[x] Define warehouses with their max amount of usage. So limit small warehouses to 6. 
     - Decided: everything that uses a warehouse's compute counts toward its maximum, one per running container:
       jobs (including runs started from workspaces), deployed apps, each Airflow component, and Trino queries once
       Trino runs on warehouses. At the limit, new work queues (visible, with its position) and starts automatically
@@ -141,20 +141,23 @@ models in the platform, then the agent, which benefits from all of them.
     - Built: `max_concurrent` on every warehouse (desktop admin page, `fdp_compute_pool`), a FIFO queue with visible
       position for jobs, deploys and workspaces, and workspace limits (desktop admin page, `fdp_workspace_settings`).
       Trino queries join the count when Trino runs on warehouses.
-[] Make a clear warehouse overview, what resources are using what warehouses within the compute tab
+[x] Make a clear warehouse overview, what resources are using what warehouses within the compute tab
     - Notes: the data exists (runs, published workloads, workspaces, pools). Show per warehouse and layer what is
       running/queued against its limit.
     - Built: Compute tab lists every warehouse with slots in use against its limit, waiting work and use per layer;
       a warehouse page shows what uses it (jobs, apps, Airflow, and workspaces on the workspace warehouse) with
       place in line. Counts include everyone; details only of work the viewer may see (`GET /v1/compute/warehouses`).
 
-[] Rename devcenter to - FlorenDP, Full spelling, Limoon, shorthand for efficiency, FDP.
+[x] Rename devcenter to - FlorenDP, Full spelling, Limoon, shorthand for efficiency, FDP.
+    - Built: technical names are `fdp` (`fdp.floren.app` labels, `FDP_*` settings, `fdp_*` resources); the product
+      was renamed again to Limoon (2026-11-04), keeping the `fdp` technical names.
     - Notes: do this before the first real installation. "devcenter" is also in Kubernetes labels the layer
       controller uses for ownership, Secret names, `DEVCENTER_*` settings, the Helm chart, the OpenTofu provider and
       resource names (`devcenter_*`), and the SDKs; after real installs each needs a migration.
     - Decided: label/annotation domain `fdp.floren.app` (e.g. `fdp.floren.app/layer`); short technical names `fdp`,
       `FDP_*`, `fdp_layer`. Baseline commit a3d00a5 is the last state before the rename.
-[] Rename "publication" to "workload" everywhere.
+[x] Rename "publication" to "workload" everywhere.
+    - Built: Workloads, `/v1/workloads`, `fdp_workload` and Deploy; the running container is an "execution".
     - Decided: users see "workload" (Workloads tab, `/v1/workloads`, `fdp_workload`), and the action is "Deploy"
       instead of "Publish" ("deploy a program as a workload"). The existing internal "workload" (the running
       container, its token and service account) is renamed to "execution" in the code, matching the existing
@@ -190,6 +193,8 @@ Findings from the hands-on Kubernetes lab test (2026-10-22)
    `deploy/lab/devcenter-lab.py seed`).
 [] A registered schema that does not exist in the engine (yet) looks simply empty in the catalog. Say so, and offer
    to create it for users who may.
+    - Built (2026-11-07): Storage says when a registered schema does not exist in the engine yet. Open: offering to
+      create it.
 [x] VS Code workspaces in the lab: the image is now loaded (streamed in, kept as .lab/images/*.tar).
 [x] Five default warehouses (xsmall..xlarge, up to 16 vCPU/64 GB) are created by the platform at first start, outside
    OpenTofu and regardless of cluster size. Decided: warehouses come only from code or manual configuration, never by

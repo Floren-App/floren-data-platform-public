@@ -22,6 +22,8 @@ type providerModel struct {
 	ClientSecret  types.String `tfsdk:"client_secret"`
 	CAFile        types.String `tfsdk:"ca_file"`
 	ActiveGroupID types.String `tfsdk:"owner_group_id"`
+	ConfigRef     types.String `tfsdk:"configuration_reference"`
+	ConfigRev     types.String `tfsdk:"configuration_revision"`
 }
 
 func New(version string) func() provider.Provider {
@@ -44,6 +46,10 @@ func (p *fdpProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *
 			"client_secret":  schema.StringAttribute{Optional: true, Sensitive: true, Description: "Env: FDP_CLIENT_SECRET."},
 			"ca_file":        schema.StringAttribute{Optional: true, Description: "PEM bundle to trust for the API's TLS certificate. Env: FDP_CA_FILE."},
 			"owner_group_id": schema.StringAttribute{Optional: true, Description: "App group that owns created objects. Env: FDP_OWNER_GROUP_ID."},
+			"configuration_reference": schema.StringAttribute{Optional: true, Description: "Where this configuration lives, e.g. " +
+				"git.example.com/platform-config//terraform. Shown in the app on the objects it manages. Env: FDP_CONFIGURATION_REFERENCE."},
+			"configuration_revision": schema.StringAttribute{Optional: true, Description: "The applied revision, e.g. a commit. " +
+				"Env: FDP_CONFIGURATION_REVISION."},
 		},
 	}
 }
@@ -65,7 +71,9 @@ func (p *fdpProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		Endpoint: pick(cfg.Endpoint, "FDP_ENDPOINT"), Token: pick(cfg.Token, "FDP_TOKEN"),
 		TokenURL: pick(cfg.TokenURL, "FDP_TOKEN_URL"), ClientID: pick(cfg.ClientID, "FDP_CLIENT_ID"),
 		ClientSecret: pick(cfg.ClientSecret, "FDP_CLIENT_SECRET"), CAFile: pick(cfg.CAFile, "FDP_CA_FILE"),
-		ActiveGroupID: pick(cfg.ActiveGroupID, "FDP_OWNER_GROUP_ID"),
+		ActiveGroupID:          pick(cfg.ActiveGroupID, "FDP_OWNER_GROUP_ID"),
+		ConfigurationReference: pick(cfg.ConfigRef, "FDP_CONFIGURATION_REFERENCE"),
+		ConfigurationRevision:  pick(cfg.ConfigRev, "FDP_CONFIGURATION_REVISION"),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Limoon provider configuration", err.Error())

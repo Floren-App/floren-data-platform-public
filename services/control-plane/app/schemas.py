@@ -161,6 +161,35 @@ class ConfigOut(BaseModel):
     errors: List[str] = Field(default_factory=list)
 
 
+class ActingContext(BaseModel):
+    """Who a request acts as: the person, or the editor, job or workload credential they used."""
+    kind: Literal["person", "editor", "job", "workload", "service"]
+    username: str
+    group_id: Optional[str] = Field(default=None, description="The group whose access applies")
+    group_name: Optional[str] = None
+    layer_id: Optional[str] = None
+    layer_name: Optional[str] = None
+
+
+class ReadinessCheck(BaseModel):
+    key: str
+    label: str
+    state: Literal["ready", "missing", "unavailable", "unknown"] = Field(
+        description="missing: a permission or setting is absent; unavailable: a dependency is not usable now; "
+                    "unknown: it could not be checked")
+    detail: str = ""
+    permission: Optional[str] = Field(default=None, description="The permission key involved, if any")
+
+
+class WorkspaceReadiness(BaseModel):
+    """A point-in-time explanation. Every action still checks permissions, policy and capacity itself."""
+    context: ActingContext
+    workspace_group_id: Optional[str] = None
+    workspace_group_name: Optional[str] = Field(default=None, description="The group the workspace was created for")
+    checks: List[ReadinessCheck]
+    checked_at: datetime
+
+
 class RepoIn(BaseModel):
     name: str = Field(pattern=NAME)
     url: str = Field(description="https://… clone URL")

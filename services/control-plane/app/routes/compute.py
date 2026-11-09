@@ -23,7 +23,7 @@ router = APIRouter(prefix="/v1/compute", tags=["compute"])
 class Occupant(BaseModel):
     category: str                     # job | app | airflow | trino | workspace
     kind: str                         # script, notebook, dbt, app, airflow, or the editor
-    state: str                        # running | queued
+    state: str                        # running | queued | requested (platform infrastructure: reserved, readiness not confirmed here)
     slots: int                        # warehouse slots it takes (workspaces take none)
     name: str
     owner: str
@@ -139,7 +139,8 @@ def warehouses(db: Session = Depends(get_db), user: User = Depends(get_current_u
     from ..layer_infrastructure import trino_workers
     for layer, name, count in trino_workers(db):  # layer infrastructure: everyone may see what it takes
         if name in names:
-            seen[name].append((Occupant(category="trino", kind="workers", state="running", slots=count,
+            # The configured count holds the slots; this overview does not know how many are ready yet.
+            seen[name].append((Occupant(category="trino", kind="workers", state="requested", slots=count,
                                         name="Trino workers", owner="platform", layer_id=layer.id, layer_name=layer.name), True))
 
     settings = capacity.workspace_settings(db)
@@ -149,7 +150,7 @@ def warehouses(db: Session = Depends(get_db), user: User = Depends(get_current_u
         kafka = infrastructure.get('kafka') or {}
         name = kafka.get('warehouse')
         if name in names and infrastructure.get('enabled') and not infrastructure.get('retired') and kafka.get('running', kafka.get('enabled', False)):
-            seen[name].append((Occupant(category='kafka', kind='brokers', state='running', slots=kafka.get('replicas',1),
+            seen[name].append((Occupant(category='kafka', kind='brokers', state='requested', slots=kafka.get('replicas',1),
                 name='Kafka brokers', owner='platform', layer_id=layer.id, layer_name=layer.name), True))
     if settings["warehouse"] in names:
         for ws in db.scalars(select(Workspace).where(Workspace.status.in_(("queued", "starting", "running")))):
@@ -168,7 +169,7 @@ def warehouses(db: Session = Depends(get_db), user: User = Depends(get_current_u
             if occupant.category != "workspace":
                 use = layers.setdefault(occupant.layer_id, LayerUse(layer_id=occupant.layer_id, layer_name=occupant.layer_name))
                 by_kind = kinds.setdefault(occupant.kind, KindUse(kind=occupant.kind))
-                if occupant.state == "running":
+                if occupant.state != "queued":  # running or requested: it holds its slots
                     use.in_use += occupant.slots
                     by_kind.in_use += occupant.slots
                 else:
@@ -177,7 +178,7 @@ def warehouses(db: Session = Depends(get_db), user: User = Depends(get_current_u
             if shown:
                 visible.append(occupant)
             elif occupant.category != "workspace":
-                others_in_use += occupant.slots if occupant.state == "running" else 0
+                others_in_use += occupant.slots if occupant.state != "queued" else 0
                 others_queued += 1 if occupant.state == "queued" else 0
         visible.sort(key=lambda o: (o.state != "running", o.queue_position or 0, o.category, o.name))
         workspaces = None

@@ -66,6 +66,14 @@ The SQL types are queried through Trino catalogs:
 The catalog name is what you enter as **Trino catalog**. Restart Trino after adding a
 catalog you configured yourself.
 
+## Browsing schemas
+
+Storage loads a schema's tables and views when you open it, shows the last listing at once while it refreshes, and
+keeps it for your session; **Refresh** asks the engine again. An empty schema says which kind of empty it is: one
+that exists but has no tables yet, or one that is registered in Limoon but does not exist in the engine yet (it
+appears once something creates it, such as a first dbt run or `CREATE SCHEMA`). Missing access and an engine that
+does not answer are reported as such, not as an empty list.
+
 ## Local example storage
 
 For [local development](local-development.md), the repository includes example external storage. It stands

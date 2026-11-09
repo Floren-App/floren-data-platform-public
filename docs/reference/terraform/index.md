@@ -13,6 +13,8 @@ Configures Limoon through its API. Authenticate with a token, or with OAuth clie
 | `ca_file` | `basetypes.StringType` | Optional | PEM bundle to trust for the API's TLS certificate. Env: FDP_CA_FILE. |
 | `client_id` | `basetypes.StringType` | Optional | Env: FDP_CLIENT_ID. |
 | `client_secret` | `basetypes.StringType` | Optional, Sensitive | Env: FDP_CLIENT_SECRET. |
+| `configuration_reference` | `basetypes.StringType` | Optional | Where this configuration lives, e.g. git.example.com/platform-config//terraform. Shown in the app on the objects it manages. Env: FDP_CONFIGURATION_REFERENCE. |
+| `configuration_revision` | `basetypes.StringType` | Optional | The applied revision, e.g. a commit. Env: FDP_CONFIGURATION_REVISION. |
 | `endpoint` | `basetypes.StringType` | Optional | API base URL, e.g. https://fdp.example.com/api. Env: FDP_ENDPOINT. |
 | `owner_group_id` | `basetypes.StringType` | Optional | App group that owns created objects. Env: FDP_OWNER_GROUP_ID. |
 | `token` | `basetypes.StringType` | Optional, Sensitive | Bearer token. Env: FDP_TOKEN. |

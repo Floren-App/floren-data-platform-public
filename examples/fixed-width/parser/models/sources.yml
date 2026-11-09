@@ -1,0 +1,8 @@
+version: 2
+sources:
+  - name: landing
+    database: "{{ target.database }}"
+    schema: "{{ var('raw_schema', target.schema) }}"
+    tables:
+      - name: raw_lines
+        description: One unchanged physical line per row, with ingestion metadata.

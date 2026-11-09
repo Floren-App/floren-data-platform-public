@@ -40,7 +40,7 @@ def owned_run(db: Session, run_id: str, user: User) -> Run:
     """Your own runs, and runs of service accounts you may use (e.g. ones Airflow started)."""
     run = db.get(Run, run_id)
     from ..environments import run_permitted
-    if run and not run_permitted(db, user, run):
+    if run and (not run_permitted(db, user, run) or not run_access.in_context(db, user, run)):
         raise HTTPException(404, "run not found")
     if run and user.is_admin:
         return run
@@ -88,6 +88,9 @@ def list_runs(workspace_id: str = "", limit: int = Query(100, ge=1, le=500),
     visible_workloads = [p.id for p in db.scalars(select(Workload))
                             if browsing_allowed(db,user,rbac.workload_resource(db,p))]
     stmt = stmt.where(Run.workload_id.is_(None) | Run.workload_id.in_(visible_workloads))
+    bound = run_access.context_clause(db, user)
+    if bound is not None:  # before the limit, so another context's runs never fill the page
+        stmt = stmt.where(bound)
     from ..environments import run_permitted
     ordered_at = func.coalesce(Run.finished_at, Run.created_at) if sort == "updated" else Run.created_at
     return [run_out(r,db,user) for r in db.scalars(stmt.order_by(ordered_at.desc(), Run.id.desc()).limit(limit)) if run_permitted(db, user, r) and run_access.allowed(db,user,'runs.list',r) and run_access.allowed(db,user,'runs.read',r)]

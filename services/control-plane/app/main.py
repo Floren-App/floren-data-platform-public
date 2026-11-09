@@ -166,6 +166,17 @@ async def secret_backend_unavailable(request: Request, exc: SecretBackendError):
 
 app.include_router(measurements.router)
 @app.middleware("http")
+async def management_declaration(request: Request, call_next):
+    """The provider's declaration that Terraform manages what this request changes; see provenance.py."""
+    from .provenance import declared, from_headers
+    token = declared.set(from_headers(request.headers))
+    try:
+        return await call_next(request)
+    finally:
+        declared.reset(token)
+
+
+@app.middleware("http")
 async def count_requests(request: Request, call_next):
     """Request counts and durations per route template (never the concrete path: no IDs in metric labels)."""
     from . import metrics

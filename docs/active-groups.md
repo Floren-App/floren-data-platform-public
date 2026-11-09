@@ -44,6 +44,18 @@ execution tokens retain their workspace group, and managed workload identities r
 the workload's owning group. Managed identities keep their explicit/direct data grants;
 they do not need an intermediate group to perform authorized data operations.
 
+Execution credentials also stay within the context they were issued for when they reach runs: their details,
+logs, outputs, opening, stopping and retrying.
+
+| Credential | Runs it can reach |
+|---|---|
+| Workspace editor | Runs started in that workspace, not those of the owner's other workspaces |
+| Run | Its own run and the runs of the workspace or workload it belongs to |
+| Workload (for example an Airflow DAG) | That workload's runs, and the deployed runs its identity started: the DAG's tasks |
+
+The role checks still apply within that context. Other runs answer as if they do not exist. In the browser, a
+person keeps access to the runs of all their own workspaces.
+
 The shared SQL gateway uses selected-group and explicit principal permissions for reads, writes and alteration, and
 requires primary-group DDL authority at the destination for CREATE operations. A secondary
 Admin grant cannot supply that authority. Job admission snapshots both ordinary data

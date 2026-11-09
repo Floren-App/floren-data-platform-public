@@ -25,12 +25,13 @@ The identity chain is: permission → resource role assignment → app group →
 group/role/user → person. A service identity may also receive a direct role assignment.
 See the complete [role matrices](rbac.md).
 
-## Primary and secondary groups
+## The group you act as
 
-Your active app group authorizes creation and owns new objects. Other memberships
-continue to authorize operations on existing objects. Workloads, Storage and Catalog
-discovery use the active group; object visibility and authorization are distinct.
-Global Admin has protected platform-wide access. See [active groups](active-groups.md).
+You act as one app group at a time. It authorizes everything you see and do, and owns
+the objects you create. Your other memberships add nothing until you switch to them.
+Workloads, Storage and Catalog discovery use the active group; object visibility and
+authorization are distinct. Global Admin has protected platform-wide access. See
+[active groups](active-groups.md).
 
 ## Execution is separate from viewing
 

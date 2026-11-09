@@ -792,3 +792,42 @@ def provision(resource_id: str, db: Session = Depends(get_db), user: User = Depe
     audit(db, user.username, "schema.provision", r.id, source=ds.name)
     db.commit()
     return resource_out(db, r, user)
+
+
+@router.get("/provenance", tags=["RBAC"])
+def provenance(target: str, db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Who manages an object's configuration: Terraform (with its configuration reference and revision), the app, or
+    unknown; and any app change since Terraform last applied it. For objects you may read; others answer 404."""
+    from ..models import DataSource, ManagementProvenance, Workload
+    from ..provenance import output
+    from ..app_profiles import acting_as_admin
+    user = rbac.resolve_user(db, user)
+    resource = db.get(Resource, target)
+    if resource is None:
+        workload = db.scalar(select(Workload).where(Workload.slug == target))
+        source = None if workload else db.scalar(select(DataSource).where(DataSource.name == target))
+        resource = rbac.workload_resource(db, workload) if workload else rbac.source_resource(db, source) if source else None
+    group = None if resource else db.get(AppGroup, target)
+    if resource is not None:
+        visible = browsing_allowed(db, user, resource) or rbac.allowed(db, user, "read", resource)
+    elif group is not None:
+        visible = acting_as_admin(user) or user.principal_id in (group.owners or [])
+    else:
+        visible = acting_as_admin(user)
+    if not visible:
+        raise HTTPException(404, "not found")
+    return output(db.get(ManagementProvenance, target))
+
+
+@router.get("/provenance/changes", tags=["RBAC"])
+def provenance_changes(db: Session = Depends(get_db), user: User = Depends(get_actor)):
+    """Terraform-managed objects changed in the app since Terraform last applied them: what the next plan will likely
+    show as drift. A review list for Global Admin; it changes nothing and adopts nothing into Terraform state."""
+    from ..models import ManagementProvenance
+    from ..provenance import output
+    from ..app_profiles import acting_as_admin
+    if not acting_as_admin(rbac.resolve_user(db, user)):
+        raise HTTPException(403, "active Global Admin required")
+    rows = db.scalars(select(ManagementProvenance).where(ManagementProvenance.app_changed_at.is_not(None))
+                      .order_by(ManagementProvenance.app_changed_at.desc()).limit(500))
+    return [{"target": r.target, **output(r)} for r in rows]

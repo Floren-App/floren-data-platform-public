@@ -1,0 +1,19 @@
+name: fixed_width_parser
+version: '1.0.0'
+config-version: 2
+profile: fdp
+model-paths: [models]
+macro-paths: [macros]
+seed-paths: [seeds]
+test-paths: [tests]
+models:
+  fixed_width_parser:
+    +materialized: table
+seeds:
+  fixed_width_parser:
+    file_definition:
+      +column_types:
+        definition_name: varchar
+        column_name: varchar
+        start_position: integer
+        field_length: integer

@@ -1,0 +1,5 @@
+definition_name,column_name,start_position,field_length
+customers_v1,customer_id,1,6
+customers_v1,customer_name,7,20
+customers_v1,country_code,27,2
+customers_v1,balance,29,10

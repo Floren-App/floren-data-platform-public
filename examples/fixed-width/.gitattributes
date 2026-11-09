@@ -1,0 +1,2 @@
+# Padding is data in these fixed-width sample records.
+data/*.txt -whitespace
